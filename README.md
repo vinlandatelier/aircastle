@@ -1,6 +1,6 @@
 # Aircastle
 
-A standalone headless CMS with code-defined collections.
+Aircastle is a code-first, headless CMS with agentic capabilities designed to automate the slow, manual parts of managing written content.
 
 ## Development
 
