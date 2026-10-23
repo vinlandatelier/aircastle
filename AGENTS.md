@@ -23,4 +23,5 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 ## Public documentation
 
 - Keep README.md focused on general development setup and getting started. Do not add implementation progress, module plans, or internal design notes.
-- Obtain explicit user approval before changing README.md or any other public documentation. A direct request for a specific documentation change authorizes that change; feature work alone does not.
+- Routine README.md development-setup updates that reflect agreed tooling or workflow changes are authorized. Keep installation and development commands current as part of those changes.
+- Obtain explicit user approval for other public documentation changes. A direct request for a specific documentation change authorizes that change; feature work alone does not.
