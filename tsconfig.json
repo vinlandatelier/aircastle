@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "rootDir": "src",
+    "rootDir": ".",
     "target": "ES2022",
     "lib": ["ES2022", "ES2022.Intl"],
     "module": "Preserve",
@@ -19,5 +19,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["scripts/**/*.ts", "tests/**/*.ts"]
 }

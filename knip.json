@@ -2,8 +2,12 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
+      "ignoreDependencies": ["vite"],
+      "ignoreExportsUsedInFile": true
+    },
+    "packages/schema": {
       "entry": ["src/index.ts", "tests/types/**/*.ts"],
-      "ignoreDependencies": ["@stryker-mutator/command-runner", "vite"],
+      "ignoreDependencies": ["@stryker-mutator/command-runner"],
       "ignoreExportsUsedInFile": true
     }
   }

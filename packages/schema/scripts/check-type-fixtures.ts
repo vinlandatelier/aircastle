@@ -1,5 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { rejectionCases, type RejectionCase } from "../tests/types/rejections.ts";
 
 const root = resolve(import.meta.dir, "..");
@@ -55,7 +55,7 @@ function compile(
   const result = Bun.spawnSync(
     [
       process.execPath,
-      join(root, "node_modules/typescript/bin/tsc"),
+      join(dirname(Bun.resolveSync("typescript/package.json", root)), "bin/tsc"),
       "-p",
       config,
       "--pretty",

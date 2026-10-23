@@ -1,0 +1,39 @@
+{
+  "name": "@aircastle/schema",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:schema": "bun test tests/schema",
+    "test:harness": "bun test tests/harness",
+    "test:coverage": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov --coverage-dir=coverage",
+    "test:unicode": "bun test tests/schema/unicode.test.ts",
+    "test:typecheck": "bun scripts/check-type-fixtures.ts contracts && bun scripts/check-type-fixtures.ts contracts declarations",
+    "test:inference": "bun scripts/check-type-fixtures.ts inference && bun scripts/check-type-fixtures.ts inference declarations",
+    "test:declarations": "bun scripts/check-type-fixtures.ts contracts declarations",
+    "test:declarations:inference": "bun scripts/check-type-fixtures.ts inference declarations",
+    "test:mutation:classify": "bun scripts/classify-mutations.ts",
+    "test:types": "bun run test:typecheck",
+    "test:mutation": "stryker run && bun run test:mutation:classify"
+  },
+  "dependencies": {
+    "arktype": "2.2.9"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@types/bun": "1.3.4",
+    "fast-check": "4.10.2",
+    "typescript": "7.0.2",
+    "vite-plus": "catalog:"
+  }
+}

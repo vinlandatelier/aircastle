@@ -4,14 +4,7 @@ export default defineConfig({
   defaultPackage: {
     build: "./apps/web",
     preview: "./apps/web",
-    pack: ".",
-  },
-  pack: {
-    entry: ["src/index.ts"],
-    format: "esm",
-    target: "es2022",
-    dts: true,
-    clean: true,
+    pack: "./packages/schema",
   },
   staged: {
     "*": "vp check --fix",
@@ -38,7 +31,11 @@ export default defineConfig({
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
     },
-    ignorePatterns: ["**/dist/**", "tests/types/inference.ts", "tests/types/negative/**"],
+    ignorePatterns: [
+      "**/dist/**",
+      "packages/schema/tests/types/inference.ts",
+      "packages/schema/tests/types/negative/**",
+    ],
     options: {
       typeAware: true,
       typeCheck: true,

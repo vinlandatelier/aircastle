@@ -48,7 +48,7 @@ async function compile(directory: string): Promise<{ exitCode: number; output: s
   const child = Bun.spawn(
     [
       process.execPath,
-      join(root, "node_modules/typescript/bin/tsc"),
+      join(dirname(Bun.resolveSync("typescript/package.json", root)), "bin/tsc"),
       "-p",
       join(directory, "tsconfig.json"),
       "--pretty",
@@ -86,7 +86,14 @@ export async function classifyMutations(reportPath: string): Promise<void> {
       const directory = mkdtempSync(join(root, ".mutation-types-"));
       try {
         cpSync(join(root, "src"), join(directory, "src"), { recursive: true });
-        cpSync(join(root, "tsconfig.json"), join(directory, "tsconfig.json"));
+        writeFileSync(
+          join(directory, "tsconfig.json"),
+          JSON.stringify({
+            extends: join(root, "tsconfig.json"),
+            compilerOptions: { rootDir: "./src" },
+            include: ["src/**/*.ts"],
+          }),
+        );
         const baseline = await compile(directory);
         if (baseline.exitCode !== 0)
           throw new Error(`Mutation compiler baseline failed\n${baseline.output}`);
@@ -151,9 +158,8 @@ export async function classifyMutations(reportPath: string): Promise<void> {
     JSON.stringify(
       {
         report: reportPath,
-        compiler: JSON.parse(
-          readFileSync(join(root, "node_modules/typescript/package.json"), "utf8"),
-        ).version,
+        compiler: JSON.parse(readFileSync(Bun.resolveSync("typescript/package.json", root), "utf8"))
+          .version,
         summary,
         mutants: results,
       },
