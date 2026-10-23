@@ -13,11 +13,32 @@ export function inspectCode(file: string, source: string): PolicyViolation[] {
   if (/\.[cm]?tsx?$/.test(file)) plugins.push(["typescript", { dts: /\.d\.[cm]?ts$/.test(file) }]);
   if (/\.[jt]sx$/.test(file)) plugins.push("jsx");
   const ast = parse(source, { sourceType: "unambiguous", plugins });
+  const documented = new Set<number>();
+  const declarationParts = new Set([
+    "ClassMethod", "ClassPrivateMethod", "ClassProperty", "ClassPrivateProperty",
+    "ClassAccessorProperty", "ObjectMethod", "ObjectProperty", "TSPropertySignature",
+    "TSMethodSignature", "TSCallSignatureDeclaration", "TSConstructSignatureDeclaration",
+    "TSIndexSignature", "TSDeclareMethod",
+  ]);
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) { value.forEach(visit); return; }
+    if (value === null || typeof value !== "object") return;
+    const node = value as Record<string, unknown>;
+    if (typeof node.type === "string" && (node.type.endsWith("Declaration") || declarationParts.has(node.type)) && typeof node.start === "number" && Array.isArray(node.leadingComments)) {
+      for (const leading of node.leadingComments as { start: number; end: number }[]) {
+        if (source.slice(leading.end, node.start).trim() === "") documented.add(leading.start);
+      }
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (!["comments", "leadingComments", "innerComments", "trailingComments", "loc", "tokens"].includes(key)) visit(child);
+    }
+  };
+  visit(ast.program);
   const violations: PolicyViolation[] = [];
   for (const comment of ast.comments ?? []) {
     const rule = /@ts-(?:expect-error|ignore|nocheck)\b/i.test(comment.value)
       ? "type-suppression"
-      : comment.type === "CommentBlock" && comment.value.startsWith("*") && !comment.value.startsWith("**")
+      : comment.type === "CommentBlock" && comment.value.startsWith("*") && !comment.value.startsWith("**") && documented.has(comment.start!)
         ? undefined : "ordinary-comment";
     if (rule) violations.push({ line: comment.loc?.start.line ?? 1, column: (comment.loc?.start.column ?? 0) + 1, rule });
   }

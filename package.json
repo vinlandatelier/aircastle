@@ -14,8 +14,8 @@
     "test": "bun test",
     "test:harness": "bun test tests/harness",
     "test:schema": "bun test tests/schema",
-    "test:typecheck": "tsc -p tsconfig.tests.json",
-    "test:types": "bun scripts/check-type-fixtures.ts contracts",
+    "test:typecheck": "bun scripts/check-type-fixtures.ts contracts",
+    "test:types": "bun run test:typecheck",
     "test:inference": "bun scripts/check-type-fixtures.ts inference"
   },
   "dependencies": {

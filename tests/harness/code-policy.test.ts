@@ -12,6 +12,9 @@ test.each([
   ["empty block", "/**/"],
   ["decorative block", "/*** explanation */"],
   ["template expression", "const value = `${1 /* explanation */}`;"],
+  ["inline disguised docstring", "const value = /** explanation */ 1;"],
+  ["function-body disguised docstring", "function value() { /** explanation */ return 1; }"],
+  ["unattached docstring", "/** explanation */"],
 ])("rejects ordinary comments: %s", (_name, source) => {
   expect(inspectCode("value.ts", source)).toHaveLength(1);
 });
@@ -24,6 +27,8 @@ test.each(["@ts-expect-error", "@ts-ignore", "@ts-nocheck"])("rejects %s even in
 
 test.each([
   "/** Public API documentation. */\nexport const value = 1;",
+  "interface Value { /** Public field. */ readonly field: string; }",
+  "class Value { /** Public method. */ method() {} }",
   'const url = "https://example.com";',
   'const example = "// @ts-ignore";',
   "const value = `/* literal */ // text`;",
