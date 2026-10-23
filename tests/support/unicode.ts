@@ -9,6 +9,12 @@ export interface GraphemeFixture {
   graphemes: number;
 }
 
+export interface RuntimeGraphemeFixture {
+  reference: GraphemeFixture;
+  boundaries: readonly number[];
+  graphemes: number;
+}
+
 export function parseGraphemeFixtures(source: string): GraphemeFixture[] {
   const fixtures: GraphemeFixture[] = [];
   source.split(/\r?\n/).forEach((line, index) => {
@@ -53,4 +59,31 @@ export function loadGraphemeFixtures(): GraphemeFixture[] {
   if (fixtures.length !== metadata.cases) throw new Error("Unicode fixture case count mismatch");
   if (fixtures.some((fixture) => fixture.input.includes("\u0000"))) throw new Error("Unicode fixture requires a separate forbidden-character classification");
   return fixtures;
+}
+
+export function loadRuntimeGraphemeFixtures(): RuntimeGraphemeFixture[] {
+  const fixtures = loadGraphemeFixtures();
+  const differences = JSON.parse(readFileSync(resolve(import.meta.dir, "../fixtures/unicode/15.1.0/accepted-runtime-differences.json"), "utf8")) as {
+    line: number; input: string; referenceBoundaries: number[]; alternativeBoundaries: number[];
+  }[];
+  if (new Set(differences.map((entry) => entry.line)).size !== differences.length) throw new Error("Duplicate Unicode runtime difference");
+  for (const difference of differences) {
+    const reference = fixtures.find((entry) => entry.line === difference.line);
+    if (!reference || reference.input !== difference.input || JSON.stringify(reference.boundaries) !== JSON.stringify(difference.referenceBoundaries)) {
+      throw new Error("Accepted Unicode difference does not match the independent fixture");
+    }
+  }
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  return fixtures.map((reference) => {
+    const difference = differences.find((entry) => entry.line === reference.line);
+    let boundaries = reference.boundaries;
+    if (difference) {
+      const actual = [...segmenter.segment(reference.input)].map((part) => part.index).concat(reference.input.length);
+      if (![reference.boundaries, difference.alternativeBoundaries].some((allowed) => JSON.stringify(allowed) === JSON.stringify(actual))) {
+        throw new Error(`Unexpected runtime boundary profile at Unicode line ${reference.line}`);
+      }
+      boundaries = actual;
+    }
+    return { reference, boundaries, graphemes: boundaries.length - 1 };
+  });
 }

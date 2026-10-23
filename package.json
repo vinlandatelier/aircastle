@@ -14,6 +14,7 @@
     "test": "bun test",
     "test:harness": "bun test tests/harness",
     "test:schema": "bun test tests/schema",
+    "test:unicode": "bun test tests/schema/unicode.test.ts",
     "test:typecheck": "bun scripts/check-type-fixtures.ts contracts && bun scripts/check-type-fixtures.ts contracts declarations",
     "test:types": "bun run test:typecheck",
     "test:inference": "bun scripts/check-type-fixtures.ts inference && bun scripts/check-type-fixtures.ts inference declarations",

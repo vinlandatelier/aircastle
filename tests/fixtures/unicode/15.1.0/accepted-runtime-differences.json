@@ -1,0 +1,9 @@
+[
+  {
+    "line": 1199,
+    "input": "✁‍✁",
+    "referenceBoundaries": [0, 3],
+    "alternativeBoundaries": [0, 2, 3],
+    "reason": "Approved Intl.Segmenter policy. Bun 1.3.4 on the observed runtime splits this sequence. Keep the independent Unicode reference unchanged."
+  }
+]
