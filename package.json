@@ -1,0 +1,22 @@
+{
+  "name": "aircastle",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.4",
+  "engines": {
+    "bun": "1.3.4"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit false --declaration --emitDeclarationOnly --outDir dist",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "arktype": "2.2.9"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.4",
+    "typescript": "7.0.2"
+  }
+}
