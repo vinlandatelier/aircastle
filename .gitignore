@@ -5,7 +5,7 @@ node_modules/
 dist/
 .vite/
 .vite-hooks/_/
-/coverage/
-/.stryker-tmp/
-/reports/
-/.mutation-types-*/
+coverage/
+.stryker-tmp/
+reports/
+.mutation-types-*/

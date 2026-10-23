@@ -13,12 +13,14 @@
   "scripts": {
     "build": "vp pack",
     "typecheck": "tsc --noEmit",
-    "test": "vp test"
+    "test": "vp test",
+    "test:mutation": "stryker run && bun ../schema/scripts/classify-mutations.ts reports/mutation/mutation.json . src"
   },
   "dependencies": {
     "@aircastle/schema": "workspace:*"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
     "@types/bun": "1.3.4",
     "typescript": "7.0.2",
     "vite-plus": "catalog:"

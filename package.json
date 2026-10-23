@@ -47,7 +47,8 @@
     "test:content": "vp test --config vite.content.config.ts",
     "test:content:db": "vp run db:test -- vp run test:content --project database",
     "dev:setup": "bun scripts/dev-setup.ts",
-    "test:all": "bun run test:typecheck && vp run --filter '@aircastle/*' --parallel test && vp test && bun run test:inference"
+    "test:all": "bun run test:typecheck && vp run --filter '@aircastle/*' --parallel test && vp test && bun run test:inference",
+    "test:content:mutation": "vp -C packages/contracts run test:mutation"
   },
   "devDependencies": {
     "@aircastle/adapter-postgres": "workspace:*",

@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "mutate": ["src/index.ts"],
+  "testRunner": "command",
+  "coverageAnalysis": "off",
+  "disableTypeChecks": false,
+  "concurrency": 4,
+  "reporters": ["clear-text", "progress", "json", "html"],
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "ignorePatterns": ["dist/**", "reports/**", "coverage/**", ".type-fixtures-*/**"],
+  "commandRunner": {
+    "command": "vp test src --bail 1 --maxWorkers 1"
+  }
+}

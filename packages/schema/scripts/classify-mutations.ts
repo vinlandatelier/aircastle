@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
@@ -19,7 +20,7 @@ interface ClassifiedMutant {
   validity: "valid" | "compile-error" | "checker-error";
   diagnostic?: string;
 }
-const root = resolve(import.meta.dirname, "..");
+const defaultRoot = resolve(import.meta.dirname, "..");
 
 export function applyMutation(
   source: string,
@@ -44,7 +45,10 @@ export function applyMutation(
   return source.slice(0, start) + mutant.replacement + source.slice(end);
 }
 
-async function compile(directory: string): Promise<{ exitCode: number; output: string }> {
+async function compile(
+  directory: string,
+  root: string,
+): Promise<{ exitCode: number; output: string }> {
   const child = Bun.spawn(
     [
       process.execPath,
@@ -64,13 +68,17 @@ async function compile(directory: string): Promise<{ exitCode: number; output: s
   return { exitCode, output: stdout + stderr };
 }
 
-export async function classifyMutations(reportPath: string): Promise<void> {
+export async function classifyMutations(
+  reportPath: string,
+  root = defaultRoot,
+  sourceSubdirectory = "src/schema",
+): Promise<void> {
   const report = JSON.parse(readFileSync(reportPath, "utf8")) as {
     files: Record<string, MutationFile>;
   };
   const tasks: { file: string; source: string; mutant: Mutant }[] = [];
   for (const [file, data] of Object.entries(report.files)) {
-    if (!resolve(root, file).startsWith(join(root, "src", "schema") + sep))
+    if (!resolve(root, file).startsWith(resolve(root, sourceSubdirectory) + sep))
       throw new Error(`Unexpected mutation file: ${file}`);
     if (readFileSync(resolve(root, file), "utf8") !== data.source)
       throw new Error(`Source changed since mutation run: ${file}`);
@@ -94,7 +102,7 @@ export async function classifyMutations(reportPath: string): Promise<void> {
             include: ["src/**/*.ts"],
           }),
         );
-        const baseline = await compile(directory);
+        const baseline = await compile(directory, root);
         if (baseline.exitCode !== 0)
           throw new Error(`Mutation compiler baseline failed\n${baseline.output}`);
         while (next < tasks.length) {
@@ -103,7 +111,7 @@ export async function classifyMutations(reportPath: string): Promise<void> {
           writeFileSync(path, applyMutation(source, mutant));
           let checked: { exitCode: number; output: string };
           try {
-            checked = await compile(directory);
+            checked = await compile(directory, root);
           } finally {
             writeFileSync(path, source);
           }
@@ -167,10 +175,25 @@ export async function classifyMutations(reportPath: string): Promise<void> {
       2,
     ) + "\n",
   );
-  console.log(JSON.stringify(summary, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ...summary,
+        reportSHA256: createHash("sha256").update(readFileSync(reportPath)).digest("hex"),
+      },
+      null,
+      2,
+    ),
+  );
   if (summary.checkerErrors)
     throw new Error("Some mutation validity checks failed without compiler diagnostics");
 }
 
-if (import.meta.main)
-  await classifyMutations(resolve(root, process.argv[2] ?? "reports/mutation/mutation.json"));
+if (import.meta.main) {
+  const root = resolve(process.argv[3] ?? defaultRoot);
+  await classifyMutations(
+    resolve(root, process.argv[2] ?? "reports/mutation/mutation.json"),
+    root,
+    process.argv[4] ?? "src/schema",
+  );
+}
