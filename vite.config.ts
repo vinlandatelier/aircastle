@@ -2,6 +2,9 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   defaultPackage: "./apps/web",
+  staged: {
+    "*": "vp check --fix",
+  },
   fmt: {
     ignorePatterns: ["**/*.md"],
     overrides: [

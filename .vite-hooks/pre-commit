@@ -1,0 +1,3 @@
+set -e
+vp staged
+vp run check:policy
