@@ -1,8 +1,4 @@
-import { Hono } from "hono";
-
-const app = new Hono();
-
-app.get("/health", (c) => c.json({ status: "ok" }));
+import app from "./app.ts";
 
 export default {
   port: Number(process.env.PORT ?? 43122),

@@ -36,7 +36,8 @@
     "test:unicode": "vp -C packages/schema run test:unicode",
     "test:declarations": "vp -C packages/schema run test:declarations",
     "test:declarations:inference": "vp -C packages/schema run test:declarations:inference",
-    "test:mutation:classify": "vp -C packages/schema run test:mutation:classify"
+    "test:mutation:classify": "vp -C packages/schema run test:mutation:classify",
+    "hono-api": "vp -C apps/api run hono"
   },
   "devDependencies": {
     "@babel/parser": "7.28.5",
