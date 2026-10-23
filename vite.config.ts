@@ -11,7 +11,7 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: ["**/*.md", ".agents/skills/**"],
+    ignorePatterns: ["**/*.md", ".agents/skills/**", ".claude/skills/**"],
     overrides: [
       {
         files: ["apps/web/**"],
@@ -34,6 +34,7 @@ export default defineConfig({
     },
     ignorePatterns: [
       ".agents/skills/**",
+      ".claude/skills/**",
       "**/dist/**",
       "packages/schema/tests/types/inference.ts",
       "packages/schema/tests/types/negative/**",
