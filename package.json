@@ -12,7 +12,7 @@
     "prepare": "vp config --no-agent",
     "knip": "knip",
     "typecheck": "bun run check:policy && tsc --noEmit",
-    "build": "tsc --noEmit false --declaration --emitDeclarationOnly --outDir dist",
+    "build": "vp pack",
     "test": "bun test",
     "check:policy": "bun scripts/check-code-policy.ts",
     "test:harness": "bun test tests/harness",

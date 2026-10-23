@@ -1,7 +1,19 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
-  defaultPackage: "./apps/web",
+  defaultPackage: {
+    dev: "./apps/web",
+    build: "./apps/web",
+    preview: "./apps/web",
+    pack: ".",
+  },
+  pack: {
+    entry: ["src/index.ts"],
+    format: "esm",
+    target: "es2022",
+    dts: true,
+    clean: true,
+  },
   staged: {
     "*": "vp check --fix",
   },
