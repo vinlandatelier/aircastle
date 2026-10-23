@@ -1,4 +1,4 @@
-import type { CompiledCollection, CompiledSchema, ValidationIssue, ValidationResult } from "../../src/index.ts";
+import type { CompiledCollection, CompiledSchema, ValidationIssue, ValidationResult } from "aircastle-under-test";
 import type { Assert, Equal } from "./assert.ts";
 
 export type ValidationCodes = Assert<Equal<ValidationIssue["code"],

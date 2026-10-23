@@ -1,5 +1,5 @@
-import { collection, compileSchema, text } from "../../src/index.ts";
-import type { InferInput, InferOutput } from "../../src/index.ts";
+import { collection, compileSchema, text } from "aircastle-under-test";
+import type { InferInput, InferOutput } from "aircastle-under-test";
 import type { Assert, Equal, IsAny } from "./assert.ts";
 
 const articles = collection({

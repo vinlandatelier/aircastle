@@ -1,5 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { rejectionCases, type RejectionCase } from "../tests/types/rejections.ts";
 
 const root = resolve(import.meta.dir, "..");
@@ -31,37 +31,65 @@ export function assertExpectedDiagnostic(output: string, source: string, fixture
   }
 }
 
-function compile(config: string): { exitCode: number; output: string } {
-  const result = Bun.spawnSync([process.execPath, join(root, "node_modules/typescript/bin/tsc"), "-p", config, "--pretty", "false"], {
+function compile(config: string, options: readonly string[] = []): { exitCode: number; output: string } {
+  const result = Bun.spawnSync([process.execPath, join(root, "node_modules/typescript/bin/tsc"), "-p", config, "--pretty", "false", ...options], {
     cwd: root, stdout: "pipe", stderr: "pipe",
   });
   if (result.signalCode) throw new Error(`Compiler terminated with ${result.signalCode}`);
   return { exitCode: result.exitCode, output: new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr) };
 }
 
-export function runTypeFixtures(suite: "contracts" | "inference"): void {
-  const config = resolve(root, suite === "contracts" ? "tsconfig.tests.json" : "tsconfig.inference.json");
-  const baseline = compile(config);
-  if (baseline.exitCode !== 0) throw new Error(`Positive ${suite} baseline failed. No negative fixture receives credit.\n${baseline.output}`);
+export function assertDeclarationGraph(output: string, artifact: string, sourceDirectory: string): void {
+  const files = output.split(/\r?\n/).filter(Boolean).map((file) => resolve(root, file));
+  if (!files.includes(resolve(artifact))) throw new Error("Consumer did not load the emitted entry point");
+  if (files.some((file) => file.startsWith(resolve(sourceDirectory) + sep))) throw new Error("Declaration consumer fell back to source");
+}
+
+export function runTypeFixtures(suite: "contracts" | "inference", target: "source" | "declarations" = "source"): void {
+  let config = resolve(root, suite === "contracts" ? "tsconfig.tests.json" : "tsconfig.inference.json");
   const directory = mkdtempSync(join(root, ".type-fixtures-"));
+  let emittedEntry: string | undefined;
   let passed = 0;
   try {
+    if (target === "declarations") {
+      const artifactDirectory = join(directory, "artifacts");
+      const build = compile(resolve(root, "tsconfig.json"), ["--noEmit", "false", "--declaration", "--emitDeclarationOnly", "--outDir", artifactDirectory]);
+      if (build.exitCode !== 0) throw new Error(`Declaration build failed\n${build.output}`);
+      const entry = join(artifactDirectory, "index.d.ts");
+      emittedEntry = entry;
+      const consumerConfig = join(directory, "consumer.json");
+      writeFileSync(consumerConfig, JSON.stringify({
+        extends: config,
+        compilerOptions: { types: [], skipLibCheck: false, paths: { "aircastle-under-test": [entry] } },
+        files: [resolve(root, `tests/types/${suite === "contracts" ? "contracts" : "inference"}.ts`)],
+        include: [], exclude: [],
+      }));
+      config = consumerConfig;
+      const graph = compile(config, ["--listFilesOnly"]);
+      if (graph.exitCode !== 0) throw new Error(`Declaration consumer graph failed\n${graph.output}`);
+      assertDeclarationGraph(graph.output, entry, join(root, "src"));
+    }
+    const baseline = compile(config);
+    if (baseline.exitCode !== 0) throw new Error(`Positive ${suite} ${target} baseline failed. No negative fixture receives credit.\n${baseline.output}`);
     for (const fixture of rejectionCases.filter((entry) => entry.suite === suite)) {
       const temporaryConfig = join(directory, "tsconfig.json");
       writeFileSync(temporaryConfig, JSON.stringify({ extends: config, files: [resolve(root, fixture.file)], include: [], exclude: [] }));
-      const result = compile(temporaryConfig);
+      const result = compile(temporaryConfig, emittedEntry ? ["--listFiles"] : []);
       if (result.exitCode === 0) throw new Error(`${fixture.file}: invalid program unexpectedly compiled`);
+      if (emittedEntry) assertDeclarationGraph(result.output, emittedEntry, join(root, "src"));
       assertExpectedDiagnostic(result.output, readFileSync(resolve(root, fixture.file), "utf8"), fixture);
       passed++;
-      console.log(`PASS ${fixture.file}`);
+      console.log(`PASS ${target} ${fixture.file}`);
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
   if (passed === 0) throw new Error(`No ${suite} negative fixtures were discovered`);
-  console.log(`${passed} ${suite} negative fixtures rejected at their intended expressions`);
+  console.log(`${passed} ${suite} ${target} negative fixtures rejected at their intended expressions`);
 }
 
 if (import.meta.main) {
   const suite = process.argv[2];
+  const target = process.argv[3] ?? "source";
   if (suite !== "contracts" && suite !== "inference") throw new Error("Choose contracts or inference");
-  runTypeFixtures(suite);
+  if (target !== "source" && target !== "declarations") throw new Error("Choose source or declarations");
+  runTypeFixtures(suite, target);
 }
