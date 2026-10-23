@@ -80,7 +80,10 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
   const { cms, maxRequestBytes = 1_048_576 } = options;
   if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes < 1)
     throw new Error("maxRequestBytes must be a positive safe integer");
-  const app = new Hono().onError((_error, c) => reply(c, failure("internal_error")));
+  const app = new Hono().onError((_error, c) => {
+    c.error = new Error("Content operation failed");
+    return reply(c, failure("internal_error"));
+  });
   return app
     .get(
       "/projects/:project/schema",
