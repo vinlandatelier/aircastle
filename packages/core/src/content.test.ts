@@ -215,3 +215,17 @@ test("unexpected storage failures do not expose internal details", async () => {
     error: { code: "internal_error" },
   });
 });
+
+test("a compatible stricter client cannot receive invalid output or leave a speculative document", async () => {
+  const stricter = {
+    ...articles,
+    fields: { ...articles.fields, title: { ...articles.fields.title!, min: 5 } },
+  };
+  const { store, snapshotDocuments } = controlledStore({ contracts: { [contract]: stricter } });
+  const result = await createService(store).create(access, "articles", contract, {
+    title: "Hi",
+    slug: "must-not-persist",
+  });
+  expect(result).toEqual({ ok: false, error: { code: "schema_mismatch" } });
+  expect(snapshotDocuments()).toEqual([]);
+});
