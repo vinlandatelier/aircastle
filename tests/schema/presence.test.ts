@@ -10,7 +10,7 @@ describe("presence and defaults", () => {
   const omitted = Symbol("omitted");
   const wrongNull = Symbol("wrong null");
   type Answer = string | null | typeof required | typeof omitted | typeof wrongNull;
-  // Independent finite oracle from the accepted presence/default rules.
+
   const rows: { name: string; field: (text: RuntimeText) => RuntimeText; answers: Answer[] }[] = [
     { name: "required", field: (t) => t, answers: [required, required, wrongNull, "", "Hi"] },
     { name: "optional", field: (t) => t.optional(), answers: [omitted, omitted, wrongNull, "", "Hi"] },

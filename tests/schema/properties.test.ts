@@ -8,8 +8,8 @@ describe("generated schema laws", () => {
   let api: RuntimeApi;
   beforeAll(() => { api = requireSchemaApi(); });
 
-  // Concatenation can merge graphemes. This generator promises valid text,
-  // not an additive grapheme count.
+
+
   const text = fc.array(fc.constantFrom("a", "é", "e\u0301", "😀", "🇦🇺", "👨‍👩‍👧‍👦", " ", "\r\n", "\t"), { maxLength: 30 }).map((parts) => parts.join(""));
   const ascii = fc.array(fc.constantFrom("a", "b", " ", "\t", "\n"), { maxLength: 40 }).map((parts) => parts.join(""));
 

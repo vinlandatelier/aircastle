@@ -33,7 +33,7 @@ describe("document boundary and diagnostic order", () => {
     const previous = Object.getOwnPropertyDescriptor(Object.prototype, name);
     let reads = 0;
     let result: unknown;
-    // The callback is synchronous and restoration precedes every assertion.
+
     try {
       Object.defineProperty(Object.prototype, name, {
         configurable: true, get() { reads++; return "Inherited text"; },

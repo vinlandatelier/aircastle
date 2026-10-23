@@ -21,7 +21,7 @@ export function expectOwnKeys(value: object, expected: readonly string[]): void 
   expect(Reflect.ownKeys(value).sort()).toEqual([...expected].sort());
 }
 
-// Compare own keys and values without choosing an unspecified output prototype.
+
 export function expectData(actual: unknown, expected: Record<string, unknown>): void {
   const data = record(actual);
   expectOwnKeys(data, Object.keys(expected));

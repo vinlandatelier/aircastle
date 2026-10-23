@@ -11,7 +11,7 @@ describe("Aircastle format policy", () => {
     "Ada@Example.COM", "ada@my-company.com", "!#$%&'*+-/=?^_`{|}~@example.com",
     "ada@xn--fsqu00a.xn--0zwm56d", `${"a".repeat(64)}@example.com`,
     `ada@${"a".repeat(63)}.com`,
-    // 64 + 1 + 63 + 1 + 63 + 1 + 61 = 254; all component limits hold.
+
     `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(61)}`,
   ];
   const invalidEmail = [
@@ -22,7 +22,7 @@ describe("Aircastle format policy", () => {
     "ada@例子.com", "Ada <ada@example.com>", "ada@example.123", "ada@ex..com",
     "ada@example.com\n", "ada\t@example.com", "ada@@example.com", "@example.com",
     `${"a".repeat(65)}@example.com`, `ada@${"a".repeat(64)}.com`,
-    // Only the complete-address limit fails: local 64, labels 63, 63, 62.
+
     `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(62)}`,
   ];
   for (const title of validEmail) {

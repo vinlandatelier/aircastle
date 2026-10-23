@@ -1,8 +1,8 @@
 import * as publicExports from "../../src/index.ts";
 import type { CompiledCollection } from "../../src/index.ts";
 
-// Runtime conformance only. Inference is checked against real exports separately.
-// This interface must never be used as evidence that production inference works.
+
+
 export interface RuntimeText {
   min(value: number): RuntimeText;
   max(value: number): RuntimeText;
