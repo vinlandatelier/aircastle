@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import { applyMutation } from "../../scripts/classify-mutations.ts";
 
 test("mutation replay uses one-based UTF-16 locations from the report", () => {

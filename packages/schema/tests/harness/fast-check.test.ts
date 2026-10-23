@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import fc from "fast-check";
 
 test("fast-check runs passing properties under the pinned Bun runtime", () => {

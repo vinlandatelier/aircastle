@@ -2,9 +2,6 @@
   "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "mutate": ["src/schema/**/*.ts", "!src/schema/contract.ts"],
   "testRunner": "command",
-  "commandRunner": {
-    "command": "bun test tests/schema --bail"
-  },
   "coverageAnalysis": "off",
   "disableTypeChecks": false,
   "concurrency": 4,
@@ -22,5 +19,8 @@
     "dist/**",
     "reports/**",
     "tsconfig*.json"
-  ]
+  ],
+  "commandRunner": {
+    "command": "bun run test:schema --bail 1 --maxWorkers 1"
+  }
 }

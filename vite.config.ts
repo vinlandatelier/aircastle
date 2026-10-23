@@ -1,6 +1,7 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  test: { include: ["tests/**/*.test.ts"], environment: "node", maxWorkers: 2 },
   defaultPackage: {
     build: "./apps/web",
     preview: "./apps/web",

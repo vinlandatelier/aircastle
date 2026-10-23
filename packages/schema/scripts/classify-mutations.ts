@@ -19,7 +19,7 @@ interface ClassifiedMutant {
   validity: "valid" | "compile-error" | "checker-error";
   diagnostic?: string;
 }
-const root = resolve(import.meta.dir, "..");
+const root = resolve(import.meta.dirname, "..");
 
 export function applyMutation(
   source: string,

@@ -81,7 +81,7 @@ export function inspectCode(file: string, source: string): PolicyViolation[] {
   return violations;
 }
 
-export function checkCodePolicy(root = resolve(import.meta.dir, "..")): void {
+export function checkCodePolicy(root = resolve(import.meta.dirname, "..")): void {
   const git = Bun.spawnSync(
     ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
     {

@@ -1,4 +1,4 @@
-import { expect } from "bun:test";
+import { expect } from "vite-plus/test";
 import type { SchemaIssue, ValidationIssue } from "../../src/index.ts";
 
 type ExpectedIssue<Issue> = Issue extends { message: string }

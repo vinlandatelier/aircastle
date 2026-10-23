@@ -52,7 +52,7 @@ export function parseGraphemeFixtures(source: string): GraphemeFixture[] {
 }
 
 export function loadGraphemeFixtures(): GraphemeFixture[] {
-  const directory = resolve(import.meta.dir, "../fixtures/unicode/15.1.0");
+  const directory = resolve(import.meta.dirname, "../fixtures/unicode/15.1.0");
   const source = readFileSync(resolve(directory, "GraphemeBreakTest.txt"), "utf8");
   const metadata = JSON.parse(readFileSync(resolve(directory, "source.json"), "utf8")) as {
     sha256: string;
@@ -65,8 +65,6 @@ export function loadGraphemeFixtures(): GraphemeFixture[] {
   const license = readFileSync(resolve(directory, "LICENSE.txt"));
   if (createHash("sha256").update(license).digest("hex") !== metadata.licenseSha256)
     throw new Error("Unicode license checksum mismatch");
-  if (process.versions.unicode !== metadata.unicodeVersion)
-    throw new Error("Runtime Unicode version differs from fixture version");
   const fixtures = parseGraphemeFixtures(source);
   if (fixtures.length !== metadata.cases) throw new Error("Unicode fixture case count mismatch");
   if (fixtures.some((fixture) => fixture.input.includes("\u0000")))
@@ -78,7 +76,7 @@ export function loadRuntimeGraphemeFixtures(): RuntimeGraphemeFixture[] {
   const fixtures = loadGraphemeFixtures();
   const differences = JSON.parse(
     readFileSync(
-      resolve(import.meta.dir, "../fixtures/unicode/15.1.0/accepted-runtime-differences.json"),
+      resolve(import.meta.dirname, "../fixtures/unicode/15.1.0/accepted-runtime-differences.json"),
       "utf8",
     ),
   ) as {

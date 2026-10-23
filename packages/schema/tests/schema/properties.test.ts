@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "vite-plus/test";
 import fc from "fast-check";
 import { compileCollection, requireSchemaApi, type RuntimeApi } from "../support/api.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vite-plus/test";
 import { expectFailure, expectSchemaError, expectSuccess } from "../support/assertions.ts";
 
 describe("assertion controls", () => {

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vite-plus/test";
 import * as schema from "../../src/index.ts";
 
 test("invalid compilation throws an instance of the public SchemaError constructor", () => {

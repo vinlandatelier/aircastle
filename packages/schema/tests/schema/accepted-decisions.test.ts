@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "vite-plus/test";
 import type { ReceivedType } from "../../src/index.ts";
 import {
   compileCollection,

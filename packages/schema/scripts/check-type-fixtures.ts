@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { rejectionCases, type RejectionCase } from "../tests/types/rejections.ts";
 
-const root = resolve(import.meta.dir, "..");
+const root = resolve(import.meta.dirname, "..");
 
 export function assertExpectedDiagnostic(
   output: string,

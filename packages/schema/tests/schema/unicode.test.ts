@@ -1,4 +1,4 @@
-import { beforeAll, describe, test } from "bun:test";
+import { beforeAll, describe, test } from "vite-plus/test";
 import type { CompiledCollection } from "../../src/index.ts";
 import { compileCollection, requireSchemaApi } from "../support/api.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";
