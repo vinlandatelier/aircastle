@@ -24,9 +24,9 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const contract = /^v1:[0-9a-f]{64}$/;
 
-function failure(code: ContentError["code"]): Result<never> {
-  if (code === "validation_failed" || code === "unique_conflict")
-    throw new Error("Structured error details are required");
+function failure(
+  code: Exclude<ContentError["code"], "validation_failed" | "unique_conflict">,
+): Result<never> {
   return { ok: false, error: { code } };
 }
 
