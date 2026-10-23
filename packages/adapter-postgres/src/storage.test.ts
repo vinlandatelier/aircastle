@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "vite-plus/test";
 import { postgresAdapter } from "./index.ts";
-import { databaseUrl, withDatabase } from "./test-support/database.ts";
+import { databaseUrl, withDatabase } from "../../../tests/support/content-database.ts";
 import type { Permission, PublishedCollection } from "@aircastle/contracts";
 
 const permissions: readonly Permission[] = ["content:read", "content:write", "schema:publish"];

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { postgresAdapter } from "../index.ts";
+import { postgresAdapter } from "@aircastle/adapter-postgres";
 import type { ContentStore } from "@aircastle/core";
 
 export const databaseUrl = () => {
@@ -15,7 +15,7 @@ export async function withDatabase<Value>(
     store: ContentStore;
     namespace: string;
     url: string;
-    close(): Promise<void>;
+    close: () => Promise<void>;
   }) => Promise<Value>,
   options: { namespace?: string } = {},
 ): Promise<Value> {
