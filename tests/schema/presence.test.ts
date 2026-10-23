@@ -61,6 +61,11 @@ describe("presence and defaults", () => {
     expectSuccess(collection.validate({ title: null }), { title: null });
   });
 
+  test("wrong-type details describe the text field kind even when nullable", () => {
+    const collection = compileCollection(api, { title: api.text().nullable() });
+    expectFailure(collection.validate({ title: 7 }), [{ code: "invalid_type", path: ["title"], expected: "string", received: "number" }]);
+  });
+
   test("frozen inputs work without default insertion or undefined deletion on the caller", () => {
     const input = Object.freeze({ subtitle: undefined });
     const collection = compileCollection(api, { title: api.text().default("New"), subtitle: api.text().optional() });
