@@ -27,5 +27,7 @@ test("declaration consumers must load emitted files without falling back to sour
   const sourceDirectory = resolve("src");
   expect(() => assertDeclarationGraph(artifact + "\n", artifact, sourceDirectory)).not.toThrow();
   expect(() => assertDeclarationGraph("", artifact, sourceDirectory)).toThrow();
+  expect(() => assertDeclarationGraph("", artifact, sourceDirectory, false)).not.toThrow();
+  expect(() => assertDeclarationGraph(resolve("src/index.ts"), artifact, sourceDirectory, false)).toThrow();
   expect(() => assertDeclarationGraph(`${artifact}\n${resolve("src/index.ts")}\n`, artifact, sourceDirectory)).toThrow();
 });

@@ -39,9 +39,9 @@ function compile(config: string, options: readonly string[] = []): { exitCode: n
   return { exitCode: result.exitCode, output: new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr) };
 }
 
-export function assertDeclarationGraph(output: string, artifact: string, sourceDirectory: string): void {
+export function assertDeclarationGraph(output: string, artifact: string, sourceDirectory: string, requireEntry = true): void {
   const files = output.split(/\r?\n/).filter(Boolean).map((file) => resolve(root, file));
-  if (!files.includes(resolve(artifact))) throw new Error("Consumer did not load the emitted entry point");
+  if (requireEntry && !files.includes(resolve(artifact))) throw new Error("Consumer did not load the emitted entry point");
   if (files.some((file) => file.startsWith(resolve(sourceDirectory) + sep))) throw new Error("Declaration consumer fell back to source");
 }
 
@@ -76,7 +76,7 @@ export function runTypeFixtures(suite: "contracts" | "inference", target: "sourc
       writeFileSync(temporaryConfig, JSON.stringify({ extends: config, files: [resolve(root, fixture.file)], include: [], exclude: [] }));
       const result = compile(temporaryConfig, emittedEntry ? ["--listFiles"] : []);
       if (result.exitCode === 0) throw new Error(`${fixture.file}: invalid program unexpectedly compiled`);
-      if (emittedEntry) assertDeclarationGraph(result.output, emittedEntry, join(root, "src"));
+      if (emittedEntry) assertDeclarationGraph(result.output, emittedEntry, join(root, "src"), fixture.requiresApi !== false);
       assertExpectedDiagnostic(result.output, readFileSync(resolve(root, fixture.file), "utf8"), fixture);
       passed++;
       console.log(`PASS ${target} ${fixture.file}`);

@@ -3,6 +3,7 @@ export interface RejectionCase {
   file: string;
   codes: readonly number[];
   target: string;
+  requiresApi?: false;
 }
 
 export const rejectionCases: readonly RejectionCase[] = [
@@ -82,6 +83,7 @@ export const rejectionCases: readonly RejectionCase[] = [
   {
     "suite": "contracts",
     "file": "tests/types/negative/contracts/equality-control.ts",
+    "requiresApi": false,
     "codes": [
       2344
     ],
@@ -90,6 +92,7 @@ export const rejectionCases: readonly RejectionCase[] = [
   {
     "suite": "contracts",
     "file": "tests/types/negative/contracts/any-control.ts",
+    "requiresApi": false,
     "codes": [
       2344
     ],
