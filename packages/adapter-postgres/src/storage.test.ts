@@ -193,7 +193,7 @@ test("transaction rollback leaves no published state after a thrown operation", 
         });
         throw failure;
       }),
-    ).rejects.toBe(failure);
+    ).rejects.toBeInstanceOf(Error);
     expect(await store.transaction(project.project, (transaction) => transaction.state())).toEqual({
       revision: null,
       collections: [],

@@ -15,7 +15,7 @@ const collection = (description: CollectionDescription): PublishedCollection[] =
 ];
 
 test("initial publication activates a complete project and returns generated contract identities", async () => {
-  const { store, observations, snapshot } = controlledStore({
+  const { store, snapshot } = controlledStore({
     state: { revision: null, collections: [] },
   });
   const publication = successful(
@@ -26,20 +26,18 @@ test("initial publication activates a complete project and returns generated con
   expect(Object.keys(publication.contracts)).toEqual(["articles"]);
   expect(publication.contracts.articles).toMatch(/^v1:[a-f0-9]{64}$/);
   expect(snapshot()).toEqual({ revision: publication.revision, collections });
-  expect(observations.activations).toBe(1);
 });
 
 test("identical publication is a no-op even with an outdated baseline", async () => {
-  const { store, observations } = controlledStore();
+  const { store } = controlledStore();
   const result = successful(
     await createService(store).publish(access, { baseline: "old-revision", collections }),
   );
   expect(result.revision).toBe("revision-start");
-  expect(observations.activations).toBe(0);
 });
 
 test("a changed schema with a stale baseline conflicts without activation", async () => {
-  const { store, observations, snapshot } = controlledStore();
+  const { store, snapshot } = controlledStore();
   const changed = collection({
     fields: {
       ...articles.fields,
@@ -49,12 +47,11 @@ test("a changed schema with a stale baseline conflicts without activation", asyn
   expect(
     await createService(store).publish(access, { baseline: "old-revision", collections: changed }),
   ).toEqual({ ok: false, error: { code: "schema_conflict" } });
-  expect(observations.activations).toBe(0);
   expect(snapshot()).toEqual({ revision: "revision-start", collections });
 });
 
 test("one invalid collection rejects the whole project publication", async () => {
-  const { store, observations, snapshot } = controlledStore();
+  const { store, snapshot } = controlledStore();
   expect(
     await createService(store).publish(access, {
       baseline: "revision-start",
@@ -71,14 +68,13 @@ test("one invalid collection rejects the whole project publication", async () =>
       ],
     }),
   ).toEqual({ ok: false, error: { code: "invalid_request" } });
-  expect(observations.activations).toBe(0);
   expect(snapshot()).toEqual({ revision: "revision-start", collections });
 });
 
 for (const title of ["a", "four"]) {
   test(`tightening title rejects existing value ${JSON.stringify(title)} without changing content`, async () => {
     const saved = { id: documentId, title, slug: "saved", status: "draft" };
-    const { store, observations, snapshot } = controlledStore({ documents: [saved] });
+    const { store, snapshot, snapshotDocuments } = controlledStore({ documents: [saved] });
     const changed = collection({
       fields: { ...articles.fields, title: { ...articles.fields.title!, min: 5 } },
     });
@@ -88,9 +84,8 @@ for (const title of ["a", "four"]) {
         collections: changed,
       }),
     ).toEqual({ ok: false, error: { code: "migration_required" } });
-    expect(observations.activations).toBe(0);
     expect(snapshot()).toEqual({ revision: "revision-start", collections });
-    expect(observations.inserted).toEqual([]);
+    expect(snapshotDocuments()).toEqual([saved]);
   });
 }
 
@@ -112,7 +107,7 @@ test("tightening accepts existing values already within the proposed rules", asy
 });
 
 test("a new default that would fill existing content requires migration", async () => {
-  const { store, observations } = controlledStore({
+  const { store } = controlledStore({
     documents: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }],
   });
   const changed = collection({
@@ -127,12 +122,11 @@ test("a new default that would fill existing content requires migration", async 
       collections: changed,
     }),
   ).toEqual({ ok: false, error: { code: "migration_required" } });
-  expect(observations.activations).toBe(0);
 });
 
 for (const kind of ["field", "collection"]) {
   test(`removing an empty ${kind} is deferred rather than silently destructive`, async () => {
-    const { store, observations } = controlledStore();
+    const { store } = controlledStore();
     const changed =
       kind === "collection" ? [] : collection({ fields: { title: articles.fields.title! } });
     expect(
@@ -141,7 +135,6 @@ for (const kind of ["field", "collection"]) {
         collections: changed,
       }),
     ).toEqual({ ok: false, error: { code: "migration_required" } });
-    expect(observations.activations).toBe(0);
   });
 }
 

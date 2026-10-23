@@ -73,8 +73,6 @@ export function controlledStore(
     initialized: 0,
     closed: 0,
     transactions: 0,
-    activations: 0,
-    inserted: [] as ContentDocument[],
     authorization: [] as { project: string; verifier: string; permission: Permission }[],
   };
   const transaction: ProjectTransaction = {
@@ -85,7 +83,6 @@ export function controlledStore(
     },
     documents: async () => structuredClone(documents),
     activate: async (next, publication) => {
-      observations.activations++;
       state = { revision: publication.revision, collections: structuredClone(next) };
       for (const entry of next) {
         const id = publication.contracts[entry.name];
@@ -94,7 +91,6 @@ export function controlledStore(
     },
     insert: async (_collection, data) => {
       const saved = { ...structuredClone(data), id: documentId };
-      observations.inserted.push(saved);
       documents.push(saved);
       return { ok: true, data: structuredClone(saved) };
     },
@@ -115,11 +111,27 @@ export function controlledStore(
     transaction: async (_project, operation) => {
       observations.transactions++;
       await options.beforeTransaction?.();
-      return operation(transaction);
+      const originalState = structuredClone(state);
+      const originalDocuments = structuredClone(documents);
+      const originalContracts = new Map(contracts);
+      try {
+        return await operation(transaction);
+      } catch (error) {
+        state = originalState;
+        documents.splice(0, documents.length, ...originalDocuments);
+        contracts.clear();
+        for (const [id, description] of originalContracts) contracts.set(id, description);
+        throw error;
+      }
     },
     close: async () => {
       observations.closed++;
     },
   };
-  return { store, observations, snapshot: () => structuredClone(state) };
+  return {
+    store,
+    observations,
+    snapshot: () => structuredClone(state),
+    snapshotDocuments: () => structuredClone(documents),
+  };
 }

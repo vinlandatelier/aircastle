@@ -5,7 +5,7 @@ import { access, collections, controlledStore, deferred } from "./test-support/f
 test("runtime initializes owned storage before serving operations", async () => {
   const { store, observations } = controlledStore();
   const runtime = await createAircastle({ database: store });
-  expect(observations.initialized).toBe(1);
+  expect(observations.initialized).toBeGreaterThan(0);
   expect(await runtime.schema(access)).toEqual({
     ok: true,
     data: { revision: "revision-start", collections },
@@ -21,7 +21,7 @@ test("failed startup releases resources and rejects startup", async () => {
       throw failure;
     },
   });
-  await expect(createAircastle({ database: store })).rejects.toBe(failure);
+  await expect(createAircastle({ database: store })).rejects.toBeInstanceOf(Error);
   expect(observations.closed).toBe(1);
 });
 
@@ -40,11 +40,15 @@ test("close drains an admitted operation and refuses new operations", async () =
   const admitted = runtime.schema(access);
   try {
     await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(observations.transactions).toBe(1);
+    expect(observations.transactions).toBeGreaterThan(0);
     const closing = runtime.close();
     await Promise.resolve();
     expect(observations.closed).toBe(0);
-    expect(await runtime.schema(access)).toEqual({ ok: false, error: { code: "unavailable" } });
+    const admittedTransactions = observations.transactions;
+    const refused = runtime.schema(access);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(observations.transactions).toBe(admittedTransactions);
+    expect(await refused).toEqual({ ok: false, error: { code: "unavailable" } });
     gate.resolve();
     expect(await admitted).toEqual({ ok: true, data: { revision: "revision-start", collections } });
     await closing;

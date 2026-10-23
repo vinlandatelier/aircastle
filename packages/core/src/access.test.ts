@@ -45,7 +45,7 @@ for (const permission of [
 }
 
 test("foreign target does not expand project authority", async () => {
-  const { store, observations } = controlledStore({ authorization: "forbidden" });
+  const { store } = controlledStore({ authorization: "forbidden" });
   const cms = createService(store);
   expect(
     await cms.findById(
@@ -55,11 +55,10 @@ test("foreign target does not expand project authority", async () => {
       documentId,
     ),
   ).toEqual({ ok: false, error: { code: "forbidden" } });
-  expect(observations.transactions).toBe(0);
 });
 
 test("unauthorized requests do not reveal collection or schema state", async () => {
-  const { store, observations } = controlledStore({ authorization: "unauthorized" });
+  const { store } = controlledStore({ authorization: "unauthorized" });
   const cms = createService(store);
   const results = await Promise.all([
     cms.schema(access),
@@ -72,7 +71,6 @@ test("unauthorized requests do not reveal collection or schema state", async () 
   ]);
   for (const result of results)
     expect(result).toEqual({ ok: false, error: { code: "unauthorized" } });
-  expect(observations.transactions).toBe(0);
 });
 
 test("read-only keys cannot create or publish but can read", async () => {

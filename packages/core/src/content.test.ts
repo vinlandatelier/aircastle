@@ -10,7 +10,7 @@ import {
 } from "./test-support/fixtures.ts";
 
 test("create validates the active schema, applies defaults and returns the saved document", async () => {
-  const { store, observations } = controlledStore();
+  const { store, snapshotDocuments } = controlledStore();
   const result = successful(
     await createService(store).create(access, "articles", contract, {
       title: "Hello",
@@ -18,13 +18,13 @@ test("create validates the active schema, applies defaults and returns the saved
     }),
   );
   expect(result).toEqual({ id: documentId, title: "Hello", slug: "hello", status: "draft" });
-  expect(observations.inserted).toEqual([
+  expect(snapshotDocuments()).toEqual([
     { id: documentId, title: "Hello", slug: "hello", status: "draft" },
   ]);
 });
 
 test("independent invalid fields aggregate in declaration order and persist nothing", async () => {
-  const { store, observations } = controlledStore();
+  const { store, snapshotDocuments } = controlledStore();
   const result = await createService(store).create(access, "articles", contract, {
     slug: 42,
     status: "invalid",
@@ -39,7 +39,7 @@ test("independent invalid fields aggregate in declaration order and persist noth
   ]);
   expect(result.error.issues[1]).toMatchObject({ expected: "string", received: "number" });
   expect(result.error.issues[2]).toMatchObject({ allowed: ["draft", "published"] });
-  expect(observations.inserted).toEqual([]);
+  expect(snapshotDocuments()).toEqual([]);
 });
 
 for (const input of [
@@ -47,10 +47,10 @@ for (const input of [
   { title: "Hello", slug: "hello", unknown: "value" },
 ]) {
   test(`create rejects unknown input field ${Object.keys(input).at(-1)}`, async () => {
-    const { store, observations } = controlledStore();
+    const { store, snapshotDocuments } = controlledStore();
     const result = await createService(store).create(access, "articles", contract, input);
     expect(result).toMatchObject({ ok: false, error: { code: "validation_failed" } });
-    expect(observations.inserted).toEqual([]);
+    expect(snapshotDocuments()).toEqual([]);
   });
 }
 
@@ -112,7 +112,7 @@ test("corrupt authoritative stored data is internal_error rather than repaired c
 
 test("incompatible old create contract is rejected even when this title passes", async () => {
   const strict = { fields: { ...articles.fields, title: { ...articles.fields.title!, min: 5 } } };
-  const { store, observations } = controlledStore({
+  const { store, snapshotDocuments } = controlledStore({
     state: { revision: "strict", collections: [{ name: "articles", description: strict }] },
   });
   expect(
@@ -121,16 +121,16 @@ test("incompatible old create contract is rejected even when this title passes",
       slug: "hello",
     }),
   ).toEqual({ ok: false, error: { code: "schema_mismatch" } });
-  expect(observations.inserted).toEqual([]);
+  expect(snapshotDocuments()).toEqual([]);
 });
 
 test("schema compatibility precedes document field validation", async () => {
-  const { store, observations } = controlledStore({ contracts: {} });
+  const { store, snapshotDocuments } = controlledStore({ contracts: {} });
   expect(await createService(store).create(access, "articles", contract, null)).toEqual({
     ok: false,
     error: { code: "schema_mismatch" },
   });
-  expect(observations.inserted).toEqual([]);
+  expect(snapshotDocuments()).toEqual([]);
 });
 
 test("collection absence is distinct from document absence", async () => {
@@ -178,7 +178,7 @@ test("an old client stays compatible with an optional addition", async () => {
 });
 
 test("a persistence unique conflict retains its structured field detail", async () => {
-  const { store, observations } = controlledStore();
+  const { store, snapshotDocuments } = controlledStore();
   const rejectedStore = {
     ...store,
     transaction: <Value>(
@@ -201,7 +201,7 @@ test("a persistence unique conflict retains its structured field detail", async 
       slug: "taken",
     }),
   ).toEqual({ ok: false, error: { code: "unique_conflict", field: "slug" } });
-  expect(observations.inserted).toEqual([]);
+  expect(snapshotDocuments()).toEqual([]);
 });
 
 test("unexpected storage failures do not expose internal details", async () => {
