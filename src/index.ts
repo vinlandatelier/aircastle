@@ -5,7 +5,6 @@ export type {
   CompiledSchema,
   IssuePath,
   ReceivedType,
-  SchemaError,
   SchemaIssue,
   TextEditorDescription,
   TextFieldDescription,
@@ -14,3 +13,5 @@ export type {
 } from "./schema/contract.ts";
 export { collection, text } from "./schema/declarations.ts";
 export type { InferInput, InferOutput } from "./schema/declarations.ts";
+export { compileSchema } from "./schema/compile.ts";
+export { SchemaError } from "./schema/errors.ts";
