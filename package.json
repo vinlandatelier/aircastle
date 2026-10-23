@@ -13,6 +13,7 @@
     "check:policy": "bun scripts/check-code-policy.ts",
     "build": "tsc --noEmit false --declaration --emitDeclarationOnly --outDir dist",
     "test": "bun test",
+    "test:coverage": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov --coverage-dir=coverage",
     "test:harness": "bun test tests/harness",
     "test:schema": "bun test tests/schema",
     "test:unicode": "bun test tests/schema/unicode.test.ts",
