@@ -26,6 +26,7 @@ export function createApp({ logger }: { logger: Logger }) {
       }),
     )
     .onError((_error, c) => c.json({ error: "Internal server error" }, 500))
+    .basePath("/api")
     .route("/", health);
 
   return app
@@ -40,7 +41,7 @@ export function createApp({ logger }: { logger: Logger }) {
     .get(
       "/docs",
       Scalar({
-        url: "/openapi.json",
+        url: "/api/openapi.json",
         pageTitle: "Aircastle API",
         cdn: "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0/dist/browser/standalone.js",
       }),

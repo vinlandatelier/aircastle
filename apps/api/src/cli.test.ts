@@ -18,14 +18,14 @@ describe("Hono CLI", () => {
 
     expect(output.ok).toBe(true);
     expect(output.data.routes).toContainEqual(
-      expect.objectContaining({ method: "GET", path: "/health" }),
+      expect.objectContaining({ method: "GET", path: "/api/health" }),
     );
   });
 
   test("sends a request through the Bun runtime without starting the server", () => {
     const result = spawnSync(
       process.execPath,
-      [cli, "request", "/health", "src/cli.ts", "--runtime", "bun"],
+      [cli, "request", "/api/health", "src/cli.ts", "--runtime", "bun"],
       { cwd: apiDirectory, encoding: "utf8", timeout: 10_000 },
     );
 

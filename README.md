@@ -30,7 +30,7 @@ vp run dev-api
 
 The API uses port 43122 in both development and built runs. Override it with `PORT`; override the web app's port with `vp run dev-web -- --port <port>`. An occupied port stops startup rather than selecting another port.
 
-Open [API documentation](http://localhost:43122/docs) or its [OpenAPI document](http://localhost:43122/openapi.json). The documentation UI loads a pinned Scalar script from jsDelivr and requires internet access.
+Open [API documentation](http://localhost:43122/api/docs) or its [OpenAPI document](http://localhost:43122/api/openapi.json). The documentation UI loads a pinned Scalar script from jsDelivr and requires internet access.
 
 API environment variables are validated at startup. `PORT` must be an integer from 1 to 65535. `LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`. `NODE_ENV` accepts `development`, `test`, or `production` and defaults to `development`.
 

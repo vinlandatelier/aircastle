@@ -4,7 +4,7 @@
 - The CLI entry loads the app through native module resolution because the pinned CLI bundles CommonJS dependencies incorrectly. Its working directory is `apps/api`, set by the root command.
 - From the repository root, run `vp run hono-api --help` first.
 - Inspect routes with `vp run hono-api routes src/cli.ts`.
-- Send requests with `vp run hono-api request /health src/cli.ts --runtime bun`.
+- Send requests with `vp run hono-api request /api/health src/cli.ts --runtime bun`.
 - Use `vp run hono-api batch - src/cli.ts` for JSONL request sequences. Batch runs on Node by default; it does not support Bun in the pinned CLI release.
 - Use the CLI for API exploration without starting a server. Keep regression tests in Vitest and run them with `vp run test-api`.
 - Find Hono documentation through `https://hono.dev/llms.txt`; fetch individual pages with `Accept: text/markdown`.

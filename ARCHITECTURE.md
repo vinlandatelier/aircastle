@@ -20,7 +20,7 @@ packages/
 scripts/                      Repository checks and local development tooling
 ```
 
-The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration and constructs the logger. The CLI entry uses the same app factory with a silent logger. Health follows the feature pattern below.
+The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration and constructs the logger. The CLI entry uses the same app factory with a silent logger. The server mounts every API route under `/api`, including `/api/docs` and `/api/openapi.json`. Feature routers use paths relative to that mount. Hosting proxies must preserve the `/api` prefix. Health follows the feature pattern below.
 
 ## Feature pattern
 
