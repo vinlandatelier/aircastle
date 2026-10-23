@@ -264,3 +264,15 @@ test("unexpected content failures return a safe envelope", async () => {
   expect(response.status).toBe(500);
   expect(await response.json()).toEqual({ ok: false, error: { code: "internal_error" } });
 });
+
+test("a false Content-Length cannot bypass the actual request byte budget", async () => {
+  const { cms, headers } = fixture();
+  const app = createApp({ logger: pino({ level: "silent" }), cms, maxRequestBytes: 12 });
+  const response = await app.request(documents, {
+    method: "POST",
+    headers: { ...headers, "content-length": "1" },
+    body: JSON.stringify({ title: "more than the limit" }),
+  });
+  expect(response.status).toBe(413);
+  expect(await response.json()).toEqual({ ok: false, error: { code: "payload_too_large" } });
+});

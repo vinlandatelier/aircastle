@@ -48,6 +48,11 @@ async function fixture(
       body: input,
     });
     response.setHeader("content-type", "application/json");
+    if (request.url === "/_advance") {
+      state.revision = "published-during-review";
+      response.end(JSON.stringify({ ok: true }));
+      return;
+    }
     if (request.method === "GET") {
       response.end(JSON.stringify({ ok: true, data: state }));
       return;
@@ -283,4 +288,16 @@ test("invalid field declarations fail before network publication", async () =>
     expect(result.code).not.toBe(0);
     expect(requests).toHaveLength(0);
     expect(result.output).toContain("invalid_bound");
+  }));
+
+test("a publication during reconciliation review invalidates the confirmed baseline", async () =>
+  fixture(async ({ cwd, url, state, lock, command }) => {
+    await lock("old");
+    state.revision = "reviewed-revision";
+    const before = await readFile(join(cwd, "aircastle.lock"), "utf8");
+    const entry = pathToFileURL(resolve(repository, "packages/cli/src/index.ts")).href;
+    const script = `import { push } from ${JSON.stringify(entry)}; process.exitCode = await push({ cwd: ${JSON.stringify(cwd)}, reconcile: true, interactive: true, confirm: async () => { await fetch(${JSON.stringify(url + "/_advance")}); return true; } });`;
+    expect((await command([], script)).code).not.toBe(0);
+    expect(state.revision).toBe("published-during-review");
+    expect(await readFile(join(cwd, "aircastle.lock"), "utf8")).toBe(before);
   }));
