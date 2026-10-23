@@ -14,10 +14,15 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Keep field validation rules distinct from editor presentation settings. Changing an editor must preserve the field's data contract.
 - Enforce database-dependent guarantees, such as uniqueness, at the persistence layer.
 
+## Command recipes
+
+- Use `vp run <script>` for repository package-script commands in instructions, documentation, examples, and agent execution. Do not use `bun run <script>` for these recipes.
+- Keep Bun where it is the configured runtime inside a script; this rule does not require rewriting package-script implementations.
+
 ## Local infrastructure
 
 - Start local services through committed configuration and repository commands. Add infrastructure changes to the repository before using them; do not create ad hoc containers.
-- Use `bun run db:test -- <command>` for disposable Postgres. It isolates concurrent runs and cleans up their storage. Never reset another worktree's database.
+- Use `vp run db:test -- <command>` for disposable Postgres. It isolates concurrent runs and cleans up their storage. Never reset another worktree's database.
 
 ## Code policy
 
@@ -25,7 +30,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Declaration documentation such as JSDoc is allowed. Do not reformat ordinary comments as docstrings to bypass this rule.
 - Never use compiler suppression directives, including `@ts-expect-error`, `@ts-ignore`, or `@ts-nocheck`, even inside docstrings.
 - Verify expected type errors with isolated negative fixtures and explicit compiler diagnostics, without suppressions.
-- Run `bun run check:policy` for JavaScript and TypeScript changes. The configured type-check command also enforces this policy.
+- Run `vp run check:policy` for JavaScript and TypeScript changes. The configured type-check command also enforces this policy.
 
 ## Changes and verification
 
@@ -39,7 +44,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.
 - Verify documentation and configuration changes directly; add executable tests when behavior changes.
-- After edits, run affected checks. Run `bun run check` for final verification; it covers policy, source and emitted type contracts, runtime tests, and inference. A failed stage stops the command and leaves later stages unverified.
+- After edits, run affected checks. Run `vp run check` for final verification; it covers policy, source and emitted type contracts, runtime tests, and inference. A failed stage stops the command and leaves later stages unverified.
 - Reuse passing evidence for unchanged code, dependencies, configuration, and environment. Repeat a check only when its inputs change, it fails, or a new finding requires it. Record the command, exit code, and revision or content hash; setup failures do not establish behavior.
 - Use one focused audit of the completed change. Follow up on named findings and affected code instead of restarting a broad review. The author checks the reviewer's evidence and log; do not create recursive audit chains.
 
