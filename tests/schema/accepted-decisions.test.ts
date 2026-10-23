@@ -73,11 +73,19 @@ describe("approved declaration and metadata decisions", () => {
   });
 
   test("explicit and implicit editor defaults are equivalent", () => {
-    for (const field of [
-      api.text().editor("textarea").editor("textarea", { rows: 4 }),
-      api.text().editor("code", { language: "plaintext" }).editor("code"),
-      api.text().oneOf(["a"]).editor("radio").editor("radio", {}),
-    ]) expect(() => compileCollection(api, { title: field })).not.toThrow();
+    const cases = [
+      { field: api.text().editor("textarea").editor("textarea", { rows: 4 }), baseline: api.text().editor("textarea"), editor: { type: "textarea", rows: 4 } },
+      { field: api.text().editor("code", { language: "plaintext" }).editor("code"), baseline: api.text().editor("code"), editor: { type: "code", language: "plaintext" } },
+      { field: api.text().oneOf(["a"]).editor("radio").editor("radio", {}), baseline: api.text().oneOf(["a"]).editor("radio"), editor: { type: "radio" } },
+    ] as const;
+    for (const entry of cases) {
+      const collection = compileCollection(api, { title: entry.field });
+      const baseline = compileCollection(api, { title: entry.baseline });
+      expect(collection.describe().fields.title!.editor).toEqual(entry.editor);
+      expect(collection.describe()).toEqual(baseline.describe());
+      expectSuccess(collection.validate({ title: "a" }), { title: "a" });
+      expectFailure(collection.validate({ title: 42 }), [{ code: "invalid_type", path: ["title"], expected: "string", received: "number" }]);
+    }
   });
 
   test("returned description mutation cannot change the compiled schema", () => {
