@@ -14,9 +14,11 @@
     "test": "bun test",
     "test:harness": "bun test tests/harness",
     "test:schema": "bun test tests/schema",
-    "test:typecheck": "bun scripts/check-type-fixtures.ts contracts",
+    "test:typecheck": "bun scripts/check-type-fixtures.ts contracts && bun scripts/check-type-fixtures.ts contracts declarations",
     "test:types": "bun run test:typecheck",
-    "test:inference": "bun scripts/check-type-fixtures.ts inference"
+    "test:inference": "bun scripts/check-type-fixtures.ts inference && bun scripts/check-type-fixtures.ts inference declarations",
+    "test:declarations": "bun scripts/check-type-fixtures.ts contracts declarations",
+    "test:declarations:inference": "bun scripts/check-type-fixtures.ts inference declarations"
   },
   "dependencies": {
     "arktype": "2.2.9"

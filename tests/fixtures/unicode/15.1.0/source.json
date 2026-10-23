@@ -1,0 +1,8 @@
+{
+  "unicodeVersion": "15.1",
+  "source": "https://www.unicode.org/Public/15.1.0/ucd/auxiliary/GraphemeBreakTest.txt",
+  "sha256": "ed9c5e92fd0911ccbeeb63c97cb19c519ea272ff1112ce843abd991582dd848f",
+  "cases": 1187,
+  "license": "https://www.unicode.org/license.txt",
+  "licenseSha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+}
