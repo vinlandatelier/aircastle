@@ -5,8 +5,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "bun run --hot src/index.ts",
-    "build": "bun build src/index.ts --target bun --outdir dist",
+    "dev": "bun --conditions=development --hot src/index.ts",
+    "build": "bun build src/index.ts --conditions=development --target bun --outdir dist",
     "start": "bun run dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vp test",

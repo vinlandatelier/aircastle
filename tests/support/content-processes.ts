@@ -14,7 +14,7 @@ export function execute(
   return new Promise<{ code: number; output: string }>((resolve) => {
     execFile(
       file,
-      args,
+      file === "bun" ? ["--conditions=development", ...args] : args,
       { cwd: options.cwd ?? repository, env: { ...process.env, ...options.env }, timeout: 25_000 },
       (error, stdout, stderr) =>
         resolve({
@@ -47,7 +47,7 @@ export async function standaloneServer(namespace: string) {
   });
   const child = execFile(
     "bun",
-    ["tests/fixtures/content-server.ts"],
+    ["--conditions=development", "tests/fixtures/content-server.ts"],
     {
       cwd: repository,
       env: { ...process.env, AIRCASTLE_DATABASE_NAMESPACE: namespace },

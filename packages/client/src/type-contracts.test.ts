@@ -51,6 +51,7 @@ function configFor(target: "source" | "declarations", file: string) {
     JSON.stringify({
       extends: sourceConfig,
       compilerOptions: {
+        customConditions: target === "declarations" ? [] : ["development"],
         paths: {
           "aircastle-client-under-test": [
             target === "source" ? join(root, "src/index.ts") : emittedEntry,
@@ -124,7 +125,10 @@ describe.each(["source", "declarations"] as const)("%s client type contract", (t
         .filter(Boolean)
         .map((file) => resolve(root, file));
       expect(files).toContain(emittedEntry);
-      expect(files.some((file) => file.startsWith(join(root, "src") + sep))).toBe(false);
+      for (const name of ["client", "contracts", "core", "adapter-postgres", "cli", "schema"]) {
+        const source = join(resolve(root, "../.."), "packages", name, "src") + sep;
+        expect(files.some((file) => file.startsWith(source))).toBe(false);
+      }
     }
   }, 30_000);
 

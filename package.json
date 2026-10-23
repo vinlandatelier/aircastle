@@ -20,7 +20,7 @@
     "lint-web": "vp lint apps/web",
     "lint-api": "vp lint apps/api",
     "lint-schema": "vp lint packages/schema",
-    "test": "vp run db:test -- vp run test:all",
+    "test": "vp run build && vp run test:prepared",
     "test-web": "vp -C apps/web run test",
     "test-api": "vp -C apps/api run test",
     "test-schema": "vp -C packages/schema run test",
@@ -30,7 +30,7 @@
     "test:typecheck": "vp -C packages/schema run test:typecheck",
     "test:types": "bun run test:typecheck",
     "test:inference": "vp -C packages/schema run test:inference",
-    "check": "vp run typecheck && vp run lint && vp run test && vp run build",
+    "check": "vp run build && vp run typecheck && vp run lint && vp run test:prepared",
     "test:coverage": "vp -C packages/schema run test:coverage",
     "test-mutation": "vp -C packages/schema run test:mutation",
     "test:unicode": "vp -C packages/schema run test:unicode",
@@ -46,9 +46,10 @@
     "test:db": "vp test --config vite.db.config.ts",
     "test:content": "vp test --config vite.content.config.ts",
     "test:content:db": "vp run db:test -- vp run test:content --project database",
-    "dev:setup": "bun scripts/dev-setup.ts",
+    "dev:setup": "bun --conditions=development scripts/dev-setup.ts",
     "test:all": "bun run test:typecheck && vp run --filter '@aircastle/*' --parallel test && vp test && bun run test:inference",
-    "test:content:mutation": "vp -C packages/contracts run test:mutation"
+    "test:content:mutation": "vp -C packages/contracts run test:mutation",
+    "test:prepared": "vp run db:test -- vp run test:all"
   },
   "devDependencies": {
     "@aircastle/adapter-postgres": "workspace:*",

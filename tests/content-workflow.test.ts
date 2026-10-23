@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { expect, test } from "vite-plus/test";
 import { collection, text } from "@aircastle/schema";
 import { createClient, defineConfig } from "@aircastle/client";
@@ -46,10 +46,17 @@ test("developer config, push, SDK create/read and restart form one durable workf
       AIRCASTLE_PROJECT_ID: provisioned.project,
       AIRCASTLE_API_KEY: key,
     };
-    const result = await execute("bun", [join(repository, "packages/cli/src/cli.ts"), "push"], {
-      cwd: app.cwd,
-      env,
-    });
+    const metadata: { bin: { aircastle: string } } = JSON.parse(
+      await readFile(join(repository, "packages/cli/package.json"), "utf8"),
+    );
+    const result = await execute(
+      resolve(repository, "packages/cli", metadata.bin.aircastle),
+      ["push"],
+      {
+        cwd: app.cwd,
+        env,
+      },
+    );
     expect(result.code, result.output).toBe(0);
     const lock = JSON.parse(await readFile(join(app.cwd, "aircastle.lock"), "utf8"));
     expect(lock.target).toEqual({ url: server.url, project: provisioned.project });

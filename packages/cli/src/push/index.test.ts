@@ -91,7 +91,7 @@ async function fixture(
     new Promise<{ code: number; output: string }>((resolveCommand) => {
       execFile(
         "bun",
-        custom ? ["-e", custom] : [cliEntry, "push", ...args],
+        ["--conditions=development", ...(custom ? ["-e", custom] : [cliEntry, "push", ...args])],
         {
           cwd,
           env: {

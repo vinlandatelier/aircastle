@@ -17,7 +17,8 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "customConditions": ["development"]
   },
   "include": ["scripts/**/*.ts", "tests/**/*.ts"]
 }
