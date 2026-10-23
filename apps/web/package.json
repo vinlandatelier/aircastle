@@ -8,6 +8,7 @@
     "dev": "vp dev",
     "build": "vp build",
     "typecheck": "tsc -b",
+    "test": "vp test run --passWithNoTests",
     "lint": "vp lint",
     "preview": "vp preview",
     "check": "vp check"
