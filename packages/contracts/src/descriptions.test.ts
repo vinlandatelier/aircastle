@@ -229,6 +229,22 @@ describe("published collection descriptions", () => {
     expect(called).toBe(false);
   });
 
+  test("legal toString collection and prototype-like field names survive wire parsing", () => {
+    const fields = Object.fromEntries([
+      ["__proto__", field()],
+      ["constructor", field()],
+    ]);
+    const input = [{ name: "toString", description: description(fields) }];
+    const result = parseCollections(input);
+    expect(result).toEqual({ ok: true, data: input });
+    if (!result.ok) throw new Error("Expected legal own-property names");
+    const parsed = result.data[0]!.description.fields;
+    expect(Object.hasOwn(parsed, "__proto__")).toBe(true);
+    expect(Object.hasOwn(parsed, "constructor")).toBe(true);
+    expect([Object.prototype, null]).toContain(Object.getPrototypeOf(parsed));
+    expect({}.constructor).toBe(Object);
+  });
+
   test("a later invalid collection prevents an otherwise valid project parse", () => {
     expect(
       parseCollections([

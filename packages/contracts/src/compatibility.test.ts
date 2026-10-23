@@ -277,6 +277,27 @@ describe("client output projection", () => {
     });
   });
 
+  test("projection preserves legal prototype-like own fields without prototype mutation", () => {
+    const schema = description(
+      Object.fromEntries([
+        ["__proto__", field()],
+        ["constructor", field()],
+      ]),
+    );
+    const document = Object.fromEntries([
+      ["id", id],
+      ["__proto__", "Proto"],
+      ["constructor", "Ctor"],
+    ]) as { id: string } & Record<string, string>;
+    const result = projectDocument(schema, schema, document);
+    expect(result).toEqual({ ok: true, data: document });
+    if (!result.ok) throw new Error("Expected legal own fields to project");
+    expect(Object.hasOwn(result.data, "__proto__")).toBe(true);
+    expect(Object.hasOwn(result.data, "constructor")).toBe(true);
+    expect([Object.prototype, null]).toContain(Object.getPrototypeOf(result.data));
+    expect({}.constructor).toBe(Object);
+  });
+
   test("null cannot pass a nonnullable client output contract", () => {
     const client: CollectionDescription = description();
     const server = description({ title: field({ nullable: true }) });

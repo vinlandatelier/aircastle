@@ -87,6 +87,18 @@ describe("developer configuration", () => {
     );
   });
 
+  test("permits the legal collection name toString", () => {
+    const config = defineConfig({
+      ...connection,
+      collections: { toString: collection({ title: text() }) },
+    });
+    expect(Object.hasOwn(config.collections, "toString")).toBe(true);
+    expect(compileSchema(config.collections).toString.validate({ title: "Hello" })).toEqual({
+      ok: true,
+      data: { title: "Hello" },
+    });
+  });
+
   test("permits legal prototype-like field names without prototype lookup", () => {
     const articles = collection(
       Object.fromEntries([

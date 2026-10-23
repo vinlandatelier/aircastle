@@ -79,6 +79,23 @@ describe("typed HTTP client protocol", () => {
     expect(transport).toHaveBeenCalledTimes(1);
   });
 
+  test("a legal collection named toString has its own collection methods", async () => {
+    const transport = vi.fn<Fetch>(async () =>
+      reply({ ok: true, data: { id, title: "Hello" } }, 201),
+    );
+    const client = createClient({
+      ...options(),
+      collections: { toString: collection({ title: text() }) },
+      fetch: transport,
+    });
+    expect(Object.hasOwn(client, "toString")).toBe(true);
+    expect(await client.toString.create({ title: "Hello" })).toEqual({
+      ok: true,
+      data: { id, title: "Hello" },
+    });
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
   test("a reused client does not cache a prior document as the next read", async () => {
     let count = 0;
     const transport = vi.fn<Fetch>(async () =>
