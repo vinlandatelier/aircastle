@@ -12,3 +12,5 @@ export type {
   ValidationIssue,
   ValidationResult,
 } from "./schema/contract.ts";
+export { collection, text } from "./schema/declarations.ts";
+export type { InferInput, InferOutput } from "./schema/declarations.ts";
