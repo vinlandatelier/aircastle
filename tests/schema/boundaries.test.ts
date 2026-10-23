@@ -27,6 +27,26 @@ describe("document boundary and diagnostic order", () => {
     expect(reads).toBe(0);
   });
 
+  test("a plain document must supply its own required field", () => {
+    const name = "inheritedValueForSchemaTest";
+    const collection = compileCollection(api, { [name]: api.text() });
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, name);
+    let reads = 0;
+    let result: unknown;
+    // The callback is synchronous and restoration precedes every assertion.
+    try {
+      Object.defineProperty(Object.prototype, name, {
+        configurable: true, get() { reads++; return "Inherited text"; },
+      });
+      result = collection.validate({});
+    } finally {
+      if (previous) Object.defineProperty(Object.prototype, name, previous);
+      else Reflect.deleteProperty(Object.prototype, name);
+    }
+    expectFailure(result, [{ code: "required", path: [name] }]);
+    expect(reads).toBe(0);
+  });
+
   test("rejects accessors without invoking getters", () => {
     let reads = 0;
     const input = Object.defineProperty({}, "title", { enumerable: true, get() { reads++; throw new Error("Must not execute"); } });
