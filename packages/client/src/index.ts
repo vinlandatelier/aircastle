@@ -41,7 +41,12 @@ export function createClient<const Collections extends CollectionDefinitions>(
     fetch?: Fetch;
   },
 ): AircastleClient<Collections> {
-  throw new Error("Not implemented");
+  const unavailable = async () => ({ ok: false as const, error: { code: "unavailable" as const } });
+  const client: Partial<AircastleClient<Collections>> = {};
+  for (const name in _options.collections) {
+    client[name] = { create: unavailable, findById: unavailable };
+  }
+  return client as AircastleClient<Collections>;
 }
 export function validateResponse(_description: CollectionDescription, _response: unknown): boolean {
   return false;
