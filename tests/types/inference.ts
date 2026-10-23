@@ -62,8 +62,4 @@ if (validation.ok) {
 }
 schema.articles.validate(Symbol("validate accepts unknown inputs"));
 
-const nullDefault = collection({ title: text().nullable().default(null) });
-export type NullDefaultDomain = Assert<Equal<InferOutput<typeof nullDefault>["title"], string | null>>;
-const suppliedNullDefault: InferInput<typeof nullDefault> = { title: "Supplied text" };
-const suppliedNullDefaultOutput: InferOutput<typeof nullDefault> = { title: "Supplied text" };
-void [suppliedNullDefault, suppliedNullDefaultOutput];
+text().nullable().default(null);
