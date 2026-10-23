@@ -30,6 +30,10 @@ vp run dev-api
 
 The API uses port 43122 in both development and built runs. Override it with `PORT`; override the web app's port with `vp run dev-web -- --port <port>`. An occupied port stops startup rather than selecting another port.
 
+Open [API documentation](http://localhost:43122/docs) or its [OpenAPI document](http://localhost:43122/openapi.json). The documentation UI loads a pinned Scalar script from jsDelivr and requires internet access.
+
+API environment variables are validated at startup. `PORT` must be an integer from 1 to 65535. `LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`. `NODE_ENV` accepts `development`, `test`, or `production` and defaults to `development`.
+
 Start both apps concurrently with `vp run dev`.
 
 Run common commands from the repository root:
@@ -52,21 +56,21 @@ Install Docker with Compose v2.20 or later and start the Docker engine. The comm
 
 ```sh
 cp .env.example .env
-bun run db:up
+vp run db:up
 ```
 
 Postgres listens on `127.0.0.1:43123`. The example contains local-only credentials and a `DATABASE_URL` for application development. The API does not connect to the database yet.
 
-`db:up` waits for readiness. `bun run db:down` removes the container but preserves its data. `bun run db:logs` follows database logs. **`bun run db:reset` deletes this Compose project's database data.** Run `db:up` again to create an empty database.
+`db:up` waits for readiness. `vp run db:down` removes the container but preserves its data. `vp run db:logs` follows database logs. **`vp run db:reset` deletes this Compose project's database data.** Run `db:up` again to create an empty database.
 
 Compose names resources after the checkout directory. For concurrent worktrees, use distinct directory names and set a different `AIRCASTLE_DB_PORT` in each `.env`; update its `DATABASE_URL` port to match. Do not share a `COMPOSE_PROJECT_NAME` between independent checkouts.
 
 Run a command against a disposable database:
 
 ```sh
-bun run db:test -- bun run test-api
+vp run db:test -- vp run test-api
 ```
 
 The wrapper uses the same Compose file and pinned image. Each invocation gets a unique project, volume and automatically assigned localhost port. It supplies `DATABASE_URL` to the command, overriding any inherited value. It preserves the command's exit status and deletes its database after success, failure, Ctrl-C or termination. Forced kills and Docker outages can prevent cleanup; the wrapper prints its project name for recovery with `docker compose -p <project> -f compose.yaml down --volumes`.
 
-`bun run test:db` verifies the infrastructure with real Postgres, including persistence, reset and concurrent isolation. It requires Docker and runs separately from the regular test suite. Future CI database checks should use `db:test` so the image pin stays in one place.
+`vp run test:db` verifies the infrastructure with real Postgres, including persistence, reset and concurrent isolation. It requires Docker and runs separately from the regular test suite. Future CI database checks should use `db:test` so the image pin stays in one place.

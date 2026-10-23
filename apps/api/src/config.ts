@@ -10,5 +10,3 @@ export function readConfig(env: Record<string, string | undefined>) {
     { env, emptyAsUndefined: false },
   );
 }
-
-export type Config = ReturnType<typeof readConfig>;

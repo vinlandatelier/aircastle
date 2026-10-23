@@ -8,7 +8,8 @@ This map records module ownership and the pattern for organizing features. Entri
 apps/
 ├── api/                      HTTP API and Bun startup
 │   └── src/
-│       └── features/         planned: HTTP and agent interfaces by feature
+│       └── features/         HTTP interfaces by feature
+│           └── health/       Process liveness and its response schema
 └── web/                      React admin
 
 packages/
@@ -19,7 +20,7 @@ packages/
 scripts/                      Repository checks and local development tooling
 ```
 
-The API currently implements health directly in `apps/api/src/app.ts`. The feature-directory pattern below is the convention for new feature modules; it does not describe an existing health directory.
+The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration and constructs the logger. The CLI entry uses the same app factory with a silent logger. Health follows the feature pattern below.
 
 ## Feature pattern
 

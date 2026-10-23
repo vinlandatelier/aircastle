@@ -1,10 +1,13 @@
+import { Scalar } from "@scalar/hono-api-reference";
 import { Hono } from "hono";
 import { requestId } from "hono/request-id";
+import { openAPIRouteHandler } from "hono-openapi";
 import { pinoLogger } from "hono-pino";
 import type { Logger } from "pino";
+import { health } from "./features/health/index.ts";
 
 export function createApp({ logger }: { logger: Logger }) {
-  return new Hono()
+  const app = new Hono()
     .use(requestId())
     .use(
       pinoLogger({
@@ -24,5 +27,23 @@ export function createApp({ logger }: { logger: Logger }) {
       }),
     )
     .onError((_error, c) => c.json({ error: "Internal server error" }, 500))
-    .get("/health", (c) => c.json({ status: "ok" }));
+    .route("/", health);
+
+  return app
+    .get(
+      "/openapi.json",
+      openAPIRouteHandler(app, {
+        documentation: {
+          info: { title: "Aircastle API", version: "0.0.0" },
+        },
+      }),
+    )
+    .get(
+      "/docs",
+      Scalar({
+        url: "/openapi.json",
+        pageTitle: "Aircastle API",
+        cdn: "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0/dist/browser/standalone.js",
+      }),
+    );
 }

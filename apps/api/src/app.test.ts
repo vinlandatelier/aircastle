@@ -1,6 +1,6 @@
+import pino from "pino";
 import { describe, expect, test } from "vite-plus/test";
 import { createApp } from "./app.ts";
-import pino from "pino";
 
 function captureLogs(level: "info" | "error" | "silent" = "info") {
   const lines: string[] = [];
@@ -80,12 +80,63 @@ describe("API", () => {
     const ids = responses.map((response) => response.headers.get("x-request-id"));
 
     expect(new Set(ids).size).toBe(2);
-    expect(lines.map((line) => JSON.parse(line).reqId).sort()).toEqual(ids.sort());
+    expect(new Set(lines.map((line) => JSON.parse(line).reqId))).toEqual(new Set(ids));
   });
 
   test.each(["error", "silent"] as const)("honors the %s log level", async (level) => {
     const { logger, lines } = captureLogs(level);
     await createApp({ logger }).request("/health");
     expect(lines).toEqual([]);
+  });
+});
+
+describe("API documentation", () => {
+  test("publishes the health response schema as OpenAPI 3.1", async () => {
+    const { logger } = captureLogs("silent");
+    const response = await createApp({ logger }).request("/openapi.json");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    const spec = await response.json();
+    expect(spec).toMatchObject({
+      openapi: expect.stringMatching(/^3\.1\./),
+      info: { title: "Aircastle API", version: "0.0.0" },
+    });
+    expect(spec).toHaveProperty("paths", { "/health": expect.any(Object) });
+    expect(spec).toMatchObject({
+      paths: {
+        "/health": {
+          get: {
+            operationId: "getHealth",
+            responses: {
+              "200": {
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["status"],
+                      properties: { status: { const: "ok" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  test("serves Scalar with the local spec and a pinned UI asset", async () => {
+    const { logger } = captureLogs("silent");
+    const response = await createApp({ logger }).request("/docs");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    const html = await response.text();
+    expect(html).toContain("Aircastle API");
+    expect(html).toContain("/openapi.json");
+    expect(html).toContain("https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0");
+    expect(html).not.toContain("@latest");
   });
 });
