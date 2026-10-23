@@ -34,3 +34,15 @@ test("declared aircastle executable can be launched by the operating system", ()
     rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test("developer configuration fixtures use the public schema builder identity", () => {
+  const schemaEntry = import.meta.resolve("@aircastle/schema");
+  const script = `import { collection, text } from ${JSON.stringify(schemaEntry)}; import { compileSchema } from "@aircastle/schema"; const compiled = compileSchema({ articles: collection({ title: text() }) }); console.log(JSON.stringify(compiled.articles.validate({ title: "Hello" })));`;
+  const result = spawnSync("bun", ["--conditions=development", "-e", script], {
+    cwd: resolve("."),
+    encoding: "utf8",
+    timeout: 15_000,
+  });
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({ ok: true, data: { title: "Hello" } });
+});

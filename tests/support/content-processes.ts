@@ -28,7 +28,7 @@ export function execute(
 export async function developerApp() {
   const cwd = await mkdtemp(join(tmpdir(), "aircastle-developer-app-"));
   const client = pathToFileURL(join(repository, "packages/client/src/index.ts")).href;
-  const schema = pathToFileURL(join(repository, "packages/schema/src/index.ts")).href;
+  const schema = import.meta.resolve("@aircastle/schema");
   await writeFile(
     join(cwd, "aircastle.config.ts"),
     `import { defineConfig } from ${JSON.stringify(client)};

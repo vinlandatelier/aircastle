@@ -82,7 +82,7 @@ async function fixture(
     throw new Error("HTTP test server did not bind a TCP port");
   const url = `http://127.0.0.1:${address.port}`;
   const config = async (source: string) => writeFile(join(cwd, "aircastle.config.ts"), source);
-  const prelude = `import { defineConfig } from ${JSON.stringify(pathToFileURL(join(repository, "packages/client/src/index.ts")).href)};\nimport { collection, text } from ${JSON.stringify(pathToFileURL(join(repository, "packages/schema/src/index.ts")).href)};\n`;
+  const prelude = `import { defineConfig } from ${JSON.stringify(pathToFileURL(join(repository, "packages/client/src/index.ts")).href)};\nimport { collection, text } from ${JSON.stringify(import.meta.resolve("@aircastle/schema"))};\n`;
   await config(
     prelude +
       "export default defineConfig({ url: process.env.AIRCASTLE_URL, project: process.env.AIRCASTLE_PROJECT_ID, collections: { articles: collection({ title: text() }) } });\n",
