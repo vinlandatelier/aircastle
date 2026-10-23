@@ -33,6 +33,14 @@
       ]
     },
     {
+      "name": "coss",
+      "repository": "https://github.com/cosscom/ui",
+      "path": "apps/ui/skills/coss",
+      "commit": "3d8ca28e7d90123e9e0f44665944dc240b026ccb",
+      "localEdits": [],
+      "addedLicenseFiles": []
+    },
+    {
       "name": "emil-design-eng",
       "repository": "https://github.com/emilkowalski/skills",
       "path": "skills/emil-design-eng",
