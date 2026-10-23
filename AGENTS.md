@@ -4,6 +4,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 
 ## Architecture
 
+- Follow [ARCHITECTURE.md](ARCHITECTURE.md) for the module map and feature pattern. Update it in the same change when module locations or ownership change, including when planned modules are implemented. These maintenance updates are authorized; keep the map at module level rather than listing every file.
 - Design deep modules that agents can navigate easily: small explicit interfaces, clear ownership, and cohesive implementations. Keep each feature's implementation, types, and public-interface behavior tests together.
 - Keep the CMS core independent of frontend frameworks and HTTP routing. Keep HTTP contexts and SQL-driver types inside their adapters.
 - Browser code communicates with the server through HTTP and browser-safe shared contracts. It must not import server implementations, database adapters, or executable collection configuration.
