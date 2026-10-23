@@ -7,7 +7,7 @@ const cli = resolve(apiDirectory, "node_modules/.bin/hono");
 
 describe("Hono CLI", () => {
   test("discovers API routes without starting the server", () => {
-    const result = spawnSync(process.execPath, [cli, "routes", "src/app.ts"], {
+    const result = spawnSync(process.execPath, [cli, "routes", "src/cli.ts"], {
       cwd: apiDirectory,
       encoding: "utf8",
       timeout: 10_000,
@@ -25,7 +25,7 @@ describe("Hono CLI", () => {
   test("sends a request through the Bun runtime without starting the server", () => {
     const result = spawnSync(
       process.execPath,
-      [cli, "request", "/health", "src/app.ts", "--runtime", "bun"],
+      [cli, "request", "/health", "src/cli.ts", "--runtime", "bun"],
       { cwd: apiDirectory, encoding: "utf8", timeout: 10_000 },
     );
 

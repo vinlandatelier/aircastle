@@ -17,7 +17,9 @@
   "dependencies": {
     "@arkenv/core": "1.0.0-rc.4",
     "arktype": "2.2.9",
-    "hono": "4.13.13"
+    "hono": "4.13.13",
+    "hono-pino": "0.10.3",
+    "pino": "10.4.0"
   },
   "devDependencies": {
     "@hono/cli": "1.0.0-rc.8",
