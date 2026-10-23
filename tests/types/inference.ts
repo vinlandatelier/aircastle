@@ -69,9 +69,12 @@ export type EditorOutputInvariant = Assert<Equal<InferOutput<typeof plain>, Infe
 const schema = compileSchema({ articles });
 const validation = schema.articles.validate({ title: "Hi", note: null });
 if (validation.ok) {
+  const precise: Assert<Equal<IsAny<typeof validation.data>, false>> = true;
+  const matchesOutput: Assert<Equal<typeof validation.data, Output>> = true;
   const output: Output = validation.data;
-  void output;
+  void [precise, matchesOutput, output];
 }
+schema.articles.validate(Symbol("validate accepts unknown inputs"));
 // @ts-expect-error Unknown collections are not inferred.
 schema.pages;
 
