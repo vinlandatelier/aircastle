@@ -14,6 +14,11 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Keep field validation rules distinct from editor presentation settings. Changing an editor must preserve the field's data contract.
 - Enforce database-dependent guarantees, such as uniqueness, at the persistence layer.
 
+## Local infrastructure
+
+- Start local services through committed configuration and repository commands. Add infrastructure changes to the repository before using them; do not create ad hoc containers.
+- Use `bun run db:test -- <command>` for disposable Postgres. It isolates concurrent runs and cleans up their storage. Never reset another worktree's database.
+
 ## Code policy
 
 - Do not add ordinary code comments, including inline, line, or block comments. Use clear names and structure to explain the code.

@@ -1,5 +1,7 @@
 /eng-hidden/
 /node_modules/
+/.env
+/.env.local
 /dist/
 .vite/
 .vite-hooks/_/
