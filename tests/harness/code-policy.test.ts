@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { inspectCode } from "../../scripts/check-code-policy.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 test.each([
@@ -48,18 +49,21 @@ test("fails closed on source the parser cannot understand", () => {
 
 test("the policy command checks untracked files and preserves docstrings", () => {
   const root = resolve(import.meta.dir, "../..");
-  const directory = mkdtempSync(join(root, ".policy-probe-"));
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-policy-"));
   const file = join(directory, "probe.ts");
-  const run = () => Bun.spawnSync([process.execPath, join(root, "scripts/check-code-policy.ts")], {
-    cwd: root, stdout: "pipe", stderr: "pipe",
+  const run = () => Bun.spawnSync([process.execPath, join(root, "scripts/check-code-policy.ts"), directory], {
+    cwd: directory, stdout: "pipe", stderr: "pipe",
   });
   try {
+    const initialized = Bun.spawnSync(["git", "init", "--quiet"], { cwd: directory });
+    expect(initialized.exitCode).toBe(0);
     writeFileSync(file, "// ordinary explanation\nexport const value = 1;\n");
     const ordinary = run();
     expect(ordinary.exitCode).not.toBe(0);
     expect(new TextDecoder().decode(ordinary.stderr)).toContain("ordinary-comment");
     writeFileSync(file, "/** Public API documentation. */\nexport const value = 1;\n");
     expect(run().exitCode).toBe(0);
+    expect(Bun.spawnSync(["git", "add", "probe.ts"], { cwd: directory }).exitCode).toBe(0);
     writeFileSync(file, "/** @ts-ignore */\nexport const value = 1;\n");
     const suppression = run();
     expect(suppression.exitCode).not.toBe(0);

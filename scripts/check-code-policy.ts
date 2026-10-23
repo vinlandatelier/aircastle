@@ -24,8 +24,7 @@ export function inspectCode(file: string, source: string): PolicyViolation[] {
   return violations;
 }
 
-export function checkCodePolicy(): void {
-  const root = resolve(import.meta.dir, "..");
+export function checkCodePolicy(root = resolve(import.meta.dir, "..")): void {
   const git = Bun.spawnSync(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
     cwd: root, stdout: "pipe", stderr: "pipe",
   });
@@ -43,4 +42,4 @@ export function checkCodePolicy(): void {
   console.log(`Code policy passed for ${files.length} JavaScript/TypeScript files`);
 }
 
-if (import.meta.main) checkCodePolicy();
+if (import.meta.main) checkCodePolicy(process.argv[2] === undefined ? undefined : resolve(process.argv[2]));
