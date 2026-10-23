@@ -12,6 +12,7 @@
     "build": "tsc --noEmit false --declaration --emitDeclarationOnly --outDir dist",
     "test": "bun test",
     "test:harness": "bun test tests/harness",
+    "test:schema": "bun test tests/schema",
     "test:typecheck": "tsc -p tsconfig.tests.json"
   },
   "dependencies": {
