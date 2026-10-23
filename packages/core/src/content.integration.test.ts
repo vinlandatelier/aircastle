@@ -191,7 +191,10 @@ test("unique text preserves case, normalization spelling and large valid values"
     const cms = fixture.cms();
     const publication = await publish(cms, fixture.access);
     const contract = publication.contracts.articles!;
-    const values = ["Case", "case", "é", "e\u0301", "x".repeat(128_000)];
+    const entropy = Array.from({ length: 256 }, (_, index) =>
+      createHash("sha256").update(`value-${index}`).digest("hex"),
+    ).join("");
+    const values = ["Case", "case", "é", "e\u0301", "x".repeat(128_000), entropy];
     for (const [index, slug] of values.entries()) {
       const document = saved(
         await cms.create(fixture.access, "articles", contract, { title: `Value ${index}`, slug }),
@@ -580,5 +583,38 @@ test("every configured unique field is enforced without requiring a fixed confli
         .store()
         .transaction(fixture.access.project, (transaction) => transaction.documents("articles")),
     ).toHaveLength(1);
+  });
+});
+
+test("valid long collection and unique field names do not inherit SQL index byte limits", async () => {
+  await withCms(async (fixture) => {
+    const entropy = (seed: string) =>
+      Array.from({ length: 96 }, (_, index) =>
+        createHash("sha256").update(`${seed}-${index}`).digest("hex"),
+      ).join("");
+    const collectionName = "collection_" + entropy("collection");
+    const fieldName = "field_" + entropy("field");
+    const definition: CollectionDescription = {
+      fields: { [fieldName]: { type: "text", required: true, nullable: false, unique: true } },
+    };
+    const cms = fixture.cms();
+    const publication = successful(
+      await cms.publish(fixture.access, {
+        baseline: null,
+        collections: [{ name: collectionName, description: definition }],
+      }),
+    );
+    const contract = publication.contracts[collectionName]!;
+    const document = saved(
+      await cms.create(fixture.access, collectionName, contract, { [fieldName]: "kept" }),
+    );
+    expect(document).toEqual({ id: expect.any(String), [fieldName]: "kept" });
+    expect(await cms.findById(fixture.access, collectionName, contract, document.id)).toEqual({
+      ok: true,
+      data: document,
+    });
+    expect(
+      await cms.create(fixture.access, collectionName, contract, { [fieldName]: "kept" }),
+    ).toEqual({ ok: false, error: { code: "unique_conflict", field: fieldName } });
   });
 });

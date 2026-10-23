@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "vite-plus/test";
+import postgres from "postgres";
 import { postgresAdapter } from "./index.ts";
 import { databaseUrl, withDatabase } from "../../../tests/support/content-database.ts";
 import type { Permission, PublishedCollection } from "@aircastle/contracts";
@@ -379,3 +380,27 @@ for (const [namespace, truncated] of [
     });
   });
 }
+
+test("database fixture creates and cleans one literal dotted namespace independently of the adapter", async () => {
+  const namespace = `fixture.${randomUUID().replaceAll("-", "")}`;
+  const inspector = postgres(databaseUrl(), { onnotice: () => {} });
+  try {
+    await withDatabase(
+      async ({ sql }) => {
+        const identifier = '"' + namespace.replaceAll('"', '""') + '"';
+        await sql.unsafe(`CREATE SCHEMA ${identifier}`);
+        const rows = await sql<
+          { exists: boolean }[]
+        >`SELECT EXISTS (SELECT FROM pg_namespace WHERE nspname = ${namespace}) AS exists`;
+        expect(rows[0]?.exists).toBe(true);
+      },
+      { namespace },
+    );
+    const rows = await inspector<
+      { exists: boolean }[]
+    >`SELECT EXISTS (SELECT FROM pg_namespace WHERE nspname = ${namespace}) AS exists`;
+    expect(rows[0]?.exists).toBe(false);
+  } finally {
+    await inspector.end();
+  }
+});
