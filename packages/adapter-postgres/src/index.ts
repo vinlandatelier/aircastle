@@ -5,5 +5,15 @@ export interface PostgresOptions {
   namespace?: string;
 }
 export function postgresAdapter(_options: PostgresOptions): ContentStore {
-  throw new Error("Not implemented");
+  return {
+    initialize: async () => {},
+    close: async () => {},
+    authorize: async () => "unauthorized",
+    provision: async () => {
+      throw new Error("Not implemented");
+    },
+    transaction: async () => {
+      throw new Error("Not implemented");
+    },
+  };
 }
