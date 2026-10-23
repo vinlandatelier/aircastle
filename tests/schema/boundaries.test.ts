@@ -84,24 +84,18 @@ describe("document boundary and diagnostic order", () => {
     });
     const result = compileCollection(api, { title: api.text() }).validate(input);
     expect(reads).toBe(0);
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("Accessor document was accepted");
-    expect(result.issues.length).toBeGreaterThan(0);
-    expect(Object.hasOwn(result, "data")).toBe(false);
+    expectFailure(result, [{ code: "invalid_document", path: [] }]);
   });
 
   for (const kind of ["symbol", "non-enumerable"] as const) {
-    test(`rejects ${kind} own properties without choosing unresolved issue details`, () => {
+    test(`rejects ${kind} own properties as an invalid document`, () => {
       const input: Record<string, unknown> = { title: "Hi" };
       Object.defineProperty(input, kind === "symbol" ? Symbol("hidden") : "hidden", {
         value: "x",
         enumerable: kind === "symbol",
       });
       const result = compileCollection(api, { title: api.text() }).validate(input);
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error("Invalid document was accepted");
-      expect(result.issues.length).toBeGreaterThan(0);
-      expect(Object.hasOwn(result, "data")).toBe(false);
+      expectFailure(result, [{ code: "invalid_document", path: [] }]);
     });
   }
 

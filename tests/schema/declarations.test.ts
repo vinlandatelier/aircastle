@@ -217,6 +217,108 @@ describe("declaration compilation", () => {
     );
   });
 
+  test("partially overlapping and prefix choice declarations conflict", () => {
+    for (const choices of [["a"], ["a", "c"], ["a", "b", "c"]]) {
+      expectSchemaError(
+        () => compileCollection(api, { title: api.text().oneOf(["a", "b"]).oneOf(choices) }),
+        [{ code: "conflicting_choices", path }],
+      );
+    }
+  });
+
+  test("different options on the same editor conflict", () => {
+    for (const field of [
+      api.text().editor("textarea", { rows: 3 }).editor("textarea", { rows: 5 }),
+      api.text().editor("code", { language: "sql" }).editor("code", { language: "json" }),
+      api.text().oneOf(["a"]).editor("radio").editor("code"),
+    ]) {
+      expectSchemaError(
+        () => compileCollection(api, { title: field }),
+        [{ code: "conflicting_editors", path }],
+      );
+    }
+  });
+
+  test("editor options must be a plain data record", () => {
+    for (const options of [
+      null,
+      [],
+      new Date(),
+      Object.defineProperty({}, "rows", {
+        enumerable: true,
+        get() {
+          throw new Error("Getter must not run");
+        },
+      }),
+    ]) {
+      expectSchemaError(
+        () =>
+          compileCollection(api, {
+            title: api.text().editor("textarea", options as unknown as Record<string, unknown>),
+          }),
+        [{ code: "invalid_editor_options", path, option: "options", reason: "invalid_value" }],
+      );
+    }
+  });
+
+  test("choice constraint diagnostics contain every cause exactly once", () => {
+    expectSchemaError(
+      () => compileCollection(api, { title: api.text().min(2).email().oneOf(["a"]) }),
+      [
+        {
+          code: "invalid_choices",
+          path,
+          reason: "violates_constraints",
+          index: 0,
+          causes: [
+            { code: "too_short", path, minimum: 2, actual: 1, unit: "graphemes" },
+            { code: "invalid_email", path },
+          ],
+        },
+      ],
+    );
+  });
+
+  test("invalid choices suppress default membership errors", () => {
+    const cases: { field: RuntimeText; issues: ExpectedSchemaIssue[] }[] = [
+      {
+        field: api
+          .text()
+          .oneOf([42] as unknown as string[])
+          .default("ok"),
+        issues: [{ code: "invalid_choices", path, reason: "invalid_type", index: 0 }],
+      },
+      {
+        field: api.text().min(2).oneOf(["a"]).default("ok"),
+        issues: [
+          {
+            code: "invalid_choices",
+            path,
+            reason: "violates_constraints",
+            index: 0,
+            causes: [{ code: "too_short", path, minimum: 2, actual: 1, unit: "graphemes" }],
+          },
+        ],
+      },
+      {
+        field: api.text().oneOf(["a", "a"]).default("b"),
+        issues: [{ code: "duplicate_choice", path, index: 1, firstIndex: 0 }],
+      },
+    ];
+    for (const { field, issues } of cases)
+      expectSchemaError(() => compileCollection(api, { title: field }), issues);
+  });
+
+  test("editor conflicts precede invalid bounds regardless of discovery order", () => {
+    expectSchemaError(
+      () => compileCollection(api, { title: api.text().min(-1).editor("code").editor("textarea") }),
+      [
+        { code: "conflicting_editors", path },
+        { code: "invalid_bound", path, constraint: "min" },
+      ],
+    );
+  });
+
   test("does not echo invalid default content in diagnostics", () => {
     const secret = "private-default-value-marker";
     const field = api.text().default(secret).max(0);

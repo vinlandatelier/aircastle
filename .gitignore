@@ -3,3 +3,7 @@
 /dist/
 .vite/
 .vite-hooks/_/
+/coverage/
+/.stryker-tmp/
+/reports/
+/.mutation-types-*/

@@ -63,6 +63,11 @@ export type ValidationResult<Output extends object> =
 export type SchemaIssue = IssueDetails &
   (
     | {
+        readonly code: "invalid_definition";
+        readonly expected: "record" | "collection" | "field";
+        readonly received: ReceivedType;
+      }
+    | {
         readonly code:
           | "conflicting_defaults"
           | "conflicting_formats"
@@ -92,6 +97,11 @@ export type SchemaIssue = IssueDetails &
         readonly code: "duplicate_choice";
         readonly index: number;
         readonly firstIndex: number;
+      }
+    | {
+        readonly code: "invalid_editor";
+        readonly expected: "string";
+        readonly received: ReceivedType;
       }
     | {
         readonly code: "unknown_editor";
@@ -141,7 +151,7 @@ export interface TextFieldDescription {
   readonly choices?: readonly string[];
   readonly default?: string | null;
   readonly format?: "email" | "url";
-  /** Explicit editor metadata; the plain-input discriminator is undecided. */
+  /** Explicit editor metadata; omitted for the plain text input. */
   readonly editor?: TextEditorDescription;
 }
 

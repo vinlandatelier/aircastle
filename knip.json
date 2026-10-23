@@ -3,7 +3,7 @@
   "workspaces": {
     ".": {
       "entry": ["src/index.ts", "tests/types/**/*.ts"],
-      "ignoreDependencies": ["arktype", "vite"],
+      "ignoreDependencies": ["@stryker-mutator/command-runner", "vite"],
       "ignoreExportsUsedInFile": true
     }
   }

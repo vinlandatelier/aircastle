@@ -3,9 +3,34 @@ export interface RejectionCase {
   file: string;
   codes: readonly number[];
   target: string;
+  requiresApi?: false;
 }
 
 export const rejectionCases: readonly RejectionCase[] = [
+  {
+    suite: "contracts",
+    file: "tests/types/negative/contracts/definition-needs-expected.ts",
+    codes: [2322],
+    target: "const rejected: SchemaIssue",
+  },
+  {
+    suite: "contracts",
+    file: "tests/types/negative/contracts/definition-needs-received.ts",
+    codes: [2322],
+    target: "const rejected: SchemaIssue",
+  },
+  {
+    suite: "contracts",
+    file: "tests/types/negative/contracts/editor-needs-received.ts",
+    codes: [2322],
+    target: "const rejected: SchemaIssue",
+  },
+  {
+    suite: "contracts",
+    file: "tests/types/negative/contracts/definition-kind.ts",
+    codes: [2322],
+    target: 'expected: "number"',
+  },
   {
     suite: "contracts",
     file: "tests/types/negative/contracts/success-has-no-issues.ts",
@@ -63,12 +88,14 @@ export const rejectionCases: readonly RejectionCase[] = [
   {
     suite: "contracts",
     file: "tests/types/negative/contracts/equality-control.ts",
+    requiresApi: false,
     codes: [2344],
     target: "Assert<Equal<string, number>>",
   },
   {
     suite: "contracts",
     file: "tests/types/negative/contracts/any-control.ts",
+    requiresApi: false,
     codes: [2344],
     target: "Assert<Equal<IsAny<any>, false>>",
   },

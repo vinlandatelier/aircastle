@@ -1,4 +1,4 @@
-import type { SchemaIssue } from "../../../../src/index.ts";
+import type { SchemaIssue } from "aircastle-under-test";
 const rejected: SchemaIssue = {
   code: "invalid_default",
   path: [],

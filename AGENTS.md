@@ -24,6 +24,9 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 
 ## Changes and verification
 
+- Before editing, identify the active worktree, approved behavior, bounded outcome, and relevant checks. Resolve blocking behavior choices before writing dependent code or expectations; choose routine implementation details autonomously.
+- Keep one authoritative specification and decision record, with one writer per shared update. Worktrees must reference them rather than maintain copies. Resolve code paths in the active worktree.
+- Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists.
 - Define observable behavior and relevant failure cases before implementing a feature.
 - For executable behavior changes, write or update tests first and confirm they fail for the intended reason before implementing the change.
 - Derive expected results from requirements and test through the module's public interface.
@@ -31,6 +34,9 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.
 - Verify documentation and configuration changes directly; add executable tests when behavior changes.
+- After edits, run affected checks. Run `bun run check` for final verification; it covers policy, source and emitted type contracts, runtime tests, and inference. A failed stage stops the command and leaves later stages unverified.
+- Reuse passing evidence for unchanged code, dependencies, configuration, and environment. Repeat a check only when its inputs change, it fails, or a new finding requires it. Record the command, exit code, and revision or content hash; setup failures do not establish behavior.
+- Use one focused audit of the completed change. Follow up on named findings and affected code instead of restarting a broad review. The author checks the reviewer's evidence and log; do not create recursive audit chains.
 
 ## Public documentation
 

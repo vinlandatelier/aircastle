@@ -1,3 +1,3 @@
-import type { CompiledSchema } from "../../../../src/index.ts";
+import type { CompiledSchema } from "aircastle-under-test";
 declare const schema: CompiledSchema<{ articles: { title: string } }>;
 schema.articles = schema.articles;

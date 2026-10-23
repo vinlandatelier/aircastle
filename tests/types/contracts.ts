@@ -1,9 +1,10 @@
 import type {
   CompiledCollection,
   CompiledSchema,
+  SchemaIssue,
   ValidationIssue,
   ValidationResult,
-} from "../../src/index.ts";
+} from "aircastle-under-test";
 import type { Assert, Equal } from "./assert.ts";
 
 export type ValidationCodes = Assert<
@@ -35,3 +36,19 @@ if (result.ok) {
 declare const schema: CompiledSchema<{ articles: { title: string } }>;
 const collection: CompiledCollection<{ title: string }> = schema.articles;
 collection.validate(Symbol("unknown input is allowed"));
+
+const invalidDefinition: SchemaIssue = {
+  code: "invalid_definition",
+  path: [],
+  message: "Expected a record.",
+  expected: "record",
+  received: "array",
+};
+const invalidEditor: SchemaIssue = {
+  code: "invalid_editor",
+  path: ["articles", "title"],
+  message: "Expected an editor name.",
+  expected: "string",
+  received: "number",
+};
+void [invalidDefinition, invalidEditor];

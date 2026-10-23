@@ -1,5 +1,5 @@
-import { collection, compileSchema, text } from "../../src/index.ts";
-import type { InferInput, InferOutput } from "../../src/index.ts";
+import { collection, compileSchema, text } from "aircastle-under-test";
+import type { InferInput, InferOutput } from "aircastle-under-test";
 import type { Assert, Equal, IsAny } from "./assert.ts";
 
 const articles = collection({
@@ -86,4 +86,10 @@ if (validation.ok) {
 }
 schema.articles.validate(Symbol("validate accepts unknown inputs"));
 
-text().nullable().default(null);
+const nullDefault = collection({ title: text().nullable().default(null) });
+export type NullDefaultDomain = Assert<
+  Equal<InferOutput<typeof nullDefault>["title"], string | null>
+>;
+const suppliedNullDefault: InferInput<typeof nullDefault> = { title: "Supplied text" };
+const suppliedNullDefaultOutput: InferOutput<typeof nullDefault> = { title: "Supplied text" };
+void [suppliedNullDefault, suppliedNullDefaultOutput];

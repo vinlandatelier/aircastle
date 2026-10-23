@@ -9,6 +9,14 @@ describe("Aircastle format policy", () => {
   });
 
   const validEmail = [
+    "a@example.com",
+    "ada@b.com",
+    "ada@example.c",
+    "ada@example.c0m",
+    "ada@example.3com",
+    "ada@example.com3",
+    "ada@123.example.com",
+    "ada@example.123.com",
     "ada@example.com",
     "ada+news@example.com",
     "first.last@example.co.uk",
@@ -23,6 +31,7 @@ describe("Aircastle format policy", () => {
   ];
   const invalidEmail = [
     "",
+    "example.com",
     " ada@example.com",
     "ada@example.com ",
     "a..b@example.com",
@@ -84,6 +93,15 @@ describe("Aircastle format policy", () => {
     "https://example.com:65535",
     "https://example.com:1",
     "https://example.com/-1:foo",
+    "http://example.com:0",
+    "http://example.com:080",
+    "https://under_score.example",
+    `https://${"a".repeat(64)}.example`,
+    "https://example.com/%00",
+    "https://example.com/%0A",
+    "http://123.example",
+    "http://[::1]",
+    "https://127.0.0.1.Example",
   ];
   const invalidUrls = [
     "",
@@ -115,6 +133,15 @@ describe("Aircastle format policy", () => {
     "https://example.com/a\nb",
     "https://example.com/a\tb",
     "https://example.com/a\u00A0b",
+    "http://example.123",
+    "http://0127.0.0.1",
+    "\u0001https://example.com",
+    "http://[::1",
+    "http://[::1]oops",
+    "http://[::1]:",
+    "http://127.42.1",
+    "http://127.2570",
+    "http://0x7f002a2a",
   ];
   for (const title of validUrls) {
     test(`accepts URL unchanged ${JSON.stringify(title)}`, () => {
