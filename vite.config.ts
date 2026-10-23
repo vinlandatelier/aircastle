@@ -11,7 +11,7 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: ["**/*.md"],
+    ignorePatterns: ["**/*.md", ".agents/skills/**"],
     overrides: [
       {
         files: ["apps/web/**"],
@@ -33,6 +33,7 @@ export default defineConfig({
       "vite-plus/prefer-vite-plus-imports": "error",
     },
     ignorePatterns: [
+      ".agents/skills/**",
       "**/dist/**",
       "packages/schema/tests/types/inference.ts",
       "packages/schema/tests/types/negative/**",

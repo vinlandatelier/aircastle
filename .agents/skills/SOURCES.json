@@ -1,0 +1,122 @@
+{
+  "skills": [
+    {
+      "name": "agent-browser",
+      "repository": "https://github.com/vercel-labs/agent-browser",
+      "path": "skills/agent-browser",
+      "commit": "50c34e78c98dbe8add0b3ff36b4bcd7a47f1022b",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "break-ui",
+      "repository": "https://github.com/emilkowalski/skills",
+      "path": "skills/break-ui",
+      "commit": "2d228630ba1446365f614a108cb8252f1feda202",
+      "localEdits": [
+        "Point UI prototype references to prototype-ui."
+      ],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "codebase-design",
+      "repository": "https://github.com/mattpocock/skills",
+      "path": "skills/engineering/codebase-design",
+      "commit": "5beb35b040e3de97e54fa9e386d7e42d15c295c2",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "emil-design-eng",
+      "repository": "https://github.com/emilkowalski/skills",
+      "path": "skills/emil-design-eng",
+      "commit": "2d228630ba1446365f614a108cb8252f1feda202",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "prototype-ui",
+      "repository": "https://github.com/emilkowalski/skills",
+      "path": "skills/prototype",
+      "commit": "2d228630ba1446365f614a108cb8252f1feda202",
+      "localEdits": [
+        "Rename frontmatter from prototype to prototype-ui."
+      ],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "shadcn",
+      "repository": "https://github.com/shadcn-ui/ui",
+      "path": "skills/shadcn",
+      "commit": "3d98900e9b73c45f035f8109e9d41ba6a51685e7",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE.md"
+      ]
+    },
+    {
+      "name": "tanstack-query",
+      "repository": "https://github.com/tanstack-skills/tanstack-skills",
+      "path": "plugins/tanstack-query/skills/tanstack-query",
+      "commit": "6f5521ecbdfbfa3d54d335eba6c8b4df0b804c03",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "tanstack-router",
+      "repository": "https://github.com/tanstack-skills/tanstack-skills",
+      "path": "plugins/tanstack-router/skills/tanstack-router",
+      "commit": "6f5521ecbdfbfa3d54d335eba6c8b4df0b804c03",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "typescript-advanced-types",
+      "repository": "https://github.com/wshobson/agents",
+      "path": "plugins/javascript-typescript/skills/typescript-advanced-types",
+      "commit": "0874a27b17a22e2b7c2e2bcd725768e0803cad06",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "vercel-composition-patterns",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/composition-patterns",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "localEdits": [],
+      "addedLicenseFiles": []
+    },
+    {
+      "name": "vercel-react-best-practices",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/react-best-practices",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "localEdits": [],
+      "addedLicenseFiles": []
+    },
+    {
+      "name": "web-design-guidelines",
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "path": "skills/web-design-guidelines",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "localEdits": [],
+      "addedLicenseFiles": []
+    }
+  ]
+}

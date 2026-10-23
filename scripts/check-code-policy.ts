@@ -92,7 +92,7 @@ export function checkCodePolicy(root = resolve(import.meta.dirname, "..")): void
   );
   if (!git.success) throw new Error(new TextDecoder().decode(git.stderr));
   const files = [...new Set(new TextDecoder().decode(git.stdout).split("\0"))]
-    .filter((file) => /\.[cm]?[jt]sx?$/.test(file))
+    .filter((file) => /\.[cm]?[jt]sx?$/.test(file) && !file.startsWith(".agents/skills/shadcn/"))
     .sort();
   let failures = 0;
   for (const file of files) {

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { expect, test } from "vite-plus/test";
 import { inspectCode } from "../../scripts/check-code-policy.ts";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -86,6 +86,33 @@ test("the policy command checks untracked files and preserves docstrings", () =>
     const suppression = run();
     expect(suppression.status).not.toBe(0);
     expect(suppression.stderr).toContain("type-suppression");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("the policy command preserves vendored shadcn code and checks authored skills", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-vendor-policy-"));
+  const run = () =>
+    spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    const vendor = join(directory, ".agents/skills/shadcn");
+    mkdirSync(vendor, { recursive: true });
+    writeFileSync(join(vendor, "sample.ts"), "// upstream example\nexport const value = 1;\n");
+    expect(run().status).toBe(0);
+
+    const authored = join(directory, ".agents/skills/worktree");
+    mkdirSync(authored, { recursive: true });
+    writeFileSync(join(authored, "sample.ts"), "// authored comment\nexport const value = 1;\n");
+    const result = run();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(".agents/skills/worktree/sample.ts");
+    expect(result.stderr).toContain("ordinary-comment");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
