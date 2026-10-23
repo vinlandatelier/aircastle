@@ -36,6 +36,8 @@ API environment variables are validated at startup. `PORT` must be an integer fr
 
 Start both apps concurrently with `vp run dev`.
 
+The web dev server and local preview forward `/api` requests to the API, so browser code can use relative URLs such as `/api/health`. To change the API port for both servers, use `PORT=43130 vp run dev`.
+
 Run common commands from the repository root:
 
 | Command | Scope |
