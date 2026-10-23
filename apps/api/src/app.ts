@@ -4,9 +4,19 @@ import { requestId } from "hono/request-id";
 import { openAPIRouteHandler } from "hono-openapi";
 import { pinoLogger } from "hono-pino";
 import type { Logger } from "pino";
+import type { ContentService } from "@aircastle/core";
+import { contentRoutes } from "./features/content/index.ts";
 import { health } from "./features/health/index.ts";
 
-export function createApp({ logger }: { logger: Logger }) {
+export function createApp({
+  logger,
+  cms,
+  maxRequestBytes,
+}: {
+  logger: Logger;
+  cms?: ContentService;
+  maxRequestBytes?: number;
+}) {
   const app = new Hono()
     .use(requestId())
     .use(
@@ -28,6 +38,12 @@ export function createApp({ logger }: { logger: Logger }) {
     .onError((_error, c) => c.json({ error: "Internal server error" }, 500))
     .basePath("/api")
     .route("/", health);
+
+  if (cms)
+    app.route(
+      "/",
+      contentRoutes({ cms, ...(maxRequestBytes === undefined ? {} : { maxRequestBytes }) }),
+    );
 
   return app
     .get(

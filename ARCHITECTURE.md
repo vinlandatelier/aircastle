@@ -20,8 +20,11 @@ apps/
 
 packages/
 ├── schema/                   Collection definitions, validation, and descriptions
-├── core/                     planned: CMS operations and rules
-└── adapter-postgres/         planned: Postgres persistence and migrations
+├── contracts/                Shared content contracts and schema compatibility
+├── core/                     CMS operation and persistence interfaces
+├── adapter-postgres/         Postgres adapter interface
+├── client/                   Developer config and typed HTTP client interface
+└── cli/                      Schema publication command interface
 
 scripts/                      Repository checks and local development tooling
 ```
@@ -55,9 +58,11 @@ This is a general pattern, not a required file inventory for every module. Exist
 - `apps/api` translates HTTP requests and agent tool calls into CMS operations. It owns transport schemas, logging integration, API documentation, and runtime resource assembly. Keep startup configuration outside feature handlers.
 - `apps/web` owns the admin shell, local UI components, and browser state. `App` composes the shell through `components/app-shell.tsx` and provides light, dark, and system themes with `next-themes`. The full-width header owns the fixed brand cell and header actions. The sidebar collapses independently beneath it. The Efferd layout uses shadcn components and displays sample navigation and dashboard placeholders. `apps/web/components.json` configures shadcn and the Efferd registry.
 - `packages/schema` owns collection definitions, compilation, validation, and descriptions. Its public entry point is `@aircastle/schema`.
-- The planned core owns CMS operations and their rules. Keep feature-specific permissions, revisions, and review behavior with the feature. HTTP and agent tools call the same operations.
-- The planned core defines the persistence operations it needs and which changes must be atomic. Database adapters implement those operations and transactions, keeping SQL and driver types private.
-- The planned Postgres adapter owns SQL, row mapping, database constraints, and migrations for Aircastle's own tables. User collection migrations belong with the user's project when the eventual storage design requires them. Collection storage and migration formats remain undecided.
+- The core owns CMS operations and their rules. Keep feature-specific permissions, revisions, and review behavior with the feature. HTTP and agent tools call the same operations.
+- The core defines the persistence operations it needs and which changes must be atomic. Database adapters implement those operations and transactions, keeping SQL and driver types private.
+- The Postgres adapter owns SQL, row mapping, database constraints, and migrations for Aircastle's own tables. User collection migrations belong with the user's project when the eventual storage design requires them. Project collections share JSONB document storage within an instance-owned namespace. Content migration execution is deferred.
+- `packages/contracts` owns browser-safe content result types, serialized collection contracts, compatibility and projection. It uses the schema package and has no server or SQL imports.
+- `packages/client` owns developer configuration and the typed application HTTP client. `packages/cli` owns publication and lockfile workflows and communicates over HTTP.
 - Browser code uses HTTP and browser-safe contracts. It does not import server implementations or executable collection configuration.
 
 Local Postgres setup stays in the root `compose.yaml` and development scripts. Application migrations belong with their database adapter.

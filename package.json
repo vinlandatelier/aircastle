@@ -43,9 +43,17 @@
     "db:logs": "docker compose -f compose.yaml logs --follow postgres",
     "db:reset": "docker compose -f compose.yaml down --volumes",
     "db:test": "bun scripts/with-postgres.ts",
-    "test:db": "vp test --config vite.db.config.ts"
+    "test:db": "vp test --config vite.db.config.ts",
+    "test:content": "vp test --config vite.content.config.ts",
+    "test:content:db": "vp run db:test -- vp run test:content -- --project database",
+    "dev:setup": "bun scripts/dev-setup.ts"
   },
   "devDependencies": {
+    "@aircastle/adapter-postgres": "workspace:*",
+    "@aircastle/cli": "workspace:*",
+    "@aircastle/client": "workspace:*",
+    "@aircastle/contracts": "workspace:*",
+    "@aircastle/core": "workspace:*",
     "@babel/parser": "7.28.5",
     "@types/bun": "1.3.4",
     "knip": "6.42.1",
