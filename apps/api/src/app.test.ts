@@ -19,6 +19,7 @@ describe("API", () => {
     expect(await response.json()).toEqual({ status: "ok" });
     expect(response.headers.get("x-request-id")).toBeTruthy();
     expect(lines).toHaveLength(1);
+    expect(lines[0]!.match(/"reqId":/g)).toHaveLength(1);
     expect(JSON.parse(lines[0]!)).toMatchObject({
       level: 30,
       reqId: response.headers.get("x-request-id"),

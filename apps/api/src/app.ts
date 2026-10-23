@@ -14,7 +14,6 @@ export function createApp({ logger }: { logger: Logger }) {
         pino: logger,
         http: {
           onReqBindings: (c) => ({
-            reqId: c.get("requestId"),
             req: { method: c.req.method, path: c.req.path },
           }),
           onResBindings: (c) => ({
