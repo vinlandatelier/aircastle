@@ -17,6 +17,16 @@ describe("document boundary and diagnostic order", () => {
     expectSuccess(compileCollection(api, { title: api.text() }).validate(input), { title: "Hi" });
   });
 
+  test("rejects inherited field getters without reading inherited values", () => {
+    let reads = 0;
+    const prototype = Object.defineProperty({}, "title", {
+      enumerable: true, get() { reads++; throw new Error("Inherited value must not execute"); },
+    });
+    const input = Object.create(prototype);
+    expectFailure(compileCollection(api, { title: api.text() }).validate(input), [{ code: "invalid_document", path: [] }]);
+    expect(reads).toBe(0);
+  });
+
   test("rejects accessors without invoking getters", () => {
     let reads = 0;
     const input = Object.defineProperty({}, "title", { enumerable: true, get() { reads++; throw new Error("Must not execute"); } });

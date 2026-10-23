@@ -1,4 +1,4 @@
-import { beforeAll, describe, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { compileCollection, requireSchemaApi, type RuntimeApi } from "../support/api.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";
 
@@ -79,6 +79,15 @@ describe("strict text, bounds and Unicode", () => {
       { code: "invalid_unicode", path: ["title"] }, { code: "invalid_character", path: ["title"] },
     ]);
   });
+
+  for (const [suffix, code] of [["\uD800", "invalid_unicode"], ["\u0000", "invalid_character"]] as const) {
+    test(`${code} diagnostics do not echo submitted text`, () => {
+      const marker = "private-text-content-marker";
+      const result = compileCollection(api, { title: api.text() }).validate({ title: marker + suffix });
+      expectFailure(result, [{ code, path: ["title"] }]);
+      expect(JSON.stringify(result)).not.toContain(marker);
+    });
+  }
 
   test("choices match exact strings and preserve declaration order in issues", () => {
     const collection = compileCollection(api, { title: api.text().oneOf(["published", "draft", "é", ""]) });
