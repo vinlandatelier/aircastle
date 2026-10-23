@@ -1,6 +1,9 @@
 import app from "./app.ts";
+import { readConfig } from "./config.ts";
+
+const config = readConfig(process.env);
 
 export default {
-  port: Number(process.env.PORT ?? 43122),
+  port: config.PORT,
   fetch: app.fetch,
 };
