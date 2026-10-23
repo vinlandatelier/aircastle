@@ -11,6 +11,12 @@ apps/
 │       └── features/         HTTP interfaces by feature
 │           └── health/       Process liveness and its response schema
 └── web/                      React admin
+    ├── scripts/              Theme-aware brand icon generation
+    └── src/
+        ├── components/       Efferd app shell and its layout components
+        │   └── ui/           Local shadcn UI components built on Base UI
+        ├── hooks/            Browser state subscriptions
+        └── lib/              Browser-safe UI utilities
 
 packages/
 ├── schema/                   Collection definitions, validation, and descriptions
@@ -47,6 +53,7 @@ This is a general pattern, not a required file inventory for every module. Exist
 ## Ownership
 
 - `apps/api` translates HTTP requests and agent tool calls into CMS operations. It owns transport schemas, logging integration, API documentation, and runtime resource assembly. Keep startup configuration outside feature handlers.
+- `apps/web` owns the admin shell, local UI components, and browser state. `App` composes the shell through `components/app-shell.tsx` and provides light, dark, and system themes with `next-themes`. The full-width header owns the fixed brand cell and header actions. The sidebar collapses independently beneath it. The Efferd layout uses shadcn components and displays sample navigation and dashboard placeholders. `apps/web/components.json` configures shadcn and the Efferd registry.
 - `packages/schema` owns collection definitions, compilation, validation, and descriptions. Its public entry point is `@aircastle/schema`.
 - The planned core owns CMS operations and their rules. Keep feature-specific permissions, revisions, and review behavior with the feature. HTTP and agent tools call the same operations.
 - The planned core defines the persistence operations it needs and which changes must be atomic. Database adapters implement those operations and transactions, keeping SQL and driver types private.

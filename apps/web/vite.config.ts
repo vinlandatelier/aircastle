@@ -1,8 +1,10 @@
 import process from 'node:process'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, lazyPlugins } from 'vite-plus'
 export default defineConfig({
+  resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
   server: {
     port: 43121,
     strictPort: true,
@@ -11,5 +13,5 @@ export default defineConfig({
     },
   },
   preview: { port: 43121, strictPort: true },
-  plugins: lazyPlugins(() => [react(), babel({ presets: [reactCompilerPreset()] })]),
+  plugins: lazyPlugins(() => [tailwindcss(), react(), babel({ presets: [reactCompilerPreset()] })]),
 })
