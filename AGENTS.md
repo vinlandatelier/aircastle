@@ -4,8 +4,12 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 
 ## Architecture
 
-- Design deep modules that agents can navigate easily: small explicit interfaces, clear ownership, cohesive implementations, and nearby tests showing observable behavior.
-- Keep the CMS core independent of frontend frameworks and HTTP routing.
+- Design deep modules that agents can navigate easily: small explicit interfaces, clear ownership, and cohesive implementations. Keep each feature's implementation, types, and public-interface behavior tests together.
+- Keep the CMS core independent of frontend frameworks and HTTP routing. Keep HTTP contexts and SQL-driver types inside their adapters.
+- Browser code communicates with the server through HTTP and browser-safe shared contracts. It must not import server implementations, database adapters, or executable collection configuration.
+- Cross-module callers use public entry points. Keep implementation files private; prevent cross-module deep imports and dependency cycles.
+- For backend operations, pass dependencies explicitly and represent expected failures with discriminated results. Construct runtime resources at application startup and follow the established pattern for each concern.
+- As module boundaries are introduced, enforce dependency direction and public entry points with package exports, types, or automated import checks in CI.
 - Validate external configuration and document input at entry points. Keep internal operations typed.
 - Keep field validation rules distinct from editor presentation settings. Changing an editor must preserve the field's data contract.
 - Enforce database-dependent guarantees, such as uniqueness, at the persistence layer.
