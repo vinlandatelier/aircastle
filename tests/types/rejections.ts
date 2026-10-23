@@ -7,6 +7,10 @@ export interface RejectionCase {
 }
 
 export const rejectionCases: readonly RejectionCase[] = [
+  { suite: "contracts", file: "tests/types/negative/contracts/definition-needs-expected.ts", codes: [2322], target: "const rejected: SchemaIssue" },
+  { suite: "contracts", file: "tests/types/negative/contracts/definition-needs-received.ts", codes: [2322], target: "const rejected: SchemaIssue" },
+  { suite: "contracts", file: "tests/types/negative/contracts/editor-needs-received.ts", codes: [2322], target: "const rejected: SchemaIssue" },
+  { suite: "contracts", file: "tests/types/negative/contracts/definition-kind.ts", codes: [2322], target: "expected: \"number\"" },
   {
     "suite": "contracts",
     "file": "tests/types/negative/contracts/success-has-no-issues.ts",

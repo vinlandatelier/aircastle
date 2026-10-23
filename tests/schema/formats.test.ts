@@ -44,6 +44,9 @@ describe("Aircastle format policy", () => {
     "https://example.com/你好?q=café#章节", "https://example.com/a/../b",
     "https://example.com/%61", "HTTPS://EXAMPLE.COM:443/a/../b?token=abc",
     "https://example.com:65535", "https://example.com:1", "https://example.com/-1:foo",
+    "http://example.com:0", "http://example.com:080", "https://under_score.example",
+    `https://${"a".repeat(64)}.example`, "https://example.com/%00", "https://example.com/%0A",
+    "http://123.example",
   ];
   const invalidUrls = [
     "", "/articles/hello", "example.com", "//example.com", "mailto:ada@example.com",
@@ -55,6 +58,7 @@ describe("Aircastle format policy", () => {
     "https://alice@example.com", "https://:secret@example.com", "https://example.com/%",
     "https://example.com/%2", "https://example.com/a\\b", "https://example.com/a\nb",
     "https://example.com/a\tb", "https://example.com/a\u00A0b",
+    "http://example.123", "http://0127.0.0.1",
   ];
   for (const title of validUrls) {
     test(`accepts URL unchanged ${JSON.stringify(title)}`, () => {
