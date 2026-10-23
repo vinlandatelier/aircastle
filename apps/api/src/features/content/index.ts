@@ -57,7 +57,7 @@ async function jsonBody(c: Context, limit: number): Promise<Result<unknown>> {
       if (part.done) break;
       size += part.value.byteLength;
       if (size > limit) {
-        await reader.cancel();
+        await reader.cancel().catch(() => {});
         return failure("payload_too_large");
       }
       chunks.push(part.value);

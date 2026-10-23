@@ -5,9 +5,9 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "bun --conditions=development --hot src/index.ts",
+    "dev": "bun --conditions=development --env-file=../../.env --hot src/index.ts",
     "build": "bun build src/index.ts --conditions=development --target bun --outdir dist",
-    "start": "bun run dist/index.js",
+    "start": "bun --env-file=../../.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vp test",
     "lint": "vp lint",
