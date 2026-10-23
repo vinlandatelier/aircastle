@@ -16,16 +16,18 @@ vp run test:types
 vp run -r build
 ```
 
-Start the web app on port 5173:
+Start the web app on port 43121:
 
 ```sh
 vp run dev-web
 ```
 
-Start the API on port 3000:
+Start the API on port 43122:
 
 ```sh
 vp run dev-api
 ```
+
+The API uses port 43122 in both development and built runs. Override it with `PORT`; override the web app's port with `vp run dev-web -- --port <port>`. An occupied port stops startup rather than selecting another port.
 
 Run API tests with `vp -C apps/api run test`.
