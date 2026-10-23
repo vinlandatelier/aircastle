@@ -19,3 +19,8 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.
 - Verify documentation and configuration changes directly; add executable tests when behavior changes.
+
+## Public documentation
+
+- Keep README.md focused on general development setup and getting started. Do not add implementation progress, module plans, or internal design notes.
+- Obtain explicit user approval before changing README.md or any other public documentation. A direct request for a specific documentation change authorizes that change; feature work alone does not.
