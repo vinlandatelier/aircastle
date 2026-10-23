@@ -32,6 +32,8 @@ export interface ContentStore {
     verifier: string;
     permissions: readonly Permission[];
     newKey: boolean;
+    workspaceName?: string;
+    projectName?: string;
   }): Promise<ProvisionedProject>;
   authorize(
     project: string,
