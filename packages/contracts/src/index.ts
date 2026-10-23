@@ -8,6 +8,7 @@ import type {
 export type { CollectionDescription, CollectionDefinitions } from "@aircastle/schema";
 export type DocumentData = Record<string, string | null>;
 export type ContentDocument = DocumentData & { id: string };
+export type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 export type Permission = "content:read" | "content:write" | "schema:publish";
 export type ContentError =
   | { code: "validation_failed"; issues: readonly [ValidationIssue, ...ValidationIssue[]] }

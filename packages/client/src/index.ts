@@ -1,4 +1,9 @@
-import type { CollectionDefinitions, CollectionDescription, Result } from "@aircastle/contracts";
+import type {
+  CollectionDefinitions,
+  CollectionDescription,
+  Fetch,
+  Result,
+} from "@aircastle/contracts";
 import type { InferInput, InferOutput } from "@aircastle/schema";
 
 export interface AircastleConfig<Collections extends CollectionDefinitions> {
@@ -33,7 +38,7 @@ export function defineConfig<const Collections extends CollectionDefinitions>(_c
 export function createClient<const Collections extends CollectionDefinitions>(
   _options: AircastleConfig<Collections> & {
     apiKey: string | undefined;
-    fetch?: typeof globalThis.fetch;
+    fetch?: Fetch;
   },
 ): AircastleClient<Collections> {
   throw new Error("Not implemented");
