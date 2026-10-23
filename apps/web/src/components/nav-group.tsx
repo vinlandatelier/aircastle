@@ -14,8 +14,12 @@ import { ChevronRightIcon } from 'lucide-react'
 
 export function NavGroup({ label, items }: SidebarNavGroup) {
   return (
-    <SidebarGroup>
-      {label && <SidebarGroupLabel className="mb-2">{label}</SidebarGroupLabel>}
+    <SidebarGroup className="transition-[padding] duration-150 ease-out motion-reduce:transition-none group-data-[collapsible=icon]:py-0">
+      {label && (
+        <SidebarGroupLabel className="mb-2 overflow-hidden group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:h-0">
+          {label}
+        </SidebarGroupLabel>
+      )}
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible

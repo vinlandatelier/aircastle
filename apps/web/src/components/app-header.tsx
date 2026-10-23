@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator'
 import { CustomSidebarTrigger } from '@/components/custom-sidebar-trigger'
 import { NavUser } from '@/components/nav-user'
 import { ThemeSwitcher } from '@/components/theme-switcher'
-import { BookOpenIcon, CrownIcon } from 'lucide-react'
+import { BookOpenIcon, CrownIcon, PlugIcon, PlusIcon } from 'lucide-react'
 import { GitHubIcon } from '@/components/github-icon'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AppSearch } from '@/components/app-search'
@@ -26,6 +26,18 @@ export function AppHeader() {
         <span aria-hidden="true" className="brand-logo block size-6 shrink-0" />
       </a>
       <ProjectSwitcher />
+      <div role="group" aria-label="Project actions" className="hidden items-center gap-2 lg:flex">
+        <Button aria-label="Connect" variant="outline">
+          <PlugIcon data-icon="inline-start" aria-hidden="true" />
+          Connect
+        </Button>
+        <Tooltip>
+          <TooltipTrigger render={<Button aria-label="Create" variant="outline" size="icon" />}>
+            <PlusIcon aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Create</TooltipContent>
+        </Tooltip>
+      </div>
       <div className="md:hidden">
         <CustomSidebarTrigger />
       </div>

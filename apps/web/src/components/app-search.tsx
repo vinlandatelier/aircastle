@@ -36,7 +36,7 @@ export function AppSearch() {
         aria-expanded={open}
         aria-keyshortcuts="Meta+K Control+K"
         variant="secondary"
-        className="w-8 justify-start sm:w-60 sm:gap-2.5"
+        className="w-8 justify-start sm:w-40 sm:gap-2.5 xl:w-60"
         onClick={() => setOpen(true)}
       >
         <SearchIcon data-icon="inline-start" aria-hidden="true" className="text-muted-foreground" />

@@ -12,7 +12,7 @@ export function AppSidebar() {
       collapsible="icon"
       variant="sidebar"
     >
-      <SidebarContent className="sidebar-navigation gap-3 px-1 py-4">
+      <SidebarContent className="sidebar-navigation gap-3 px-1 py-4 transition-[gap] duration-150 ease-out motion-reduce:transition-none group-data-[collapsible=icon]:gap-1">
         {navGroups.map((group, index) => (
           <NavGroup key={`sidebar-group-${index}`} {...group} />
         ))}

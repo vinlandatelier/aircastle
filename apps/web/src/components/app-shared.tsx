@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
 import {
   LayoutGridIcon,
-  BarChart3Icon,
-  BriefcaseIcon,
+  ImagesIcon,
   UsersIcon,
-  PlugIcon,
   KeyRoundIcon,
   SettingsIcon,
-  CreditCardIcon,
+  ListTodoIcon,
+  BarChart3Icon,
 } from 'lucide-react'
 
 export type SidebarNavItem = {
@@ -28,40 +27,25 @@ export const navGroups: SidebarNavGroup[] = [
     label: 'Product',
     items: [
       {
-        title: 'Dashboard',
-        path: '#/dashboard',
+        title: 'Tasks',
+        path: '#/tasks',
+        icon: <ListTodoIcon />,
+      },
+      {
+        title: 'Collections',
+        path: '#/collections',
         icon: <LayoutGridIcon />,
         isActive: true,
+      },
+      {
+        title: 'Media Library',
+        path: '#/media',
+        icon: <ImagesIcon />,
       },
       {
         title: 'Analytics',
         path: '#/analytics',
         icon: <BarChart3Icon />,
-      },
-      {
-        title: 'Projects',
-        path: '#/projects',
-        icon: <BriefcaseIcon />,
-      },
-    ],
-  },
-  {
-    label: 'Workspace',
-    items: [
-      {
-        title: 'Team',
-        path: '#/team',
-        icon: <UsersIcon />,
-      },
-      {
-        title: 'Integrations',
-        path: '#/integrations',
-        icon: <PlugIcon />,
-      },
-      {
-        title: 'API Keys',
-        path: '#/api-keys',
-        icon: <KeyRoundIcon />,
       },
     ],
   },
@@ -69,14 +53,19 @@ export const navGroups: SidebarNavGroup[] = [
     label: 'Administration',
     items: [
       {
+        title: 'Users',
+        path: '#/users',
+        icon: <UsersIcon />,
+      },
+      {
+        title: 'Access Tokens',
+        path: '#/access-tokens',
+        icon: <KeyRoundIcon />,
+      },
+      {
         title: 'Settings',
         path: '#/settings',
         icon: <SettingsIcon />,
-      },
-      {
-        title: 'Billing',
-        path: '#/billing',
-        icon: <CreditCardIcon />,
       },
     ],
   },

@@ -170,6 +170,13 @@
   transition: opacity 75ms ease-out 60ms;
 }
 
+.sidebar-navigation [data-sidebar='group-label'] {
+  transition:
+    height 150ms ease-out,
+    margin 150ms ease-out,
+    opacity 50ms ease-out 60ms;
+}
+
 [data-collapsible='icon'] .sidebar-navigation [data-sidebar='group-label'],
 [data-collapsible='icon'] .sidebar-navigation [data-sidebar='menu-button'] > span:last-child {
   opacity: 0;

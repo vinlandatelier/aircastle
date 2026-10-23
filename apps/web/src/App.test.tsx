@@ -3,6 +3,20 @@ import { describe, expect, it } from 'vite-plus/test'
 import App from './App'
 
 describe('Aircastle app shell', () => {
+  it('places Connect and Create after the project switcher', () => {
+    const html = renderToStaticMarkup(<App />)
+
+    expect(html).toContain('aria-label="Connect"')
+    expect(html).toContain('aria-label="Create"')
+    expect(html.indexOf('aria-label="Switch project:')).toBeLessThan(
+      html.indexOf('aria-label="Connect"'),
+    )
+    expect(html.indexOf('aria-label="Connect"')).toBeLessThan(html.indexOf('aria-label="Create"'))
+    expect(html.indexOf('aria-label="Create"')).toBeLessThan(
+      html.indexOf('aria-label="Search pages"'),
+    )
+  })
+
   it('places Upgrade between the header links and account menu', () => {
     const html = renderToStaticMarkup(<App />)
 
@@ -54,22 +68,30 @@ describe('Aircastle app shell', () => {
     expect(sidebar).toContain('aria-expanded="true"')
   })
 
-  it('renders the installed shell navigation and header', () => {
+  it('renders the core CMS navigation and header', () => {
     const html = renderToStaticMarkup(<App />)
 
     for (const label of [
       'Aircastle',
-      'Dashboard',
+      'Product',
+      'Tasks',
+      'Collections',
+      'Media Library',
       'Analytics',
-      'Projects',
-      'Team',
-      'Integrations',
-      'API Keys',
+      'Administration',
+      'Users',
+      'Access Tokens',
       'Settings',
-      'Billing',
     ]) {
       expect(html).toContain(label)
     }
+    const sidebar = html.slice(html.indexOf('data-slot="sidebar"'), html.indexOf('<main'))
+    expect(sidebar).not.toMatch(
+      />Dashboard<|>Projects<|>Team<|>Integrations<|>API Keys<|>Billing<|>Workspace</,
+    )
+    expect(sidebar.indexOf('>Tasks<')).toBeLessThan(sidebar.indexOf('>Collections<'))
+    expect(sidebar.indexOf('>Collections<')).toBeLessThan(sidebar.indexOf('>Media Library<'))
+    expect(sidebar.indexOf('>Media Library<')).toBeLessThan(sidebar.indexOf('>Analytics<'))
     expect(html).toContain('Toggle Sidebar')
     expect(html).toContain('aria-label="Docs"')
     expect(html).toContain('aria-label="Choose theme"')
