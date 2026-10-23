@@ -1,7 +1,11 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
-  test: { include: ["tests/**/*.test.ts"], environment: "node", maxWorkers: 2 },
+  test: {
+    include: ["tests/**/*.test.ts", "scripts/dev-setup.test.ts"],
+    environment: "node",
+    maxWorkers: 2,
+  },
   defaultPackage: {
     build: "./apps/web",
     preview: "./apps/web",
@@ -38,6 +42,7 @@ export default defineConfig({
       "**/dist/**",
       "packages/schema/tests/types/inference.ts",
       "packages/schema/tests/types/negative/**",
+      "packages/client/tests/types/**",
     ],
     options: {
       typeAware: true,
