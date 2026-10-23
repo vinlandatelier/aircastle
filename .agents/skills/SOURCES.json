@@ -51,6 +51,16 @@
       ]
     },
     {
+      "name": "hono",
+      "repository": "https://github.com/honojs/skills",
+      "path": "skills/hono",
+      "commit": "e54ce51f6effaeb574ebd2629e89e086e14a2db3",
+      "localEdits": [],
+      "addedLicenseFiles": [
+        "LICENSE"
+      ]
+    },
+    {
       "name": "prototype-ui",
       "repository": "https://github.com/emilkowalski/skills",
       "path": "skills/prototype",
