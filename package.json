@@ -45,7 +45,7 @@
     "db:test": "bun scripts/with-postgres.ts",
     "test:db": "vp test --config vite.db.config.ts",
     "test:content": "vp test --config vite.content.config.ts",
-    "test:content:db": "vp run db:test -- vp run test:content -- --project database",
+    "test:content:db": "vp run db:test -- vp run test:content --project database",
     "dev:setup": "bun scripts/dev-setup.ts"
   },
   "devDependencies": {
@@ -54,9 +54,11 @@
     "@aircastle/client": "workspace:*",
     "@aircastle/contracts": "workspace:*",
     "@aircastle/core": "workspace:*",
+    "@aircastle/schema": "workspace:*",
     "@babel/parser": "7.28.5",
     "@types/bun": "1.3.4",
     "knip": "6.42.1",
+    "pino": "10.4.0",
     "typescript": "7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"
