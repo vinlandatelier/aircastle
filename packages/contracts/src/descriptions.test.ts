@@ -255,6 +255,41 @@ describe("published collection descriptions", () => {
     ]);
   });
 
+  test("wire recompilation enforces formats, choices and nullable presence", () => {
+    const compiled = compileDescription(
+      description({
+        email: field({ format: "email" }),
+        website: field({ format: "url" }),
+        notes: field({ nullable: true }),
+        status: field({ required: false, choices: ["draft", "published"], default: "draft" }),
+      }),
+    );
+    expect(
+      compiled.validate({ email: "ada@example.com", website: "https://example.com", notes: null }),
+    ).toEqual({
+      ok: true,
+      data: {
+        email: "ada@example.com",
+        website: "https://example.com",
+        notes: null,
+        status: "draft",
+      },
+    });
+    const result = compiled.validate({
+      email: "not an email",
+      website: "not a URL",
+      status: "archived",
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("Expected format and presence failures");
+    expect(result.issues.map(({ message: _message, ...issue }) => issue)).toEqual([
+      { code: "invalid_email", path: ["email"] },
+      { code: "invalid_url", path: ["website"] },
+      { code: "required", path: ["notes"] },
+      { code: "invalid_choice", path: ["status"], allowed: ["draft", "published"] },
+    ]);
+  });
+
   test("wire recompilation retains grapheme length and exact text", () => {
     const compiled = compileDescription(description({ title: field({ min: 1, max: 1 }) }));
     expect(compiled.validate({ title: "e\u0301" })).toEqual({
