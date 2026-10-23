@@ -1,0 +1,72 @@
+[
+  {
+    "file": "missing-required.ts",
+    "target": "{ slug: \"hello\", subtitle: null }",
+    "codes": [2741]
+  },
+  {
+    "file": "nullable-still-required.ts",
+    "target": "{ title: \"Hello\", slug: \"hello\" }",
+    "codes": [2741]
+  },
+  {
+    "file": "wrong-value-type.ts",
+    "target": "title: 42",
+    "codes": [2322]
+  },
+  {
+    "file": "wrong-choice.ts",
+    "target": "status: \"archived\"",
+    "codes": [2322]
+  },
+  {
+    "file": "unknown-field.ts",
+    "target": "body: \"Unknown\"",
+    "codes": [2353]
+  },
+  {
+    "file": "unknown-collection.ts",
+    "target": "pages",
+    "codes": [2339]
+  },
+  {
+    "file": "no-close.ts",
+    "target": "close",
+    "codes": [2339]
+  },
+  {
+    "file": "no-publish-method.ts",
+    "target": "publishSchema",
+    "codes": [2339]
+  },
+  {
+    "file": "defaulted-output-required.ts",
+    "target": "record",
+    "codes": [2322]
+  },
+  {
+    "file": "output-choice-narrow.ts",
+    "target": "status: \"archived\"",
+    "codes": [2322]
+  },
+  {
+    "file": "optional-output-no-undefined.ts",
+    "target": "record",
+    "codes": [2375, 2322]
+  },
+  {
+    "file": "unique-error-needs-field.ts",
+    "target": "error: ContentError",
+    "codes": [2322]
+  },
+  {
+    "file": "validation-needs-nonempty-issues.ts",
+    "target": "issues: []",
+    "codes": [2322]
+  },
+  {
+    "file": "success-needs-data.ts",
+    "target": "result: CreateResult",
+    "codes": [2322]
+  }
+]

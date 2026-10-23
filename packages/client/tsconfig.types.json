@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "paths": {
+      "aircastle-client-under-test": ["./src/index.ts"]
+    },
+    "skipLibCheck": false,
+    "types": [],
+    "lib": ["ES2022", "ES2022.Intl", "DOM", "DOM.Iterable"]
+  },
+  "files": ["tests/types/positive.ts"],
+  "include": [],
+  "exclude": []
+}
