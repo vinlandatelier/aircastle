@@ -1,5 +1,5 @@
 {
-  "name": "@aircastle/server",
+  "name": "@aircastle/api",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",

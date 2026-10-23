@@ -17,8 +17,8 @@
         "vite-plus": "catalog:",
       },
     },
-    "apps/server": {
-      "name": "@aircastle/server",
+    "apps/api": {
+      "name": "@aircastle/api",
       "version": "0.0.0",
       "dependencies": {
         "hono": "4.13.13",
@@ -59,7 +59,7 @@
     "vite-plus": "1.4.0",
   },
   "packages": {
-    "@aircastle/server": ["@aircastle/server@workspace:apps/server"],
+    "@aircastle/api": ["@aircastle/api@workspace:apps/api"],
 
     "@aircastle/web": ["@aircastle/web@workspace:apps/web"],
 

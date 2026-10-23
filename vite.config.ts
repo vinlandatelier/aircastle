@@ -2,7 +2,6 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   defaultPackage: {
-    dev: "./apps/web",
     build: "./apps/web",
     preview: "./apps/web",
     pack: ".",

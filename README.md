@@ -14,9 +14,18 @@ vp run -r typecheck
 vp check
 vp run test:types
 vp run -r build
-vp run -r --parallel dev
 ```
 
-This starts the web app on port 5173 and the Bun API on port 3000. The API exposes `GET /health` for process liveness.
+Start the web app on port 5173:
 
-To run one app, use `vp dev` for the web app or `vp run @aircastle/server#dev` for the API. Run the server tests with `vp run @aircastle/server#test`.
+```sh
+vp run dev-web
+```
+
+Start the API on port 3000:
+
+```sh
+vp run dev-api
+```
+
+Run API tests with `vp -C apps/api run test`.

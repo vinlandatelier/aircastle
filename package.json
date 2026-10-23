@@ -10,6 +10,8 @@
   "type": "module",
   "scripts": {
     "prepare": "vp config --no-agent",
+    "dev-web": "vp -C apps/web dev",
+    "dev-api": "vp -C apps/api run dev",
     "knip": "knip",
     "typecheck": "bun run check:policy && tsc --noEmit",
     "build": "vp pack",

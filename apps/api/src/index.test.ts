@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import app from "./index.ts";
 
-describe("server", () => {
+describe("api", () => {
   test("GET /health reports process liveness", async () => {
     const response = await app.request("/health");
 
