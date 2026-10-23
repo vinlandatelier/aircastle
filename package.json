@@ -14,7 +14,8 @@
     "test:harness": "bun test tests/harness",
     "test:schema": "bun test tests/schema",
     "test:typecheck": "tsc -p tsconfig.tests.json",
-    "test:inference": "tsc -p tsconfig.inference.json"
+    "test:types": "bun scripts/check-type-fixtures.ts contracts",
+    "test:inference": "bun scripts/check-type-fixtures.ts inference"
   },
   "dependencies": {
     "arktype": "2.2.9"

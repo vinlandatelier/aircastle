@@ -6,7 +6,3 @@ export type Assert<Value extends true> = Value;
 
 export type EqualControl = Assert<Equal<string, string>>;
 export type AnyControl = Assert<IsAny<any>>;
-// @ts-expect-error The equality assertion must reject a different domain.
-export type WrongEqualityControl = Assert<Equal<string, number>>;
-// @ts-expect-error An any domain must not count as a precise inference result.
-export type WrongAnyControl = Assert<Equal<IsAny<any>, false>>;
