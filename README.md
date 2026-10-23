@@ -10,7 +10,9 @@ Vite+ uses Bun 1.3.4 for dependency management, pinned in `.bun-version` and `pa
 
 ```sh
 vp install --frozen-lockfile
+vp run -r typecheck
 vp check
+vp run test:types
 vp run -r build
 vp run -r --parallel dev
 ```

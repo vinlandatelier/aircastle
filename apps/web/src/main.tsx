@@ -1,10 +1,22 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createRouter, RouterProvider } from '@tanstack/react-router'
-import { routeTree } from './routeTree.gen'
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router'
+import App from './App'
 import './index.css'
 
-const router = createRouter({ routeTree })
+const rootRoute = createRootRoute({ component: Outlet })
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  component: App,
+})
+const router = createRouter({ routeTree: rootRoute.addChildren([indexRoute]) })
 
 declare module '@tanstack/react-router' {
   interface Register {

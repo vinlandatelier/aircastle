@@ -14,6 +14,14 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Keep field validation rules distinct from editor presentation settings. Changing an editor must preserve the field's data contract.
 - Enforce database-dependent guarantees, such as uniqueness, at the persistence layer.
 
+## Code policy
+
+- Do not add ordinary code comments, including inline, line, or block comments. Use clear names and structure to explain the code.
+- Declaration documentation such as JSDoc is allowed. Do not reformat ordinary comments as docstrings to bypass this rule.
+- Never use compiler suppression directives, including `@ts-expect-error`, `@ts-ignore`, or `@ts-nocheck`, even inside docstrings.
+- Verify expected type errors with isolated negative fixtures and explicit compiler diagnostics, without suppressions.
+- Run `bun run check:policy` for JavaScript and TypeScript changes. The configured type-check command also enforces this policy.
+
 ## Changes and verification
 
 - Define observable behavior and relevant failure cases before implementing a feature.

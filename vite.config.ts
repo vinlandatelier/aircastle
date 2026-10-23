@@ -3,7 +3,7 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   defaultPackage: "./apps/web",
   fmt: {
-    ignorePatterns: ["**/*.md", "apps/web/src/routeTree.gen.ts"],
+    ignorePatterns: ["**/*.md"],
     overrides: [
       {
         files: ["apps/web/**"],
@@ -24,7 +24,7 @@ export default defineConfig({
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
     },
-    ignorePatterns: ["**/dist/**", "apps/web/src/routeTree.gen.ts"],
+    ignorePatterns: ["**/dist/**", "tests/types/inference.ts", "tests/types/negative/**"],
     options: {
       typeAware: true,
       typeCheck: true,
