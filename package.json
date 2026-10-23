@@ -13,7 +13,8 @@
     "test": "bun test",
     "test:harness": "bun test tests/harness",
     "test:schema": "bun test tests/schema",
-    "test:typecheck": "tsc -p tsconfig.tests.json"
+    "test:typecheck": "tsc -p tsconfig.tests.json",
+    "test:inference": "tsc -p tsconfig.inference.json"
   },
   "dependencies": {
     "arktype": "2.2.9"
