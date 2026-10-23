@@ -549,3 +549,36 @@ test("a failed multi-unique insert rolls back other claimed values", async () =>
     ).toHaveLength(2);
   });
 });
+
+test("every configured unique field is enforced without requiring a fixed conflict order", async () => {
+  await withCms(async (fixture) => {
+    const cms = fixture.cms();
+    const description = {
+      fields: { ...articles.fields, title: { ...articles.fields.title!, unique: true } },
+    };
+    const initial = await publish(cms, fixture.access, description);
+    const contract = initial.contracts.articles!;
+    saved(
+      await cms.create(fixture.access, "articles", contract, { title: "Taken", slug: "original" }),
+    );
+    expect(
+      await cms.create(fixture.access, "articles", contract, { title: "Taken", slug: "new-slug" }),
+    ).toEqual({ ok: false, error: { code: "unique_conflict", field: "title" } });
+    expect(
+      await cms.create(fixture.access, "articles", contract, { title: "Other", slug: "original" }),
+    ).toEqual({ ok: false, error: { code: "unique_conflict", field: "slug" } });
+    const both = await cms.create(fixture.access, "articles", contract, {
+      title: "Taken",
+      slug: "original",
+    });
+    expect(both).toMatchObject({ ok: false, error: { code: "unique_conflict" } });
+    if (both.ok || both.error.code !== "unique_conflict")
+      throw new Error("Expected a detected unique conflict");
+    expect(["title", "slug"]).toContain(both.error.field);
+    expect(
+      await fixture
+        .store()
+        .transaction(fixture.access.project, (transaction) => transaction.documents("articles")),
+    ).toHaveLength(1);
+  });
+});
