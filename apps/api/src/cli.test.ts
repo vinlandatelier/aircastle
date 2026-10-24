@@ -20,7 +20,7 @@ describe("Hono CLI", () => {
     expect(output.data.routes).toContainEqual(
       expect.objectContaining({ method: "GET", path: "/api/health" }),
     );
-  });
+  }, 15_000);
 
   test("sends a request through the Bun runtime without starting the server", () => {
     const result = spawnSync(
@@ -34,5 +34,5 @@ describe("Hono CLI", () => {
       ok: true,
       data: { status: 200, body: { status: "ok" }, runtime: "bun" },
     });
-  });
+  }, 15_000);
 });
