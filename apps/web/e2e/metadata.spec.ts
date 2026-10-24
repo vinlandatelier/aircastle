@@ -12,6 +12,7 @@ test('shell:R2 marketing entry keeps its URL and exact metadata before and after
   expect(html).toContain(`<title>${landingTitle}</title>`)
   expect(html).toContain(landingDescription)
   await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
   await expect(page).toHaveURL(/\/$/)
   await expect(page).toHaveTitle(landingTitle)
   await expect(page.locator('head title')).toHaveCount(1)
@@ -21,6 +22,17 @@ test('shell:R2 marketing entry keeps its URL and exact metadata before and after
     landingDescription,
   )
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Sign in', exact: true }).click()
+  await expect(page).toHaveTitle('Aircastle - Sign in')
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+  await expect(page).toHaveTitle(landingTitle)
+  await expect(page.locator('head title')).toHaveCount(1)
+  await expect(page.locator('meta[name="description"]')).toHaveCount(1)
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    landingDescription,
+  )
 })
 
 test('shell:R2 sign-in and dashboard metadata follows navigation and history', async ({ page }) => {
