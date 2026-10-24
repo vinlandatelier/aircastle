@@ -13,7 +13,7 @@ describe('App navigation', () => {
       await router.load()
       expect(router.state.location.pathname).toBe(pathname)
       render(<RouterProvider router={router} />)
-      expect(await screen.findByText('Not Found')).toBeTruthy()
+      expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeTruthy()
       expect(screen.queryByRole('navigation', { name: 'Main navigation' })).toBeNull()
     },
   )
