@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { expect } from 'vite-plus/test'
-import { originalWeb, readJson } from '../scripts/verification-sandbox'
+import { originalWeb, readJson, verificationTimeouts } from '../scripts/verification-sandbox'
 
 export function assertArtifacts(output: string, expectedTitle: string) {
   const report = readJson(output, 'browser.json')
@@ -36,7 +36,7 @@ export async function liveRun(output: string) {
       cwd: originalWeb,
       env: { ...process.env, WEB_RUN_DIR: output },
       stdio: 'ignore',
-      timeout: 180_000,
+      timeout: verificationTimeouts.browser,
     },
   )
   const exited = new Promise<number | null>((resolve, reject) => {

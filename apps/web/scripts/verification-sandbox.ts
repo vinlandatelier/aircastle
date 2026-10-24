@@ -4,6 +4,8 @@ import path from 'node:path'
 import process from 'node:process'
 import { tmpdir } from 'node:os'
 
+export const verificationTimeouts = { browser: 180_000, component: 60_000 }
+
 export const originalWeb = path.resolve(import.meta.dirname, '..')
 
 export function copyWeb() {
@@ -29,7 +31,7 @@ export function runWeb(
     cwd: directory,
     env: { ...process.env, ...env, WEB_RUN_DIR: output },
     encoding: 'utf8',
-    timeout: 180_000,
+    timeout: verificationTimeouts.browser,
   })
 }
 
