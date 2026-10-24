@@ -74,6 +74,7 @@
     "vite-plus": "catalog:"
   },
   "overrides": {
+    "@types/node": "24.19.2",
     "vite": "catalog:"
   },
   "engines": {
