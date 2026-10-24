@@ -1,9 +1,6 @@
-'use client'
-
 import { Sidebar, SidebarContent, SidebarTrigger } from '@/components/ui/sidebar'
 import { ChevronLeftIcon } from 'lucide-react'
-import { navGroups } from '@/components/app-shared'
-import { NavGroup } from '@/components/nav-group'
+import { SidebarNavigation } from '@/navigation'
 
 export function AppSidebar() {
   return (
@@ -12,10 +9,12 @@ export function AppSidebar() {
       collapsible="icon"
       variant="sidebar"
     >
-      <SidebarContent className="sidebar-navigation gap-3 px-1 py-4 transition-[gap] duration-150 ease-out motion-reduce:transition-none group-data-[collapsible=icon]:gap-1">
-        {navGroups.map((group, index) => (
-          <NavGroup key={`sidebar-group-${index}`} {...group} />
-        ))}
+      <SidebarContent
+        role="navigation"
+        aria-label="Main navigation"
+        className="sidebar-navigation gap-3 px-1 py-4 transition-[gap] duration-150 ease-out motion-reduce:transition-none group-data-[collapsible=icon]:gap-1"
+      >
+        <SidebarNavigation />
       </SidebarContent>
       <SidebarTrigger
         size="icon-sm"
