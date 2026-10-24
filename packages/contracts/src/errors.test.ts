@@ -242,3 +242,11 @@ describe("malformed content errors", () => {
     }
   });
 });
+
+test("preserves numeric components in the accepted issue path type", () => {
+  const issue: ValidationIssue = { code: "required", path: ["body", 0, "title"], message };
+  expect(parseContentError(wrapped(issue))).toMatchObject({
+    code: "validation_failed",
+    issues: [expectedIssue(issue)],
+  });
+});

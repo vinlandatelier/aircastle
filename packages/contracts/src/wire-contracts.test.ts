@@ -208,3 +208,18 @@ describe("saved optional presence", () => {
     expect(validateStored(schema, { title: "Hello", summary: undefined })).toBe(false);
   });
 });
+
+test("unknown editor kinds stay invalid when valid choices could satisfy a radio editor", () => {
+  expect(
+    parseCollections([
+      {
+        name: "articles",
+        description: {
+          fields: {
+            status: { ...field({ choices: ["draft", "published"] }), editor: { type: "unknown" } },
+          },
+        },
+      },
+    ]),
+  ).toEqual({ ok: false, error: { code: "invalid_request" } });
+});
