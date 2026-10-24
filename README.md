@@ -43,7 +43,10 @@ Run common commands from the repository root:
 | Command | Scope |
 | --- | --- |
 | `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases |
-| `vp run test-web` | Web tests, currently an empty suite |
+| `vp run test-web` | Fast web component tests |
+| `vp run test-web:e2e` | Fresh web builds and Chromium journeys |
+| `vp run test-web:coverage` | Web V8 coverage with HTML and JSON reports |
+| `vp run verify-web` | Frontend policy, types, lint, boundaries, component tests, builds, and browser journeys |
 | `vp run test-api` | API tests |
 | `vp run test-schema` | Schema runtime tests |
 | `vp run test-mutation` | Slower schema mutation tests, run separately |
@@ -51,6 +54,15 @@ Run common commands from the repository root:
 | `vp run lint-web` | Web app |
 | `vp run lint-api` | API app |
 | `vp run lint-schema` | Schema package |
+
+Install the browser before running web browser verification:
+
+```sh
+vp -C apps/web exec playwright install chromium
+vp run verify-web
+```
+
+Browser verification starts and cleans up its own servers on allocated ports. It does not require the API or Postgres for the current shell. Each run prints an isolated directory under `apps/web/reports/` containing its receipt, logs, test reports, and failure artifacts. Run a focused scenario with `vp run test-web:e2e stress.spec.ts --grep long-text`.
 
 ## Local Postgres
 

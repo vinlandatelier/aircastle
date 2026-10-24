@@ -31,7 +31,7 @@ const receipt: {
 } = {
   status: 'running',
   runtime: {
-    node: process.version,
+    node: execFileSync('node', ['--version'], { encoding: 'utf8' }).trim(),
     bun: process.versions.bun ?? null,
     playwright: require('@playwright/test/package.json').version,
   },
