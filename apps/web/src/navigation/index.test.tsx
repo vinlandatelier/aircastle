@@ -56,6 +56,8 @@ describe('App navigation', () => {
     await user.click(screen.getByRole('link', { name: 'Tasks' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tasks'))
-    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(
+      screen.getAllByRole('button', { name: 'Toggle Sidebar' })[0]!.getAttribute('aria-expanded'),
+    ).toBe('false')
   })
 })
