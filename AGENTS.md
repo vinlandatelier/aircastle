@@ -35,6 +35,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 
 ## Changes and verification
 
+- Use Sol 6.1 (`gpt-6.1-sol`) for delegated implementation work.
 - Before editing, identify the active worktree, approved behavior, bounded outcome, and relevant checks. Resolve blocking behavior choices before writing dependent code or expectations; choose routine implementation details autonomously.
 - Keep one authoritative specification and decision record, with one writer per shared update. Worktrees must reference them rather than maintain copies. Resolve code paths in the active worktree.
 - Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists.
