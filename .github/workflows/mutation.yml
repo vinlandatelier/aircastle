@@ -1,79 +1,38 @@
-name: Full mutation
-'on':
+name: Mutation
+on:
   schedule:
-    - cron: 23 16 * * *
-  workflow_dispatch: {}
+    - cron: "23 16 * * *"
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
-env:
-  CI: 'true'
+defaults:
+  run:
+    shell: bash
 jobs:
-  schema:
-    name: Schema full mutation
+  mutation:
+    name: Mutation (${{ matrix.package }})
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [schema, contracts]
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - name: Build
+        run: vp run build
+      - name: Run and classify mutations
+        run: vp -C packages/${{ matrix.package }} run test:mutation
+      - name: Upload mutation report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          chromium: 'false'
-      - name: Build packages
-        shell: bash
-        run: |
-          vp run build |& tee reports/ci/build.log
-      - name: Run full mutation and classification
-        shell: bash
-        run: |
-          vp run test-mutation |& tee reports/ci/schema-mutation.log
-      - name: Upload logs and reports
-        if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: schema-full-mutation-${{ github.run_attempt }}
-          path: |
-            reports/
-            apps/web/reports/
-            packages/schema/coverage/
-            packages/schema/reports/
-            packages/contracts/reports/
-          if-no-files-found: warn
+          name: mutation-${{ matrix.package }}-${{ github.run_attempt }}
+          path: packages/${{ matrix.package }}/reports/mutation/
           retention-days: 14
-          include-hidden-files: false
-  contracts:
-    name: Contracts full mutation
-    runs-on: ubuntu-24.04
-    timeout-minutes: 180
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          chromium: 'false'
-      - name: Build packages
-        shell: bash
-        run: |
-          vp run build |& tee reports/ci/build.log
-      - name: Run full mutation and classification
-        shell: bash
-        run: |
-          vp run test:content:mutation |& tee reports/ci/contracts-mutation.log
-      - name: Upload logs and reports
-        if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: contracts-full-mutation-${{ github.run_attempt }}
-          path: |
-            reports/
-            apps/web/reports/
-            packages/schema/coverage/
-            packages/schema/reports/
-            packages/contracts/reports/
-          if-no-files-found: warn
-          retention-days: 14
-          include-hidden-files: false
