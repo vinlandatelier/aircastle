@@ -55,6 +55,8 @@ Paths in this section are relative to `apps/web`.
 
 `src/features/sign-in` vendors the Efferd `@efferd/auth-5` layout with Aircastle branding and email-only controls. The email action remains disabled until magic-link authentication is implemented. Legal links open `/terms-of-service` and `/privacy-policy` in new tabs; those pages are not implemented yet.
 
+`src/index.css` gives public pages Efferd's light and dark colour tokens by default. The shell's `data-theme-scope="dashboard"` marker selects the dashboard palette at the document root, including overlays rendered outside the shell. New public pages inherit the public palette without a separate theme provider.
+
 Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys, extreme-input fixtures, and command/report conformance tests. `playwright.config.ts` owns browser execution settings. A verification-only Vite adapter supplies fixture data before rendering; normal production builds retain their real data and expose no fixture controls.
 
 `scripts/verify-web.ts` owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness.
