@@ -74,7 +74,9 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/sign-in')
     await expectPublic(page, theme === 'dark')
     await page.getByRole('link', { name: 'Home', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Your content. Defined in code.', exact: true }),
+    ).toBeVisible()
     await page.goto('/dash')
     await expect(page.getByRole('button', { name: 'Choose theme' })).toBeVisible()
     const background = theme === 'dark' ? '#19191c' : '#ffffff'
@@ -93,7 +95,9 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await dialog.evaluate((node) => node.closest('[data-theme-scope]') === null)).toBe(true)
     await page.keyboard.press('Escape')
     await page.goBack()
-    await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Your content. Defined in code.', exact: true }),
+    ).toBeVisible()
     await page.goBack()
     await expectPublic(page, theme === 'dark')
     await page.goto('/dash')
