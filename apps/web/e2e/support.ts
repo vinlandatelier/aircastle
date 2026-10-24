@@ -50,7 +50,7 @@ export const test = base.extend<{ runtimeEvidence: void }>({
 
 export { expect }
 
-export async function visit(page: Page, scenario: Scenario = 'normal', pathname = '/') {
+export async function visit(page: Page, scenario: Scenario = 'normal', pathname = '/dash') {
   const origin = scenario === 'normal' ? process.env.WEB_ORIGIN : process.env.WEB_FIXTURE_ORIGIN
   if (!origin) throw new Error('Browser origin missing; use vp run test-web:e2e')
   test.info().annotations.push({ type: 'scenario', description: scenario })
