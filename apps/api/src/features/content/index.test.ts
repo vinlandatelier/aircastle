@@ -276,3 +276,14 @@ test("a false Content-Length cannot bypass the actual request byte budget", asyn
   expect(response.status).toBe(413);
   expect(await response.json()).toEqual({ ok: false, error: { code: "payload_too_large" } });
 });
+
+test("canonicalizes valid project UUID casing before authorization and lookup", async () => {
+  const { app, calls, headers } = fixture();
+  const upperProject = "ABCDEFAB-1111-4111-8111-ABCDEFABCDEF";
+  const response = await app.request(`/api/projects/${upperProject}/schema`, { headers });
+  expect(response.status).toBe(200);
+  expect(calls.find((call) => call.operation === "schema")?.access).toEqual({
+    project: "abcdefab-1111-4111-8111-abcdefabcdef",
+    apiKey: "test-secret",
+  });
+});
