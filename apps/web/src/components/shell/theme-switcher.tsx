@@ -1,6 +1,5 @@
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -18,14 +17,7 @@ const themes = [
 ] as const
 
 export function ThemeSwitcher() {
-  const { theme, setTheme, resolvedTheme } = useTheme()
-
-  useEffect(() => {
-    if (!resolvedTheme) return
-    document
-      .querySelector('link[rel="icon"]')
-      ?.setAttribute('href', `/brand/favicon-${resolvedTheme === 'dark' ? 'dark' : 'light'}.svg`)
-  }, [resolvedTheme])
+  const { theme, setTheme } = useTheme()
 
   return (
     <DropdownMenu>
