@@ -18,10 +18,34 @@ export async function command(
         cwd: webRoot,
         env,
         stdio: ['ignore', log.fd, log.fd],
-        timeout: 300_000,
+        detached: true,
       })
-      child.once('error', reject)
-      child.once('exit', (code) => resolve(code ?? 1))
+      const stop = () => {
+        if (child.pid) {
+          try {
+            process.kill(-child.pid, 'SIGTERM')
+          } catch (error) {
+            if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH'))
+              reject(error)
+          }
+        }
+      }
+      const timer = setTimeout(stop, 300_000)
+      process.once('SIGINT', stop)
+      process.once('SIGTERM', stop)
+      const cleanup = () => {
+        clearTimeout(timer)
+        process.off('SIGINT', stop)
+        process.off('SIGTERM', stop)
+      }
+      child.once('error', (error) => {
+        cleanup()
+        reject(error)
+      })
+      child.once('exit', (code) => {
+        cleanup()
+        resolve(code ?? 1)
+      })
     })
   } finally {
     await log.close()
@@ -43,6 +67,7 @@ export async function withServers<T>(
       const code = await command(['vp', 'run', 'build'], path.join(output, `${mode}-build.log`), {
         ...process.env,
         WEB_BUILD_DIR: outDir,
+        WEB_RUN_DIR: output,
         WEB_PUBLIC_DIR: publicDir,
         WEB_FIXTURES: mode === 'fixture' ? '1' : '0',
       })

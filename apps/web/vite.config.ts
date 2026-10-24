@@ -19,6 +19,7 @@ export default defineConfig({
     },
     setupFiles: ['./src/test-setup.ts'],
   },
+  cacheDir: process.env.WEB_RUN_DIR ? `${process.env.WEB_RUN_DIR}/cache` : 'node_modules/.vite',
   publicDir: process.env.WEB_PUBLIC_DIR ?? 'public',
   build: { outDir: process.env.WEB_BUILD_DIR ?? 'dist' },
   resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
