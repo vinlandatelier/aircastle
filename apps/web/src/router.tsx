@@ -10,14 +10,15 @@ import {
 import App from './App'
 import { AppShell } from '@/components/shell'
 import { SignInPage } from '@/features/sign-in'
+import { NotFoundPage } from '@/features/not-found'
 import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { navigationPages } from '@/features/navigation'
 
 const rootRoute = createRootRoute({
   component: App,
+  notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [
-      { title: 'Aircastle' },
       {
         name: 'description',
         content:
@@ -110,7 +111,7 @@ const routeTree = rootRoute.addChildren([
 ])
 
 export function createAppRouter(history?: RouterHistory) {
-  return createRouter({ routeTree, history })
+  return createRouter({ routeTree, history, notFoundMode: 'root' })
 }
 
 declare module '@tanstack/react-router' {
