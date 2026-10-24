@@ -528,7 +528,7 @@ export class Coordinator {
       }
       const authorization = await this.authorize(invocation);
       if (authorization.kind !== "authorized") return true;
-      const snapshot = await this.snapshot(number, prior?.receipt.job.snapshot);
+      const snapshot = await this.snapshot(number, prior?.receipt.job.snapshot ?? bare);
       const job: Job = {
         version: 1,
         id,
@@ -549,14 +549,22 @@ export class Coordinator {
       return true;
     };
     const manual = async (raw: unknown, source: Comment["source"]): Promise<boolean> => {
-      const c = record(raw);
-      if (typeof c.body !== "string" || !parseCommand(c.body)) return true;
-      if ((await this.membership(identity(c.user).login)) !== "member") return true;
-      const accepted = await this.command(raw, source);
-      if (!accepted) return true;
-      const cmd = parseCommand(accepted.comment.body)!;
-      const role: Role = `${cmd.provider === "openai" ? "codex" : "claude"}${cmd.kind === "fix" ? "Implementer" : "Reviewer"}`;
-      return queue(accepted.number, role, accepted.comment);
+      try {
+        const c = record(raw);
+        if (typeof c.body !== "string" || !parseCommand(c.body)) return true;
+        if ((await this.membership(identity(c.user).login)) !== "member") return true;
+        const accepted = await this.command(raw, source);
+        if (!accepted) return true;
+        const cmd = parseCommand(accepted.comment.body)!;
+        const role: Role = `${cmd.provider === "openai" ? "codex" : "claude"}${cmd.kind === "fix" ? "Implementer" : "Reviewer"}`;
+        return await queue(accepted.number, role, accepted.comment);
+      } catch (error) {
+        console.error(
+          "Skipped PR command:",
+          error instanceof Error ? error.message : "unavailable",
+        );
+        return true;
+      }
     };
     if (immediateComment)
       await manual(
@@ -594,26 +602,33 @@ export class Coordinator {
     let consumed = true;
     for (const raw of prs) {
       const number = integer(record(raw).number);
-      for (const role of ["codexReviewer", "claudeReviewer"] as const)
-        if (!(await queue(number, role))) {
-          consumed = false;
-          break;
+      try {
+        for (const role of ["codexReviewer", "claudeReviewer"] as const)
+          if (!(await queue(number, role))) {
+            consumed = false;
+            break;
+          }
+        if (!consumed) break;
+        const existing = await this.receipts(number);
+        for (const prior of existing.filter(
+          (r) => ["claimed", "failed"].includes(r.receipt.state) && r.receipt.attempt < 2,
+        )) {
+          const original = prior.receipt.job;
+          if (
+            Date.now() - Date.parse(prior.receipt.at) < 30 * 60_000 ||
+            jobs.length >= 6 ||
+            !(await this.current({ ...original, snapshot: { ...original.snapshot, files: [] } }))
+          )
+            continue;
+          const snapshot = await this.snapshot(number, original.snapshot);
+          const job = { ...original, snapshot };
+          if (await this.claim(job, existing)) jobs.push(job);
         }
-      if (!consumed) break;
-      const existing = await this.receipts(number);
-      for (const prior of existing.filter(
-        (r) => ["claimed", "failed"].includes(r.receipt.state) && r.receipt.attempt < 2,
-      )) {
-        const original = prior.receipt.job;
-        if (
-          Date.now() - Date.parse(prior.receipt.at) < 30 * 60_000 ||
-          jobs.length >= 6 ||
-          !(await this.current({ ...original, snapshot: { ...original.snapshot, files: [] } }))
-        )
-          continue;
-        const snapshot = await this.snapshot(number, original.snapshot);
-        const job = { ...original, snapshot };
-        if (await this.claim(job, existing)) jobs.push(job);
+      } catch (error) {
+        console.error(
+          `Skipped PR #${number}:`,
+          error instanceof Error ? error.message : "unavailable",
+        );
       }
     }
     if (consumed) state.value.prPage = prs.length === 100 ? state.value.prPage + 1 : 1;

@@ -24,6 +24,15 @@ const job: Job = {
   instructions: "",
   thread: "",
 };
+const config = {
+  version: 1 as const,
+  roles: {
+    codexReviewer: { provider: "openai" as const, model: "review", effort: "high" },
+    codexImplementer: { provider: "openai" as const, model: "fix", effort: "high" },
+    claudeReviewer: { provider: "anthropic" as const, model: "review", effort: "high" },
+    claudeImplementer: { provider: "anthropic" as const, model: "fix", effort: "high" },
+  },
+};
 
 test("a permission error is unknown membership, never a member", async () => {
   const coordinator = new Coordinator(options, async () => new Response("", { status: 403 }));
@@ -455,4 +464,81 @@ test("UTF-8 task metadata cannot exceed the reserved provider budget before a cl
     "bound",
   );
   expect(writes).toBe(0);
+});
+
+test("a fix pinned to A cannot claim B when the head moves before context capture", async () => {
+  let prReads = 0;
+  let claimWrites = 0;
+  let cursorWrites = 0;
+  const moved = "f".repeat(40);
+  const command = {
+    id: 80,
+    user: snapshot.author,
+    body: `@codex fix head=${snapshot.head} correct the value`,
+    created_at: "2026-10-25T01:00:00Z",
+    updated_at: "2026-10-25T01:00:00Z",
+    issue_url: "https://api.github.com/repos/vinlandatelier/aircastle/issues/7",
+  };
+  const coordinator = new Coordinator(options, async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path.includes("/members/")) return new Response(null, { status: 204 });
+    if (path.endsWith("/issues/comments/80")) return Response.json(command);
+    if (path.endsWith("/pulls/7"))
+      return Response.json({
+        state: "open",
+        user: snapshot.author,
+        head: { sha: ++prReads === 1 ? snapshot.head : moved, repo: { id: 11 } },
+        base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
+      });
+    if (path.includes("/compare/")) return Response.json({ files: [] });
+    if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
+    if (init?.method === "POST") {
+      if (path.endsWith("/issues/7/comments")) claimWrites++;
+      if (path.endsWith("/issues/1/comments")) cursorWrites++;
+      return Response.json({ id: 100 });
+    }
+    return Response.json([]);
+  });
+  expect(await coordinator.prepare(config, 80)).toEqual([]);
+  expect(claimWrites).toBe(0);
+  expect(cursorWrites).toBe(1);
+});
+
+test("an outsider's incomplete history cannot block later member PRs or shared scan progress", async () => {
+  let cursorWrites = 0;
+  let outsiderPages = 0;
+  const outsider = { id: 21, login: "outsider", type: "User" };
+  const coordinator = new Coordinator(options, async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path.endsWith("/members/outsider")) return new Response(null, { status: 404 });
+    if (path.endsWith("/members/member")) return new Response(null, { status: 204 });
+    if (/\/pulls\/(7|8)$/.test(path))
+      return Response.json({
+        state: "open",
+        user: path.endsWith("/7") ? outsider : snapshot.author,
+        head: { sha: snapshot.head, repo: { id: 11 } },
+        base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
+      });
+    if (path.endsWith("/pulls")) return Response.json([{ number: 7 }, { number: 8 }]);
+    if (path.endsWith("/issues/7/comments")) {
+      outsiderPages++;
+      return Response.json(
+        Array.from({ length: 100 }, (_, id) => ({ id, user: outsider, body: "ordinary comment" })),
+      );
+    }
+    if (path.includes("/compare/")) return Response.json({ files: [] });
+    if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
+    if (init?.method === "POST") {
+      if (path.endsWith("/issues/1/comments")) cursorWrites++;
+      return Response.json({ id: 100 });
+    }
+    return Response.json([]);
+  });
+  const jobs = await coordinator.prepare(config);
+  expect(jobs.map((item) => [item.snapshot.number, item.role])).toEqual([
+    [8, "codexReviewer"],
+    [8, "claudeReviewer"],
+  ]);
+  expect(outsiderPages).toBe(3);
+  expect(cursorWrites).toBe(1);
 });
