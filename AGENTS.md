@@ -45,7 +45,10 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.
 - Verify documentation and configuration changes directly; add executable tests when behavior changes.
-- After edits, run affected checks. Run `vp run check` for final verification; it covers policy, source and emitted type contracts, runtime tests, and inference. A failed stage stops the command and leaves later stages unverified.
+- Run only the checks necessary to verify the current change and its affected callers. Select the smallest relevant test files, cases, and package checks. Explain what each selected check proves before running it.
+- Do not run repository-wide suites or aggregate commands containing unrelated tests unless the user explicitly requests them. This includes `vp run check`, `vp run test`, `vp run test:all`, and `vp run test:prepared`. Completing, committing, or merging a task does not require a full-suite run.
+- Broaden verification only when a failure or a concrete dependency impact requires it. Name the affected behavior and select its relevant checks. UI work does not require backend, database, mutation, or verification-tool suites unless it changes those concerns.
+- For documentation-only changes, inspect the edited text, links, and diff. Do not run executable test suites.
 - Reuse passing evidence for unchanged code, dependencies, configuration, and environment. Repeat a check only when its inputs change, it fails, or a new finding requires it. Record the command, exit code, and revision or content hash; setup failures do not establish behavior.
 - Use one focused audit of the completed change. Follow up on named findings and affected code instead of restarting a broad review. The author checks the reviewer's evidence and log; do not create recursive audit chains.
 
