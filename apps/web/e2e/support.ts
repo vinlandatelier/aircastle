@@ -2,9 +2,21 @@ import process from 'node:process'
 import { test as base, expect, type Page } from '@playwright/test'
 import type { Scenario } from './fixtures'
 
-export const test = base.extend<{ runtimeEvidence: void }>({
+function runtimeMessage(error: string) {
+  const [firstLine = ''] = error.split(/\n|\\n/, 1)
+  return firstLine.replace(/^Error: /, '')
+}
+
+export const test = base.extend<{ runtimeEvidence: void; expectedRuntimeErrors: string[] }>({
+  expectedRuntimeErrors: [[], { option: true }],
   runtimeEvidence: [
-    async ({ page }, use, info) => {
+    async ({ page, expectedRuntimeErrors }, use, info) => {
+      for (const expected of expectedRuntimeErrors) {
+        expect(
+          expected.trim().length,
+          'Expected runtime error must name a specific failure',
+        ).toBeGreaterThan(0)
+      }
       const errors: string[] = []
       const network: string[] = []
       page.on('pageerror', (error) => errors.push(error.message))
@@ -37,11 +49,21 @@ export const test = base.extend<{ runtimeEvidence: void }>({
             )
             .catch(() => null),
           errors,
+          expectedRuntimeErrors,
           network,
         }),
         contentType: 'application/json',
       })
-      expect(errors, 'Local application runtime/console errors').toEqual([])
+      for (const expected of expectedRuntimeErrors) {
+        expect(
+          errors.some((error) => runtimeMessage(error) === expected),
+          `Observed ${expected}`,
+        ).toBe(true)
+      }
+      expect(
+        errors.filter((error) => !expectedRuntimeErrors.includes(runtimeMessage(error))),
+        'Unexpected local application runtime/console errors',
+      ).toEqual([])
       expect(network, 'Required local assets must load').toEqual([])
     },
     { auto: true },

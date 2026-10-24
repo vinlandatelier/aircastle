@@ -6,18 +6,23 @@ import {
   Link,
   redirect,
   type RouterHistory,
+  type ErrorComponentProps,
 } from '@tanstack/react-router'
 import App from './App'
 import { AppShell } from '@/components/shell'
 import { SignInPage } from '@/features/sign-in'
+import { NotFoundPage } from '@/features/not-found'
 import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { navigationPages } from '@/features/navigation'
 
 const rootRoute = createRootRoute({
   component: App,
+  errorComponent: ({ error }: ErrorComponentProps): never => {
+    throw error
+  },
+  notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [
-      { title: 'Aircastle' },
       {
         name: 'description',
         content:
@@ -110,7 +115,12 @@ const routeTree = rootRoute.addChildren([
 ])
 
 export function createAppRouter(history?: RouterHistory) {
-  return createRouter({ routeTree, history })
+  return createRouter({
+    routeTree,
+    history,
+    notFoundMode: 'root',
+    disableGlobalCatchBoundary: true,
+  })
 }
 
 declare module '@tanstack/react-router' {
