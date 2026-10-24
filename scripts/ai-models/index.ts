@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { checkSchema, matches, record } from "./schema.ts";
+import { anthropicSchema, checkSchema, matches, record } from "./schema.ts";
 
 export type Role = "codexReviewer" | "codexImplementer" | "claudeReviewer" | "claudeImplementer";
 export type ModelSelection = { provider: "openai" | "anthropic"; model: string; effort: string };
@@ -95,7 +95,10 @@ export async function runModel(
         }
       : {
           model: chosen.model,
-          output_config: { effort: chosen.effort, format: { type: "json_schema", schema } },
+          output_config: {
+            effort: chosen.effort,
+            format: { type: "json_schema", schema: anthropicSchema(schema) },
+          },
           messages: [{ role: "user", content: prompt }],
           max_tokens: maxOutputTokens,
         };

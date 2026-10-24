@@ -85,7 +85,10 @@ function pricing(text: string, selection: ModelSelection): Candidate {
   };
 }
 
-export async function discoverCandidates(config: ModelConfig): Promise<Discovery> {
+export async function discoverCandidates(
+  config: ModelConfig,
+  now = new Date(),
+): Promise<Discovery> {
   if (!process.env.OPENAI_API_KEY || !process.env.ANTHROPIC_API_KEY)
     throw new Error("setup_required");
   const discovery: Discovery = { candidates: [], prices: [], sources: [] };
@@ -120,7 +123,12 @@ export async function discoverCandidates(config: ModelConfig): Promise<Discovery
     );
     advertised.sort((a, b) => modelPosition(guidance, a) - modelPosition(guidance, b));
     const current = Object.values(config.roles).filter((item) => item.provider === provider);
-    const id = advertised.find((id) => current.some((item) => item.model !== id));
+    const unconfigured = advertised.filter((id) => current.every((item) => item.model !== id));
+    const pool = unconfigured.length
+      ? unconfigured
+      : advertised.filter((id) => current.some((item) => item.model !== id));
+    const day = Math.floor(now.getTime() / 86_400_000);
+    const id = pool[((day % pool.length) + pool.length) % pool.length];
     if (!id) throw new Error("discovery_unavailable");
     const candidate: ModelSelection = { provider, model: id, effort: "high" };
     const selections = [

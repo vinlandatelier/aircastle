@@ -12,14 +12,9 @@ import {
 import { publishModelUpdate } from "./publisher.ts";
 import { checkEvaluatorImage, verifyModelUpdate } from "./verify.ts";
 import { checkDailyWindow } from "./daily.ts";
+import { reviewSchema, codingSchema } from "./fixtures.ts";
 
 const configFile = new URL("../../.github/ai-models.json", import.meta.url);
-const schema = {
-  type: "object",
-  properties: { ok: { type: "boolean", const: true } },
-  required: ["ok"],
-  additionalProperties: false,
-};
 
 async function readJson(path: string | URL): Promise<unknown> {
   const text = await readFile(path, "utf8");
@@ -64,8 +59,10 @@ async function main(): Promise<void> {
     for (const [role, selection] of Object.entries(config.roles)) {
       await runModel(
         selection,
-        'Compatibility check. Return {"ok":true} using the supplied schema.',
-        schema,
+        role.endsWith("Reviewer")
+          ? 'Compatibility check. Return {"findings":[]} using the supplied schema.'
+          : 'Compatibility check. Return {"source":"(input) => input"} using the supplied schema.',
+        role.endsWith("Reviewer") ? reviewSchema : codingSchema,
       );
       console.log(JSON.stringify({ role, selection, status: "live_compatible" }));
     }

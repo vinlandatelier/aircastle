@@ -170,3 +170,55 @@ test("a failed provider response is distinguished from incomplete output without
   );
   await expect(runModel(openai, "review", schema)).rejects.toThrow("provider_failed");
 });
+
+test("Anthropic transport describes unsupported bounds while local validation still enforces them", async () => {
+  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
+  const bounded = {
+    type: "object",
+    properties: {
+      findings: {
+        type: "array",
+        minItems: 2,
+        maxItems: 8,
+        items: {
+          type: "object",
+          properties: {
+            line: { type: "integer", minimum: 1, maximum: 100 },
+            quote: { type: "string", minLength: 12, maxLength: 12000, description: "Exact quote." },
+          },
+          required: ["line", "quote"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["findings"],
+    additionalProperties: false,
+  };
+  const original = structuredClone(bounded);
+  const fetcher = vi.fn(async () =>
+    response({
+      model: anthropic.model,
+      stop_reason: "end_turn",
+      content: [
+        { type: "text", text: JSON.stringify({ findings: [{ line: 0, quote: "short" }] }) },
+      ],
+    }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  await expect(runModel(anthropic, "review", bounded)).rejects.toThrow("provider_schema_mismatch");
+  const request = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+  if (typeof request[1].body !== "string") throw new Error("missing request");
+  const transport = JSON.parse(request[1].body).output_config.format.schema;
+  expect(transport.properties.findings.minItems).toBeUndefined();
+  expect(transport.properties.findings.maxItems).toBeUndefined();
+  expect(transport.properties.findings.description).toContain("maxItems: 8");
+  expect(transport.properties.findings.items.properties.line).toEqual({
+    type: "integer",
+    description: "{minimum: 1} {maximum: 100}",
+  });
+  expect(transport.properties.findings.items.properties.quote).toEqual({
+    type: "string",
+    description: "Exact quote. {minLength: 12} {maxLength: 12000}",
+  });
+  expect(bounded).toEqual(original);
+});

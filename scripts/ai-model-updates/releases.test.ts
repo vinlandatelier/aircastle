@@ -57,7 +57,7 @@ function mockOfficial(reject = false, missingPrice = false) {
 
 test("discovery intersects official coding guidance with account IDs and never ranks timestamps as quality", async () => {
   mockOfficial();
-  const result = await discoverCandidates(config);
+  const result = await discoverCandidates(config, new Date(0));
   expect(result.candidates.map((item) => item.selection.model)).toEqual([
     "gpt-reviewed",
     "claude-reviewed",
@@ -78,4 +78,25 @@ test("discovery errors or absent official price evidence fail closed", async () 
   mockOfficial(false, true);
   await expect(discoverCandidates(config)).rejects.toThrow("pricing_unavailable");
   expect(digest(config)).toBe(before);
+});
+
+test("discovery prioritizes unconfigured models and rotates them across UTC days", async () => {
+  mockOfficial();
+  const original = globalThis.fetch;
+  vi.stubGlobal("fetch", async (url: string, request: RequestInit) => {
+    if (url.endsWith("models.md"))
+      return new Response("Coding and reasoning: gpt-6-astra gpt-6.1-sol gpt-reviewed gpt-newest.");
+    if (url.endsWith("models/overview"))
+      return new Response(
+        '<p>Coding reasoning: claude-fable-5-1 claude-opus-5-5 claude-reviewed.</p><a href="/docs/en/models/reviewed/overview">reviewed</a><a href="/docs/en/models/fable/overview">fable</a><a href="/docs/en/models/opus/overview">opus</a>',
+      );
+    return original(url, request);
+  });
+  const first = await discoverCandidates(config, new Date("2026-10-24T00:00:00Z"));
+  const second = await discoverCandidates(config, new Date("2026-10-25T00:00:00Z"));
+  expect(
+    new Set([first.candidates[0]?.selection.model, second.candidates[0]?.selection.model]),
+  ).toEqual(new Set(["gpt-reviewed", "gpt-newest"]));
+  expect(first.candidates[1]?.selection.model).toBe("claude-reviewed");
+  expect(second.candidates[1]?.selection.model).toBe("claude-reviewed");
 });
