@@ -33,11 +33,24 @@ packages/
 scripts/                      Repository checks and local development tooling
 ```
 
-The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. The CLI entry uses the same app factory with a silent logger.
+The API assembles middleware, feature routes, and API documentation through `createApp({ logger })` in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. `src/cli.ts` exports a quiet app using the same factory with a silent logger.
 
 The server mounts every API route under `/api`, including `/api/docs` and `/api/openapi.json`. Feature routers use paths relative to that mount and follow the feature pattern below.
 
 Vite forwards `/api` requests unchanged during development and preview. The built API owns the same prefix without Vite. Hosted routing must forward `/api` unchanged to Bun. Production admin serving and deployment configuration are not implemented yet.
+
+## Web app structure
+
+Paths in this section are relative to `apps/web`.
+
+- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `App` provides light, dark, and system themes with `next-themes` and keeps the shell mounted as page destinations change.
+- `src/components/shell/` owns the persistent header, sidebar, page frame, and private supporting controls. The sidebar collapses independently beneath the full-width header. Import the shell through its `index.tsx` entry point.
+- `src/components/ui/` holds shared UI primitives built on Base UI.
+- `src/features/<feature>/` owns a product feature's behavior, types, data fetching, and tests. Import features through their `index.ts` or `index.tsx` entry point; keep supporting files private.
+- Keep feature-specific hooks and helpers inside their feature. Reserve `src/hooks/` and `src/lib/` for shared browser subscriptions and utilities.
+- Keep public-interface behavior tests beside the module implementation. Add feature folders only when implementing their behavior.
+
+`src/features/navigation` owns the page catalog, sidebar links, and keyboard page search. `src/router.tsx` registers destinations from that catalog and redirects the index to Collections. Destinations currently render dashboard placeholders. `components.json` configures shadcn and the Efferd registry.
 
 ## Feature pattern
 
@@ -60,7 +73,7 @@ This is a general pattern, not a required file inventory for every module. Exist
 ## Ownership
 
 - `apps/api` translates HTTP requests and agent tool calls into CMS operations. It owns transport schemas, logging integration, API documentation, and runtime resource assembly. Keep startup configuration outside feature handlers.
-- `apps/web` owns the admin shell, local UI components, and browser state. `App` composes the shell through `components/shell` and provides light, dark, and system themes with `next-themes`. The shell owns the full-width header, sidebar, page frame, and private supporting controls. The sidebar collapses independently beneath the header. Product modules live under `features/`; `features/navigation` owns the page catalog, sidebar links, and keyboard page search through its public entry point. `router.tsx` registers destinations from that catalog, redirects the index to Collections, and keeps the shell mounted as page destinations change. Destinations currently render dashboard placeholders. The Efferd layout uses shadcn components. `apps/web/components.json` configures shadcn and the Efferd registry.
+- `apps/web` owns the admin shell, local UI components, and browser state. Its module layout and entry points are described in [Web app structure](#web-app-structure).
 - `packages/schema` owns collection definitions, compilation, validation, and descriptions. Its public entry point is `@aircastle/schema`.
 - The core owns CMS operations and their rules. Keep feature-specific permissions, revisions, and review behavior with the feature. HTTP and agent tools call the same operations.
 - The core defines the persistence operations it needs and which changes must be atomic. Database adapters implement those operations and transactions, keeping SQL and driver types private.

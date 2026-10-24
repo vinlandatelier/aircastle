@@ -1,13 +1,6 @@
 # Web UI
 
-## File structure
-
-- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes.
-- `src/components/shell/` owns the persistent header, sidebar, page frame, and private supporting controls. Import it through its `index.tsx` entry point.
-- `src/components/ui/` holds shared UI primitives.
-- `src/features/<feature>/` owns a product feature's behavior, types, data fetching, and tests. Import features through their `index.ts` or `index.tsx` entry point; keep supporting files private.
-- Keep feature-specific hooks and helpers inside their feature. Reserve `src/hooks/` and `src/lib/` for shared browser subscriptions and utilities.
-- Keep public-interface behavior tests beside the module implementation. Add feature folders only when implementing their behavior.
+Follow [ARCHITECTURE.md](../../ARCHITECTURE.md#web-app-structure) for the web app's file structure, module ownership, and public entry points.
 
 ## UI conventions
 
