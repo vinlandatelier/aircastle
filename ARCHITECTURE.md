@@ -79,6 +79,8 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
 
+`.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
+
 ## Feature pattern
 
 The folder names the feature. Small features such as API health keep their implementation and public-interface tests together:
