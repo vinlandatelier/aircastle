@@ -48,6 +48,7 @@
     "test:content": "vp test --config vite.content.config.ts",
     "test:content:db": "vp run db:test -- vp run test:content --project database",
     "dev:setup": "bun --conditions=development scripts/dev-setup.ts",
+    "ai:models": "bun scripts/ai-model-updates/cli.ts",
     "test:all": "bun run test:typecheck && vp run --filter '@aircastle/*' --parallel --concurrency-limit 2 test && vp test && bun run test:inference",
     "test:content:mutation": "vp -C packages/contracts run test:mutation",
     "test:prepared": "vp run db:test -- vp run test:all",

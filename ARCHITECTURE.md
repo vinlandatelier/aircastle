@@ -34,6 +34,11 @@ packages/
 └── cli/                      Schema publication, reconciliation, and lockfiles
 
 scripts/                      Repository checks and local development tooling
+├── ai-automation/            Organization authorization, PR context, and advisory review/fix publication
+├── ai-models/                Pinned model roles and bounded provider API calls
+└── ai-model-updates/         Release discovery, role evaluations, and model update proposals
+
+.github/                      CI workflows, shared setup, and model selections
 ```
 
 The API assembles middleware, feature routes, and API documentation through `createApp({ logger })` in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. `src/cli.ts` exports a quiet app using the same factory with a silent logger.
