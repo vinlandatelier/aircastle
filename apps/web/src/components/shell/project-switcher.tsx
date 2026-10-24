@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronDownIcon, PlusCircleIcon } from 'lucide-react'
-import { GeneratedAvatar } from '@/components/generated-avatar'
+import { GeneratedAvatar } from './generated-avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {

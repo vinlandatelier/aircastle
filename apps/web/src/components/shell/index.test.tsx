@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vite-plus/test'
-import { renderApp } from './test-utils'
+import { renderApp } from '@/test-utils'
 
 describe('Aircastle app shell', () => {
   it('renders the brand, project switcher, and CMS navigation', async () => {

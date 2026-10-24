@@ -1,6 +1,6 @@
 import { Sidebar, SidebarContent, SidebarTrigger } from '@/components/ui/sidebar'
 import { ChevronLeftIcon } from 'lucide-react'
-import { SidebarNavigation } from '@/navigation'
+import { SidebarNavigation } from '@/features/navigation'
 
 export function AppSidebar() {
   return (
