@@ -1,4 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { pathToFileURL } from 'node:url'
+import process from 'node:process'
 
 const webRoot = new URL('../', import.meta.url)
 const stylesheet = await readFile(new URL('src/index.css', webRoot), 'utf8')
@@ -19,5 +21,13 @@ const variants = [
 
 for (const [name, style] of variants) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="32" height="32"><style>${style}</style><mask id="brand" maskUnits="userSpaceOnUse" x="0" y="0" width="500" height="500" style="mask-type:alpha"><image href="${image}" width="500" height="500"/></mask><rect width="500" height="500" fill="currentColor" mask="url(#brand)"/></svg>\n`
-  await writeFile(new URL(`public/brand/${name}`, webRoot), svg)
+  await writeFile(
+    new URL(
+      `brand/${name}`,
+      process.env.WEB_PUBLIC_DIR
+        ? pathToFileURL(`${process.env.WEB_PUBLIC_DIR}/`)
+        : new URL('public/', webRoot),
+    ),
+    svg,
+  )
 }

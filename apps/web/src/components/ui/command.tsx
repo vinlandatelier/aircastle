@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Command as CommandPrimitive } from 'cmdk'
+import { Command as CommandPrimitive, defaultFilter } from 'cmdk'
 import { cn } from 'cn'
 
 import {
@@ -12,9 +12,20 @@ import {
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group'
 import { SearchIcon, CheckIcon } from 'lucide-react'
 
-function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
+const substringFirst: NonNullable<React.ComponentProps<typeof CommandPrimitive>['filter']> = (
+  value,
+  query,
+  keywords,
+) => (value.toLowerCase().includes(query.toLowerCase()) ? 1 : defaultFilter(value, query, keywords))
+
+function Command({
+  className,
+  filter = substringFirst,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
+      filter={filter}
       data-slot="command"
       className={cn(
         'flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground',
@@ -83,7 +94,7 @@ function CommandList({ className, ...props }: React.ComponentProps<typeof Comman
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        'max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none',
+        'max-h-72 in-data-[slot=dialog-content]:max-h-[min(18rem,calc(66svh-5rem))] scroll-py-1 overflow-x-hidden overflow-y-auto outline-none',
         className,
       )}
       {...props}

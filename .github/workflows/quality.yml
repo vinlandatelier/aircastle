@@ -145,6 +145,35 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           include-hidden-files: false
+  browser:
+    name: Browser journeys and extremes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: 'true'
+      - name: Exercise production browser journeys
+        shell: bash
+        run: |
+          vp run test-web:e2e |& tee reports/ci/browser.log
+      - name: Upload logs and reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: browser-journeys-and-extremes-${{ github.run_attempt }}
+          path: |
+            reports/
+            apps/web/reports/
+            packages/schema/coverage/
+            packages/schema/reports/
+            packages/contracts/reports/
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: false
   integrity:
     name: Database runner integrity
     runs-on: ubuntu-24.04
@@ -155,12 +184,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
         with:
-          chromium: 'false'
+          chromium: 'true'
       - name: Build and verify database runner and verification tools
         shell: bash
         run: |
           vp run build |& tee reports/ci/build.log
           vp run test:db |& tee reports/ci/database-runner.log
+          vp -C apps/web run test:verification |& tee reports/ci/verification-tools.log
       - name: Upload logs and reports
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -191,6 +221,7 @@ jobs:
         run: |
           vp run build |& tee reports/ci/build.log
           vp run test:coverage |& tee reports/ci/schema-coverage.log
+          vp run test-web:coverage |& tee reports/ci/frontend-coverage.log
       - name: Upload logs and reports
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -212,6 +243,7 @@ jobs:
       - workflow-lint
       - static
       - runtime
+      - browser
       - integrity
       - coverage
     runs-on: ubuntu-24.04
@@ -228,7 +260,7 @@ jobs:
           import os
           import sys
 
-          expected = ('workflow-lint', 'static', 'runtime', 'integrity', 'coverage')
+          expected = ('workflow-lint', 'static', 'runtime', 'browser', 'integrity', 'coverage')
           results = json.loads(os.environ['JOB_RESULTS'])
           failed = False
           for job in expected:
