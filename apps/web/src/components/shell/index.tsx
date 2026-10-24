@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { AppHeader } from '@/components/app-header'
-import { AppSidebar } from '@/components/app-sidebar'
+import { AppHeader } from './app-header'
+import { AppSidebar } from './app-sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 export function AppShell({ children }: { children: React.ReactNode }) {

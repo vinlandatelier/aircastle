@@ -5,10 +5,17 @@ import { describe, expect, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "../..");
 const sourceRoot = resolve(root, "apps/api/src");
-const features = resolve(sourceRoot, "features");
-const modules = readdirSync(features, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => resolve(features, entry.name));
+const webRoot = resolve(root, "apps/web/src");
+const sourceRoots = [sourceRoot, webRoot];
+const modules = [
+  resolve(webRoot, "components/shell"),
+  ...sourceRoots.flatMap((source) => {
+    const features = resolve(source, "features");
+    return readdirSync(features, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => resolve(features, entry.name));
+  }),
+];
 
 const apiRoot = resolve(root, "apps/api");
 
@@ -73,13 +80,17 @@ function privateImports(file: string, source: string): string[] {
       return [{ specifier, bases: loaderBases }];
     return [];
   });
-  return loads.flatMap(({ specifier, bases }) =>
-    specifier !== undefined &&
-    specifier.startsWith(".") &&
-    bases.some((base) => isPrivate(file, resolve(base, specifier)))
-      ? [specifier]
-      : [],
-  );
+  const aliased = file.startsWith(`${webRoot}${sep}`);
+  return loads.flatMap(({ specifier, bases }) => {
+    if (specifier === undefined) return [];
+    const targets =
+      aliased && specifier.startsWith("@/")
+        ? [resolve(webRoot, specifier.slice(2))]
+        : specifier.startsWith(".")
+          ? bases.map((base) => resolve(base, specifier))
+          : [];
+    return targets.some((target) => isPrivate(file, target)) ? [specifier] : [];
+  });
 }
 
 function isPrivate(file: string, target: string): boolean {
@@ -187,11 +198,68 @@ describe("Module entry points", () => {
     ).toEqual([]);
   });
 
-  it("keeps feature implementations private for API callers", () => {
-    const violations = readdirSync(sourceRoot, { recursive: true, encoding: "utf8" })
+  it("detects nested web type imports through aliases and relative paths", () => {
+    expect(
+      privateImports(
+        resolve(webRoot, "components/example.tsx"),
+        `type Navigation = {
+           page: import('@/features/navigation/pages').Page;
+           search: ReturnType<typeof import('../features/navigation/navigation').PageSearch>;
+         };`,
+      ),
+    ).toEqual(["@/features/navigation/pages", "../features/navigation/navigation"]);
+  });
+
+  it("allows web public type imports and same-feature private type queries", () => {
+    expect(
+      privateImports(
+        resolve(webRoot, "features/navigation/index.ts"),
+        `type Shell = typeof import('@/components/shell/index.tsx').AppShell;
+         type Page = import('./pages').Page;
+         type Search = typeof import('@/features/navigation/navigation').PageSearch;`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("detects aliases and relative imports that bypass navigation", () => {
+    const file = resolve(webRoot, "components/example.tsx");
+    expect(
+      privateImports(
+        file,
+        "import { PageSearch } from '@/features/navigation/navigation'; export { navigationGroups } from '../features/navigation/pages';",
+      ),
+    ).toEqual(["@/features/navigation/navigation", "../features/navigation/pages"]);
+    expect(privateImports(file, "import { PageSearch } from '@/features/navigation';")).toEqual([]);
+  });
+
+  it("protects shell internals while allowing its public interface", () => {
+    const file = resolve(webRoot, "App.tsx");
+    expect(
+      privateImports(file, "import { AppHeader } from '@/components/shell/app-header';"),
+    ).toEqual(["@/components/shell/app-header"]);
+    expect(privateImports(file, "import { AppShell } from '@/components/shell';")).toEqual([]);
+    expect(
+      privateImports(
+        resolve(webRoot, "components/shell/index.tsx"),
+        "import { AppHeader } from './app-header';",
+      ),
+    ).toEqual([]);
+  });
+
+  it("resolves the @/ alias only for web callers", () => {
+    expect(
+      privateImports(
+        resolve(root, "apps/api/src/app.ts"),
+        "import { PageSearch } from '@/features/navigation/navigation';",
+      ),
+    ).toEqual([]);
+  });
+
+  it.each(sourceRoots)("keeps module implementations private for callers in %s", (source) => {
+    const violations = readdirSync(source, { recursive: true, encoding: "utf8" })
       .filter((file) => /\.tsx?$/.test(file))
       .flatMap((file) => {
-        const path = resolve(sourceRoot, file);
+        const path = resolve(source, file);
         return privateImports(path, readFileSync(path, "utf8")).map(
           (specifier) => `${file}: ${specifier}`,
         );
