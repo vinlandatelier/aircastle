@@ -17,5 +17,6 @@ Follow [the architecture map](../ARCHITECTURE.md) for tooling ownership.
 - Set `AI_BOT_USER_ID` to the App bot's immutable user ID, `AI_STATE_ISSUE` to a dedicated state issue, and `AI_ACTIVATED_AT` to the activation timestamp in ISO format. Historical commands before activation are ignored.
 - `vp run ai:models -- offline` checks configuration without provider calls. Dispatch the model-update workflow in `live` mode to test the configured providers and representative schemas after merging the workflow.
 - `vp run ai:setup` requires the trusted workflow environment, App token, provider keys, and configured identity/state values. A missing credential is a setup failure, not passing evidence.
+- The fix verifier maps supported frontend paths to file-level lint and colocated behavior tests. Unsupported or mixed scopes produce an unverified patch artifact and no branch. Extend the mapping only with focused verification evidence.
 - Exercise one member review, a denied outsider command, an inline reply, and an explicit fix before relying on live automation. Check the model settings, reviewed SHA, verification scope, and follow-up PR's deterministic checks.
 - Do not enable separate native mention integrations that bypass this workflow's membership checks.

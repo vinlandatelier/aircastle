@@ -25,6 +25,7 @@ import {
   type Verification,
 } from "./index.ts";
 import type { ModelConfig, Role } from "../ai-models/index.ts";
+import { verificationPlan } from "./checks.ts";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type StoredReceipt = { commentId: number; receipt: Receipt };
@@ -649,11 +650,14 @@ export class Coordinator {
     claim: StoredReceipt,
   ): Promise<string> {
     const fix: Fix = validateEdits(raw, job.snapshot);
+    const commands = verificationPlan(fix.edits);
     if (
       verification.id !== job.id ||
       verification.digest !== digest(job) ||
       verification.editsDigest !== digest(fix.edits) ||
-      verification.passed !== true
+      verification.recipe !== digest(commands) ||
+      digest(verification.commands) !== digest(commands) ||
+      verification.passed !== (commands !== null)
     ) {
       await this.finish(claim, "failed");
       return "verification_failed";
@@ -662,9 +666,13 @@ export class Coordinator {
       await this.finish(claim, "stale");
       return "stale";
     }
-    if (job.snapshot.fork && job.snapshot.changedPaths.some(controlPath)) {
+    if (commands === null || (job.snapshot.fork && job.snapshot.changedPaths.some(controlPath))) {
+      const reason =
+        commands === null
+          ? "scoped verification is unavailable for these paths. This patch is unverified; no verification commands ran"
+          : "this fork changes automation/configuration. Selected scoped checks passed";
       await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
-        body: `Fix for reviewed SHA ${job.snapshot.head} is patch-only because this fork changes automation/configuration. No branch was promoted. Download artifact ai-model-${job.id} from https://github.com/${this.options.repository}/actions/runs/${this.options.run}. It contains a unified patch and original structured edits. Verification: ${verification.scope}.`,
+        body: `Fix for reviewed SHA ${job.snapshot.head} is patch-only because ${reason}. No branch was promoted. Download artifact ai-model-${job.id} from https://github.com/${this.options.repository}/actions/runs/${this.options.run}. It contains a unified patch and original structured edits.`,
       });
       await this.finish(claim, "published");
       return "patch_only";
@@ -749,7 +757,7 @@ export class Coordinator {
         title: `AI fix for #${job.snapshot.number}: ${fix.summary.slice(0, 100)}`,
         head: branch,
         base: job.snapshot.baseRef,
-        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${job.selection.model}; effort sent: ${job.selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}. Ordinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
+        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${job.selection.model}; effort sent: ${job.selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}.\n\nSelected commands:\n\n\`\`\`text\n${commands.map((args) => args.join(" ")).join("\n")}\n\`\`\`\n\nOrdinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
       }),
     );
     await this.finish(claim, "published");

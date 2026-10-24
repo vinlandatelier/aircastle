@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { Coordinator, type Job } from "./index.ts";
+import { Coordinator, digest, type Job } from "./index.ts";
+import { verificationPlan } from "./checks.ts";
 import { snapshot, invocation } from "./fixtures.ts";
 
 const options = {
@@ -223,18 +224,20 @@ test("forks with automation changes produce only a patch notice", async () => {
     if (init?.method === "POST" || init?.method === "PATCH") return Response.json({ id: 10 });
     throw new Error(path);
   });
+  const path = "apps/web/src/features/navigation/index.tsx";
   const fixJob = {
     ...job,
     task: "fix" as const,
     role: "codexImplementer" as const,
     snapshot: {
       ...snapshot,
-      changedPaths: [...snapshot.changedPaths, ".github/workflows/hostile.yml"],
+      files: snapshot.files.map((file) => ({ ...file, path })),
+      changedPaths: [path, ".github/workflows/hostile.yml"],
     },
   };
   const fix = {
     summary: "Correct value",
-    edits: [{ path: "src/value.ts", expectedBlob: "c".repeat(40), content: "fixed\n" }],
+    edits: [{ path, expectedBlob: "c".repeat(40), content: "fixed\n" }],
   };
   const { digest } = await import("./index.ts");
   const receipt = {
@@ -256,7 +259,8 @@ test("forks with automation changes produce only a patch notice", async () => {
         digest: digest(fixJob),
         editsDigest: digest(fix.edits),
         passed: true,
-        recipe: "tested",
+        commands: verificationPlan(fix.edits),
+        recipe: digest(verificationPlan(fix.edits)),
         scope: "fixture",
       },
       { commentId: 91, receipt },
@@ -264,6 +268,99 @@ test("forks with automation changes produce only a patch notice", async () => {
   ).toBe("patch_only");
   expect(requests.some((url) => url.includes("/git/"))).toBe(false);
 });
+
+test.each([
+  ["unsupported", false, "matching", "patch_only"],
+  ["unsupported", true, "matching", "verification_failed"],
+  ["unsupported", false, "commands", "verification_failed"],
+  ["supported", true, "matching", "https://github.com/vinlandatelier/aircastle/pull/9"],
+  ["supported", false, "matching", "verification_failed"],
+  ["supported", true, "commands", "verification_failed"],
+  ["supported", true, "recipe", "verification_failed"],
+] as const)(
+  "fix publication binds %s scope, passed=%s, %s receipt",
+  async (scope, passed, mismatch, expected) => {
+    const writes: string[] = [];
+    const messages: string[] = [];
+    const coordinator = new Coordinator(options, async (url, init) => {
+      const path = new URL(url).pathname;
+      if (init?.method === "POST" || init?.method === "PATCH") {
+        writes.push(path);
+        if (typeof init.body === "string") {
+          const body = JSON.parse(init.body).body;
+          if (typeof body === "string") messages.push(body);
+        }
+        return Response.json({
+          id: 90,
+          sha: "c".repeat(40),
+          html_url: "https://github.com/vinlandatelier/aircastle/pull/9",
+        });
+      }
+      if (path.includes("/members/")) return new Response(null, { status: 204 });
+      if (path.endsWith("/users/member")) return Response.json(snapshot.author);
+      if (path.endsWith("/pulls/7"))
+        return Response.json({
+          state: "open",
+          head: { sha: snapshot.head },
+          base: { sha: snapshot.base },
+        });
+      if (path.includes("/git/ref/")) return new Response(null, { status: 404 });
+      if (path.includes("/git/commits/"))
+        return Response.json({ committer: { date: "2026-10-25T01:00:00Z" } });
+      return Response.json([]);
+    });
+    const path =
+      scope === "supported" ? "apps/web/src/features/navigation/index.tsx" : "src/value.ts";
+    const captured = {
+      ...snapshot,
+      fork: false,
+      changedPaths: [path],
+      files: snapshot.files.map((file) => ({ ...file, path })),
+    };
+    const fixJob = {
+      ...job,
+      task: "fix" as const,
+      role: "codexImplementer" as const,
+      snapshot: captured,
+    };
+    const fix = {
+      summary: "Correct value",
+      edits: [{ path, expectedBlob: "c".repeat(40), content: "fixed\n" }],
+    };
+    const commands = verificationPlan(fix.edits);
+    coordinator.entry = async () => ({ sha: "c".repeat(40), mode: "100644", type: "blob" });
+    const receipt = {
+      version: 1 as const,
+      id: job.id,
+      job: fixJob,
+      digest: digest(fixJob),
+      attempt: 1,
+      state: "claimed" as const,
+      run: "123",
+      at: "2026-10-25T00:00:00Z",
+    };
+    const result = await coordinator.publishFix(
+      fixJob,
+      fix,
+      {
+        id: job.id,
+        digest: digest(fixJob),
+        editsDigest: digest(fix.edits),
+        passed,
+        commands: mismatch === "commands" ? [["vp", "run", "test-schema"]] : commands,
+        recipe: mismatch === "recipe" ? "wrong" : digest(commands),
+        scope: "fixture",
+      },
+      { commentId: 91, receipt },
+    );
+    expect(result).toBe(expected);
+    expect(writes.some((value) => value.includes("/git/"))).toBe(expected.startsWith("https://"));
+    if (expected === "patch_only")
+      expect(messages.join("\n")).toContain("unverified; no verification commands ran");
+    if (expected.startsWith("https://"))
+      expect(messages.join("\n")).toContain("Selected commands:");
+  },
+);
 
 test("scheduled reconciliation creates independent provider claims and a repeat spends no work", async () => {
   const comments = new Map<number, Record<string, unknown>[]>([
