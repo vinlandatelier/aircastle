@@ -30,7 +30,7 @@ Supply deterministic data before rendering through a module-owned seam. Extend t
 
 ## Prove test strength
 
-A red test must fail because the promised behavior is absent or broken. Once a test passes, temporarily break that behavior in an isolated copy and confirm the relevant assertion fails. Restore it and confirm the control passes again. A screenshot or a failed build is insufficient.
+A red test must fail because the promised behavior is absent or broken. Use a focused fault check when needed to resolve a specific concern about test sensitivity: temporarily break that behavior in an isolated copy, confirm the relevant assertion fails, restore it, and confirm the control passes again. A screenshot or a failed build is insufficient evidence of test sensitivity.
 
 The committed examples run through:
 
@@ -47,10 +47,10 @@ A surviving fault is a test gap or an equivalent change requiring explanation. I
 
 ## Complete the feature
 
-- Run focused checks after edits. Examples: `vp run test-web` and `vp run test-web:e2e stress.spec.ts --grep long-text`.
-- Run `vp run verify-web` for frontend completion. Run `vp run check` for repository completion; it includes the browser suite, verification-tool integrity, and database-runner lifecycle checks and requires Chromium and Docker.
-- For focused checks of verification scripts, reporters, fixtures or configuration, run `vp run test-web:verification`. It exercises actual commands, concurrent ownership, failure classification, emitted reports and the strength runner.
+- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). Run only the component tests, browser journeys, and package checks needed to verify the change and affected callers. Select files and cases rather than running the whole frontend suite by default.
+- Neither `vp run verify-web` nor `vp run check` is a required completion gate. Reserve full-suite runs for explicit user requests. A focused UI change does not require backend, database, mutation, or verification-tool suites.
+- When changing verification scripts, reporters, fixtures or configuration, select the affected files or cases through `vp run test-web:verification -- <file>`. Do not run its unrelated fault campaigns.
 - Run `vp run test-web:coverage` when assessing coverage. Inspect raw covered/total counts and uncovered modules. The component-suite V8 report includes unimported source, excludes CSS, and includes compiler-generated branch effects. Browser journey results are separate evidence.
 - Preserve the command, revision/source fingerprint, executed/failed/skipped counts, intended red witness and final passing result. Use one focused independent review to challenge missing outcomes and assertions that could pass with broken behavior.
 
-The receipt lists the cases selected for that run, including each test's file and title hierarchy, status, attempts, errors and browser metadata. A focused run proves only its selected cases. Read the full-suite result before claiming broader coverage. Do not weaken assertions, silently skip failures, or accept retries to obtain green evidence.
+The receipt lists the cases selected for that run, including each test's file and title hierarchy, status, attempts, errors and browser metadata. Report only the coverage established by those selected cases. Do not weaken assertions, silently skip failures, or accept retries to obtain green evidence.
