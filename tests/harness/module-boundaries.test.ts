@@ -81,7 +81,7 @@ function privateImports(file: string, source: string): string[] {
           (serverRoots.some(
             (directory) => target === directory || target.startsWith(`${directory}${sep}`),
           ) ||
-            /^aircastle\.config\.[cm]?[jt]sx?$/.test(basename(target)))))
+            /^aircastle\.config(?:\.[cm]?[jt]sx?)?$/.test(basename(target)))))
     )
       return true;
     const owner = modules.find((module) => target?.startsWith(`${module}${sep}`));
@@ -126,6 +126,8 @@ describe("Module entry points", () => {
     "../../../packages/core/src/index.ts",
     "../../../packages/adapter-postgres/src/index.ts",
     "@/../../../packages/cli/src/index.ts",
+    "../../../aircastle.config",
+    "@/../../../aircastle.config",
     "../../../aircastle.config.ts",
     "@/../../../aircastle.config.js",
     "../../../aircastle.config.mjs",
