@@ -15,14 +15,14 @@ export function AppHeader() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 flex h-(--app-header-height) shrink-0 items-center justify-between gap-1.5 border-b sm:gap-2',
+        '[--spacing:4px] sticky top-0 z-50 flex h-(--app-header-height) shrink-0 items-center justify-between gap-1.5 border-b sm:gap-2',
         'bg-background/95 backdrop-blur-sm supports-backdrop-filter:bg-background/50',
       )}
     >
       <Link
         to="/collections"
         aria-label="Aircastle"
-        className="brand-link flex h-full w-(--sidebar-width-icon) shrink-0 items-center justify-center border-r outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="brand-link flex h-full w-14 shrink-0 items-center justify-center border-r outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span aria-hidden="true" className="brand-logo block size-6 shrink-0" />
       </Link>
@@ -49,6 +49,7 @@ export function AppHeader() {
             role="link"
             render={
               <Button
+                className="hidden sm:inline-flex"
                 aria-label="Docs"
                 size="icon-sm"
                 variant="plain"
@@ -68,6 +69,7 @@ export function AppHeader() {
             role="link"
             render={
               <Button
+                className="hidden sm:inline-flex"
                 aria-label="GitHub"
                 size="icon-sm"
                 variant="plain"
