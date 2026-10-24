@@ -36,6 +36,10 @@ The server mounts every API route under `/api`, including `/api/docs` and `/api/
 
 Vite forwards `/api` requests unchanged during development and preview. The built API owns the same prefix without Vite. Hosted routing must forward `/api` unchanged to Bun. Production admin serving and deployment configuration are not implemented yet.
 
+## Repository automation
+
+`.github/workflows/ci.yml` runs the required `Lint, typecheck and test` check on pull requests and pushes to `main`. `.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
+
 ## Feature pattern
 
 The folder names the feature. Start with its implementation and public-interface tests together:
