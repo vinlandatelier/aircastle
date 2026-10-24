@@ -16,6 +16,14 @@ vp check
 vp run test
 ```
 
+Create your local environment file at the repository root:
+
+```sh
+cp .env.example .env
+```
+
+Both apps read the root `.env`; no `.env` files are needed in `apps/api` or `apps/web`. Exported shell variables take precedence. Set `PORT` in the root file to change the API port and the web app's `/api` proxy together. Only `VITE_*` variables are exposed to browser code; keep secrets unprefixed. Restart the development servers after changing environment values.
+
 Start the web app on port 43121:
 
 ```sh
@@ -69,7 +77,6 @@ Browser verification starts and cleans up its own servers on allocated ports. It
 Install Docker with Compose v2.20 or later and start the Docker engine. The committed `compose.yaml` pins Postgres 18.6 by image digest. It supports ARM64 and AMD64.
 
 ```sh
-cp .env.example .env
 vp run db:up
 ```
 
