@@ -10,10 +10,10 @@ Vite+ uses Bun 1.3.4 for dependency management, pinned in `.bun-version` and `pa
 
 ```sh
 vp install --frozen-lockfile
+vp run build
 vp run typecheck
 vp check
 vp run test
-vp run build
 ```
 
 Start the web app on port 43121:
