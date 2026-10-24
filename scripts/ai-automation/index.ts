@@ -153,7 +153,8 @@ export function parseCommand(body: string): Command | null {
   const lines = body.replace(/<!--[\s\S]*?(?:-->|$)/g, "").split(/\r?\n/);
   let fence: string | null = null;
   const commands: Command[] = [];
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!;
     const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
     if (marker) {
       if (fence === null) fence = marker[0]!;
@@ -176,7 +177,9 @@ export function parseCommand(body: string): Command | null {
     commands.push({
       provider: match[1]!.toLowerCase() === "codex" ? "openai" : "anthropic",
       kind,
-      instructions,
+      instructions: [...lines.slice(0, index), instructions, ...lines.slice(index + 1)]
+        .join("\n")
+        .trim(),
       ...(expected ? { expectedHead: expected[1]! } : {}),
     });
   }

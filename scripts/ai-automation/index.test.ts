@@ -195,3 +195,10 @@ test.each(["    @codex fix", "\t@claude fix", "<!-- unclosed\n@codex fix"])(
 test("a polite explicit fix request selects fix", () => {
   expect(parseCommand("@codex please fix the referenced finding")?.kind).toBe("fix");
 });
+
+test("multiline fix instructions reach the task instead of disappearing", () => {
+  expect(
+    parseCommand("@codex fix\nUse the API's validated result.\nKeep the original public behavior.")
+      ?.instructions,
+  ).toBe("Use the API's validated result.\nKeep the original public behavior.");
+});

@@ -232,7 +232,7 @@ export class Coordinator {
     if (
       !reviews.some((raw) => {
         const r = record(raw);
-        return record(r.user).id === this.options.botId && String(r.body).includes(receiptMarker);
+        return record(r.user).id === this.options.botId && String(r.body).endsWith(receiptMarker);
       })
     ) {
       await this.api(`${this.root}/pulls/${job.snapshot.number}/reviews`, "POST", {
@@ -371,7 +371,7 @@ export class Coordinator {
       .find(
         (r) =>
           record(r.user).id === this.options.botId &&
-          String(r.body).includes(`<!-- aircastle-ai-result:${prior.receipt.id} -->`),
+          String(r.body).endsWith(`<!-- aircastle-ai-result:${prior.receipt.id} -->`),
       );
     return review
       ? `Incremental review since ${old}. Previous advisory evidence:\n${String(review.body).slice(0, 16000)}`
@@ -647,7 +647,7 @@ export class Coordinator {
       .find(
         (pr) =>
           record(pr.user).id === this.options.botId &&
-          String(pr.body).includes(`<!-- aircastle-ai-fix:${job.id} -->`),
+          String(pr.body).endsWith(`<!-- aircastle-ai-fix:${job.id} -->`),
       );
     if (prior) {
       await this.finish(claim, "published");
