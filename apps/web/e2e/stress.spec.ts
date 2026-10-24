@@ -224,10 +224,7 @@ for (const method of ['keyboard', 'pointer'] as const) {
     }) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await visit(page, 'many-projects')
-      const project = page.getByRole('button', {
-        name: 'Switch project: Acme Inc / Technical Blog',
-        exact: true,
-      })
+      const project = page.getByRole('button', { name: /^Switch project:/ })
       await project.click()
       const input = page.getByRole('combobox')
       const list = page.getByRole('listbox')
@@ -245,7 +242,9 @@ for (const method of ['keyboard', 'pointer'] as const) {
       const target = endpoint === '001' ? first : last
       if (method === 'keyboard') {
         await expect(input).toBeFocused()
-        await input.press(endpoint === '001' ? 'Home' : 'End')
+        if (endpoint === '100') {
+          for (let index = 1; index < 100; index++) await input.press('ArrowDown')
+        }
         await expect(target).toHaveAttribute('aria-selected', 'true')
       } else {
         await list.hover()
@@ -379,11 +378,49 @@ for (const viewport of viewports) {
       await expect(page).toHaveURL(new RegExp(`${destination.path}(?:\\?.*)?$`))
       if (mobile) await visibleSidebarTrigger(page).click()
       await expect(page.getByRole('link', { name: destination.name, exact: true })).toHaveAttribute(
-        'data-active',
-        'true',
+        'aria-current',
+        'page',
       )
+      await expect(
+        page.getByRole('navigation', { name: 'Main navigation' }).locator('a[aria-current="page"]'),
+      ).toHaveCount(1)
       if (mobile) await page.keyboard.press('Escape')
       await assertLayout(page)
     })
   }
 }
+
+test('T5 R7 R8 long-text multiword: trigger containment preserves all header controls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await visit(page, 'long-text')
+  const trigger = page.getByRole('button', { name: /^Switch project:/ })
+  await trigger.click()
+  await page.getByRole('option').filter({ hasText: multiwordName.trimEnd() }).click()
+  await expect(trigger).toHaveAccessibleName(
+    new RegExp(`^Switch project: Acme Inc / ${multiwordName.trimEnd()}$`),
+  )
+  await assertLayout(page)
+})
+
+test('T5 R7 R8 long-text popup: viewport containment keeps extreme candidates within reach', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 })
+  await visit(page, 'long-text')
+  await page.getByRole('button', { name: /^Switch project:/ }).click()
+  const popup = page.getByRole('dialog', { name: 'Switch project', exact: true })
+  await expect(popup).toBeVisible()
+  await expect(
+    page.getByRole('option', { name: `${longName} / ${longName}`, exact: true }),
+  ).toHaveAccessibleName(`${longName} / ${longName}`)
+  await expect
+    .poll(async () => {
+      const box = await popup.boundingBox()
+      return Boolean(box && box.x >= -1 && box.x + box.width <= 321)
+    })
+    .toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(popup).toBeHidden()
+})

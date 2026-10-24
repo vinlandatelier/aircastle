@@ -59,7 +59,10 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await trigger.click()
     await expect(
       page.getByRole('dialog').getByRole('link', { name: 'Tasks', exact: true }),
-    ).toHaveAttribute('data-active', 'true')
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('navigation', { name: 'Main navigation' }).locator('a[aria-current="page"]'),
+    ).toHaveCount(1)
     await page.keyboard.press('Escape')
     await expect(trigger).toBeFocused()
     await assertLayout(page)
@@ -86,7 +89,10 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await trigger.click()
     await expect(
       page.getByRole('dialog').getByRole('link', { name: 'Users', exact: true }),
-    ).toHaveAttribute('data-active', 'true')
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('navigation', { name: 'Main navigation' }).locator('a[aria-current="page"]'),
+    ).toHaveCount(1)
     await page.keyboard.press('Escape')
     await expect(trigger).toBeFocused()
     await page.reload()
@@ -108,7 +114,10 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await trigger.click()
     await expect(
       page.getByRole('dialog').getByRole('link', { name: 'Users', exact: true }),
-    ).toHaveAttribute('data-active', 'true')
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.getByRole('navigation', { name: 'Main navigation' }).locator('a[aria-current="page"]'),
+    ).toHaveCount(1)
     await page.keyboard.press('Escape')
     await assertLayout(page)
     await testInfo.attach('after-reload', {

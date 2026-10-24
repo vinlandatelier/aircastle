@@ -31,6 +31,11 @@ export const test = base.extend<{ runtimeEvidence: void }>({
           viewport: page.viewportSize(),
           url: page.url(),
           browser: page.context().browser()?.version(),
+          theme: await page
+            .evaluate(() =>
+              document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+            )
+            .catch(() => null),
           errors,
           network,
         }),
@@ -48,6 +53,7 @@ export { expect }
 export async function visit(page: Page, scenario: Scenario = 'normal', pathname = '/') {
   const origin = scenario === 'normal' ? process.env.WEB_ORIGIN : process.env.WEB_FIXTURE_ORIGIN
   if (!origin) throw new Error('Browser origin missing; use vp run test-web:e2e')
+  test.info().annotations.push({ type: 'scenario', description: scenario })
   const url = new URL(pathname, origin)
   if (scenario !== 'normal') url.searchParams.set('scenario', scenario)
   await page.goto(url.href)

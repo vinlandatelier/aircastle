@@ -1,10 +1,9 @@
-import process from 'node:process'
-import { spawnSync } from 'node:child_process'
 import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vite-plus/test'
 import { browserOutcome, requirementResults } from '../scripts/evidence'
+import { originalWeb, readJson, runWeb } from './command-copy'
 
 describe('[R1 R9 R10] verification evidence', () => {
   it('accepts only executed passing tests', () => {
@@ -58,6 +57,15 @@ describe('[R1 R9 R10] verification evidence', () => {
         ['R2'],
       ),
     ).toEqual({ R2: 'failed' })
+    expect(
+      requirementResults(
+        [
+          { title: 'R2 passed', status: 'passed' },
+          { title: 'R2 skipped', status: 'skipped' },
+        ],
+        ['R2'],
+      ),
+    ).toEqual({ R2: 'not exercised' })
   })
 })
 
@@ -77,30 +85,11 @@ it('[R9] coverage inventories unimported source and excludes tests in a disposab
       path.join(copy, 'src/unimported-proof.ts'),
       'export function unimportedProof() { return 734021 }\n',
     )
-    const result = spawnSync(
-      'vp',
-      [
-        'test',
-        'run',
-        '--coverage',
-        '--reporter=junit',
-        '--outputFile.junit=' + path.join(copy, 'results.xml'),
-      ],
-      {
-        cwd: copy,
-        env: {
-          ...process.env,
-          WEB_COVERAGE_DIR: path.join(copy, 'coverage'),
-          WEB_FIXTURES: '0',
-          WEB_RUN_DIR: copy,
-        },
-        encoding: 'utf8',
-        timeout: 90_000,
-      },
-    )
+    const output = path.join(copy, 'reports/coverage-proof')
+    const result = runWeb(copy, output, ['coverage'])
     expect(result.status, result.stdout + result.stderr).toBe(0)
     const summary = JSON.parse(
-      readFileSync(path.join(copy, 'coverage/coverage-summary.json'), 'utf8'),
+      readFileSync(path.join(output, 'coverage/coverage-summary.json'), 'utf8'),
     )
     const keys = Object.keys(summary)
     expect(keys.some((key) => key.endsWith('/src/unimported-proof.ts'))).toBe(true)
@@ -108,7 +97,44 @@ it('[R9] coverage inventories unimported source and excludes tests in a disposab
       summary[keys.find((key) => key.endsWith('/src/unimported-proof.ts'))!].lines.covered,
     ).toBe(0)
     expect(keys.some((key) => /\.test\.|test-utils|test-setup|e2e/.test(key))).toBe(false)
+    expect(readFileSync(path.join(output, 'coverage/index.html'), 'utf8')).toContain('<html')
+    const details = readJson(output, 'coverage-info.json')
+    expect(details.provider).toBe('v8')
+    expect(details.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/)
+    expect(details.totals).toEqual(summary.total)
+    expect(details.interpretation.css).toBe(false)
+    expect(details.interpretation.compilerBranches).toMatch(/compiler/i)
+    expect(details.interpretation.uiWrappers.length).toBeGreaterThan(0)
   } finally {
     rmSync(copy, { recursive: true, force: true })
   }
 }, 90_000)
+
+it('[R1 R9 R10] command reports real title hierarchy, attempts and unexercised requirements', () => {
+  const output = mkdtempSync(path.join(tmpdir(), 'aircastle-emitted-report-'))
+  try {
+    const result = runWeb(originalWeb, output, ['e2e', '--grep', 'Back and Forward follow'])
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+    const requirements = readJson(output, 'requirements.json')
+    expect(requirements.R2).toBe('passed')
+    expect(requirements.R3).toBe('not exercised')
+    const receipt = readJson(output, 'receipt.json')
+    expect(receipt.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/)
+    expect(receipt.runtime.node).toBeTruthy()
+    expect(receipt.runtime.playwright).toBeTruthy()
+    expect(receipt.browserVersion).toBeTruthy()
+    expect(receipt.servingMode).toBe('built preview')
+    expect(receipt.cases).toHaveLength(1)
+    const actual = receipt.cases[0]
+    expect(actual.title).toContain('R2 routes and history')
+    expect(actual.title).toContain('Back and Forward follow')
+    expect(actual.scenario).toBe('normal')
+    expect(actual.viewport).toEqual({ width: 1440, height: 900 })
+    expect(actual.theme).toBe('light')
+    expect(actual.attempts).toHaveLength(1)
+    expect(actual.attempts[0].retry).toBe(0)
+    expect(actual.attempts[0].status).toBe('passed')
+  } finally {
+    rmSync(output, { recursive: true, force: true })
+  }
+}, 180_000)
