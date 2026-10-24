@@ -34,6 +34,7 @@ packages/
 └── cli/                      Schema publication, reconciliation, and lockfiles
 
 scripts/                      Repository checks and local development tooling
+├── ai-automation/            Organization authorization, PR context, and advisory review/fix publication
 ├── ai-models/                Pinned model roles and bounded provider API calls
 └── ai-model-updates/         Release discovery, role evaluations, and model update proposals
 
@@ -75,7 +76,11 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 `.github/workflows/quality.yml` runs deterministic pull-request checks and joins them in `Quality`. Full schema and contract mutation runs use a separate scheduled/manual workflow. AI workflows are advisory and do not participate in `Quality`, approval counts, or conversation-resolution requirements.
 
+`scripts/ai-automation/index.ts` exposes review/fix authorization and the coordinator. Its private GitHub adapter owns immutable source capture, authenticated claims, revision checks, and publication. The workflow uses trusted default-branch code and checks current `vinlandatelier` membership before model calls. It scans PR revisions and inline commands on a schedule; new issue comments can wake it immediately. Source and model output remain data in credential-bearing jobs. Supported fixes run selected file-level checks in a separate container and publish through a fresh trusted job as follow-up PRs. Unsupported scopes produce explicitly unverified patch artifacts without executing repository checks.
+
 `scripts/ai-models/index.ts` owns the four-role config parser and provider API transport. Callers supply task text and a bounded output schema. `.github/ai-models.json` pins each role's model and effort. `scripts/ai-model-updates` owns official release/account discovery, paired role evaluations, isolated coding checks, and one bot-owned upgrade proposal. A model change takes effect after its proposal is merged.
+
+Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
 
 ## Feature pattern
 
