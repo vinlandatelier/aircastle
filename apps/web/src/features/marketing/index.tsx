@@ -8,7 +8,9 @@ export function MarketingPage() {
       <Header />
       <main data-theme-scope="marketing">
         <HeroSection />
-        <LogoCloud />
+        <div className="relative -mt-8 overflow-hidden rounded-t-[2rem] bg-background pt-2">
+          <LogoCloud />
+        </div>
       </main>
     </div>
   )

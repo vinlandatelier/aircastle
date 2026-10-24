@@ -230,6 +230,25 @@
   background-image: url('/brand/logo-dark.png');
 }
 
+[data-theme-scope='hero'] {
+  --background: oklch(0.1 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.24 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --card: oklch(0.22 0 0);
+  --muted: oklch(0.3 0 0);
+  --muted-foreground: oklch(0.8 0 0);
+  --border: oklch(1 0 0 / 0.2);
+  --input: oklch(1 0 0 / 0.15);
+  --ring: oklch(0.8 0 0);
+}
+
+[data-theme-scope='hero'] .brand-logo {
+  background-image: url('/brand/logo-dark.png');
+}
+
 @keyframes brand-spin {
   to {
     transform: rotate(-360deg);

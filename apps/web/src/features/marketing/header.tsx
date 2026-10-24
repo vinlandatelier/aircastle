@@ -23,8 +23,9 @@ export function Header() {
 
   return (
     <header
+      data-theme-scope={scrolled ? 'marketing' : 'hero'}
       className={cn(
-        'sticky top-0 z-20 w-full border-b motion-safe:transition-colors motion-safe:duration-200',
+        'sticky top-0 z-20 w-full border-b text-foreground motion-safe:transition-colors motion-safe:duration-200',
         scrolled
           ? 'border-border/50 bg-background/95 backdrop-blur-sm'
           : 'border-transparent bg-transparent',
