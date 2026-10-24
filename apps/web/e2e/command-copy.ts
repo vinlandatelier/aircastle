@@ -30,7 +30,7 @@ export function assertArtifacts(output: string, expectedTitle: string) {
 
 export async function liveRun(output: string) {
   const child = spawn(
-    'bun',
+    'node',
     ['scripts/verify-web.ts', 'e2e', '--grep', 'normal production build exposes'],
     {
       cwd: originalWeb,

@@ -8,7 +8,7 @@ const sourceRoot = resolve(root, "apps/web/src");
 const sourceRoots = [sourceRoot, resolve(root, "apps/api/src")];
 const serverPackages = ["@aircastle/core", "@aircastle/adapter-postgres", "@aircastle/cli"];
 const serverRoots = [
-  resolve(root, "apps/api/src"),
+  resolve(root, "apps/api"),
   ...serverPackages.map((name) => resolve(root, "packages", name.slice("@aircastle/".length))),
 ];
 const modules = [
@@ -116,6 +116,8 @@ describe("Module entry points", () => {
     "@aircastle/adapter-postgres/storage",
     "@aircastle/cli",
     "@aircastle/cli/config",
+    "../../api",
+    "../../api/dist/index.js",
     "../../api/src",
     "../../api/src/app.ts",
     "../../api/src/features/content/index.ts",
@@ -151,7 +153,7 @@ describe("Module entry points", () => {
     "@aircastle/cli-ui",
     "react",
     "@base-ui/react/button",
-    "../../api/src-extra/app.ts",
+    "../../api-extra/src/app.ts",
     "../../api/src/../../shared/index.ts",
     "../../../packages/core-extra/src/index.ts",
     "./aircastle.config.json",

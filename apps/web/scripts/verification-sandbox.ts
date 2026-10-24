@@ -25,7 +25,7 @@ export function runWeb(
   args: string[],
   env: NodeJS.ProcessEnv = {},
 ) {
-  return spawnSync('bun', ['scripts/verify-web.ts', ...args], {
+  return spawnSync('node', ['scripts/verify-web.ts', ...args], {
     cwd: directory,
     env: { ...process.env, ...env, WEB_RUN_DIR: output },
     encoding: 'utf8',
