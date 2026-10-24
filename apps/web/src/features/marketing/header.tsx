@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { cn } from 'cn'
 import { Link } from '@tanstack/react-router'
 import { MenuIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,9 +12,24 @@ const navLinks = [
 
 export function Header() {
   const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const updateScrolled = () => setScrolled(window.scrollY > 0)
+    updateScrolled()
+    window.addEventListener('scroll', updateScrolled, { passive: true })
+    return () => window.removeEventListener('scroll', updateScrolled)
+  }, [])
 
   return (
-    <header className="sticky top-0 z-20 w-full border-b border-border/50 bg-background/95 backdrop-blur-sm">
+    <header
+      className={cn(
+        'sticky top-0 z-20 w-full border-b motion-safe:transition-colors motion-safe:duration-200',
+        scrolled
+          ? 'border-border/50 bg-background/95 backdrop-blur-sm'
+          : 'border-transparent bg-transparent',
+      )}
+    >
       <nav
         aria-label="Marketing navigation"
         className="mx-auto flex min-h-16 w-full max-w-5xl items-center justify-between gap-4 px-4"
