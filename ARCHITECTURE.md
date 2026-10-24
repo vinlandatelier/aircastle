@@ -28,6 +28,9 @@ packages/
 └── cli/                      Schema publication, reconciliation, and lockfiles
 
 scripts/                      Repository checks and local development tooling
+└── ai-models/                Pinned model roles and bounded provider API calls
+
+.github/                      CI workflows, shared setup, and model selections
 ```
 
 The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. The CLI entry uses the same app factory with a silent logger.
@@ -35,6 +38,10 @@ The API assembles middleware, feature routes, and API documentation in `apps/api
 The server mounts every API route under `/api`, including `/api/docs` and `/api/openapi.json`. Feature routers use paths relative to that mount and follow the feature pattern below.
 
 Vite forwards `/api` requests unchanged during development and preview. The built API owns the same prefix without Vite. Hosted routing must forward `/api` unchanged to Bun. Production admin serving and deployment configuration are not implemented yet.
+
+## Repository automation
+
+`scripts/ai-models/index.ts` owns the four-role config parser and provider API transport. Callers supply task text and a bounded output schema. `.github/ai-models.json` pins each role's model and effort.
 
 ## Feature pattern
 
