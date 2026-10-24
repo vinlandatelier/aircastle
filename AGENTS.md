@@ -33,9 +33,15 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Verify expected type errors with isolated negative fixtures and explicit compiler diagnostics, without suppressions.
 - Run `vp run check:policy` for JavaScript and TypeScript changes. The configured type-check command also enforces this policy.
 
+## Agent collaboration
+
+- Select models by capability from those available in the active harness. Do not hardcode provider names, model names, or versions in shared instructions.
+- Use the most capable reasoning model available for complex analysis, scoping, architecture, and review.
+- Use a capable everyday coding model one tier below the strongest reasoning model for implementation. Do not use small or lightweight models for implementation; report when a suitable model is unavailable.
+- Keep shared instructions in `AGENTS.md` and skills in `.agents/skills/`. Keep `CLAUDE.md` and `.claude/skills/` entries as symlinks to those sources so harnesses share the same guidance.
+
 ## Changes and verification
 
-- Use Sol 6.1 (`gpt-6.1-sol`) for delegated implementation work.
 - Before editing, identify the active worktree, approved behavior, bounded outcome, and relevant checks. Resolve blocking behavior choices before writing dependent code or expectations; choose routine implementation details autonomously.
 - Keep one authoritative specification and decision record, with one writer per shared update. Worktrees must reference them rather than maintain copies. Resolve code paths in the active worktree.
 - Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists.
