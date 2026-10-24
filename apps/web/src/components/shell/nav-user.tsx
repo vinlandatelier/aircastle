@@ -13,10 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { UserIcon, SettingsIcon, CreditCardIcon, LogOutIcon } from 'lucide-react'
 
-const user = {
-  name: 'Shaban Haider',
-  email: 'shaban@efferd.com',
-}
+import { user } from './data'
 
 export function NavUser() {
   return (

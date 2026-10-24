@@ -9,10 +9,14 @@
     "build": "bun scripts/generate-icons.mjs && vp build",
     "generate:icons": "bun scripts/generate-icons.mjs",
     "typecheck": "tsc -b",
-    "test": "vp test run --passWithNoTests",
+    "test": "vp test run",
     "lint": "vp lint",
     "preview": "vp preview",
-    "check": "vp check"
+    "check": "vp check",
+    "test:e2e": "bun scripts/verify-web.ts e2e",
+    "test:coverage": "bun scripts/verify-web.ts coverage",
+    "test:verification": "vp test run --config vite.verification.config.ts",
+    "verify": "bun scripts/verify-web.ts verify"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
