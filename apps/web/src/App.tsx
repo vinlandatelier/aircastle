@@ -1,4 +1,3 @@
-import { AppShell } from '@/components/shell'
 import { Outlet } from '@tanstack/react-router'
 import { ThemeProvider } from 'next-themes'
 
@@ -10,9 +9,7 @@ function App() {
       storageKey="aircastle-theme"
       enableSystem
     >
-      <AppShell>
-        <Outlet />
-      </AppShell>
+      <Outlet />
     </ThemeProvider>
   )
 }
