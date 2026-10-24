@@ -31,7 +31,7 @@ const receipt: {
 } = {
   status: 'running',
   runtime: {
-    node: process.version,
+    node: execFileSync('node', ['--version'], { encoding: 'utf8' }).trim(),
     bun: process.versions.bun ?? null,
     playwright: require('@playwright/test/package.json').version,
   },
@@ -76,6 +76,19 @@ async function phase(name: string, argv: string[], env: NodeJS.ProcessEnv = {}) 
     )
 }
 
+async function requirePassingTests(name: string) {
+  const report: { numTotalTests: number; numFailedTests: number; numPendingTests: number } =
+    JSON.parse(await readFile(path.join(output, `${name}.json`), 'utf8'))
+  if (
+    !Number.isSafeInteger(report.numTotalTests) ||
+    report.numTotalTests < 1 ||
+    report.numFailedTests !== 0 ||
+    report.numPendingTests !== 0
+  )
+    throw new Error(`Setup: ${name} suite must execute nonempty passing tests without skips`)
+  receipt.phases.at(-1)!.executed = report.numTotalTests
+}
+
 async function fast(coverage: boolean) {
   const json = path.join(output, 'components.json')
   await phase(
@@ -93,16 +106,7 @@ async function fast(coverage: boolean) {
     ],
     { WEB_COVERAGE_DIR: path.join(output, 'coverage') },
   )
-  const report: { numTotalTests: number; numFailedTests: number; numPendingTests: number } =
-    JSON.parse(await readFile(json, 'utf8'))
-  if (
-    !Number.isSafeInteger(report.numTotalTests) ||
-    report.numTotalTests < 1 ||
-    report.numFailedTests !== 0 ||
-    report.numPendingTests !== 0
-  )
-    throw new Error('Setup: component suite must execute nonempty passing tests without skips')
-  receipt.phases.at(-1)!.executed = report.numTotalTests
+  await requirePassingTests('components')
   if (coverage) {
     const summary = JSON.parse(
       await readFile(path.join(output, 'coverage/coverage-summary.json'), 'utf8'),
@@ -187,9 +191,14 @@ try {
       'test',
       'run',
       'tests/harness/module-boundaries.test.ts',
+      '--allowOnly=false',
+      '--reporter=default',
+      '--reporter=json',
       '--reporter=junit',
-      `--outputFile=${path.join(output, 'boundaries.xml')}`,
+      `--outputFile.json=${path.join(output, 'boundaries.json')}`,
+      `--outputFile.junit=${path.join(output, 'boundaries.xml')}`,
     ])
+    await requirePassingTests('boundaries')
     await fast(false)
   }
   if (mode === 'coverage') {
