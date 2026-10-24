@@ -38,7 +38,7 @@ Vite forwards `/api` requests unchanged during development and preview. The buil
 
 ## Feature pattern
 
-The folder names the feature. Start with its implementation and public-interface tests together:
+The folder names the feature. Small features such as API health keep their implementation and public-interface tests together:
 
 ```text
 <feature>/
@@ -51,6 +51,20 @@ The folder names the feature. Start with its implementation and public-interface
 - Extract supporting files when they have a distinct responsibility, are reused, or make the main file harder to understand. Use specific names such as `tools.ts` or `revisions.ts`.
 - Keep supporting files private. Cross-module callers use the public entry point.
 - Optimize how much code a reader needs to understand one change. File count alone is not the goal.
+
+The API content feature separates HTTP mechanics behind the same public factory:
+
+```text
+content/
+├── index.ts          Public factory, route descriptions, handlers, and hand-written input checks
+├── request.ts        Credentials and bounded JSON body parsing
+├── responses.ts      Result status mapping and sanitized error responses
+└── index.test.ts     HTTP behavior through createApp
+```
+
+The content routes check their input by hand and have no request schemas yet. `apps/api/AGENTS.md` describes how API routes declare schemas and where handlers go. Test supporting files through the feature's public behavior; do not export them from the entry point solely for tests.
+
+`tests/harness/module-boundaries.test.ts` fails when a file under `apps/api/src` reaches into another API feature's private files through a relative static import, re-export, import-type query, dynamic `import()`, `require`, or `createRequire` loader.
 
 This is a general pattern, not a required file inventory for every module. Existing modules can adopt it when relevant work warrants a change.
 

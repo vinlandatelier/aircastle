@@ -9,4 +9,5 @@
 - Use the CLI for API exploration without starting a server. Keep regression tests in Vitest and run them with `vp run test-api`.
 - Find Hono documentation through `https://hono.dev/llms.txt`; fetch individual pages with `Accept: text/markdown`.
 
-- Keep route schemas and handlers together. Use ArkType with `describeRoute`/`resolver` for OpenAPI and `satisfies typeof schema.infer` for response types. Keep typed-client assertions in feature tests.
+- Keep route schemas and handlers together and preserve inferred router return types. Use ArkType with `describeRoute`/`resolver` for OpenAPI and `satisfies typeof schema.infer` for response types. Keep typed-client assertions in feature tests.
+- Keep each feature's public factory in `index.ts`; extract distinct request and response responsibilities into private supporting files as needed. See the feature pattern in `ARCHITECTURE.md`.
