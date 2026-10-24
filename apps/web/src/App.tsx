@@ -1,5 +1,5 @@
-import { AppShell } from '@/components/app-shell'
-import { DashboardSkeleton } from '@/components/dashboard-skeleton'
+import { AppShell } from '@/components/shell'
+import { Outlet } from '@tanstack/react-router'
 import { ThemeProvider } from 'next-themes'
 
 function App() {
@@ -11,7 +11,7 @@ function App() {
       enableSystem
     >
       <AppShell>
-        <DashboardSkeleton />
+        <Outlet />
       </AppShell>
     </ThemeProvider>
   )
