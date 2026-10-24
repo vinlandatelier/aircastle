@@ -11,7 +11,7 @@ test('R2 normal built entry loads assets and redirects to Collections', async ({
     }
   })
   await visit(page)
-  await expect(page).toHaveURL(/\/collections$/)
+  await expect(page).toHaveURL(/\/dash\/collections$/)
   await expect(page).toHaveTitle('Aircastle')
   await expect(page.getByRole('banner').getByRole('link', { name: 'Aircastle' })).toBeVisible()
   await expect(page.getByRole('main')).toBeVisible()
@@ -49,10 +49,10 @@ test('R2 normal built entry loads assets and redirects to Collections', async ({
 })
 
 test('R2 direct Settings entry survives reload in the same context', async ({ page }) => {
-  await visit(page, 'normal', '/settings')
+  await visit(page, 'normal', '/dash/settings')
   for (const reload of [false, true]) {
     if (reload) await page.reload()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/dash\/settings$/)
     await expect(page.getByRole('main')).toBeVisible()
     const navigation = page.getByRole('navigation', { name: 'Main navigation' })
     await expect(navigation.getByRole('link', { name: 'Settings', exact: true })).toHaveAttribute(

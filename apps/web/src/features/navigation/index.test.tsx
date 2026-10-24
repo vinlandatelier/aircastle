@@ -3,10 +3,18 @@ import { describe, expect, it } from 'vite-plus/test'
 import { renderApp } from '@/test-utils'
 
 describe('App navigation', () => {
+  it('redirects the dashboard index to Collections', async () => {
+    const { router } = await renderApp('/dash')
+    expect(router.state.location.pathname).toBe('/dash/collections')
+    expect(screen.getByRole('link', { name: 'Aircastle' }).getAttribute('href')).toBe(
+      '/dash/collections',
+    )
+  })
+
   it('opens Collections by default and marks the current page', async () => {
     const { router } = await renderApp()
 
-    expect(router.state.location.pathname).toBe('/collections')
+    expect(router.state.location.pathname).toBe('/dash/collections')
     expect(screen.getByRole('link', { name: 'Collections' }).getAttribute('aria-current')).toBe(
       'page',
     )
@@ -16,21 +24,21 @@ describe('App navigation', () => {
     const { router, user } = await renderApp()
 
     await user.click(screen.getByRole('link', { name: 'Tasks' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/tasks'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dash/tasks'))
     expect(screen.getByRole('link', { name: 'Tasks' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('link', { name: 'Collections' }).hasAttribute('aria-current')).toBe(
       false,
     )
 
     await user.click(screen.getByRole('link', { name: 'Media Library' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/media'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dash/media'))
 
     await act(async () => router.history.back())
-    await waitFor(() => expect(router.state.location.pathname).toBe('/tasks'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dash/tasks'))
     expect(screen.getByRole('link', { name: 'Tasks' }).getAttribute('aria-current')).toBe('page')
 
     await act(async () => router.history.forward())
-    await waitFor(() => expect(router.state.location.pathname).toBe('/media'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dash/media'))
   })
 
   it('navigates from keyboard search and dismisses the dialog', async () => {
@@ -42,20 +50,20 @@ describe('App navigation', () => {
     await user.type(input, 'Users')
     await user.keyboard('{Enter}')
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/users'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dash/users'))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByRole('link', { name: 'Users' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('supports direct destinations and keeps sidebar state during navigation', async () => {
-    const { router, user } = await renderApp('/settings')
+    const { router, user } = await renderApp('/dash/settings')
     expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe('page')
     const trigger = screen.getAllByRole('button', { name: 'Toggle Sidebar' })[0]!
     await user.click(trigger)
 
     await user.click(screen.getByRole('link', { name: 'Tasks' }))
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/tasks'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dash/tasks'))
     expect(
       screen.getAllByRole('button', { name: 'Toggle Sidebar' })[0]!.getAttribute('aria-expanded'),
     ).toBe('false')
