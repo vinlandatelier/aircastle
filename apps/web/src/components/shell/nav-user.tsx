@@ -28,7 +28,7 @@ export function NavUser() {
           </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
+      <DropdownMenuContent align="end" className="w-[min(15rem,calc(100vw-2rem))]">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="pointer-events-none flex items-center gap-2">
             <Avatar className="isolate size-8">
@@ -36,8 +36,8 @@ export function NavUser() {
                 <GeneratedAvatar name={user.name} variant="beam" />
               </AvatarFallback>
             </Avatar>
-            <div>
-              <span className="font-normal text-foreground">{user.name}</span> <br />
+            <div className="min-w-0 flex-1">
+              <span className="block truncate font-normal text-foreground">{user.name}</span>
               <div className="max-w-full truncate text-muted-foreground text-xs">{user.email}</div>
             </div>
           </DropdownMenuLabel>
