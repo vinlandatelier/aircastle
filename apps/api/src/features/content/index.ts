@@ -39,7 +39,7 @@ function access(c: Context): Result<Access> {
   if (!bearer) return failure("unauthorized");
   const project = c.req.param("project");
   if (!project || !uuid.test(project)) return failure("invalid_request");
-  return { ok: true, data: { project, apiKey: bearer } };
+  return { ok: true, data: { project: project.toLowerCase(), apiKey: bearer } };
 }
 
 async function jsonBody(c: Context, limit: number): Promise<Result<unknown>> {
