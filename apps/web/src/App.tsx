@@ -1,4 +1,4 @@
-import { Outlet } from '@tanstack/react-router'
+import { HeadContent, Outlet } from '@tanstack/react-router'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { useEffect } from 'react'
 
@@ -24,6 +24,7 @@ function App() {
       enableSystem
     >
       <ThemeFavicon />
+      <HeadContent />
       <Outlet />
     </ThemeProvider>
   )
