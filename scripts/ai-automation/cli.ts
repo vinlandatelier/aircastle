@@ -17,7 +17,7 @@ import {
   type ModelOutput,
   type Verification,
 } from "./index.ts";
-import { verificationRecipe, verify } from "./verify.ts";
+import { verificationPlan, verify } from "./verify.ts";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -196,7 +196,7 @@ async function main(): Promise<void> {
     const model = record(await json(modelPath)) as unknown as ModelOutput;
     const receipt = await verify(job, model, required("GITHUB_REPOSITORY"));
     await output(`${target}/verification/${id}.json`, receipt);
-    if (!receipt.passed)
+    if (receipt.commands !== null && !receipt.passed)
       throw new Error("Secretless verification failed; no fix branch authorized");
     return;
   }
@@ -236,9 +236,12 @@ async function main(): Promise<void> {
     const receipt = record(
       await json(`${target}/verification/${id}.json`),
     ) as unknown as Verification;
+    const commands = verificationPlan(validateEdits(model.result, original.snapshot).edits);
     if (
       required("AI_VERIFICATION_JOB_RESULT") !== "success" ||
-      receipt.recipe !== digest(verificationRecipe)
+      receipt.recipe !== digest(commands) ||
+      digest(receipt.commands) !== digest(commands) ||
+      (commands === null && receipt.passed !== false)
     ) {
       await api.finish(claim, "failed");
       throw new Error("Verification supervisor job did not succeed");

@@ -99,6 +99,7 @@ export type Verification = {
   digest: string;
   editsDigest: string;
   passed: boolean;
+  commands: string[][] | null;
   recipe: string;
   scope: string;
 };

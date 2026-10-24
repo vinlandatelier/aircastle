@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { digest, validateEdits, type Job, type ModelOutput, type Verification } from "./index.ts";
 
-export const verificationRecipe =
-  "aircastle-ai-container-v1: bun install --frozen-lockfile --ignore-scripts; vp run build; vp run typecheck; vp run lint; vp run test-schema";
+import { verificationPlan } from "./checks.ts";
+
+export { verificationPlan } from "./checks.ts";
 export async function verify(
   job: Job,
   output: ModelOutput,
@@ -14,17 +15,22 @@ export async function verify(
   const fix = validateEdits(output.result, job.snapshot);
   if (output.digest !== digest(job) || output.id !== job.id)
     throw new Error("Verification input digest mismatch");
-  const root = await mkdtemp(join(tmpdir(), "aircastle-ai-verify-"));
-  const name = `aircastle-ai-${job.id.slice(0, 20)}-${process.pid}`;
+  const commands = verificationPlan(fix.edits);
   const receipt: Verification = {
     id: job.id,
     digest: digest(job),
     editsDigest: digest(fix.edits),
     passed: false,
-    recipe: digest(verificationRecipe),
+    commands,
+    recipe: digest(commands),
     scope:
-      "Secretless container dependency install, build, typecheck, lint, schema tests. PR package scripts/configuration are untrusted. Runtime, Postgres and browser tests remain the required deterministic CI's responsibility.",
+      commands === null
+        ? "Patch only: scoped verification unavailable for these edited paths. No verification commands ran."
+        : "Secretless scoped commands listed in this receipt. PR scripts/configuration remain untrusted; no broader checks are claimed.",
   };
+  if (commands === null) return receipt;
+  const root = await mkdtemp(join(tmpdir(), "aircastle-ai-verify-"));
+  const name = `aircastle-ai-${job.id.slice(0, 20)}-${process.pid}`;
   try {
     await writeFile(join(root, "job.json"), JSON.stringify(job));
     await writeFile(join(root, "result.json"), JSON.stringify(output));
