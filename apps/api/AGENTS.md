@@ -7,6 +7,7 @@
 - Send requests with `vp run hono-api request /api/health src/cli.ts --runtime bun`.
 - Use `vp run hono-api batch - src/cli.ts` for JSONL request sequences. Batch runs on Node by default; it does not support Bun in the pinned CLI release.
 - Use the CLI for API exploration without starting a server. Keep regression tests in Vitest and run them with `vp run test-api`.
+- For the built API startup, CLI/SDK durability, request limits and shutdown, run `vp run build`, then `vp run db:test -- vp test tests/content-workflow.test.ts` from the repository root. The workflow uses the production entry and an isolated database.
 - Find Hono documentation through `https://hono.dev/llms.txt`; fetch individual pages with `Accept: text/markdown`.
 
 - Keep route schemas and handlers together and preserve inferred router return types. Use ArkType with `describeRoute`/`resolver` for OpenAPI and `satisfies typeof schema.infer` for response types. Keep typed-client assertions in feature tests.
