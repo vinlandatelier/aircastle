@@ -49,7 +49,8 @@
     "dev:setup": "bun --conditions=development scripts/dev-setup.ts",
     "test:all": "bun run test:typecheck && vp run --filter '@aircastle/*' --parallel test && vp test && bun run test:inference",
     "test:content:mutation": "vp -C packages/contracts run test:mutation",
-    "test:prepared": "vp run db:test -- vp run test:all"
+    "test:prepared": "vp run db:test -- vp run test:all",
+    "ai:setup": "node scripts/ai-automation/cli.ts setup"
   },
   "devDependencies": {
     "@aircastle/adapter-postgres": "workspace:*",
