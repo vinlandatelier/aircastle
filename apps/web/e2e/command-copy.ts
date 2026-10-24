@@ -65,7 +65,9 @@ export async function liveRun(output: string) {
     const response = await fetch(running.origin)
     expect(response.status).toBe(200)
     const html = await response.text()
-    expect(html).toContain('<title>Aircastle</title>')
+    expect(html).toContain(
+      '<title>Aircastle: The Headless CMS with Next-Generation Agentic Capabilities</title>',
+    )
     const script = html.match(/src="(\/assets\/[^"]+\.js)"/)
     expect(script).not.toBeNull()
     expect((await fetch(new URL(script![1]!, running.origin))).status).toBe(200)
