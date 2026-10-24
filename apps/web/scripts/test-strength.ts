@@ -6,7 +6,13 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { strengthCases } from '../e2e/strength-cases'
 import { browserCases, browserOutcome } from './evidence'
-import { copyWeb, originalWeb, readJson, runWeb } from './verification-sandbox'
+import {
+  copyWeb,
+  originalWeb,
+  readJson,
+  runWeb,
+  verificationTimeouts,
+} from './verification-sandbox'
 
 type Observation = {
   status: 'passed' | 'failed' | 'setup failure' | 'timeout'
@@ -80,7 +86,7 @@ async function observe(
           cwd: directory,
           env: { ...process.env, WEB_RUN_DIR: location },
           encoding: 'utf8',
-          timeout: 60_000,
+          timeout: verificationTimeouts.component,
         })
   await writeFile(`${location}.log`, (result.stdout ?? '') + (result.stderr ?? ''))
   if ((result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT')
