@@ -6,6 +6,7 @@ for (const theme of ['light', 'dark'] as const) {
       page,
     }) => {
       await page.setViewportSize({ width, height: 900 })
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
       await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
       await page.goto('/')
       await expect(
