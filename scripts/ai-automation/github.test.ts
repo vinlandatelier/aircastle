@@ -377,3 +377,69 @@ test("a result marker quoted inside another bot review does not forge publicatio
   );
   expect(reviewWrites).toBe(1);
 });
+
+test("role names cannot silently route both independent reviewers to one provider", async () => {
+  let reads = 0;
+  const coordinator = new Coordinator(options, async () => {
+    reads++;
+    return Response.json([]);
+  });
+  const wrong = { provider: "openai" as const, model: "same-provider", effort: "high" };
+  await expect(
+    coordinator.prepare({
+      version: 1,
+      roles: {
+        codexReviewer: wrong,
+        codexImplementer: wrong,
+        claudeReviewer: wrong,
+        claudeImplementer: wrong,
+      },
+    }),
+  ).rejects.toThrow("provider");
+  expect(reads).toBe(0);
+});
+
+test("serialized source context fits the real provider input budget and reports omissions", async () => {
+  const coordinator = new Coordinator(options, async (url) => {
+    const path = String(url);
+    if (path.endsWith("/pulls/7"))
+      return Response.json({
+        state: "open",
+        user: snapshot.author,
+        head: { sha: snapshot.head, repo: { id: 11 } },
+        base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
+      });
+    if (path.includes("/files?"))
+      return Response.json([
+        { filename: "value.ts", status: "modified", sha: "c".repeat(40), patch: "+quoted source" },
+      ]);
+    if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
+    if (path.includes("/git/trees/"))
+      return Response.json({
+        tree: [{ path: "value.ts", mode: "100644", sha: "c".repeat(40), type: "blob" }],
+      });
+    if (path.includes("/git/blobs/"))
+      return Response.json({
+        size: 60000,
+        encoding: "base64",
+        content: Buffer.from('"'.repeat(60000)).toString("base64"),
+      });
+    throw new Error(path);
+  });
+  const context = await coordinator.snapshot(7);
+  expect(Buffer.byteLength(JSON.stringify(context.files))).toBeLessThanOrEqual(100000);
+  expect(context.complete).toBe(false);
+  expect(context.omitted).toContain("value.ts: serialized context budget");
+});
+
+test("UTF-8 task metadata cannot exceed the reserved provider budget before a claim write", async () => {
+  let writes = 0;
+  const coordinator = new Coordinator(options, async () => {
+    writes++;
+    return Response.json({ id: 100 });
+  });
+  await expect(coordinator.claim({ ...job, instructions: "界".repeat(20000) }, [])).rejects.toThrow(
+    "bound",
+  );
+  expect(writes).toBe(0);
+});

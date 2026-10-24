@@ -187,7 +187,8 @@ export class Coordinator {
       attempt: (prior?.receipt.attempt ?? 0) + 1,
       at: new Date().toISOString(),
     };
-    if (JSON.stringify(receipt).length > 55000) throw new Error("Receipt exceeds bound");
+    if (Buffer.byteLength(JSON.stringify(receipt)) > 55000)
+      throw new Error("Receipt exceeds bound");
     if (prior) {
       await this.api(`${this.root}/issues/comments/${prior.commentId}`, "PATCH", {
         body: marker + JSON.stringify(receipt),
@@ -271,11 +272,15 @@ export class Coordinator {
     const tree = sha(record(commit.tree).sha);
     const files: SourceFile[] = [],
       omitted: string[] = [];
-    let bytes = 0;
+    const capture = (file: SourceFile): void => {
+      if (Buffer.byteLength(JSON.stringify([...files, file])) > 100000)
+        omitted.push(`${file.path}: serialized context budget`);
+      else files.push(file);
+    };
     for (const raw of changed) {
       const file = record(raw),
         path = safePath(file.filename);
-      if (files.length >= 40 || bytes > 300000) {
+      if (files.length >= 40) {
         omitted.push(path);
         continue;
       }
@@ -283,8 +288,7 @@ export class Coordinator {
       if (!patch || patch.length !== String(file.patch).length)
         omitted.push(`${path}: diff unavailable or truncated`);
       if (file.status === "removed") {
-        files.push({ path, sha: null, mode: "100644", text: null, patch });
-        bytes += patch.length;
+        capture({ path, sha: null, mode: "100644", text: null, patch });
         continue;
       }
       const entry = await this.entry(revision.head, path);
@@ -306,8 +310,7 @@ export class Coordinator {
         omitted.push(`${path}: binary`);
         continue;
       }
-      bytes += Buffer.byteLength(source) + patch.length;
-      files.push({ path, sha: entry.sha, mode: entry.mode, text: source, patch });
+      capture({ path, sha: entry.sha, mode: entry.mode, text: source, patch });
     }
     const final = record(await this.api(`${this.root}/pulls/${number}`));
     if (
@@ -459,6 +462,15 @@ export class Coordinator {
     };
   }
   async prepare(config: ModelConfig, immediateComment?: number): Promise<Job[]> {
+    for (const role of [
+      "codexReviewer",
+      "codexImplementer",
+      "claudeReviewer",
+      "claudeImplementer",
+    ] as const) {
+      if (config.roles[role].provider !== (role.startsWith("codex") ? "openai" : "anthropic"))
+        throw new Error("setup_required: role provider does not match command provider");
+    }
     const state = await this.cursor();
     const jobs: Job[] = [];
     const queue = async (number: number, role: Role, command?: Comment): Promise<boolean> => {
@@ -526,7 +538,7 @@ export class Coordinator {
         selection: config.roles[role],
         previous: await this.previous(number, role, existing, snapshot.head),
       };
-      if (job.task === "fix" && !snapshot.complete)
+      if (job.task === "fix" && (!snapshot.complete || job.thread.length >= 24000))
         throw new Error("Fix requires complete bounded changed-file context");
       if (prior && prior.receipt.digest !== digest(job)) return true;
       if (await this.claim(job, existing)) jobs.push(job);
@@ -633,7 +645,7 @@ export class Coordinator {
     }
     if (job.snapshot.fork && job.snapshot.changedPaths.some(controlPath)) {
       await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
-        body: `Fix for reviewed SHA ${job.snapshot.head} is patch-only because this fork changes automation/configuration. No branch was promoted. Download the original structured patch artifact from run ${this.options.run}. Verification: ${verification.scope}.`,
+        body: `Fix for reviewed SHA ${job.snapshot.head} is patch-only because this fork changes automation/configuration. No branch was promoted. Download artifact ai-model-${job.id} from https://github.com/${this.options.repository}/actions/runs/${this.options.run}. It contains a unified patch and original structured edits. Verification: ${verification.scope}.`,
       });
       await this.finish(claim, "published");
       return "patch_only";

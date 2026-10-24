@@ -46,3 +46,71 @@ test("the real Node 24 CLI fails honestly when App credentials are absent", asyn
   expect(result.status).toBe(1);
   expect(result.stderr).toContain("setup_required: AI_GITHUB_TOKEN is missing");
 });
+
+test("downloadable patch applies to the captured source including a missing final newline", async () => {
+  const { renderPatch } = await import("./index.ts");
+  const { snapshot } = await import("./fixtures.ts");
+  const { spawnSync } = await import("node:child_process");
+  const root = await mkdtemp(join(tmpdir(), "aircastle-ai-patch-"));
+  try {
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "src/value.ts"), snapshot.files[0]!.text!);
+    const fix = {
+      summary: "Correct value",
+      edits: [
+        {
+          path: "src/value.ts",
+          expectedBlob: snapshot.files[0]!.sha,
+          content: "fixed without newline",
+        },
+      ],
+    };
+    await writeFile(join(root, "change.patch"), renderPatch(fix, snapshot));
+    const result = spawnSync("git", ["apply", "change.patch"], { cwd: root, encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(await readFile(join(root, "src/value.ts"), "utf8")).toBe("fixed without newline");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test.each(["create", "delete"] as const)(
+  "downloadable patch supports an empty file %s",
+  async (kind) => {
+    const { renderPatch } = await import("./index.ts");
+    const { snapshot } = await import("./fixtures.ts");
+    const { spawnSync } = await import("node:child_process");
+    const root = await mkdtemp(join(tmpdir(), "aircastle-ai-empty-patch-"));
+    try {
+      await mkdir(join(root, "src"));
+      if (kind === "delete") await writeFile(join(root, "src/value.ts"), "");
+      const original = {
+        ...snapshot,
+        files: [
+          {
+            ...snapshot.files[0]!,
+            sha: kind === "create" ? null : snapshot.files[0]!.sha,
+            text: kind === "create" ? null : "",
+          },
+        ],
+      };
+      const fix = {
+        summary: "Empty file",
+        edits: [
+          {
+            path: "src/value.ts",
+            expectedBlob: original.files[0]!.sha,
+            content: kind === "create" ? "" : null,
+          },
+        ],
+      };
+      await writeFile(join(root, "change.patch"), renderPatch(fix, original));
+      const result = spawnSync("git", ["apply", "change.patch"], { cwd: root, encoding: "utf8" });
+      expect(result.status, result.stderr).toBe(0);
+      if (kind === "create") expect(await readFile(join(root, "src/value.ts"), "utf8")).toBe("");
+      else await expect(readFile(join(root, "src/value.ts"))).rejects.toThrow();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);

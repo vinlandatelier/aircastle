@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { controlPath, safePath, type Edit } from "./index.ts";
+import { controlPath, safePath, type Edit, type Fix, type Snapshot } from "./index.ts";
 
 export async function applyEdits(root: string, edits: Edit[]): Promise<void> {
   for (const edit of edits) {
@@ -41,4 +41,47 @@ export async function applyEdits(root: string, edits: Edit[]): Promise<void> {
       await writeFile(target, edit.content, { flag: edit.expectedBlob === null ? "wx" : "w" });
     }
   }
+}
+
+export function renderPatch(fix: Fix, snapshot: Snapshot): string {
+  const lines = (source: string | null, prefix: string): string[] => {
+    if (!source) return [];
+    const trailing = source.endsWith("\n");
+    const result = (trailing ? source.slice(0, -1) : source)
+      .split("\n")
+      .map((line) => prefix + line);
+    if (!trailing) result.push("\\ No newline at end of file");
+    return result;
+  };
+  const count = (source: string | null): number =>
+    source ? source.split("\n").length - Number(source.endsWith("\n")) : 0;
+  return fix.edits
+    .map((edit) => {
+      const original = snapshot.files.find((file) => file.path === edit.path)!;
+      const before = original.text,
+        after = edit.content;
+      const a = JSON.stringify(`a/${edit.path}`),
+        b = JSON.stringify(`b/${edit.path}`);
+      const removed = count(before),
+        added = count(after);
+      return [
+        `diff --git ${a} ${b}`,
+        ...(original.sha === null
+          ? [`new file mode ${original.mode}`]
+          : after === null
+            ? [`deleted file mode ${original.mode}`]
+            : []),
+        ...(removed || added
+          ? [
+              `--- ${original.sha === null ? "/dev/null" : a}`,
+              `+++ ${after === null ? "/dev/null" : b}`,
+              `@@ -${removed ? 1 : 0},${removed} +${added ? 1 : 0},${added} @@`,
+              ...lines(before, "-"),
+              ...lines(after, "+"),
+            ]
+          : []),
+        "",
+      ].join("\n");
+    })
+    .join("\n");
 }

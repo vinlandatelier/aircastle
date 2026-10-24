@@ -8,6 +8,7 @@ import {
   prompt,
   record,
   reviewSchema,
+  renderPatch,
   sha,
   text,
   validateEdits,
@@ -171,6 +172,13 @@ async function main(): Promise<void> {
       job.task === "fix"
         ? validateEdits(result, job.snapshot)
         : validateReview(result, job.snapshot);
+    if (job.task === "fix") {
+      await mkdir(`${target}/model`, { recursive: true });
+      await writeFile(
+        `${target}/model/${id}.patch`,
+        renderPatch(validateEdits(valid, job.snapshot), job.snapshot),
+      );
+    }
     await output(`${target}/model/${id}.json`, {
       id,
       digest: digest(job),

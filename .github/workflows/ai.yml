@@ -31,7 +31,7 @@ jobs:
       - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
         id: app
         with:
-          app-id: ${{ secrets.AI_APP_ID }}
+          app-id: ${{ vars.AI_APP_ID }}
           private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
           owner: vinlandatelier
           repositories: ${{ github.event.repository.name }}
@@ -84,6 +84,7 @@ jobs:
         env:
           AI_OPERATION_ID: ${{ matrix.id }}
           AI_CONTROL_SHA: ${{ github.sha }}
+          AI_MODEL_RECEIPTS_DIR: ai-data/model/receipts
           OPENAI_API_KEY: ${{ matrix.provider == 'openai' && secrets.OPENAI_API_KEY || '' }}
           ANTHROPIC_API_KEY: ${{ matrix.provider == 'anthropic' && secrets.ANTHROPIC_API_KEY || '' }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -155,7 +156,7 @@ jobs:
       - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
         id: app
         with:
-          app-id: ${{ secrets.AI_APP_ID }}
+          app-id: ${{ vars.AI_APP_ID }}
           private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
           owner: vinlandatelier
           repositories: ${{ github.event.repository.name }}

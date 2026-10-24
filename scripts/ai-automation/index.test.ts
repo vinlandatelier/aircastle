@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 import { authorize, operationId, parseCommand, validateEdits, validateReview } from "./index.ts";
 
 import { sha, snapshot, invocation } from "./fixtures.ts";
@@ -202,3 +202,47 @@ test("multiline fix instructions reach the task instead of disappearing", () => 
       ?.instructions,
   ).toBe("Use the API's validated result.\nKeep the original public behavior.");
 });
+
+test.each(["review", "fix"] as const)(
+  "the %s schema is accepted by the real provider transport",
+  async (kind) => {
+    const { runModel } = await import("../ai-models/index.ts");
+    const { reviewSchema, fixSchema } = await import("./index.ts");
+    const key = process.env.OPENAI_API_KEY;
+    const receipts = process.env.AI_MODEL_RECEIPTS_DIR;
+    const result =
+      kind === "review"
+        ? { summary: "Fixture review", findings: [] }
+        : {
+            summary: "Fixture fix",
+            edits: [{ path: "src/value.ts", expectedBlob: "c".repeat(40), content: "fixed\n" }],
+          };
+    try {
+      process.env.OPENAI_API_KEY = "offline-fixture-key";
+      delete process.env.AI_MODEL_RECEIPTS_DIR;
+      vi.stubGlobal("fetch", async () =>
+        Response.json({
+          status: "completed",
+          model: "fixture-model",
+          output: [
+            { type: "message", content: [{ type: "output_text", text: JSON.stringify(result) }] },
+          ],
+          usage: {},
+        }),
+      );
+      expect(
+        await runModel(
+          { provider: "openai", model: "fixture-model", effort: "high" },
+          "Schema compatibility fixture",
+          kind === "review" ? reviewSchema : fixSchema,
+        ),
+      ).toEqual(result);
+    } finally {
+      vi.unstubAllGlobals();
+      if (key === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = key;
+      if (receipts === undefined) delete process.env.AI_MODEL_RECEIPTS_DIR;
+      else process.env.AI_MODEL_RECEIPTS_DIR = receipts;
+    }
+  },
+);
