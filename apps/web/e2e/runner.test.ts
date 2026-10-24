@@ -7,7 +7,7 @@ import { copyWeb, originalWeb, readJson, runWeb } from '../scripts/verification-
 
 const temporary = () => mkdtempSync(path.join(tmpdir(), 'aircastle-run-'))
 
-describe('[shell:R1 shell:R10] real command contract', () => {
+describe('real command contract', () => {
   it('rejects empty test discovery with a recorded setup failure', () => {
     const output = temporary()
     try {
@@ -68,13 +68,13 @@ describe('[shell:R1 shell:R10] real command contract', () => {
   }, 180_000)
 
   for (const mode of ['focused', 'skipped', 'timeout'] as const) {
-    it(`rejects actual ${mode} browser selection and reports unexercised cases`, () => {
+    it(`rejects actual ${mode} browser selection and preserves case results`, () => {
       const copy = copyWeb()
       try {
         const prefix = mode === 'focused' ? 'test.only' : mode === 'skipped' ? 'test.skip' : 'test'
         writeFileSync(
           path.join(copy.directory, 'e2e/conformance.spec.ts'),
-          `import { test, visit } from './support'\ntest('shell:R2 positive control', async ({page}) => { await visit(page) })\n${prefix}('shell:R2 conformance fixture', async () => { ${mode === 'timeout' ? 'await new Promise(() => {})' : ''} })\n`,
+          `import { test, visit } from './support'\ntest('positive control', async ({page}) => { await visit(page) })\n${prefix}('conformance fixture', async () => { ${mode === 'timeout' ? 'await new Promise(() => {})' : ''} })\n`,
         )
         if (mode === 'timeout') {
           const config = path.join(copy.directory, 'playwright.config.ts')
@@ -96,7 +96,11 @@ describe('[shell:R1 shell:R10] real command contract', () => {
               : /timeout|timed out/i,
         )
         if (mode === 'skipped') {
-          expect(readJson(output, 'requirements.json')['shell:R2']).toBe('not exercised')
+          expect(
+            readJson(output, 'receipt.json')
+              .cases.map((item: { status: string }) => item.status)
+              .sort(),
+          ).toEqual(['passed', 'skipped'])
           expect(readJson(output, 'browser.json').stats.skipped).toBe(1)
         }
       } finally {

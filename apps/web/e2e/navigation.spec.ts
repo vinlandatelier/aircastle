@@ -28,7 +28,7 @@ async function expectFocusInside(page: Page, dialog: Locator) {
   await expect(page.locator(':focus')).toBeVisible()
 }
 
-test.describe('shell:R2 routes and history', () => {
+test.describe('routes and history', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
   test('all seven default destinations have independent titles, paths and active state', async ({
@@ -79,9 +79,7 @@ test.describe('shell:R2 routes and history', () => {
   })
 })
 
-test('shell:R3 desktop collapse changes rendered width and survives client navigation', async ({
-  page,
-}) => {
+test('desktop collapse changes rendered width and survives client navigation', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await visit(page)
   const trigger = visibleSidebarTrigger(page)
@@ -109,7 +107,7 @@ test('shell:R3 desktop collapse changes rendered width and survives client navig
     .toBeCloseTo(expandedWidth, 0)
 })
 
-test.describe('shell:R3 mobile drawer', () => {
+test.describe('mobile drawer', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
   test('keyboard focus stays inside and Escape or backdrop restores the visible trigger', async ({
@@ -167,7 +165,7 @@ test.describe('shell:R3 mobile drawer', () => {
   }
 })
 
-test('shell:R3 desktop collapse and mobile drawer state remain independent across resizing', async ({
+test('desktop collapse and mobile drawer state remain independent across resizing', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -196,7 +194,7 @@ test('shell:R3 desktop collapse and mobile drawer state remain independent acros
   await expect(visibleSidebarTrigger(page)).toHaveAttribute('aria-expanded', 'false')
 })
 
-test.describe('shell:R4 page search', () => {
+test.describe('page search', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
   for (const selection of ['keyboard', 'pointer']) {

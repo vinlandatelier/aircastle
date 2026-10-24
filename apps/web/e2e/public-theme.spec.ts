@@ -63,7 +63,7 @@ async function expectPublic(page: Page, dark: boolean) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`shell:R5 public ${theme} palette matches Efferd and restores after dashboard navigation`, async ({
+  test(`public ${theme} palette matches Efferd and restores after dashboard navigation`, async ({
     page,
   }) => {
     await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
