@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vite-plus/test'
 import { browserOutcome, requirementResults } from '../scripts/evidence'
 
-describe('verification evidence', () => {
+describe('[R1 R9 R10] verification evidence', () => {
   it('accepts only executed passing tests', () => {
     expect(
       browserOutcome({ stats: { expected: 2, unexpected: 0, skipped: 0, flaky: 0 }, errors: [] }),
@@ -61,7 +61,7 @@ describe('verification evidence', () => {
   })
 })
 
-it('coverage inventories unimported source and excludes tests in a disposable app copy', () => {
+it('[R9] coverage inventories unimported source and excludes tests in a disposable app copy', () => {
   const original = path.resolve(import.meta.dirname, '..')
   const copy = mkdtempSync(path.join(tmpdir(), 'aircastle-coverage-'))
   try {

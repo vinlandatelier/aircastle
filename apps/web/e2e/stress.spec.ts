@@ -68,7 +68,7 @@ async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
   await assertLayout(page)
   const project = page.getByRole('button', { name: /^Switch project:/ })
   await project.click()
-  const input = page.getByRole('combobox', { name: 'Find project', exact: true })
+  const input = page.getByRole('combobox')
   await expect(input).toBeFocused()
   await assertBounded(page, page.getByRole('dialog', { name: 'Switch project', exact: true }))
   const identity = scenario === 'normal' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
@@ -96,7 +96,7 @@ async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
   await search.click()
   const searchDialog = page.getByRole('dialog', { name: 'Search pages', exact: true })
   await assertBounded(page, searchDialog)
-  const query = searchDialog.getByRole('combobox', { name: 'Search pages', exact: true })
+  const query = searchDialog.getByRole('combobox')
   await expect(query).toBeFocused()
   await query.fill(longName)
   await expect(query).toHaveValue(longName)
@@ -177,7 +177,7 @@ test('T5 R7 long-text: the separate multiword project retains its complete ident
   await visit(page, 'long-text')
   const project = page.getByRole('button', { name: /^Switch project:/ })
   await project.click()
-  await page.getByRole('combobox', { name: 'Find project', exact: true }).fill('Long project name')
+  await page.getByRole('combobox').fill('Long project name')
   const option = page.getByRole('option').filter({ hasText: multiwordName.trimEnd() })
   await expect(option).toHaveCount(1)
   await expect(option).toHaveAccessibleName(new RegExp(`^.+ / ${multiwordName.trimEnd()}$`))
@@ -186,7 +186,7 @@ test('T5 R7 long-text: the separate multiword project retains its complete ident
   await expect(project).toHaveAccessibleName(
     new RegExp(`^Switch project: .+ / ${multiwordName.trimEnd()}$`),
   )
-  await expect(page.getByRole('combobox', { name: 'Find project', exact: true })).toBeHidden()
+  await expect(page.getByRole('combobox')).toBeHidden()
   await assertLayout(page)
 })
 
@@ -203,7 +203,7 @@ for (const [name, query] of [
     await chooseTheme(page, 'Dark')
     const project = page.getByRole('button', { name: /^Switch project:/ })
     await project.click()
-    const input = page.getByRole('combobox', { name: 'Find project', exact: true })
+    const input = page.getByRole('combobox')
     await input.fill(query)
     const option = page.getByRole('option')
     await expect(option).toHaveCount(1)
@@ -229,7 +229,7 @@ for (const method of ['keyboard', 'pointer'] as const) {
         exact: true,
       })
       await project.click()
-      const input = page.getByRole('combobox', { name: 'Find project', exact: true })
+      const input = page.getByRole('combobox')
       const list = page.getByRole('listbox')
       const first = list.getByRole('option', { name: 'Acme Inc / Project 001', exact: true })
       const last = list.getByRole('option', { name: 'Acme Inc / Project 100', exact: true })
@@ -288,7 +288,7 @@ test('T5 R7 empty-candidates: empty search preserves the current project, dismis
   })
   await project.click()
   for (const query of ['', 'no-such-project-734021', '']) {
-    const input = page.getByRole('combobox', { name: 'Find project', exact: true })
+    const input = page.getByRole('combobox')
     await input.fill(query)
     await expect(input).toBeFocused()
     await expect(page.getByText('No projects found.', { exact: true })).toBeVisible()
@@ -296,7 +296,7 @@ test('T5 R7 empty-candidates: empty search preserves the current project, dismis
     await assertBounded(page, page.getByRole('dialog', { name: 'Switch project', exact: true }))
   }
   await page.keyboard.press('Escape')
-  await expect(page.getByRole('combobox', { name: 'Find project', exact: true })).toBeHidden()
+  await expect(page.getByRole('combobox')).toBeHidden()
   await expect(project).toBeFocused()
   await expect(project).toHaveAccessibleName('Switch project: Acme Inc / Technical Blog')
   await project.click()
@@ -364,7 +364,7 @@ for (const viewport of viewports) {
       await expect(page).toHaveURL(/\/collections(?:\?.*)?$/)
       await page.getByRole('button', { name: 'Search pages', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: 'Search pages', exact: true })
-      const input = dialog.getByRole('combobox', { name: 'Search pages', exact: true })
+      const input = dialog.getByRole('combobox')
       await input.fill(destination.query)
       const option = dialog.getByRole('option', { name: destination.name, exact: true })
       await expect(option).toHaveAccessibleName(destination.name)

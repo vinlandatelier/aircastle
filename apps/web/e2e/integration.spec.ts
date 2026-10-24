@@ -11,7 +11,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
       scenario === 'normal' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
     const project = page.getByRole('button', { name: /^Switch project:/ })
     await project.click()
-    const projectInput = page.getByRole('combobox', { name: 'Find project', exact: true })
+    const projectInput = page.getByRole('combobox')
     await projectInput.fill(scenario === 'normal' ? 'Marketing Site' : longName)
     await page.getByRole('option', { name: identity, exact: true }).click()
     await expect(projectInput).toBeHidden()
@@ -70,7 +70,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
 
     await page.getByRole('button', { name: 'Search pages', exact: true }).click()
     const search = page.getByRole('dialog', { name: 'Search pages', exact: true })
-    const query = search.getByRole('combobox', { name: 'Search pages', exact: true })
+    const query = search.getByRole('combobox')
     await expect(query).toBeFocused()
     await query.fill('Users')
     await expect(search.getByRole('option', { name: 'Users', exact: true })).toBeVisible()

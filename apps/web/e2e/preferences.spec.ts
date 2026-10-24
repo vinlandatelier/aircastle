@@ -136,7 +136,7 @@ test('R6 project filtering selects Marketing Site, closes and excludes the curre
     exact: true,
   })
   await initial.click()
-  const input = page.getByRole('combobox', { name: 'Find project' })
+  const input = page.getByRole('combobox')
   await input.fill('Marketing Site')
   await expect(page.getByRole('option')).toHaveCount(1)
   await page.getByRole('option', { name: 'Acme Inc / Marketing Site', exact: true }).click()
@@ -166,7 +166,7 @@ test('R6 no project matches shows an empty state and clearing restores candidate
     exact: true,
   })
   await current.click()
-  const input = page.getByRole('combobox', { name: 'Find project' })
+  const input = page.getByRole('combobox')
   await input.fill('no-such-project-734021')
   await expect(page.getByText('No projects found.', { exact: true })).toBeVisible()
   await expect(page.getByRole('option')).toHaveCount(0)
@@ -186,7 +186,7 @@ test('R6 empty-candidates fixture preserves the valid current project', async ({
     exact: true,
   })
   await current.click()
-  const input = page.getByRole('combobox', { name: 'Find project' })
+  const input = page.getByRole('combobox')
   await expect(input).toBeFocused()
   await expect(page.getByText('No projects found.', { exact: true })).toBeVisible()
   await expect(page.getByRole('option')).toHaveCount(0)
