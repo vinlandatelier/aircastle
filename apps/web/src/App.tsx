@@ -1,4 +1,4 @@
-import { AppShell } from '@/components/app-shell'
+import { AppShell } from '@/components/shell'
 import { Outlet } from '@tanstack/react-router'
 import { ThemeProvider } from 'next-themes'
 

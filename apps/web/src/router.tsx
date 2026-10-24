@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router'
 import App from './App'
 import { DashboardSkeleton } from '@/components/dashboard-skeleton'
-import { navigationPaths } from '@/navigation'
+import { navigationPaths } from '@/features/navigation'
 
 const rootRoute = createRootRoute({ component: App })
 const indexRoute = createRoute({

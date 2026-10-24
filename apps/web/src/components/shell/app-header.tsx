@@ -1,15 +1,15 @@
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { CustomSidebarTrigger } from '@/components/custom-sidebar-trigger'
-import { NavUser } from '@/components/nav-user'
-import { ThemeSwitcher } from '@/components/theme-switcher'
+import { CustomSidebarTrigger } from './custom-sidebar-trigger'
+import { NavUser } from './nav-user'
+import { ThemeSwitcher } from './theme-switcher'
 import { BookOpenIcon, CrownIcon, PlugIcon, PlusIcon } from 'lucide-react'
 import { MarkGithubIcon } from '@primer/octicons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { PageSearch } from '@/navigation'
+import { PageSearch } from '@/features/navigation'
 import { Link } from '@tanstack/react-router'
-import { ProjectSwitcher } from '@/components/project-switcher'
+import { ProjectSwitcher } from './project-switcher'
 
 export function AppHeader() {
   return (

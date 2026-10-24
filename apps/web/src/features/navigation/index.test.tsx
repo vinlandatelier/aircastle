@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vite-plus/test'
-import { renderApp } from '../test-utils'
+import { renderApp } from '@/test-utils'
 
 describe('App navigation', () => {
   it('opens Collections by default and marks the current page', async () => {
