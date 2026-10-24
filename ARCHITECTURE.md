@@ -65,7 +65,7 @@ Paths in this section are relative to `apps/web`.
 
 Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys, extreme-input fixtures, and command/report conformance tests. `playwright.config.ts` owns browser execution settings. A verification-only Vite adapter supplies fixture data before rendering; normal production builds retain their real data and expose no fixture controls.
 
-`scripts/verify-web.ts` owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names; the receipt records the selected cases without a central registry. The strength command runs the bounded fault cases in disposable verification sandboxes; source copies and reports belong to verification tooling.
+`scripts/verify-web.ts` runs on Node.js and owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names; the receipt records the selected cases without a central registry. The strength command runs the bounded fault cases in disposable verification sandboxes; source copies and reports belong to verification tooling.
 
 ## Feature pattern
 
@@ -82,6 +82,8 @@ The folder names the feature. Start with its implementation and public-interface
 - Extract supporting files when they have a distinct responsibility, are reused, or make the main file harder to understand. Use specific names such as `tools.ts` or `revisions.ts`.
 - Keep supporting files private. Cross-module callers use the public entry point.
 - Optimize how much code a reader needs to understand one change. File count alone is not the goal.
+
+The module-boundary harness scans TypeScript callers under the API and web source roots for private imports into API features, web features, and the web shell. It checks static imports, re-exports, TypeScript import-type queries, literal dynamic imports, and literal CommonJS imports. It resolves normalized relative paths and the web `@/` alias. Browser callers also cannot import `@aircastle/core`, `@aircastle/adapter-postgres`, or `@aircastle/cli`, including package subpaths and relative paths into those packages, API source, or executable `aircastle.config.*` files. Browser-safe contracts, schema, and client packages remain allowed. Computed specifiers, other path resolvers, and dependency cycles are outside its scope.
 
 This is a general pattern, not a required file inventory for every module. Existing modules can adopt it when relevant work warrants a change.
 
