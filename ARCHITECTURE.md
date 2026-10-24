@@ -72,6 +72,16 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 `scripts/verify-web.ts` runs on Node.js and owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names; the receipt records the selected cases without a central registry. The strength command runs the bounded fault cases in disposable verification sandboxes; source copies and reports belong to verification tooling.
 
+## Repository automation
+
+`.github/workflows/quality.yml` runs deterministic pull-request checks and joins them in `Quality`. Full schema and contract mutation runs use a separate scheduled/manual workflow. AI workflows are advisory and do not participate in `Quality`, approval counts, or conversation-resolution requirements.
+
+`scripts/ai-automation/index.ts` exposes review/fix authorization and the coordinator. Its private GitHub adapter owns immutable source capture, authenticated claims, revision checks, and publication. The workflow uses trusted default-branch code and checks current `vinlandatelier` membership before model calls. It scans PR revisions and inline commands on a schedule; new issue comments can wake it immediately. Source and model output remain data in credential-bearing jobs. Explicit fixes run in a separate container and publish through a fresh trusted job as follow-up PRs or patch artifacts.
+
+`scripts/ai-models/index.ts` owns the four-role config parser and provider API transport. Callers supply task text and a bounded output schema. `.github/ai-models.json` pins each role's model and effort. `scripts/ai-model-updates` owns official release/account discovery, paired role evaluations, isolated coding checks, and one bot-owned upgrade proposal. A model change takes effect after its proposal is merged.
+
+Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
+
 ## Feature pattern
 
 The folder names the feature. Small features such as API health keep their implementation and public-interface tests together:
