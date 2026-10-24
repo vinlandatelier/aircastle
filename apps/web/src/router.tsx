@@ -17,23 +17,46 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/dash/collections', replace: true })
+    throw redirect({
+      to: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
+      params: { workspaceId: 'demo', projectId: 'demo' },
+      replace: true,
+    })
   },
 })
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/dash',
+  path: '/dash/workspaces/$workspaceId/projects/$projectId',
   component: () => (
     <AppShell>
       <Outlet />
     </AppShell>
   ),
 })
+const dashboardEntryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash',
+})
+const dashboardEntryIndexRoute = createRoute({
+  getParentRoute: () => dashboardEntryRoute,
+  path: '/',
+  beforeLoad: () => {
+    throw redirect({
+      to: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
+      params: { workspaceId: 'demo', projectId: 'demo' },
+      replace: true,
+    })
+  },
+})
 const dashboardIndexRoute = createRoute({
   getParentRoute: () => dashboardRoute,
   path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/dash/collections', replace: true })
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
+      params,
+      replace: true,
+    })
   },
 })
 const signInRoute = createRoute({
@@ -41,20 +64,25 @@ const signInRoute = createRoute({
   path: '/sign-in',
   component: SignInPage,
 })
-type DashboardPagePath = (typeof navigationPaths)[number] extends `/dash/${infer Path}`
-  ? Path
-  : never
+type DashboardPagePath =
+  (typeof navigationPaths)[number] extends `/dash/workspaces/$workspaceId/projects/$projectId/${infer Path}`
+    ? Path
+    : never
 
 const pageRoutes = navigationPaths.map((path) =>
   createRoute({
     getParentRoute: () => dashboardRoute,
-    path: path.replace('/dash/', '') as DashboardPagePath,
+    path: path.replace(
+      '/dash/workspaces/$workspaceId/projects/$projectId/',
+      '',
+    ) as DashboardPagePath,
     component: DashboardSkeleton,
   }),
 )
 const routeTree = rootRoute.addChildren([
   indexRoute,
   signInRoute,
+  dashboardEntryRoute.addChildren([dashboardEntryIndexRoute]),
   dashboardRoute.addChildren([dashboardIndexRoute, ...pageRoutes]),
 ])
 

@@ -8,10 +8,11 @@ import { BookOpenIcon, CrownIcon, PlugIcon, PlusIcon } from 'lucide-react'
 import { MarkGithubIcon } from '@primer/octicons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PageSearch } from '@/features/navigation'
-import { Link } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { ProjectSwitcher } from './project-switcher'
 
 export function AppHeader() {
+  const params = useParams({ from: '/dash/workspaces/$workspaceId/projects/$projectId' })
   return (
     <header
       className={cn(
@@ -20,7 +21,8 @@ export function AppHeader() {
       )}
     >
       <Link
-        to="/dash/collections"
+        to="/dash/workspaces/$workspaceId/projects/$projectId/collections"
+        params={params}
         aria-label="Aircastle"
         className="brand-link flex h-full w-14 shrink-0 items-center justify-center border-r outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >

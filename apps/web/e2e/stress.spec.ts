@@ -105,7 +105,7 @@ async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
   await assertBounded(page, searchDialog)
   await query.fill('Users')
   await searchDialog.getByRole('option', { name: 'Users', exact: true }).click()
-  await expect(page).toHaveURL(/\/dash\/users(?:\?.*)?$/)
+  await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/users(?:\?.*)?$/)
   await expect(searchDialog).toBeHidden()
 
   if (page.viewportSize()!.width < 768) {
@@ -114,12 +114,12 @@ async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
     const drawer = page.getByRole('dialog')
     await assertBounded(page, drawer)
     await drawer.getByRole('link', { name: 'Tasks', exact: true }).click()
-    await expect(page).toHaveURL(/\/dash\/tasks(?:\?.*)?$/)
+    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks(?:\?.*)?$/)
     await expect(drawer).toBeHidden()
     await expect(trigger).toBeFocused()
   } else {
     await page.getByRole('link', { name: 'Tasks', exact: true }).click()
-    await expect(page).toHaveURL(/\/dash\/tasks(?:\?.*)?$/)
+    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks(?:\?.*)?$/)
     const trigger = visibleSidebarTrigger(page)
     await expect(trigger).toHaveAttribute('aria-expanded', /^(true|false)$/)
     const expanded = await trigger.getAttribute('aria-expanded')
@@ -327,7 +327,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await trigger.click()
     await expect(trigger).toHaveAttribute('aria-expanded', expanded === 'true' ? 'false' : 'true')
     await page.getByRole('link', { name: 'Tasks', exact: true }).click()
-    await expect(page).toHaveURL(/\/dash\/tasks(?:\?.*)?$/)
+    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks(?:\?.*)?$/)
     await trigger.click()
     await expect(trigger).toHaveAttribute('aria-expanded', expanded!)
     await assertLayout(page)
@@ -336,8 +336,12 @@ for (const scenario of ['normal', 'long-text'] as const) {
 
 for (const viewport of viewports) {
   for (const destination of [
-    { name: longName, query: longName, path: '/dash/tasks' },
-    { name: '東京のプロジェクト 🚀', query: '東京', path: '/dash/users' },
+    { name: longName, query: longName, path: '/dash/workspaces/demo/projects/demo/tasks' },
+    {
+      name: '東京のプロジェクト 🚀',
+      query: '東京',
+      path: '/dash/workspaces/demo/projects/demo/users',
+    },
   ] as const) {
     test(`T5 R7 R8 long-navigation ${viewport.width}x${viewport.height} ${destination.path}: sidebar and search preserve destination identity`, async ({
       page,
@@ -360,7 +364,9 @@ for (const viewport of viewports) {
       }
       await assertLayout(page)
       await page.getByRole('link', { name: 'Aircastle', exact: true }).click()
-      await expect(page).toHaveURL(/\/dash\/collections(?:\?.*)?$/)
+      await expect(page).toHaveURL(
+        /\/dash\/workspaces\/demo\/projects\/demo\/collections(?:\?.*)?$/,
+      )
       await page.getByRole('button', { name: 'Search pages', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: 'Search pages', exact: true })
       const input = dialog.getByRole('combobox')

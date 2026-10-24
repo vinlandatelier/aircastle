@@ -54,7 +54,11 @@ describe('Sign in', () => {
     expect(screen.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/dash')
     await user.click(screen.getByRole('link', { name: 'Home' }))
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/dash/collections'))
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        '/dash/workspaces/demo/projects/demo/collections',
+      ),
+    )
     expect(await screen.findByRole('link', { name: 'Collections' })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: 'Toggle Sidebar' }).length).toBeGreaterThan(0)
   })

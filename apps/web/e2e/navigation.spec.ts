@@ -2,13 +2,13 @@ import type { Locator, Page } from '@playwright/test'
 import { test, expect, visit, assertLayout, visibleSidebarTrigger } from './support'
 
 const destinations = [
-  ['Tasks', '/dash/tasks'],
-  ['Collections', '/dash/collections'],
-  ['Media Library', '/dash/media'],
-  ['Analytics', '/dash/analytics'],
-  ['Users', '/dash/users'],
-  ['Access Tokens', '/dash/access-tokens'],
-  ['Settings', '/dash/settings'],
+  ['Tasks', '/dash/workspaces/demo/projects/demo/tasks'],
+  ['Collections', '/dash/workspaces/demo/projects/demo/collections'],
+  ['Media Library', '/dash/workspaces/demo/projects/demo/media'],
+  ['Analytics', '/dash/workspaces/demo/projects/demo/analytics'],
+  ['Users', '/dash/workspaces/demo/projects/demo/users'],
+  ['Access Tokens', '/dash/workspaces/demo/projects/demo/access-tokens'],
+  ['Settings', '/dash/workspaces/demo/projects/demo/settings'],
 ] as const
 
 async function expectDestination(page: Page, name: string, path: string) {
@@ -58,18 +58,24 @@ test.describe('R2 routes and history', () => {
   test('Back and Forward follow visible navigation and the brand returns to Collections', async ({
     page,
   }) => {
-    await visit(page, 'normal', '/dash/settings')
+    await visit(page, 'normal', '/dash/workspaces/acme/projects/editorial/settings')
+    await page.reload()
+    await expectDestination(page, 'Settings', '/dash/workspaces/acme/projects/editorial/settings')
     const navigation = page.getByRole('navigation', { name: 'Main navigation' })
     await navigation.getByRole('link', { name: 'Tasks', exact: true }).click()
-    await expectDestination(page, 'Tasks', '/dash/tasks')
+    await expectDestination(page, 'Tasks', '/dash/workspaces/acme/projects/editorial/tasks')
     await navigation.getByRole('link', { name: 'Media Library', exact: true }).click()
-    await expectDestination(page, 'Media Library', '/dash/media')
+    await expectDestination(page, 'Media Library', '/dash/workspaces/acme/projects/editorial/media')
     await page.goBack()
-    await expectDestination(page, 'Tasks', '/dash/tasks')
+    await expectDestination(page, 'Tasks', '/dash/workspaces/acme/projects/editorial/tasks')
     await page.goForward()
-    await expectDestination(page, 'Media Library', '/dash/media')
+    await expectDestination(page, 'Media Library', '/dash/workspaces/acme/projects/editorial/media')
     await page.getByRole('banner').getByRole('link', { name: 'Aircastle' }).click()
-    await expectDestination(page, 'Collections', '/dash/collections')
+    await expectDestination(
+      page,
+      'Collections',
+      '/dash/workspaces/acme/projects/editorial/collections',
+    )
   })
 })
 
@@ -150,12 +156,12 @@ test.describe('R3 mobile drawer', () => {
         await destination.focus()
         await page.keyboard.press('Enter')
       } else await destination.click()
-      await expect(page).toHaveURL(/\/dash\/tasks$/)
+      await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks$/)
       await expect(page.getByRole('dialog')).toBeHidden()
       await expect(trigger).toHaveAttribute('aria-expanded', 'false')
       await expect(trigger).toBeFocused()
       await trigger.click()
-      await expectDestination(page, 'Tasks', '/dash/tasks')
+      await expectDestination(page, 'Tasks', '/dash/workspaces/demo/projects/demo/tasks')
       await page.keyboard.press('Escape')
     })
   }
@@ -208,7 +214,7 @@ test.describe('R4 page search', () => {
         await page.keyboard.press('ArrowDown')
         await page.keyboard.press('Enter')
       } else await dialog.getByRole('option', { name: 'Users', exact: true }).click()
-      await expectDestination(page, 'Users', '/dash/users')
+      await expectDestination(page, 'Users', '/dash/workspaces/demo/projects/demo/users')
       await expect(dialog).toBeHidden()
       await expect(button).toBeFocused()
     })

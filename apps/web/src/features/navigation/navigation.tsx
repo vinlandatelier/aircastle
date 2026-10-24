@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from '@tanstack/react-router'
+import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { SearchIcon } from 'lucide-react'
 import { navigationGroups } from './pages'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/command'
 
 export function SidebarNavigation() {
-  const pathname = useLocation({ select: (location) => location.pathname })
+  const params = useParams({ from: '/dash/workspaces/$workspaceId/projects/$projectId' })
 
   return navigationGroups.map((group) => (
     <SidebarGroup
@@ -36,8 +36,13 @@ export function SidebarNavigation() {
         {group.items.map((item) => (
           <SidebarMenuItem key={item.path}>
             <SidebarMenuButton
-              render={<Link to={item.path} />}
-              isActive={pathname === item.path}
+              render={
+                <Link
+                  to={item.path}
+                  params={params}
+                  activeProps={{ 'aria-current': 'page', 'data-active': true }}
+                />
+              }
               tooltip={item.title}
             >
               <item.icon aria-hidden="true" />
@@ -53,6 +58,7 @@ export function SidebarNavigation() {
 export function PageSearch() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const params = useParams({ from: '/dash/workspaces/$workspaceId/projects/$projectId' })
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -98,7 +104,7 @@ export function PageSearch() {
                     key={item.path}
                     value={item.title}
                     onSelect={() => {
-                      void navigate({ to: item.path }).then(() => setOpen(false))
+                      void navigate({ to: item.path, params }).then(() => setOpen(false))
                     }}
                   >
                     <item.icon aria-hidden="true" />
