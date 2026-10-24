@@ -24,6 +24,7 @@ for (const theme of ['light', 'dark'] as const) {
         '/dash',
       )
       await expect(hero.getByRole('button', { name: 'Pause background animation' })).toHaveCount(0)
+      await expect(hero.locator('video')).toHaveAttribute('poster', '/brand/hero/mesh.png')
       expect(await hero.locator('video').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
         true,
       )
