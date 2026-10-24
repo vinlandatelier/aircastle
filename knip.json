@@ -18,7 +18,7 @@
       "ignoreExportsUsedInFile": true
     },
     "apps/api": {
-      "entry": ["src/{index,cli}.ts", "src/test-support/content-server.ts"]
+      "entry": ["src/{index,cli}.ts"]
     },
     "packages/client": {
       "entry": ["tests/types/**/*.ts"],
