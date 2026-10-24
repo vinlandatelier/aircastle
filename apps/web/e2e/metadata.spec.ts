@@ -4,7 +4,7 @@ const landingTitle = 'Aircastle: The Headless CMS with Next-Generation Agentic C
 const landingDescription =
   'Aircastle is a code-first, headless CMS with agentic capabilities designed to automate the slow, manual parts of managing written content.'
 
-test('shell:R2 marketing entry keeps its URL and exact metadata before and after startup', async ({
+test('marketing entry keeps its URL and exact metadata before and after startup', async ({
   page,
   request,
 }) => {
@@ -35,7 +35,7 @@ test('shell:R2 marketing entry keeps its URL and exact metadata before and after
   )
 })
 
-test('shell:R2 sign-in and dashboard metadata follows navigation and history', async ({ page }) => {
+test('sign-in and dashboard metadata follows navigation and history', async ({ page }) => {
   await page.goto('/sign-in')
   await expect(page).toHaveTitle('Aircastle - Sign in')
   await expect(page.locator('head title')).toHaveCount(1)
