@@ -69,7 +69,7 @@ Paths in this section are relative to `apps/web`.
 
 Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys, extreme-input fixtures, and command/report conformance tests. `playwright.config.ts` owns browser execution settings. Fixture builds set `WEB_FIXTURES=1`, and Vite aliases then swap `@/components/shell/data` and `@/features/navigation/pages` for the modules in `e2e/fixture-modules/`. Normal production builds retain their real data and expose no fixture controls. `tsconfig.e2e.json` type-checks the journeys, fixture modules and verification scripts.
 
-`scripts/verify-web.ts` owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names; the receipt records the selected cases without a central registry. The strength command runs the bounded fault cases in disposable verification sandboxes; source copies and reports belong to verification tooling.
+`scripts/verify-web.ts` runs on Node.js and owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names; the receipt records the selected cases without a central registry. The strength command runs the bounded fault cases in disposable verification sandboxes; source copies and reports belong to verification tooling.
 
 ## Repository automation
 
@@ -107,7 +107,7 @@ content/
 
 The content routes check their input by hand and have no request schemas yet. `apps/api/AGENTS.md` describes how API routes declare schemas and where handlers go. Test supporting files through the feature's public behavior; do not export them from the entry point solely for tests.
 
-`tests/harness/module-boundaries.test.ts` fails when a file under `apps/api/src` reaches into another API feature's private files through a relative static import, re-export, import-type query, dynamic `import()`, `require`, or `createRequire` loader.
+`tests/harness/module-boundaries.test.ts` fails when a file under `apps/api/src` or `apps/web/src` reaches into another feature's or the web shell's private files through a relative or web `@/` static import, re-export, import-type query, `import x = require`, dynamic `import()`, `require`, or `createRequire` loader. Lint and `vp run check:policy` enforce the browser boundary and imports between workspaces.
 
 This is a general pattern, not a required file inventory for every module. Existing modules can adopt it when relevant work warrants a change.
 

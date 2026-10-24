@@ -64,6 +64,8 @@ function privateImports(file: string, source: string): string[] {
     )
       return [{ specifier: text(node.source), bases: fileBase }];
     if (node.type === "TSImportType") return [{ specifier: text(node.argument), bases: fileBase }];
+    if (node.type === "TSExternalModuleReference")
+      return [{ specifier: text(node.expression), bases: fileBase }];
     if (node.type === "ImportExpression")
       return [{ specifier: text(node.source), bases: fileBase }];
     if (node.type !== "CallExpression" || !Array.isArray(node.arguments)) return [];
@@ -242,6 +244,38 @@ describe("Module entry points", () => {
       privateImports(
         resolve(webRoot, "components/shell/index.tsx"),
         "import { AppHeader } from './app-header';",
+      ),
+    ).toEqual([]);
+  });
+
+  it.each([
+    "import { value } from '$specifier';",
+    "import type { Value } from '$specifier';",
+    "import '$specifier';",
+    "export { value } from '$specifier';",
+    "export type { Value } from '$specifier';",
+    "export * from '$specifier';",
+    "export * as internals from '$specifier';",
+    "type Value = import('$specifier').Value;",
+    "type Value = { nested: ReturnType<typeof import('$specifier').value> };",
+    "async function load() { return import('$specifier'); }",
+    "const value = require('$specifier');",
+    "function load() { return require('$specifier'); }",
+    "import value = require('$specifier');",
+  ])("keeps web feature internals private for %s", (form) => {
+    const source = form.replaceAll("$specifier", "@/features/navigation/pages");
+    expect(privateImports(resolve(webRoot, "features/sign-in/index.ts"), source)).toEqual([
+      "@/features/navigation/pages",
+    ]);
+    expect(privateImports(resolve(webRoot, "features/navigation/index.ts"), source)).toEqual([]);
+  });
+
+  it("ignores ordinary strings and member calls named require", () => {
+    expect(
+      privateImports(
+        resolve(webRoot, "App.tsx"),
+        `const text = "require('@/features/navigation/pages')";
+         const value = object.require('@/features/navigation/pages');`,
       ),
     ).toEqual([]);
   });
