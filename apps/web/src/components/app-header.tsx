@@ -5,7 +5,7 @@ import { CustomSidebarTrigger } from '@/components/custom-sidebar-trigger'
 import { NavUser } from '@/components/nav-user'
 import { ThemeSwitcher } from '@/components/theme-switcher'
 import { BookOpenIcon, CrownIcon, PlugIcon, PlusIcon } from 'lucide-react'
-import { GitHubIcon } from '@/components/github-icon'
+import { MarkGithubIcon } from '@primer/octicons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PageSearch } from '@/navigation'
 import { Link } from '@tanstack/react-router'
@@ -83,7 +83,7 @@ export function AppHeader() {
               />
             }
           >
-            <GitHubIcon />
+            <MarkGithubIcon aria-hidden="true" />
           </TooltipTrigger>
           <TooltipContent side="bottom">Source</TooltipContent>
         </Tooltip>

@@ -1,5 +1,7 @@
 # Web UI
 
+- Add directories when working code needs them. Do not keep empty scaffolding or placeholder folders.
+- Use icon libraries instead of handwritten or copied SVG paths. Prefer `lucide-react` for UI icons and `@primer/octicons-react` for GitHub icons. Keep custom product branding in `public/brand`.
 - Every enabled clickable control must show a pointer cursor on hover. Use native interactive elements or the correct accessible role so the shared rule in `src/index.css` applies.
 - Preserve text-entry cursors on editable inputs and disabled cursors on disabled controls. Maintain the shared rule instead of adding cursor styles to individual components.
 - After changing `public/brand/logo.png` or `--brand-foreground` during development, run `vp run --filter @aircastle/web generate:icons` to refresh the favicons. The development and build commands also generate them.
