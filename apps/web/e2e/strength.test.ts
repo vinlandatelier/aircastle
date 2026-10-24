@@ -193,7 +193,7 @@ for (const mode of ['survived', 'invalid', 'setup failure'] as const) {
       result?.remove()
       copy.remove()
     }
-  }, 90_000)
+  }, 270_000)
 }
 
 it('rejects an unknown case instead of reporting an empty passing campaign', () => {

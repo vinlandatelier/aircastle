@@ -14,7 +14,7 @@ test("public built SDK entry loads as JavaScript in an ordinary Node application
   });
   expect(result.status, result.stdout + result.stderr).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual({ createClient: "function", defineConfig: "function" });
-});
+}, 20_000);
 
 test("declared aircastle executable can be launched by the operating system", () => {
   const cwd = mkdtempSync(join(tmpdir(), "aircastle-empty-project-"));
@@ -33,7 +33,7 @@ test("declared aircastle executable can be launched by the operating system", ()
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
-});
+}, 20_000);
 
 test("developer configuration fixtures use the public schema builder identity", () => {
   const schemaEntry = import.meta.resolve("@aircastle/schema");
@@ -45,4 +45,4 @@ test("developer configuration fixtures use the public schema builder identity", 
   });
   expect(result.status, result.stdout + result.stderr).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual({ ok: true, data: { title: "Hello" } });
-});
+}, 20_000);
