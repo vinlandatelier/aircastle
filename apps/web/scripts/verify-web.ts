@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { mkdir, open, readFile, readdir, readlink, lstat, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { browserCases, browserOutcome, requirementResults, type BrowserCase } from './evidence'
+import { browserCases, browserOutcome, type BrowserCase } from './evidence'
 import { command, webRoot, withServers } from '../e2e/serve'
 
 const require = createRequire(import.meta.url)
@@ -13,7 +13,6 @@ const output = path.resolve(
   process.env.WEB_RUN_DIR ??
     path.join(webRoot, 'reports', `verification-${Date.now()}-${process.pid}`),
 )
-const requirements = Array.from({ length: 10 }, (_, index) => `R${index + 1}`)
 const receipt: {
   status: 'running' | 'passed' | 'setup failure' | 'behavior failure' | 'check timeout'
   diagnostic?: string
@@ -244,10 +243,6 @@ try {
       }
       receipt.cases = browserCases(report)
       receipt.browserVersion = receipt.cases.find((item) => item.browser)?.browser ?? null
-      await writeFile(
-        path.join(output, 'requirements.json'),
-        JSON.stringify(requirementResults(receipt.cases, requirements), null, 2),
-      )
       const details = receipt.cases.flatMap((item) => item.errors).join('\n')
       if (/Executable doesn't exist|browserType\.launch|browser has been closed/i.test(details))
         throw new Error(`Setup: browser unavailable: ${details.slice(0, 2000)}`)
