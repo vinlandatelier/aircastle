@@ -99,7 +99,7 @@
   --accent: --alpha(var(--color-black) / 4%);
   --accent-foreground: var(--foreground);
   --destructive: var(--color-red-500);
-  --border: --alpha(var(--color-black) / 8%);
+  --border: --alpha(var(--color-black) / 10%);
   --input: --alpha(var(--color-black) / 10%);
   --ring: var(--color-neutral-400);
   --chart-1: oklch(0.87 0 0);
@@ -136,7 +136,7 @@
   --accent: #2d2d31;
   --accent-foreground: var(--foreground);
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-  --border: #1e1e20;
+  --border: #262629;
   --input: var(--border);
   --ring: var(--color-neutral-500);
   --chart-1: oklch(0.87 0 0);
