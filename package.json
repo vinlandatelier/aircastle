@@ -13,6 +13,7 @@
     "dev": "vp run --filter './apps/*' --parallel dev",
     "dev-web": "vp -C apps/web dev",
     "dev-api": "vp -C apps/api run dev",
+    "dev-db": "vp run db:up",
     "knip": "knip",
     "build": "vp run --filter '@aircastle/*' build",
     "typecheck": "bun run check:policy && tsc --noEmit && vp run --filter '@aircastle/*' --parallel typecheck",
