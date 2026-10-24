@@ -51,9 +51,17 @@ export function requirementResults(
   cases: { title: string; status: string }[],
   requirements: string[],
 ): Record<string, string> {
+  const mapped = cases.map((item) => {
+    const ids = [...new Set(item.title.match(/\b[a-z][a-z0-9-]*:R[1-9]\d*\b/g) ?? [])]
+    if (!ids.length) throw new Error(`No requirement declared for browser case: ${item.title}`)
+    for (const id of ids) {
+      if (!requirements.includes(id)) throw new Error(`Undeclared requirement: ${id}`)
+    }
+    return { ...item, requirements: ids }
+  })
   return Object.fromEntries(
     requirements.map((requirement) => {
-      const selected = cases.filter((item) => item.title.match(/\bR\d+\b/g)?.includes(requirement))
+      const selected = mapped.filter((item) => item.requirements.includes(requirement))
       const status = selected.some((item) => ['failed', 'timedOut'].includes(item.status))
         ? 'failed'
         : selected.length > 0 && selected.every((item) => item.status === 'passed')

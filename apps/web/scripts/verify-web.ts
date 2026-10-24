@@ -7,13 +7,14 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { browserCases, browserOutcome, requirementResults, type BrowserCase } from './evidence'
 import { command, webRoot, withServers } from '../e2e/serve'
+import requirementCatalog from '../e2e/requirements.json'
 
 const require = createRequire(import.meta.url)
 const output = path.resolve(
   process.env.WEB_RUN_DIR ??
     path.join(webRoot, 'reports', `verification-${Date.now()}-${process.pid}`),
 )
-const requirements = Array.from({ length: 10 }, (_, index) => `R${index + 1}`)
+const requirements = Object.keys(requirementCatalog)
 const receipt: {
   status: 'running' | 'passed' | 'setup failure' | 'behavior failure' | 'check timeout'
   diagnostic?: string
