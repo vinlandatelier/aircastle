@@ -1,0 +1,138 @@
+name: AI model update proposals
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Propose evaluated updates or check live provider compatibility
+        type: choice
+        options: [propose, live]
+        default: propose
+
+permissions: {}
+
+concurrency:
+  group: ai-model-updates
+  cancel-in-progress: false
+
+jobs:
+  provider:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event.repository.default_branch == 'main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    environment: ai-automation
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      prepared: ${{ steps.prepare.outputs.ready }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Check offline configuration
+        run: vp run ai:models -- offline
+      - name: Check actual provider compatibility
+        if: inputs.mode == 'live'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: vp run ai:models -- live
+      - name: Discover and compare baseline and candidate models
+        id: prepare
+        if: inputs.mode != 'live'
+        env:
+          AI_MODEL_READ_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          mkdir -p reports
+          vp run ai:models -- prepare reports/ai-model-prepare
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - name: Retain raw hashed provider and discovery receipts
+        if: always() && inputs.mode != 'live'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: model-preparation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/ai-model-prepare
+          retention-days: 30
+          if-no-files-found: warn
+
+  verify:
+    needs: provider
+    if: needs.provider.outputs.prepared == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: model-preparation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/ai-model-prepare
+      - name: Build the isolated evaluator from trusted files
+        run: |
+          mkdir -p reports
+          docker build --network=none --iidfile reports/model-evaluator.iid --file scripts/ai-model-updates/Dockerfile scripts/ai-model-updates
+          echo "AI_MODEL_EVALUATOR_IMAGE=$(cat reports/model-evaluator.iid)" >> "$GITHUB_ENV"
+      - name: Verify evaluator restrictions and bounded execution
+        run: vp run ai:models -- sandbox
+      - name: Execute generated code without provider or publishing credentials
+        run: vp run ai:models -- verify reports/ai-model-verified reports/ai-model-prepare/prepared.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: model-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/ai-model-verified
+          retention-days: 30
+          if-no-files-found: error
+
+  publish:
+    needs: [provider, verify]
+    if: >-
+      needs.provider.outputs.prepared == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.repository.default_branch == 'main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ai-automation
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: model-preparation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/ai-model-prepare
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: model-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/ai-model-verified
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        id: app
+        with:
+          app-id: ${{ vars.AI_APP_ID }}
+          private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Publish one advisory proposal PR
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          AI_MODEL_BOT_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
+        run: vp run ai:models -- publish reports/ai-model-prepare/prepared.json reports/ai-model-verified/verification.json
