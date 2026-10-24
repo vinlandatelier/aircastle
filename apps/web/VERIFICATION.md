@@ -48,8 +48,8 @@ A surviving fault is a test gap or an equivalent change requiring explanation. I
 ## Complete the feature
 
 - Run focused checks after edits. Examples: `vp run test-web` and `vp run test-web:e2e stress.spec.ts --grep long-text`.
-- Run `vp run verify-web` for frontend completion. Run `vp run check` for repository completion; it includes the browser suite and requires Chromium and Docker.
-- When changing verification scripts, reporters, fixtures or configuration, also run `vp run test-web:verification`. It exercises actual commands, concurrent ownership, failure classification, emitted reports and the strength runner.
+- Run `vp run verify-web` for frontend completion. Run `vp run check` for repository completion; it includes the browser suite, verification-tool integrity, and database-runner lifecycle checks and requires Chromium and Docker.
+- For focused checks of verification scripts, reporters, fixtures or configuration, run `vp run test-web:verification`. It exercises actual commands, concurrent ownership, failure classification, emitted reports and the strength runner.
 - Run `vp run test-web:coverage` when assessing coverage. Inspect raw covered/total counts and uncovered modules. The component-suite V8 report includes unimported source, excludes CSS, and includes compiler-generated branch effects. Browser journey results are separate evidence.
 - Preserve the command, revision/source fingerprint, executed/failed/skipped counts, intended red witness and final passing result. Use one focused independent review to challenge missing outcomes and assertions that could pass with broken behavior.
 

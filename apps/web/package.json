@@ -13,10 +13,10 @@
     "lint": "vp lint",
     "preview": "vp preview",
     "check": "vp check",
-    "test:e2e": "bun scripts/verify-web.ts e2e",
-    "test:coverage": "bun scripts/verify-web.ts coverage",
+    "test:e2e": "node scripts/verify-web.ts e2e",
+    "test:coverage": "node scripts/verify-web.ts coverage",
     "test:verification": "vp test run --config vite.verification.config.ts",
-    "verify": "bun scripts/verify-web.ts verify",
+    "verify": "node scripts/verify-web.ts verify",
     "test:strength": "bun scripts/test-strength.ts"
   },
   "dependencies": {

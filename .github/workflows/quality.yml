@@ -175,7 +175,7 @@ jobs:
           retention-days: 14
           include-hidden-files: false
   integrity:
-    name: Database runner integrity
+    name: Verification and database runner integrity
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -190,7 +190,7 @@ jobs:
         run: |
           vp run build |& tee reports/ci/build.log
           vp run test:db |& tee reports/ci/database-runner.log
-          vp -C apps/web run test:verification |& tee reports/ci/verification-tools.log
+          vp run test-web:verification |& tee reports/ci/verification-tools.log
       - name: Upload logs and reports
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

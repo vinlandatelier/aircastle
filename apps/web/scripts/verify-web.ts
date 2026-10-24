@@ -5,8 +5,8 @@ import { createRequire } from 'node:module'
 import { mkdir, open, readFile, readdir, readlink, lstat, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { browserCases, browserOutcome, type BrowserCase } from './evidence'
-import { command, webRoot, withServers } from '../e2e/serve'
+import { browserCases, browserOutcome, type BrowserCase } from './evidence.ts'
+import { command, webRoot, withServers } from '../e2e/serve.ts'
 
 const require = createRequire(import.meta.url)
 const output = path.resolve(

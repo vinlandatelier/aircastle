@@ -8,6 +8,35 @@ import { copyWeb, originalWeb, readJson, runWeb } from '../scripts/verification-
 const temporary = () => mkdtempSync(path.join(tmpdir(), 'aircastle-run-'))
 
 describe('real command contract', () => {
+  it('serves repeated assets over reused HTTP connections without resets', () => {
+    const copy = copyWeb()
+    try {
+      writeFileSync(
+        path.join(copy.directory, 'e2e/transport.spec.ts'),
+        `import { test, expect } from './support'
+          test('reused asset connections', async ({ request }) => {
+            test.setTimeout(90_000)
+            await Promise.all(Array.from({ length: 4 }, async () => {
+              for (let cycle = 0; cycle < 128; cycle++) {
+                for (const asset of ['logo-light.png', 'favicon-light.svg', 'logo-dark.png', 'favicon-dark.svg']) {
+                  const response = await request.get('/brand/' + asset)
+                  expect(response.status()).toBe(200)
+                  expect((await response.body()).length).toBeGreaterThan(0)
+                  await response.dispose()
+                }
+              }
+            }))
+          })`,
+      )
+      const output = path.join(copy.directory, 'reports/transport')
+      const result = runWeb(copy.directory, output, ['e2e', 'transport.spec.ts'])
+      expect(result.status, result.stdout + result.stderr).toBe(0)
+      assertArtifacts(output, 'reused asset connections')
+    } finally {
+      copy.remove()
+    }
+  }, 210_000)
+
   it('expected crash evidence does not hide unrelated errors mentioning the expected message', () => {
     const copy = copyWeb()
     try {
@@ -26,7 +55,7 @@ describe('real command contract', () => {
     } finally {
       copy.remove()
     }
-  }, 180_000)
+  }, 210_000)
 
   it('rejects empty test discovery with a recorded setup failure', () => {
     const output = temporary()
@@ -40,7 +69,7 @@ describe('real command contract', () => {
     } finally {
       rmSync(output, { recursive: true, force: true })
     }
-  }, 180_000)
+  }, 210_000)
 
   it('concurrent invocations serve real builds, execute the selected assertion and clean up', async () => {
     const outputs = [temporary(), temporary()]
@@ -55,7 +84,7 @@ describe('real command contract', () => {
     } finally {
       for (const output of outputs) rmSync(output, { recursive: true, force: true })
     }
-  }, 180_000)
+  }, 210_000)
 
   it('a changed entry invalidates the previous build and propagates a real assertion failure', () => {
     const copy = copyWeb()
@@ -85,7 +114,7 @@ describe('real command contract', () => {
     } finally {
       copy.remove()
     }
-  }, 180_000)
+  }, 390_000)
 
   for (const mode of ['focused', 'skipped', 'timeout'] as const) {
     it(`rejects actual ${mode} browser selection and preserves case results`, () => {
@@ -126,7 +155,7 @@ describe('real command contract', () => {
       } finally {
         copy.remove()
       }
-    }, 180_000)
+    }, 210_000)
   }
 
   it('classifies an unavailable browser as setup failure', () => {
@@ -141,7 +170,7 @@ describe('real command contract', () => {
     } finally {
       rmSync(output, { recursive: true, force: true })
     }
-  }, 180_000)
+  }, 210_000)
 
   it('aggregate verification propagates empty browser discovery after its prerequisite checks', () => {
     const output = temporary()
@@ -159,5 +188,5 @@ describe('real command contract', () => {
     } finally {
       rmSync(output, { recursive: true, force: true })
     }
-  }, 180_000)
+  }, 210_000)
 })
