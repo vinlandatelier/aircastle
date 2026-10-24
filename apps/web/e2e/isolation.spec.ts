@@ -3,7 +3,7 @@ import { test, expect, visit } from './support'
 test('[R7] normal production build exposes no fixture data or scenario override', async ({
   page,
 }) => {
-  await visit(page, 'normal', '/collections?scenario=long-text')
+  await visit(page, 'normal', '/dash/collections?scenario=long-text')
   await expect(
     page.getByRole('button', { name: 'Switch project: Acme Inc / Technical Blog', exact: true }),
   ).toBeVisible()

@@ -20,7 +20,7 @@ export function AppHeader() {
       )}
     >
       <Link
-        to="/collections"
+        to="/dash/collections"
         aria-label="Aircastle"
         className="brand-link flex h-full w-14 shrink-0 items-center justify-center border-r outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >

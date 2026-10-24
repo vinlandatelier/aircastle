@@ -47,7 +47,7 @@ export function shellData(scenario: string | null) {
 
 export function navigationTitle(scenario: string | null, path: string, title: string) {
   if (scenario !== 'long-navigation') return title
-  if (path === '/tasks') return 'W'.repeat(1000)
-  if (path === '/users') return '東京のプロジェクト 🚀'
+  if (path === '/dash/tasks') return 'W'.repeat(1000)
+  if (path === '/dash/users') return '東京のプロジェクト 🚀'
   return title
 }
