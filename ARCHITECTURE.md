@@ -93,7 +93,7 @@ content/
 
 Keep route schemas and handlers together and preserve inferred router return types. Test supporting files through the feature's public behavior; do not export them from the entry point solely for tests.
 
-The module-boundary harness scans TypeScript callers under the API and web source roots for private imports into API features, web features, and the web shell. It checks static imports, re-exports, and TypeScript import-type queries using relative paths or the web `@/` alias. Runtime dynamic imports, CommonJS imports, other path resolvers, and dependency cycles are outside its scope.
+The module-boundary harness scans TypeScript callers under the API and web source roots for private imports into API features, web features, and the web shell. It checks static imports, re-exports, TypeScript import-type queries, literal dynamic imports, and literal CommonJS imports. It resolves normalized relative paths and the web `@/` alias. Browser callers also cannot import `@aircastle/core`, `@aircastle/adapter-postgres`, or `@aircastle/cli`, including package subpaths and relative paths into those packages, API source, or executable `aircastle.config.*` files. Browser-safe contracts, schema, and client packages remain allowed. Computed specifiers, other path resolvers, and dependency cycles are outside its scope.
 
 This is a general pattern, not a required file inventory for every module. Existing modules can adopt it when relevant work warrants a change.
 
