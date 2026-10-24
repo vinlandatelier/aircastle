@@ -37,6 +37,26 @@ describe('real command contract', () => {
     }
   }, 210_000)
 
+  it('expected crash evidence does not hide unrelated errors mentioning the expected message', () => {
+    const copy = copyWeb()
+    try {
+      writeFileSync(
+        path.join(copy.directory, 'e2e/expected-error.spec.ts'),
+        `import { test, expect } from './support'\ntest.use({ expectedRuntimeErrors: ['Expected verification runtime failure'] })\ntest('expected and unrelated errors', async ({page}) => { await page.goto('/sign-in'); await expect(page.getByRole('heading', {name:'Sign in to Aircastle'})).toBeVisible(); await page.evaluate(() => { setTimeout(() => { throw new Error('Expected verification runtime failure') }, 0); setTimeout(() => { throw new Error('Unrelated error mentioning Expected verification runtime failure') }, 0) }); await expect(page.getByRole('heading', {name:'Something went wrong',exact:true})).toBeVisible() })\n`,
+      )
+      const output = path.join(copy.directory, 'reports/expected-error')
+      const result = runWeb(copy.directory, output, ['e2e', 'expected-error.spec.ts'])
+      expect(result.status, result.stdout + result.stderr).not.toBe(0)
+      const receipt = readJson(output, 'receipt.json')
+      expect(receipt.status).toBe('behavior failure')
+      expect(readFileSync(path.join(output, 'browser.xml'), 'utf8')).toContain(
+        'Unrelated error mentioning Expected verification runtime failure',
+      )
+    } finally {
+      copy.remove()
+    }
+  }, 210_000)
+
   it('rejects empty test discovery with a recorded setup failure', () => {
     const output = temporary()
     try {
