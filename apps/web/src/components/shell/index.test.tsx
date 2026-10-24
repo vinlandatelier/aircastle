@@ -1,8 +1,27 @@
-import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vite-plus/test'
+import { screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test'
 import { renderApp } from '@/test-utils'
 
 describe('Aircastle app shell', () => {
+  beforeEach(() => localStorage.removeItem('aircastle-theme'))
+  afterEach(() => localStorage.removeItem('aircastle-theme'))
+
+  it('applies and stores explicit theme choices through the public app', async () => {
+    const { user } = await renderApp()
+    for (const [label, value, other] of [
+      ['Dark', 'dark', 'light'],
+      ['Light', 'light', 'dark'],
+    ] as const) {
+      await user.click(screen.getByRole('button', { name: 'Choose theme' }))
+      await user.click(await screen.findByRole('menuitemradio', { name: label }))
+      await waitFor(() => {
+        expect(document.documentElement.classList.contains(value)).toBe(true)
+        expect(document.documentElement.classList.contains(other)).toBe(false)
+        expect(localStorage.getItem('aircastle-theme')).toBe(value)
+      })
+    }
+  })
+
   it('renders the brand, project switcher, and CMS navigation', async () => {
     await renderApp()
     const header = screen.getByRole('banner')
