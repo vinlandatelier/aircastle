@@ -18,6 +18,7 @@ apps/
         │   ├── shell/        Persistent header, sidebar, page frame, and supporting controls
         │   └── ui/           Local shadcn UI components built on Base UI
         ├── features/         Product behavior by feature
+        │   ├── error-recovery/ App-wide fatal error boundary and standalone recovery
         │   ├── navigation/   Shared page catalog, sidebar navigation, and page search
         │   ├── not-found/    Public recovery page for unmatched destinations
         │   └── sign-in/      Standalone email sign-in interface and decorative background
@@ -57,6 +58,8 @@ Paths in this section are relative to `apps/web`.
 `src/features/sign-in` vendors the Efferd `@efferd/auth-5` layout with Aircastle branding and email-only controls. The email action remains disabled until magic-link authentication is implemented. Legal links open `/terms-of-service` and `/privacy-policy` in new tabs; those pages are not implemented yet.
 
 `src/features/not-found` owns the standalone recovery page for unmatched destinations, including unknown dashboard paths. The router handles these at its root so the page uses the marketing palette outside the CMS shell. Its links return to `/` or `/sign-in`; sign-in's Home link also returns to `/`.
+
+`src/features/error-recovery` catches rendering failures outside the router and listens for uncaught runtime errors and unhandled promise rejections. The root route escalates fatal route failures to that boundary; the router's generic global error boundary is disabled. Recovery unmounts the failed app and its metadata, retains the document theme or resolves it for an early failure, and renders without router or theme-provider dependencies. Reload retries the current URL; Home performs a full navigation to `/`. Handled failures and ordinary missing pages keep their existing behavior.
 
 `src/index.css` owns the `marketing` and `dashboard` colour palettes in light and dark mode. Marketing uses Efferd's auth preview tokens and is the default for public pages. Sign-in declares `data-theme-scope="marketing"`; the shell declares `data-theme-scope="dashboard"`. The dashboard marker selects its palette at the document root, including overlays rendered outside the shell. Shared UI components consume the active semantic tokens without separate component variants or theme providers.
 

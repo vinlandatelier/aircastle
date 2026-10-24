@@ -6,6 +6,7 @@ import {
   Link,
   redirect,
   type RouterHistory,
+  type ErrorComponentProps,
 } from '@tanstack/react-router'
 import App from './App'
 import { AppShell } from '@/components/shell'
@@ -16,6 +17,9 @@ import { navigationPages } from '@/features/navigation'
 
 const rootRoute = createRootRoute({
   component: App,
+  errorComponent: ({ error }: ErrorComponentProps): never => {
+    throw error
+  },
   notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [
@@ -111,7 +115,12 @@ const routeTree = rootRoute.addChildren([
 ])
 
 export function createAppRouter(history?: RouterHistory) {
-  return createRouter({ routeTree, history, notFoundMode: 'root' })
+  return createRouter({
+    routeTree,
+    history,
+    notFoundMode: 'root',
+    disableGlobalCatchBoundary: true,
+  })
 }
 
 declare module '@tanstack/react-router' {
