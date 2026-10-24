@@ -4,6 +4,10 @@ import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, lazyPlugins } from 'vite-plus'
 export default defineConfig({
+  test: {
+    environment: 'happy-dom',
+    setupFiles: ['./src/test-setup.ts'],
+  },
   resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
   server: {
     port: 43121,
