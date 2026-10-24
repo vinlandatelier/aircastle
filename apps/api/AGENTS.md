@@ -11,3 +11,4 @@ Follow [ARCHITECTURE.md](../../ARCHITECTURE.md) for the API's file structure, mo
 - Find Hono documentation through `https://hono.dev/llms.txt`; fetch individual pages with `Accept: text/markdown`.
 
 - Keep route schemas and handlers together. Use ArkType with `describeRoute`/`resolver` for OpenAPI and `satisfies typeof schema.infer` for response types. Keep typed-client assertions in feature tests.
+- Keep each feature's public factory in `index.ts`; extract distinct request and response responsibilities into private supporting files as needed. Use blank lines between logical steps. See the feature pattern in `ARCHITECTURE.md`.

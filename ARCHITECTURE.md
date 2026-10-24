@@ -54,7 +54,7 @@ Paths in this section are relative to `apps/web`.
 
 ## Feature pattern
 
-The folder names the feature. Start with its implementation and public-interface tests together:
+The folder names the feature. Small features such as API health keep their implementation and public-interface tests together:
 
 ```text
 <feature>/
@@ -67,6 +67,21 @@ The folder names the feature. Start with its implementation and public-interface
 - Extract supporting files when they have a distinct responsibility, are reused, or make the main file harder to understand. Use specific names such as `tools.ts` or `revisions.ts`.
 - Keep supporting files private. Cross-module callers use the public entry point.
 - Optimize how much code a reader needs to understand one change. File count alone is not the goal.
+- Use blank lines to separate logical steps, such as parsing input, validating it, and calling an operation.
+
+The API content feature separates HTTP mechanics behind the same public factory:
+
+```text
+content/
+├── index.ts          Public factory, route schemas, handlers, and endpoint guards
+├── request.ts        Credentials and bounded JSON body parsing
+├── responses.ts      Result status mapping and safe error responses
+└── index.test.ts     HTTP behavior through createApp
+```
+
+Keep route schemas and handlers together and preserve inferred router return types. Test supporting files through the feature's public behavior; do not export them from the entry point solely for tests.
+
+The module-boundary harness scans TypeScript callers under the API and web source roots for private imports into API features, web features, and the web shell. It checks static imports, re-exports, and TypeScript import-type queries using relative paths or the web `@/` alias. Runtime dynamic imports, CommonJS imports, other path resolvers, and dependency cycles are outside its scope.
 
 This is a general pattern, not a required file inventory for every module. Existing modules can adopt it when relevant work warrants a change.
 
