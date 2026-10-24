@@ -191,7 +191,8 @@ test("immutable context refuses a PR whose head moves during collection", async 
         base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
       });
     }
-    if (path.includes("/files?")) return Response.json([]);
+    if (path.includes(`/compare/${snapshot.base}...${snapshot.head}?`))
+      return Response.json({ files: [] });
     if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
     throw new Error(path);
   });
@@ -296,15 +297,17 @@ test("scheduled reconciliation creates independent provider claims and a repeat 
       Object.assign(item, JSON.parse(typeof init.body === "string" ? init.body : "null"));
       return Response.json(item);
     }
-    if (path.endsWith("/files"))
-      return Response.json([
-        {
-          filename: "src/value.ts",
-          status: "modified",
-          sha: "c".repeat(40),
-          patch: snapshot.files[0]!.patch,
-        },
-      ]);
+    if (path.endsWith(`/compare/${snapshot.base}...${snapshot.head}`))
+      return Response.json({
+        files: [
+          {
+            filename: "src/value.ts",
+            status: "modified",
+            sha: "c".repeat(40),
+            patch: snapshot.files[0]!.patch,
+          },
+        ],
+      });
     if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
     if (path.endsWith(`/git/trees/${snapshot.head}`))
       return Response.json({
@@ -409,10 +412,20 @@ test("serialized source context fits the real provider input budget and reports 
         head: { sha: snapshot.head, repo: { id: 11 } },
         base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
       });
-    if (path.includes("/files?"))
-      return Response.json([
-        { filename: "value.ts", status: "modified", sha: "c".repeat(40), patch: "+quoted source" },
-      ]);
+    if (
+      path ===
+      `https://api.github.com/repos/vinlandatelier/aircastle/compare/${snapshot.base}...${snapshot.head}?per_page=1`
+    )
+      return Response.json({
+        files: [
+          {
+            filename: "value.ts",
+            status: "modified",
+            sha: "c".repeat(40),
+            patch: "+quoted source",
+          },
+        ],
+      });
     if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
     if (path.includes("/git/trees/"))
       return Response.json({

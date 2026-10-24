@@ -266,12 +266,16 @@ export class Coordinator {
       (bound && (bound.head !== revision.head || bound.base !== revision.base))
     )
       throw new Error("Stale revision");
-    const changed = await this.list(`${this.root}/pulls/${number}/files`);
+    const comparison = record(
+      await this.api(`${this.root}/compare/${revision.base}...${revision.head}?per_page=1`),
+    );
+    const compared = array(comparison.files);
+    const changed = compared.slice(0, 300);
     const paths = changed.map((raw) => safePath(record(raw).filename));
     const commit = record(await this.api(`${this.root}/git/commits/${revision.head}`));
     const tree = sha(record(commit.tree).sha);
     const files: SourceFile[] = [],
-      omitted: string[] = [];
+      omitted: string[] = compared.length >= 300 ? ["comparison reached the 300-file bound"] : [];
     const capture = (file: SourceFile): void => {
       if (Buffer.byteLength(JSON.stringify([...files, file])) > 100000)
         omitted.push(`${file.path}: serialized context budget`);
