@@ -155,8 +155,11 @@
 }
 
 .brand-logo {
-  background-color: var(--brand-foreground);
-  mask: url('/brand/logo.png') center / contain no-repeat;
+  background: url('/brand/logo-light.png') center / contain no-repeat;
+}
+
+.dark .brand-logo {
+  background-image: url('/brand/logo-dark.png');
 }
 
 @keyframes brand-spin {
