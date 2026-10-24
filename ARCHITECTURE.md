@@ -18,7 +18,8 @@ apps/
         │   ├── shell/        Persistent header, sidebar, page frame, and supporting controls
         │   └── ui/           Local shadcn UI components built on Base UI
         ├── features/         Product behavior by feature
-        │   └── navigation/   Shared page catalog, sidebar navigation, and page search
+        │   ├── navigation/   Shared page catalog, sidebar navigation, and page search
+        │   └── sign-in/      Standalone email sign-in interface and decorative background
         ├── hooks/            Browser state subscriptions
         └── lib/              Browser-safe UI utilities
 
@@ -43,14 +44,16 @@ Vite forwards `/api` requests unchanged during development and preview. The buil
 
 Paths in this section are relative to `apps/web`.
 
-- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `App` provides light, dark, and system themes with `next-themes` and keeps the shell mounted as page destinations change.
+- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `App` provides light, dark, and system themes with `next-themes`. A shared CMS layout under `/dash` keeps the shell mounted as dashboard destinations change; `/sign-in` renders outside that layout.
 - `src/components/shell/` owns the persistent header, sidebar, page frame, and private supporting controls. The sidebar collapses independently beneath the full-width header. Import the shell through its `index.tsx` entry point.
 - `src/components/ui/` holds shared UI primitives built on Base UI.
 - `src/features/<feature>/` owns a product feature's behavior, types, data fetching, and tests. Import features through their `index.ts` or `index.tsx` entry point; keep supporting files private.
 - Keep feature-specific hooks and helpers inside their feature. Reserve `src/hooks/` and `src/lib/` for shared browser subscriptions and utilities.
 - Keep public-interface behavior tests beside the module implementation. Add feature folders only when implementing their behavior.
 
-`src/features/navigation` owns the page catalog, sidebar links, and keyboard page search. `src/router.tsx` registers destinations from that catalog and redirects the index to Collections. Destinations currently render dashboard placeholders. `components.json` configures shadcn and the Efferd registry.
+`src/features/navigation` owns the page catalog, sidebar links, and keyboard page search. `src/router.tsx` registers destinations under `/dash` from that catalog and redirects `/` and `/dash` to `/dash/collections`. Destinations currently render dashboard placeholders. `components.json` configures shadcn and the Efferd registry.
+
+`src/features/sign-in` vendors the Efferd `@efferd/auth-5` layout with Aircastle branding and email-only controls. The email action remains disabled until magic-link authentication is implemented. Legal links open `/terms-of-service` and `/privacy-policy` in new tabs; those pages are not implemented yet.
 
 ## Feature pattern
 
