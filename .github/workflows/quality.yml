@@ -1,0 +1,243 @@
+name: Deterministic CI
+'on':
+  pull_request: {}
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  CI: 'true'
+jobs:
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: 'false'
+      - name: Lint every workflow
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/actionlint.tar.gz"
+          printf '%s  %s\n' 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 "$RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color |& tee reports/ci/actionlint.log
+      - name: Prove Quality rejects incomplete results
+        shell: bash
+        run: |
+          bun - <<'JS'
+          import assert from 'node:assert/strict';
+          const workflow = Bun.YAML.parse(await Bun.file('.github/workflows/quality.yml').text());
+          const expected = Object.keys(workflow.jobs).filter((id) => id !== 'quality');
+          assert.deepEqual([...workflow.jobs.quality.needs].sort(), [...expected].sort());
+          const gate = workflow.jobs.quality.steps.find((step) => step.id === 'gate').run;
+          const success = Object.fromEntries(expected.map((id) => [id, { result: 'success' }]));
+          let cases = 0;
+          function check(results, passes) {
+            const execution = Bun.spawnSync(['bash', '-e', '-o', 'pipefail', '-c', gate], {
+              env: { ...process.env, JOB_RESULTS: typeof results === 'string' ? results : JSON.stringify(results) },
+              stdout: 'pipe', stderr: 'pipe',
+            });
+            assert.equal(execution.exitCode === 0, passes, new TextDecoder().decode(execution.stderr));
+            cases++;
+            return new TextDecoder().decode(execution.stdout);
+          }
+          check(success, true);
+          for (const id of expected) {
+            for (const result of ['failure', 'cancelled', 'skipped', '', null]) {
+              check({ ...success, [id]: { result } }, false);
+            }
+            const missing = { ...success };
+            delete missing[id];
+            check(missing, false);
+          }
+          const allFailed = Object.fromEntries(expected.map((id) => [id, { result: 'failure' }]));
+          const output = check(allFailed, false);
+          for (const id of expected) assert.ok(output.includes(`${id}: failure`));
+          check({ ...success, unexpected: { result: 'success' } }, false);
+          check({}, false);
+          check('invalid JSON', false);
+          check('null', false);
+          console.log(`Quality gate: ${cases} execution cases passed`);
+          JS
+      - name: Upload logs and reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workflow-lint-${{ github.run_attempt }}
+          path: |
+            reports/
+            apps/web/reports/
+            packages/schema/coverage/
+            packages/schema/reports/
+            packages/contracts/reports/
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: false
+  static:
+    name: Static checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: 'false'
+      - name: Build, typecheck and lint
+        shell: bash
+        run: |
+          vp run build |& tee reports/ci/build.log
+          vp run typecheck |& tee reports/ci/typecheck.log
+          vp run lint |& tee reports/ci/lint.log
+      - name: Upload logs and reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: static-checks-${{ github.run_attempt }}
+          path: |
+            reports/
+            apps/web/reports/
+            packages/schema/coverage/
+            packages/schema/reports/
+            packages/contracts/reports/
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: false
+  runtime:
+    name: Runtime and contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: 'false'
+      - name: Build and test packages, contracts, CLI, SDK and Postgres
+        shell: bash
+        run: |
+          vp run build |& tee reports/ci/build.log
+          vp run test:prepared |& tee reports/ci/runtime.log
+      - name: Upload logs and reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-and-contracts-${{ github.run_attempt }}
+          path: |
+            reports/
+            apps/web/reports/
+            packages/schema/coverage/
+            packages/schema/reports/
+            packages/contracts/reports/
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: false
+  integrity:
+    name: Database runner integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: 'false'
+      - name: Build and verify database runner and verification tools
+        shell: bash
+        run: |
+          vp run build |& tee reports/ci/build.log
+          vp run test:db |& tee reports/ci/database-runner.log
+      - name: Upload logs and reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verification-and-database-runner-integrity-${{ github.run_attempt }}
+          path: |
+            reports/
+            apps/web/reports/
+            packages/schema/coverage/
+            packages/schema/reports/
+            packages/contracts/reports/
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: false
+  coverage:
+    name: Coverage reports
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: 'false'
+      - name: Report schema and frontend coverage
+        shell: bash
+        run: |
+          vp run build |& tee reports/ci/build.log
+          vp run test:coverage |& tee reports/ci/schema-coverage.log
+      - name: Upload logs and reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coverage-reports-${{ github.run_attempt }}
+          path: |
+            reports/
+            apps/web/reports/
+            packages/schema/coverage/
+            packages/schema/reports/
+            packages/contracts/reports/
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: false
+  quality:
+    name: Quality
+    if: ${{ always() }}
+    needs:
+      - workflow-lint
+      - static
+      - runtime
+      - integrity
+      - coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every deterministic job to succeed
+        id: gate
+        shell: bash
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import os
+          import sys
+
+          expected = ('workflow-lint', 'static', 'runtime', 'integrity', 'coverage')
+          results = json.loads(os.environ['JOB_RESULTS'])
+          failed = False
+          for job in expected:
+              result = results.get(job, {}).get('result', 'missing')
+              print(f'{job}: {result}', flush=True)
+              failed = failed or result != 'success'
+          unexpected = set(results) - set(expected)
+          if unexpected:
+              print(f'Unexpected dependencies: {sorted(unexpected)}', flush=True)
+              failed = True
+          sys.exit(1 if failed else 0)
+          PYTHON
