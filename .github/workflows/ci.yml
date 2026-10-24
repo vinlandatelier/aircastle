@@ -15,6 +15,8 @@ jobs:
   checks:
     name: Lint, typecheck and test
     runs-on: ubuntu-24.04
+    outputs:
+      coverage_summary: ${{ steps.coverage-summary.outcome }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -47,3 +49,60 @@ jobs:
       - name: Test database runner
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: vp run test:db
+      - id: coverage
+        name: Test schema coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: vp run test:coverage
+      - id: coverage-summary
+        name: Summarize schema coverage
+        if: ${{ !cancelled() && steps.coverage.outcome != 'skipped' }}
+        env:
+          RESULT: ${{ steps.coverage.outcome == 'success' && 'passed' || 'is below thresholds' }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo '<!-- aircastle-coverage -->'
+            echo "### Schema coverage ${RESULT} on ${SHA:0:7}"
+            echo
+            echo '| Statements | Branches | Functions | Lines |'
+            echo '|---|---|---|---|'
+            jq -r '.total | [.statements, .branches, .functions, .lines] | map("\(.pct)% (\(.covered)/\(.total))") | "| " + join(" | ") + " |"' \
+              packages/schema/coverage/coverage-summary.json
+            echo
+            echo "Thresholds are set in \`packages/schema/vite.config.ts\`. [Run details](${RUN_URL})"
+          } > "$RUNNER_TEMP/coverage.md"
+          cat "$RUNNER_TEMP/coverage.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage summary
+        if: ${{ !cancelled() && steps.coverage-summary.outcome == 'success' && github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-summary
+          path: ${{ runner.temp }}/coverage.md
+          retention-days: 1
+  coverage-comment:
+    name: Comment schema coverage
+    needs: checks
+    if: ${{ !cancelled() && needs.checks.outputs.coverage_summary == 'success' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: coverage-summary
+          path: ${{ runner.temp }}
+      - name: Create or update the coverage comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          ids=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- aircastle-coverage -->"))) | .id')
+          if [ -n "$ids" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/${ids%%$'\n'*}" -F body=@"$RUNNER_TEMP/coverage.md" > /dev/null
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/coverage.md" > /dev/null
+          fi
