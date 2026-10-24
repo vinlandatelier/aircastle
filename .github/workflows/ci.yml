@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       coverage_summary: ${{ steps.coverage-summary.outcome }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -49,6 +49,16 @@ jobs:
       - name: Test database runner
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: vp run test:db
+      - id: chromium
+        name: Install Chromium
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: vp -C apps/web exec playwright install --with-deps chromium
+      - name: Test browser journeys
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: vp run test-web:e2e
+      - name: Test verification tools
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: vp run test-web:verification
       - id: coverage
         name: Test schema coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
