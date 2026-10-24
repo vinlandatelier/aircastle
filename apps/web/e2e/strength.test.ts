@@ -6,6 +6,42 @@ import process from 'node:process'
 import { expect, it } from 'vite-plus/test'
 import { copyWeb, originalWeb, readJson } from '../scripts/verification-sandbox'
 
+const expectedBrowserCases: Record<string, { file: string; titles: string[] }> = {
+  entry: {
+    file: 'startup.spec.ts',
+    titles: [
+      'shell:R2 normal built entry loads assets and redirects to Collections',
+      'shell:R2 direct Settings entry survives reload in the same context',
+    ],
+  },
+  sidebar: {
+    file: 'navigation.spec.ts',
+    titles: [
+      'shell:R3 desktop collapse changes rendered width and survives client navigation',
+      'shell:R3 desktop collapse and mobile drawer state remain independent across resizing',
+    ],
+  },
+  containment: {
+    file: 'stress.spec.ts',
+    titles: [
+      'T5 shell:R7 shell:R8 long-text popup: viewport containment keeps extreme candidates within reach',
+    ],
+  },
+}
+
+type BrowserSuite = {
+  suites?: BrowserSuite[]
+  specs: {
+    file: string
+    title: string
+    tests: { results: { status: string; errors: { message?: string }[] }[] }[]
+  }[]
+}
+
+function selectedBrowserCases(suites: BrowserSuite[]): BrowserSuite['specs'] {
+  return suites.flatMap((suite) => [...suite.specs, ...selectedBrowserCases(suite.suites ?? [])])
+}
+
 function campaign(directory: string, args: string[] = []) {
   const output = mkdtempSync(path.join(tmpdir(), 'aircastle-strength-proof-'))
   const command = spawnSync('bun', ['scripts/test-strength.ts', ...args], {
@@ -35,9 +71,6 @@ it('proves the four committed faults with passing controls and restored behavior
       expect(item.baseline.failed).toBe(0)
       expect(item.fault.failed).toBeGreaterThan(0)
       expect(item.fault.skipped).toBe(0)
-      expect(item.fault.namedFailures.some((name: string) => name.includes(item.failure))).toBe(
-        true,
-      )
       expect(item.restored.executed).toBe(item.baseline.executed)
       expect(item.restored.failed).toBe(0)
       expect(readFileSync(path.join(item.output, 'fault.log'), 'utf8').length).toBeGreaterThan(0)
@@ -50,13 +83,24 @@ it('proves the four committed faults with passing controls and restored behavior
           expect(raw.numFailedTests).toBe(phase === 'fault' ? 1 : 0)
           expect(item[phase].executed).toBe(raw.numTotalTests)
           expect(item[phase].failed).toBe(raw.numFailedTests)
+          expect(raw.testResults).toHaveLength(1)
+          expect(raw.testResults[0].name).toMatch(/\/src\/components\/shell\/index\.test\.tsx$/)
+          expect(
+            raw.testResults[0].assertionResults.map((test: { title: string }) => test.title).sort(),
+          ).toEqual([
+            'applies and stores explicit theme choices through the public app',
+            'keeps the agreed header action order',
+            'renders the brand, project switcher, and CMS navigation',
+          ])
           if (phase === 'fault') {
             const failures = raw.testResults.flatMap(
               (suite: {
                 assertionResults: { fullName: string; status: string; failureMessages: string[] }[]
               }) => suite.assertionResults.filter((test) => test.status === 'failed'),
             )
-            expect(failures[0].fullName).toContain('theme')
+            expect(failures[0].fullName).toBe(
+              'Aircastle app shell applies and stores explicit theme choices through the public app',
+            )
             expect(failures[0].failureMessages.join('\n')).toMatch(/expect|AssertionError/)
           }
         } else {
@@ -64,6 +108,23 @@ it('proves the four committed faults with passing controls and restored behavior
           expect(receipt.status).toBe(phase === 'fault' ? 'behavior failure' : 'passed')
           expect(receipt.cleanedUp).toBe(true)
           const raw = readJson(directory, 'browser.json')
+          const selected = selectedBrowserCases(raw.suites)
+          const expected = expectedBrowserCases[item.id]!
+          expect(selected.map((test) => test.file)).toEqual(
+            expected.titles.map(() => expected.file),
+          )
+          expect(selected.map((test) => test.title).sort()).toEqual([...expected.titles].sort())
+          const results = selected.flatMap((test) => test.tests.flatMap((run) => run.results))
+          expect(results).toHaveLength(expected.titles.length)
+          if (phase === 'fault') {
+            expect(
+              results.some(
+                (result) =>
+                  result.status === 'failed' &&
+                  result.errors.some((error) => /expect|AssertionError/.test(error.message ?? '')),
+              ),
+            ).toBe(true)
+          } else expect(results.every((result) => result.status === 'passed')).toBe(true)
           expect(raw.stats.skipped).toBe(0)
           expect(raw.stats.flaky).toBe(0)
           expect(raw.errors).toEqual([])
@@ -81,7 +142,7 @@ it('proves the four committed faults with passing controls and restored behavior
               receipt.cases.some(
                 (test: { status: string; title: string; errors: string[] }) =>
                   test.status === 'failed' &&
-                  test.title.includes(item.failure) &&
+                  expected.titles.some((title) => test.title.endsWith(title)) &&
                   test.errors.length > 0,
               ),
             ).toBe(true)
