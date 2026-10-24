@@ -3,7 +3,7 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   resolve: { conditions: ["development"] },
   test: {
-    include: ["tests/**/*.test.ts", "scripts/dev-setup.test.ts"],
+    include: ["tests/**/*.test.ts", "scripts/dev-setup.test.ts", "scripts/ai-*/**/*.test.ts"],
     environment: "node",
     maxWorkers: 2,
   },
