@@ -49,17 +49,13 @@ describe('Sign in', () => {
     }
   })
 
-  it('returns Home to Collections with the CMS shell', async () => {
+  it('returns Home to the marketing homepage', async () => {
     const { router, user } = await renderApp('/sign-in')
-    expect(screen.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/dash')
+    expect(screen.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/')
     await user.click(screen.getByRole('link', { name: 'Home' }))
 
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(
-        '/dash/workspaces/demo/projects/demo/collections',
-      ),
-    )
-    expect(await screen.findByRole('link', { name: 'Collections' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Toggle Sidebar' }).length).toBeGreaterThan(0)
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(await screen.findByRole('heading', { name: 'Aircastle' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Toggle Sidebar' })).toBeNull()
   })
 })

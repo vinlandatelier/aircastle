@@ -30,7 +30,7 @@ export function SignInPage() {
           role="link"
           className="absolute top-7 left-5"
           variant="ghost"
-          render={<Link to="/dash" />}
+          render={<Link to="/" />}
           nativeButton={false}
         >
           <ChevronLeftIcon aria-hidden="true" data-icon="inline-start" />
