@@ -56,6 +56,10 @@ Paths in this section are relative to `apps/web`.
 
 `src/features/navigation` owns the page catalog, sidebar links, and keyboard page search. `src/router.tsx` registers destinations from that catalog and redirects the index to Collections. Destinations currently render dashboard placeholders. `components.json` configures shadcn and the Efferd registry.
 
+Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys, extreme-input fixtures, and command/report conformance tests. `playwright.config.ts` owns browser execution settings. A verification-only Vite adapter supplies fixture data before rendering; normal production builds retain their real data and expose no fixture controls.
+
+`scripts/verify-web.ts` owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness.
+
 ## Repository automation
 
 `scripts/ai-automation/index.ts` owns review/fix authorization, output validation, and prompts. Each reviewer role has its own review lens there: one hunts for correctness failures, the other checks quality and conformance with `AGENTS.md`. `github.ts` holds the coordinator, which owns immutable source capture, authenticated claims, revision checks, and publication. The workflow uses trusted default-branch code and checks current `vinlandatelier` membership before model calls. It scans PR revisions and inline commands on a schedule; a new PR comment that mentions a bot can wake it immediately. Source and model output remain data in credential-bearing jobs. Supported fixes run selected file-level checks in a separate container and publish through a fresh trusted job as follow-up PRs. Fixes for fork PRs are published only as patches. Unsupported scopes produce explicitly unverified patch artifacts without executing repository checks.

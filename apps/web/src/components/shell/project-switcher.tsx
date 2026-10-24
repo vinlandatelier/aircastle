@@ -13,19 +13,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 
-const initialProject = { workspace: 'Acme Inc', plan: 'Free', name: 'Technical Blog' }
-
-const projects = [
-  initialProject,
-  { workspace: 'Acme Inc', plan: 'Free', name: 'Marketing Site' },
-  { workspace: 'Acme Inc', plan: 'Free', name: 'Documentation' },
-  { workspace: 'Acme Inc', plan: 'Free', name: 'Changelog' },
-  { workspace: 'Design Studio', plan: 'Pro', name: 'Portfolio' },
-  { workspace: 'Design Studio', plan: 'Pro', name: 'Design System' },
-  { workspace: 'Design Studio', plan: 'Pro', name: 'Client Portal' },
-  { workspace: 'Personal', plan: 'Free', name: 'Notes' },
-  { workspace: 'Personal', plan: 'Free', name: 'Experiments' },
-]
+import { initialProject, projects } from './data'
 
 export function ProjectSwitcher() {
   const [open, setOpen] = useState(false)
@@ -41,14 +29,14 @@ export function ProjectSwitcher() {
       <PopoverTrigger
         render={<Button variant="ghost" />}
         aria-label={`Switch project: ${currentProject.workspace} / ${currentProject.name}`}
-        className="h-10 min-w-0 gap-1 px-1 sm:ml-1 sm:gap-3 sm:px-2"
+        className="h-10 min-w-0 shrink gap-1 px-1 sm:ml-1 sm:gap-3 sm:px-2"
       >
         <span role="img" aria-label="Workspace avatar" className="flex shrink-0">
           <GeneratedAvatar size={24} name={currentProject.workspace} />
         </span>
         <span className="hidden min-w-0 items-center text-sm lg:flex">
-          <span className="flex shrink-0 items-center gap-2">
-            {currentProject.workspace}
+          <span className="flex min-w-0 max-w-1/2 items-center gap-2">
+            <span className="truncate">{currentProject.workspace}</span>
             <Badge variant="secondary">{currentProject.plan}</Badge>
           </span>
           <span className="shrink-0 px-3 text-muted-foreground">/</span>

@@ -1,8 +1,17 @@
+import { useEffect } from 'react'
+import { useRouter } from '@tanstack/react-router'
+import { useSidebar } from '@/components/ui/sidebar-state'
 import { Sidebar, SidebarContent, SidebarTrigger } from '@/components/ui/sidebar'
 import { ChevronLeftIcon } from 'lucide-react'
 import { SidebarNavigation } from '@/features/navigation'
 
 export function AppSidebar() {
+  const router = useRouter()
+  const { setOpenMobile } = useSidebar()
+  useEffect(
+    () => router.subscribe('onResolved', () => setOpenMobile(false)),
+    [router, setOpenMobile],
+  )
   return (
     <Sidebar
       className="*:data-[slot=sidebar-inner]:bg-background"
