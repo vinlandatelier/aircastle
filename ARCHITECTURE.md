@@ -9,7 +9,8 @@ apps/
 ├── api/                      HTTP API and Bun startup
 │   └── src/
 │       └── features/         HTTP interfaces by feature
-│           └── health/       Process liveness and its response schema
+│           ├── health/       Process liveness and its response schema
+│           └── content/      Project schema publication and content HTTP routes
 └── web/                      React admin
     ├── scripts/              Theme-aware brand icon generation
     └── src/
@@ -21,15 +22,15 @@ apps/
 packages/
 ├── schema/                   Collection definitions, validation, and descriptions
 ├── contracts/                Shared content contracts and schema compatibility
-├── core/                     CMS operation and persistence interfaces
-├── adapter-postgres/         Postgres adapter interface
-├── client/                   Developer config and typed HTTP client interface
-└── cli/                      Schema publication command interface
+├── core/                     CMS operations, authorization, publication, and resource lifecycle
+├── adapter-postgres/         Owned SQL storage, constraints, and migrations
+├── client/                   Developer config and typed HTTP client
+└── cli/                      Schema publication, reconciliation, and lockfiles
 
 scripts/                      Repository checks and local development tooling
 ```
 
-The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration and constructs the logger. The CLI entry uses the same app factory with a silent logger.
+The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. The CLI entry uses the same app factory with a silent logger.
 
 The server mounts every API route under `/api`, including `/api/docs` and `/api/openapi.json`. Feature routers use paths relative to that mount and follow the feature pattern below.
 

@@ -22,7 +22,7 @@ Start the web app on port 43121:
 vp run dev-web
 ```
 
-Start the API on port 43122:
+Set up [local Postgres](#local-postgres), then start the API on port 43122:
 
 ```sh
 vp run dev-api
@@ -42,7 +42,7 @@ Run common commands from the repository root:
 
 | Command | Scope |
 | --- | --- |
-| `vp run test` | All regular runtime and type-contract tests |
+| `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases |
 | `vp run test-web` | Web tests, currently an empty suite |
 | `vp run test-api` | API tests |
 | `vp run test-schema` | Schema runtime tests |
@@ -61,7 +61,7 @@ cp .env.example .env
 vp run db:up
 ```
 
-Postgres listens on `127.0.0.1:43123`. The example contains local-only credentials and a `DATABASE_URL` for application development. The API does not connect to the database yet.
+Postgres listens on `127.0.0.1:43123`. The example contains local-only credentials and a `DATABASE_URL` for application development. The API uses `DATABASE_URL` and reads the root `.env` in development and local built runs. `AIRCASTLE_DATABASE_NAMESPACE` selects the owned SQL namespace and defaults to `aircastle`. The API refuses a namespace that belongs to another application.
 
 `db:up` waits for readiness. `vp run db:down` removes the container but preserves its data. `vp run db:logs` follows database logs. **`vp run db:reset` deletes this Compose project's database data.** Run `db:up` again to create an empty database.
 
@@ -74,5 +74,11 @@ vp run db:test -- vp run test-api
 ```
 
 The wrapper uses the same Compose file and pinned image. Each invocation gets a unique project, volume and automatically assigned localhost port. It supplies `DATABASE_URL` to the command, overriding any inherited value. It preserves the command's exit status and deletes its database after success, failure, Ctrl-C or termination. Forced kills and Docker outages can prevent cleanup; the wrapper prints its project name for recovery with `docker compose -p <project> -f compose.yaml down --volumes`.
+
+The full `vp run test` and `vp run check` commands require Docker and create disposable databases automatically.
+
+Run `vp run dev:setup` to provision local development connection settings. Reruns reuse the project and do not reveal its existing key. Use `vp run dev:setup --new-key` to issue another key.
+
+`AIRCASTLE_MAX_REQUEST_BYTES` sets the positive integer JSON request-byte limit and defaults to 1,048,576 bytes.
 
 `vp run test:db` verifies the infrastructure with real Postgres, including persistence, reset and concurrent isolation. It requires Docker and runs separately from the regular test suite. Future CI database checks should use `db:test` so the image pin stays in one place.
