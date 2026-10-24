@@ -9,10 +9,14 @@
     "build": "bun scripts/generate-icons.mjs && vp build",
     "generate:icons": "bun scripts/generate-icons.mjs",
     "typecheck": "tsc -b",
-    "test": "vp test run --passWithNoTests",
+    "test": "vp test run",
     "lint": "vp lint",
     "preview": "vp preview",
-    "check": "vp check"
+    "check": "vp check",
+    "test:e2e": "bun scripts/verify-web.ts e2e",
+    "test:coverage": "bun scripts/verify-web.ts coverage",
+    "test:verification": "vp test run --config vite.verification.config.ts",
+    "verify": "bun scripts/verify-web.ts verify"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -31,6 +35,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
+    "@playwright/test": "1.64.1",
     "@rolldown/plugin-babel": "^0.2.4",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/react": "^16.3.3",
@@ -40,6 +45,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "5.0.5",
     "babel-plugin-react-compiler": "^1.0.0",
     "happy-dom": "^21.0.4",
     "tailwindcss": "^4.3.3",
