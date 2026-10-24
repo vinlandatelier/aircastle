@@ -7,7 +7,8 @@ import { ThemeSwitcher } from '@/components/theme-switcher'
 import { BookOpenIcon, CrownIcon, PlugIcon, PlusIcon } from 'lucide-react'
 import { GitHubIcon } from '@/components/github-icon'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { AppSearch } from '@/components/app-search'
+import { PageSearch } from '@/navigation'
+import { Link } from '@tanstack/react-router'
 import { ProjectSwitcher } from '@/components/project-switcher'
 
 export function AppHeader() {
@@ -18,13 +19,13 @@ export function AppHeader() {
         'bg-background/95 backdrop-blur-sm supports-backdrop-filter:bg-background/50',
       )}
     >
-      <a
-        href="#link"
+      <Link
+        to="/collections"
         aria-label="Aircastle"
         className="brand-link flex h-full w-(--sidebar-width-icon) shrink-0 items-center justify-center border-r outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span aria-hidden="true" className="brand-logo block size-6 shrink-0" />
-      </a>
+      </Link>
       <ProjectSwitcher />
       <div role="group" aria-label="Project actions" className="hidden items-center gap-2 lg:flex">
         <Button aria-label="Connect" variant="outline">
@@ -42,7 +43,7 @@ export function AppHeader() {
         <CustomSidebarTrigger />
       </div>
       <div className="ms-auto flex items-center gap-2.5 pr-4 sm:gap-4 md:pr-5">
-        <AppSearch />
+        <PageSearch />
         <Tooltip>
           <TooltipTrigger
             role="link"
