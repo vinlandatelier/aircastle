@@ -352,3 +352,114 @@ test("canonicalizes valid project UUID casing before authorization and lookup", 
     apiKey: "test-secret",
   });
 });
+
+for (const endpoint of [documents, `${base}/schema`]) {
+  test(`a request without credentials returns 401 on ${endpoint}`, async () => {
+    const { app, calls, headers } = fixture();
+    const requestHeaders = new Headers(headers);
+    requestHeaders.delete("authorization");
+
+    const response = await app.request(endpoint, {
+      method: "POST",
+      headers: requestHeaders,
+      body: "{}",
+    });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ ok: false, error: { code: "unauthorized" } });
+    expect(calls).toEqual([]);
+  });
+
+  test.each([false, true])(
+    `oversized streams are cancelled and unlocked on ${endpoint}, cancellation rejects: %s`,
+    async (rejectCancellation) => {
+      const { cms, calls, headers } = fixture();
+      const app = createApp({ logger: pino({ level: "silent" }), cms, maxRequestBytes: 16 });
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(17));
+        },
+        cancel() {
+          cancelled = true;
+          if (rejectCancellation) throw new Error("Cancellation failed");
+        },
+      });
+      const request = new Request(`http://localhost${endpoint}`, {
+        method: "POST",
+        headers,
+        body,
+        duplex: "half",
+      });
+
+      const response = await app.request(request);
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ ok: false, error: { code: "payload_too_large" } });
+      expect(cancelled).toBe(true);
+      expect(body.locked).toBe(false);
+      expect(calls).toEqual([]);
+    },
+  );
+}
+
+test("decodes UTF-8 characters split across chunks and releases the request stream", async () => {
+  const { app, calls, headers } = fixture();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"title":"'));
+      controller.enqueue(new Uint8Array([0xc3]));
+      controller.enqueue(new Uint8Array([0xa9]));
+      controller.enqueue(new TextEncoder().encode('"}'));
+      controller.close();
+    },
+  });
+  const request = new Request(`http://localhost${documents}`, {
+    method: "POST",
+    headers,
+    body,
+    duplex: "half",
+  });
+
+  const response = await app.request(request);
+
+  expect(response.status).toBe(201);
+  expect(await response.json()).toEqual({ ok: true, data: document });
+  expect(calls.find((call) => call.operation === "create")?.args[2]).toEqual({ title: "é" });
+  expect(body.locked).toBe(false);
+});
+
+test.each(["invalid UTF-8", "malformed JSON", "read failure"] as const)(
+  "rejects %s and releases the request stream without calling the CMS",
+  async (failure) => {
+    const { app, calls, headers } = fixture();
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (failure === "read failure") throw new Error("Stream read failed");
+        controller.enqueue(
+          failure === "invalid UTF-8"
+            ? new Uint8Array([
+                ...new TextEncoder().encode('{"title":"'),
+                0xff,
+                ...new TextEncoder().encode('"}'),
+              ])
+            : new TextEncoder().encode("{"),
+        );
+        controller.close();
+      },
+    });
+    const request = new Request(`http://localhost${documents}`, {
+      method: "POST",
+      headers,
+      body,
+      duplex: "half",
+    });
+
+    const response = await app.request(request);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ ok: false, error: { code: "invalid_request" } });
+    expect(body.locked).toBe(false);
+    expect(calls).toEqual([]);
+  },
+);
