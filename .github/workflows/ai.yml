@@ -1,0 +1,191 @@
+name: Advisory AI review and explicit fixes
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: ai-automation-coordinator
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main' && github.repository_owner == 'vinlandatelier'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: ai-automation
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_jobs: ${{ steps.plan.outputs.has_jobs }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.11.0"
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        id: app
+        with:
+          app-id: ${{ vars.AI_APP_ID }}
+          private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
+          owner: vinlandatelier
+          repositories: ${{ github.event.repository.name }}
+          permission-members: read
+          permission-contents: read
+          permission-issues: write
+          permission-pull-requests: read
+          permission-environments: read
+          permission-administration: read
+      - id: plan
+        run: node scripts/ai-automation/cli.ts prepare
+        env:
+          AI_GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          AI_APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          AI_BOT_USER_ID: ${{ vars.AI_BOT_USER_ID }}
+          AI_STATE_ISSUE: ${{ vars.AI_STATE_ISSUE }}
+          AI_ACTIVATED_AT: ${{ vars.AI_ACTIVATED_AT }}
+          AI_CONTROL_SHA: ${{ github.sha }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-plan
+          path: ai-data/plan
+          if-no-files-found: ignore
+          retention-days: 14
+  model:
+    needs: prepare
+    if: needs.prepare.outputs.has_jobs == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ai-automation
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.11.0"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-plan
+          path: ai-data/plan
+      - run: node scripts/ai-automation/cli.ts model
+        env:
+          AI_OPERATION_ID: ${{ matrix.id }}
+          AI_CONTROL_SHA: ${{ github.sha }}
+          AI_MODEL_RECEIPTS_DIR: ai-data/model/receipts
+          OPENAI_API_KEY: ${{ matrix.provider == 'openai' && secrets.OPENAI_API_KEY || '' }}
+          ANTHROPIC_API_KEY: ${{ matrix.provider == 'anthropic' && secrets.ANTHROPIC_API_KEY || '' }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ai-model-${{ matrix.id }}
+          path: ai-data/model
+          if-no-files-found: ignore
+          retention-days: 14
+  verify:
+    needs: [prepare, model]
+    if: always() && needs.prepare.outputs.has_jobs == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.11.0"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-plan
+          path: ai-data/plan
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: matrix.task == 'fix'
+        with:
+          name: ai-model-${{ matrix.id }}
+          path: ai-data/model
+      - run: node scripts/ai-automation/cli.ts verify
+        env:
+          AI_OPERATION_ID: ${{ matrix.id }}
+          AI_CONTROL_SHA: ${{ github.sha }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ai-verification-${{ matrix.id }}
+          path: ai-data/verification
+          if-no-files-found: ignore
+          retention-days: 14
+  publish:
+    needs: [prepare, model, verify]
+    if: always() && github.ref == 'refs/heads/main' && needs.prepare.outputs.has_jobs == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: ai-automation
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.11.0"
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        id: app
+        with:
+          app-id: ${{ vars.AI_APP_ID }}
+          private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
+          owner: vinlandatelier
+          repositories: ${{ github.event.repository.name }}
+          permission-members: read
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ai-plan
+          path: ai-data/plan
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        continue-on-error: true
+        with:
+          name: ai-model-${{ matrix.id }}
+          path: ai-data/model
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: matrix.task == 'fix'
+        continue-on-error: true
+        with:
+          name: ai-verification-${{ matrix.id }}
+          path: ai-data/verification
+      - run: node scripts/ai-automation/cli.ts publish
+        env:
+          AI_OPERATION_ID: ${{ matrix.id }}
+          AI_GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          AI_APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          AI_BOT_USER_ID: ${{ vars.AI_BOT_USER_ID }}
+          AI_STATE_ISSUE: ${{ vars.AI_STATE_ISSUE }}
+          AI_ACTIVATED_AT: ${{ vars.AI_ACTIVATED_AT }}
+          AI_CONTROL_SHA: ${{ github.sha }}
+          AI_VERIFICATION_JOB_RESULT: ${{ needs.verify.result }}
