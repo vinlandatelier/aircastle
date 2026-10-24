@@ -7,15 +7,17 @@ import { FloatingPaths } from './floating-paths'
 
 export function SignInPage() {
   return (
-    <main className="relative min-h-svh overflow-hidden lg:grid lg:grid-cols-2">
-      <div className="relative hidden flex-col border-r bg-secondary p-10 lg:flex">
+    <main
+      data-theme-scope="marketing"
+      className="relative min-h-svh overflow-hidden lg:grid lg:grid-cols-2"
+    >
+      <div className="relative hidden flex-col border-r bg-secondary p-10 lg:flex dark:bg-secondary/20">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-transparent to-background"
         />
         <div className="relative z-10 flex items-center gap-2">
           <span aria-hidden="true" className="brand-logo block size-7 shrink-0" />
-          <span className="text-xl font-semibold">Aircastle</span>
         </div>
         <FloatingPaths position={1} />
         <FloatingPaths position={-1} />
@@ -42,9 +44,8 @@ export function SignInPage() {
         <div className="mx-auto flex w-full min-w-0 max-w-sm flex-col gap-4">
           <div className="flex items-center gap-2 lg:hidden">
             <span aria-hidden="true" className="brand-logo block size-7 shrink-0" />
-            <span className="text-xl font-semibold">Aircastle</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-wide">Sign in to Aircastle</h1>
+          <h1 className="text-2xl font-semibold tracking-wide">Sign in to Aircastle</h1>
           <form onSubmit={(event) => event.preventDefault()}>
             <FieldGroup className="gap-2">
               <Field>

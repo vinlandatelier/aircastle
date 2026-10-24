@@ -7,7 +7,10 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider>
-      <SidebarProvider className="flex-col [--app-header-height:3.5rem] [--app-wrapper-max-width:80rem] [--sidebar-top:var(--app-header-height)]">
+      <SidebarProvider
+        data-theme-scope="dashboard"
+        className="flex-col [--app-header-height:3.5rem] [--app-wrapper-max-width:80rem] [--sidebar-top:var(--app-header-height)]"
+      >
         <AppHeader />
         <div className="flex flex-1">
           <AppSidebar />
