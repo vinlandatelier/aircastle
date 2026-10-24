@@ -58,12 +58,12 @@ Install Docker with Compose v2.20 or later and start the Docker engine. The comm
 
 ```sh
 cp .env.example .env
-vp run db:up
+vp run dev-db
 ```
 
 Postgres listens on `127.0.0.1:43123`. The example contains local-only credentials and a `DATABASE_URL` for application development. The API uses `DATABASE_URL` and reads the root `.env` in development and local built runs. `AIRCASTLE_DATABASE_NAMESPACE` selects the owned SQL namespace and defaults to `aircastle`. The API refuses a namespace that belongs to another application.
 
-`db:up` waits for readiness. `vp run db:down` removes the container but preserves its data. `vp run db:logs` follows database logs. **`vp run db:reset` deletes this Compose project's database data.** Run `db:up` again to create an empty database.
+`dev-db` runs `db:up` and waits for readiness. `vp run db:down` removes the container but preserves its data. `vp run db:logs` follows database logs. **`vp run db:reset` deletes this Compose project's database data.** Run `db:up` again to create an empty database.
 
 Compose names resources after the checkout directory. For concurrent worktrees, use distinct directory names and set a different `AIRCASTLE_DB_PORT` in each `.env`; update its `DATABASE_URL` port to match. Do not share a `COMPOSE_PROJECT_NAME` between independent checkouts.
 
