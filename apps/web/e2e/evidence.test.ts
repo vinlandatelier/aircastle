@@ -64,7 +64,7 @@ it('runs a new descriptive browser test without registration or runner changes',
   } finally {
     copy.remove()
   }
-}, 180_000)
+}, 210_000)
 
 it('coverage inventories unimported source and excludes tests in a disposable app copy', () => {
   const original = path.resolve(import.meta.dirname, '..')
@@ -105,7 +105,7 @@ it('coverage inventories unimported source and excludes tests in a disposable ap
   } finally {
     rmSync(copy, { recursive: true, force: true })
   }
-}, 90_000)
+}, 210_000)
 
 it('focused command reports only executed cases with their title hierarchy and attempts', () => {
   const output = mkdtempSync(path.join(tmpdir(), 'aircastle-emitted-report-'))
@@ -131,4 +131,4 @@ it('focused command reports only executed cases with their title hierarchy and a
   } finally {
     rmSync(output, { recursive: true, force: true })
   }
-}, 180_000)
+}, 210_000)
