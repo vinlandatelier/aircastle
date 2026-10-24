@@ -12,6 +12,7 @@ const destinations = [
 ] as const
 
 async function expectDestination(page: Page, name: string, path: string) {
+  await expect(page).toHaveTitle(`Aircastle - ${name}`)
   await expect(page).toHaveURL(new RegExp(`${path}$`))
   const navigation = page.getByRole('navigation', { name: 'Main navigation' })
   await expect(navigation.getByRole('link', { name, exact: true })).toHaveAttribute(

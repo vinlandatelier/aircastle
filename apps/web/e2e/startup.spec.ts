@@ -12,7 +12,11 @@ test('normal built entry loads assets and redirects to Collections', async ({ pa
   })
   await visit(page)
   await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/collections$/)
-  await expect(page).toHaveTitle('Aircastle')
+  await expect(page).toHaveTitle('Aircastle - Collections')
+  const entry = await page.request.get('/')
+  expect(await entry.text()).toContain(
+    '<title>Aircastle: The Headless CMS with Next-Generation Agentic Capabilities</title>',
+  )
   await expect(page.getByRole('banner').getByRole('link', { name: 'Aircastle' })).toBeVisible()
   await expect(page.getByRole('main')).toBeVisible()
   const navigation = page.getByRole('navigation', { name: 'Main navigation' })
@@ -52,6 +56,7 @@ test('direct Settings entry survives reload in the same context', async ({ page 
   await visit(page, 'normal', '/dash/workspaces/team-42/projects/site_beta/settings')
   for (const reload of [false, true]) {
     if (reload) await page.reload()
+    await expect(page).toHaveTitle('Aircastle - Settings')
     await expect(page).toHaveURL(/\/dash\/workspaces\/team-42\/projects\/site_beta\/settings$/)
     await expect(page.getByRole('main')).toBeVisible()
     const navigation = page.getByRole('navigation', { name: 'Main navigation' })
