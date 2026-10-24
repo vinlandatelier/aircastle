@@ -3,7 +3,7 @@ import { AtSignIcon, ChevronLeftIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
-import { FloatingPaths } from './floating-paths'
+import { FloatingFrames } from './floating-frames'
 
 export function SignInPage() {
   return (
@@ -19,8 +19,7 @@ export function SignInPage() {
         <div className="relative z-10 flex items-center gap-2">
           <span aria-hidden="true" className="brand-logo block size-7 shrink-0" />
         </div>
-        <FloatingPaths position={1} />
-        <FloatingPaths position={-1} />
+        <FloatingFrames />
       </div>
       <div className="relative flex min-h-svh min-w-0 flex-col justify-center px-6 py-24 sm:px-8">
         <div
