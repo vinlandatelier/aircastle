@@ -390,7 +390,13 @@ test.each(["invalid UTF-8", "malformed JSON", "read failure"] as const)(
       pull(controller) {
         if (failure === "read failure") throw new Error("Stream read failed");
         controller.enqueue(
-          failure === "invalid UTF-8" ? new Uint8Array([0xff]) : new TextEncoder().encode("{"),
+          failure === "invalid UTF-8"
+            ? new Uint8Array([
+                ...new TextEncoder().encode('{"title":"'),
+                0xff,
+                ...new TextEncoder().encode('"}'),
+              ])
+            : new TextEncoder().encode("{"),
         );
         controller.close();
       },
