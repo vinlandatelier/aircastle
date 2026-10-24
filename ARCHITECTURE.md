@@ -34,7 +34,8 @@ packages/
 └── cli/                      Schema publication, reconciliation, and lockfiles
 
 scripts/                      Repository checks and local development tooling
-└── ai-models/                Pinned model roles and bounded provider API calls
+├── ai-models/                Pinned model roles and bounded provider API calls
+└── ai-model-updates/         Release discovery, role evaluations, and model update proposals
 
 .github/                      CI workflows, shared setup, and model selections
 ```
@@ -74,7 +75,7 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 `.github/workflows/quality.yml` runs deterministic pull-request checks and joins them in `Quality`. Full schema and contract mutation runs use a separate scheduled/manual workflow. AI workflows are advisory and do not participate in `Quality`, approval counts, or conversation-resolution requirements.
 
-`scripts/ai-models/index.ts` owns the four-role config parser and provider API transport. Callers supply task text and a bounded output schema. `.github/ai-models.json` pins each role's model and effort.
+`scripts/ai-models/index.ts` owns the four-role config parser and provider API transport. Callers supply task text and a bounded output schema. `.github/ai-models.json` pins each role's model and effort. `scripts/ai-model-updates` owns official release/account discovery, paired role evaluations, isolated coding checks, and one bot-owned upgrade proposal. A model change takes effect after its proposal is merged.
 
 ## Feature pattern
 
