@@ -1,4 +1,4 @@
-name: Quality
+name: CI
 on:
   pull_request:
   push:
@@ -12,8 +12,8 @@ defaults:
   run:
     shell: bash
 jobs:
-  quality:
-    name: Quality
+  checks:
+    name: Lint, typecheck and test
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
