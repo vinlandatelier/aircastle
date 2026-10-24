@@ -3,9 +3,9 @@ import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vite-plus/test'
 import { browserOutcome, requirementResults } from '../scripts/evidence'
-import { originalWeb, readJson, runWeb } from './command-copy'
+import { copyWeb, originalWeb, readJson, runWeb } from '../scripts/verification-sandbox'
 
-describe('[R1 R9 R10] verification evidence', () => {
+describe('[shell:R1 shell:R9 shell:R10] verification evidence', () => {
   it('accepts only executed passing tests', () => {
     expect(
       browserOutcome({ stats: { expected: 2, unexpected: 0, skipped: 0, flaky: 0 }, errors: [] }),
@@ -42,34 +42,89 @@ describe('[R1 R9 R10] verification evidence', () => {
     expect(
       requirementResults(
         [
-          { title: '[R2] entry', status: 'passed' },
-          { title: '[R3] toggle', status: 'failed' },
+          { title: '[shell:R2] entry', status: 'passed' },
+          { title: '[shell:R3] toggle', status: 'failed' },
         ],
-        ['R2', 'R3', 'R5'],
+        ['shell:R2', 'shell:R3', 'shell:R5'],
       ),
-    ).toEqual({ R2: 'passed', R3: 'failed', R5: 'not exercised' })
+    ).toEqual({ 'shell:R2': 'passed', 'shell:R3': 'failed', 'shell:R5': 'not exercised' })
     expect(
       requirementResults(
         [
-          { title: '[R2] first', status: 'passed' },
-          { title: '[R2] second', status: 'failed' },
+          { title: '[shell:R2] first', status: 'passed' },
+          { title: '[shell:R2] second', status: 'failed' },
         ],
-        ['R2'],
+        ['shell:R2'],
       ),
-    ).toEqual({ R2: 'failed' })
+    ).toEqual({ 'shell:R2': 'failed' })
     expect(
       requirementResults(
         [
-          { title: 'R2 passed', status: 'passed' },
-          { title: 'R2 skipped', status: 'skipped' },
+          { title: 'shell:R2 passed', status: 'passed' },
+          { title: 'shell:R2 skipped', status: 'skipped' },
         ],
-        ['R2'],
+        ['shell:R2'],
       ),
-    ).toEqual({ R2: 'not exercised' })
+    ).toEqual({ 'shell:R2': 'not exercised' })
+  })
+  it('keeps feature namespaces and requirement numbers independent', () => {
+    expect(
+      requirementResults(
+        [
+          { title: '[documents:R1] save', status: 'passed' },
+          { title: '[documents:R10] conflict', status: 'failed' },
+          { title: '[shell:R1] command', status: 'passed' },
+        ],
+        ['documents:R1', 'documents:R2', 'documents:R10', 'shell:R1'],
+      ),
+    ).toEqual({
+      'documents:R1': 'passed',
+      'documents:R2': 'not exercised',
+      'documents:R10': 'failed',
+      'shell:R1': 'passed',
+    })
+  })
+  it('rejects unknown requirements and browser cases without a requirement', () => {
+    expect(() =>
+      requirementResults([{ title: '[documents:R1] save', status: 'passed' }], ['shell:R1']),
+    ).toThrow(/undeclared.*documents:R1/i)
+    expect(() =>
+      requirementResults([{ title: 'unmapped save', status: 'passed' }], ['shell:R1']),
+    ).toThrow(/no requirement/i)
   })
 })
 
-it('[R9] coverage inventories unimported source and excludes tests in a disposable app copy', () => {
+it('reports a newly declared feature through the real command without runner changes', () => {
+  const copy = copyWeb()
+  try {
+    const catalog = path.join(copy.directory, 'e2e/requirements.json')
+    writeFileSync(
+      catalog,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(catalog, 'utf8')),
+        'documents:R1': 'Save a document',
+        'documents:R2': 'Reject an invalid document',
+      }),
+    )
+    writeFileSync(
+      path.join(copy.directory, 'e2e/new-feature.spec.ts'),
+      "import { test, visit } from './support'\ntest.describe('[documents:R1] new feature declaration', () => { test('real entry control', async ({page}) => { await visit(page) }) })\n",
+    )
+    const output = path.join(copy.directory, 'reports/new-feature')
+    const result = runWeb(copy.directory, output, ['e2e', 'new-feature.spec.ts'])
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+    expect(readJson(output, 'requirements.json')).toMatchObject({
+      'documents:R1': 'passed',
+      'documents:R2': 'not exercised',
+      'shell:R2': 'not exercised',
+    })
+    expect(readJson(output, 'receipt.json').cases[0].attempts).toHaveLength(1)
+  } finally {
+    copy.remove()
+  }
+}, 180_000)
+
+it('[shell:R9] coverage inventories unimported source and excludes tests in a disposable app copy', () => {
   const original = path.resolve(import.meta.dirname, '..')
   const copy = mkdtempSync(path.join(tmpdir(), 'aircastle-coverage-'))
   try {
@@ -110,14 +165,14 @@ it('[R9] coverage inventories unimported source and excludes tests in a disposab
   }
 }, 90_000)
 
-it('[R1 R9 R10] command reports real title hierarchy, attempts and unexercised requirements', () => {
+it('[shell:R1 shell:R9 shell:R10] command reports real title hierarchy, attempts and unexercised requirements', () => {
   const output = mkdtempSync(path.join(tmpdir(), 'aircastle-emitted-report-'))
   try {
     const result = runWeb(originalWeb, output, ['e2e', '--grep', 'Back and Forward follow'])
     expect(result.status, result.stdout + result.stderr).toBe(0)
     const requirements = readJson(output, 'requirements.json')
-    expect(requirements.R2).toBe('passed')
-    expect(requirements.R3).toBe('not exercised')
+    expect(requirements['shell:R2']).toBe('passed')
+    expect(requirements['shell:R3']).toBe('not exercised')
     const receipt = readJson(output, 'receipt.json')
     expect(receipt.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(receipt.runtime.node).toBeTruthy()
@@ -126,7 +181,7 @@ it('[R1 R9 R10] command reports real title hierarchy, attempts and unexercised r
     expect(receipt.servingMode).toBe('built preview')
     expect(receipt.cases).toHaveLength(1)
     const actual = receipt.cases[0]
-    expect(actual.title).toContain('R2 routes and history')
+    expect(actual.title).toContain('shell:R2 routes and history')
     expect(actual.title).toContain('Back and Forward follow')
     expect(actual.scenario).toBe('normal')
     expect(actual.viewport).toEqual({ width: 1440, height: 900 })

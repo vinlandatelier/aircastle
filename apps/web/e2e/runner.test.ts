@@ -2,11 +2,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vite-plus/test'
-import { assertArtifacts, copyWeb, liveRun, originalWeb, readJson, runWeb } from './command-copy'
+import { assertArtifacts, liveRun } from './command-copy'
+import { copyWeb, originalWeb, readJson, runWeb } from '../scripts/verification-sandbox'
 
 const temporary = () => mkdtempSync(path.join(tmpdir(), 'aircastle-run-'))
 
-describe('[R1 R10] real command contract', () => {
+describe('[shell:R1 shell:R10] real command contract', () => {
   it('rejects empty test discovery with a recorded setup failure', () => {
     const output = temporary()
     try {
@@ -73,7 +74,7 @@ describe('[R1 R10] real command contract', () => {
         const prefix = mode === 'focused' ? 'test.only' : mode === 'skipped' ? 'test.skip' : 'test'
         writeFileSync(
           path.join(copy.directory, 'e2e/conformance.spec.ts'),
-          `import { test, visit } from './support'\ntest('R2 positive control', async ({page}) => { await visit(page) })\n${prefix}('R2 conformance fixture', async () => { ${mode === 'timeout' ? 'await new Promise(() => {})' : ''} })\n`,
+          `import { test, visit } from './support'\ntest('shell:R2 positive control', async ({page}) => { await visit(page) })\n${prefix}('shell:R2 conformance fixture', async () => { ${mode === 'timeout' ? 'await new Promise(() => {})' : ''} })\n`,
         )
         if (mode === 'timeout') {
           const config = path.join(copy.directory, 'playwright.config.ts')
@@ -95,7 +96,7 @@ describe('[R1 R10] real command contract', () => {
               : /timeout|timed out/i,
         )
         if (mode === 'skipped') {
-          expect(readJson(output, 'requirements.json').R2).toBe('not exercised')
+          expect(readJson(output, 'requirements.json')['shell:R2']).toBe('not exercised')
           expect(readJson(output, 'browser.json').stats.skipped).toBe(1)
         }
       } finally {

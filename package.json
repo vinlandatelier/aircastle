@@ -31,7 +31,7 @@
     "test:typecheck": "vp -C packages/schema run test:typecheck",
     "test:types": "bun run test:typecheck",
     "test:inference": "vp -C packages/schema run test:inference",
-    "check": "vp run build && vp run typecheck && vp run lint && vp run test:prepared",
+    "check": "vp run build && vp run typecheck && vp run lint && vp run test:prepared && vp run test-web:e2e",
     "test:coverage": "vp -C packages/schema run test:coverage",
     "test-mutation": "vp -C packages/schema run test:mutation",
     "test:unicode": "vp -C packages/schema run test:unicode",
@@ -53,7 +53,9 @@
     "test:prepared": "vp run db:test -- vp run test:all",
     "test-web:e2e": "vp -C apps/web run test:e2e",
     "test-web:coverage": "vp -C apps/web run test:coverage",
-    "verify-web": "vp -C apps/web run verify"
+    "verify-web": "vp -C apps/web run verify",
+    "test-web:strength": "vp -C apps/web run test:strength",
+    "test-web:verification": "vp -C apps/web run test:verification"
   },
   "devDependencies": {
     "@aircastle/adapter-postgres": "workspace:*",

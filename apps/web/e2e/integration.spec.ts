@@ -1,7 +1,7 @@
 import { test, expect, visit, assertLayout, visibleSidebarTrigger } from './support'
 
 for (const scenario of ['normal', 'long-text'] as const) {
-  test(`T8 R3 R4 R5 R6 R7 R8 ${scenario}: mobile project and Dark survive drawer and search navigation, route and theme survive reload`, async ({
+  test(`T8 shell:R3 shell:R4 shell:R5 shell:R6 shell:R7 shell:R8 ${scenario}: mobile project and Dark survive drawer and search navigation, route and theme survive reload`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 })

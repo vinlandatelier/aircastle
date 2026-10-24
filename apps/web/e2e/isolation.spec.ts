@@ -1,6 +1,6 @@
 import { test, expect, visit } from './support'
 
-test('[R7] normal production build exposes no fixture data or scenario override', async ({
+test('[shell:R7] normal production build exposes no fixture data or scenario override', async ({
   page,
 }) => {
   await visit(page, 'normal', '/dash/workspaces/demo/projects/demo/collections?scenario=long-text')

@@ -144,7 +144,7 @@ test.afterEach(async ({ page }, testInfo) => {
 for (const scenario of ['normal', 'long-text'] as const) {
   for (const viewport of viewports) {
     for (const theme of ['Light', 'Dark'] as const) {
-      test(`T5 R7 R8 ${scenario} ${viewport.width}x${viewport.height} ${theme}: controls and overlays remain reachable`, async ({
+      test(`T5 shell:R7 shell:R8 ${scenario} ${viewport.width}x${viewport.height} ${theme}: controls and overlays remain reachable`, async ({
         page,
       }) => {
         await page.setViewportSize(viewport)
@@ -157,7 +157,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
 
   for (const viewport of viewports.slice(0, 2)) {
     for (const theme of ['Light', 'Dark'] as const) {
-      test(`T5 R8 ${scenario} ${viewport.width}x${viewport.height} ${theme} doubled-root-font: text grows and controls remain reachable`, async ({
+      test(`T5 shell:R8 ${scenario} ${viewport.width}x${viewport.height} ${theme} doubled-root-font: text grows and controls remain reachable`, async ({
         page,
       }) => {
         await page.setViewportSize(viewport)
@@ -170,7 +170,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
   }
 }
 
-test('T5 R7 long-text: the separate multiword project retains its complete identity', async ({
+test('T5 shell:R7 long-text: the separate multiword project retains its complete identity', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -195,7 +195,7 @@ for (const [name, query] of [
   ['مشروع الاختبار', 'الاختبار'],
   ['Cafe\u0301', 'Cafe\u0301'],
 ] as const) {
-  test(`T5 R7 unicode: exact substring ${query} selects ${name} without changing its string`, async ({
+  test(`T5 shell:R7 unicode: exact substring ${query} selects ${name} without changing its string`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 800 })
@@ -219,7 +219,7 @@ for (const [name, query] of [
 
 for (const method of ['keyboard', 'pointer'] as const) {
   for (const endpoint of ['001', '100'] as const) {
-    test(`T5 R7 R8 many-projects ${method}: Project ${endpoint} is reachable inside the scrolling popup`, async ({
+    test(`T5 shell:R7 shell:R8 many-projects ${method}: Project ${endpoint} is reachable inside the scrolling popup`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 390, height: 844 })
@@ -276,7 +276,7 @@ for (const method of ['keyboard', 'pointer'] as const) {
   }
 }
 
-test('T5 R7 empty-candidates: empty search preserves the current project, dismissal and focus', async ({
+test('T5 shell:R7 empty-candidates: empty search preserves the current project, dismissal and focus', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 })
@@ -306,7 +306,7 @@ test('T5 R7 empty-candidates: empty search preserves the current project, dismis
 })
 
 for (const scenario of ['normal', 'long-text'] as const) {
-  test(`T5 R8 ${scenario} sidebar boundary: 767px drawer and 768px desktop controls remain operable`, async ({
+  test(`T5 shell:R8 ${scenario} sidebar boundary: 767px drawer and 768px desktop controls remain operable`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 767, height: 844 })
@@ -343,7 +343,7 @@ for (const viewport of viewports) {
       path: '/dash/workspaces/demo/projects/demo/users',
     },
   ] as const) {
-    test(`T5 R7 R8 long-navigation ${viewport.width}x${viewport.height} ${destination.path}: sidebar and search preserve destination identity`, async ({
+    test(`T5 shell:R7 shell:R8 long-navigation ${viewport.width}x${viewport.height} ${destination.path}: sidebar and search preserve destination identity`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport)
@@ -396,7 +396,7 @@ for (const viewport of viewports) {
   }
 }
 
-test('T5 R7 R8 long-text multiword: trigger containment preserves all header controls', async ({
+test('T5 shell:R7 shell:R8 long-text multiword: trigger containment preserves all header controls', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -410,7 +410,7 @@ test('T5 R7 R8 long-text multiword: trigger containment preserves all header con
   await assertLayout(page)
 })
 
-test('T5 R7 R8 long-text popup: viewport containment keeps extreme candidates within reach', async ({
+test('T5 shell:R7 shell:R8 long-text popup: viewport containment keeps extreme candidates within reach', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 })

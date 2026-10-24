@@ -2,7 +2,7 @@ import { test, expect, visit } from './support'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test('R2 normal built entry loads assets and redirects to Collections', async ({ page }) => {
+test('shell:R2 normal built entry loads assets and redirects to Collections', async ({ page }) => {
   const assets: { type: string; status: number; url: string }[] = []
   page.on('response', (response) => {
     const type = response.request().resourceType()
@@ -48,7 +48,7 @@ test('R2 normal built entry loads assets and redirects to Collections', async ({
   expect(response.body).toContain('<svg')
 })
 
-test('R2 direct Settings entry survives reload in the same context', async ({ page }) => {
+test('shell:R2 direct Settings entry survives reload in the same context', async ({ page }) => {
   await visit(page, 'normal', '/dash/workspaces/team-42/projects/site_beta/settings')
   for (const reload of [false, true]) {
     if (reload) await page.reload()
