@@ -1,7 +1,7 @@
 'use client'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { GeneratedAvatar } from '@/components/generated-avatar'
+import { GeneratedAvatar } from './generated-avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,

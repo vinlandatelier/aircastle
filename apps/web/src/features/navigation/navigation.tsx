@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import { SearchIcon } from 'lucide-react'
-import { navGroups } from '@/components/app-shared'
+import { navigationGroups } from './pages'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/ui/sidebar'
 import {
   Command,
   CommandDialog,
@@ -13,8 +21,38 @@ import {
   CommandList,
 } from '@/components/ui/command'
 
-export function AppSearch() {
+export function SidebarNavigation() {
+  const pathname = useLocation({ select: (location) => location.pathname })
+
+  return navigationGroups.map((group) => (
+    <SidebarGroup
+      key={group.label}
+      className="transition-[padding] duration-150 ease-out motion-reduce:transition-none group-data-[collapsible=icon]:py-0"
+    >
+      <SidebarGroupLabel className="mb-2 overflow-hidden group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:h-0">
+        {group.label}
+      </SidebarGroupLabel>
+      <SidebarMenu>
+        {group.items.map((item) => (
+          <SidebarMenuItem key={item.path}>
+            <SidebarMenuButton
+              render={<Link to={item.path} />}
+              isActive={pathname === item.path}
+              tooltip={item.title}
+            >
+              <item.icon aria-hidden="true" />
+              <span>{item.title}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
+  ))
+}
+
+export function PageSearch() {
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -53,11 +91,17 @@ export function AppSearch() {
           <CommandInput aria-label="Search pages" placeholder="Search pages..." />
           <CommandList>
             <CommandEmpty>No pages found.</CommandEmpty>
-            {navGroups.map((group) => (
+            {navigationGroups.map((group) => (
               <CommandGroup key={group.label} heading={group.label}>
                 {group.items.map((item) => (
-                  <CommandItem key={item.title} value={item.title} onSelect={() => setOpen(false)}>
-                    {item.icon}
+                  <CommandItem
+                    key={item.path}
+                    value={item.title}
+                    onSelect={() => {
+                      void navigate({ to: item.path }).then(() => setOpen(false))
+                    }}
+                  >
+                    <item.icon aria-hidden="true" />
                     <span>{item.title}</span>
                   </CommandItem>
                 ))}
