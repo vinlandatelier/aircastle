@@ -2,13 +2,65 @@ import { expect, test } from "vite-plus/test";
 import { mkdtemp, readFile, rm, writeFile, mkdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { applyEdits, digest, type Edit, type Job } from "./index.ts";
+import { verificationPlan } from "./checks.ts";
 
 const edit: Edit = {
   path: "src/value.ts",
   expectedBlob: "fb8f610c89d978e2a0b113577c9c034323a8f3f3",
   content: "fixed\n",
 };
+
+test("scoped verification runner executes only the selected behavior file", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const root = await mkdtemp(join(tmpdir(), "aircastle-ai-filter-"));
+  try {
+    const web = join(root, "apps/web");
+    await mkdir(join(web, "src/features/navigation"), { recursive: true });
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"));
+    await symlink(join(process.cwd(), "apps/web/node_modules"), join(web, "node_modules"));
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: ["apps/*"] }),
+    );
+    await writeFile(
+      join(web, "package.json"),
+      JSON.stringify({ name: "filter-fixture", type: "module", scripts: { test: "vp test run" } }),
+    );
+    await writeFile(
+      join(web, "vite.config.ts"),
+      'import { defineConfig } from "vite-plus"; export default defineConfig({ test: { environment: "happy-dom", maxWorkers: 1, include: ["src/**/*.test.tsx"] } });',
+    );
+    await writeFile(
+      join(web, "src/features/navigation/index.test.tsx"),
+      'import { test, expect } from "vite-plus/test"; test("selected", () => expect(document.body).toBeTruthy());',
+    );
+    await writeFile(
+      join(web, "src/unrelated.test.tsx"),
+      'throw new Error("Unrelated test must not execute");',
+    );
+    const commands = verificationPlan([
+      { ...edit, path: "apps/web/src/features/navigation/index.ts" },
+    ]);
+    const command = commands!.at(-1)!;
+    const result = spawnSync(command[0]!, command.slice(1), {
+      cwd: root,
+      env: {
+        ...process.env,
+        PATH: `${join(process.cwd(), "node_modules/.bin")}:${process.env.PATH}`,
+      },
+      encoding: "utf8",
+      timeout: 30000,
+    });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    const stdout = stripVTControlCharacters(result.stdout);
+    expect(stdout).toMatch(/Test Files\s+1 passed/);
+    expect(stdout).toMatch(/Tests\s+1 passed/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}, 35000);
 test("materializer checks Git blob identity before changing a file", async () => {
   const root = await mkdtemp(join(tmpdir(), "aircastle-ai-test-"));
   try {

@@ -37,7 +37,6 @@ export function verificationPlan(edits: Edit[]): string[][] | null {
       "apps/web",
       "run",
       "test",
-      "--",
       ...[...tests].sort(),
       "--allowOnly=false",
       "--passWithNoTests=false",

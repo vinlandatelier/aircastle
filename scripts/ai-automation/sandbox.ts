@@ -6,7 +6,7 @@ import { verificationPlan } from "./checks.ts";
 function run(command: string, args: string[], cwd: string, timeout = 300000): void {
   const result = spawnSync(command, args, {
     cwd,
-    env: { PATH: process.env.PATH, HOME: "/tmp", CI: "true" },
+    env: { PATH: `${cwd}/node_modules/.bin:${process.env.PATH}`, HOME: "/tmp", CI: "true" },
     stdio: "inherit",
     timeout,
   });

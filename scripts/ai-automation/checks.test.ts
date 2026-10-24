@@ -22,7 +22,6 @@ const selectedTests = (...paths: string[]): string[] => [
   "apps/web",
   "run",
   "test",
-  "--",
   ...paths,
   "--allowOnly=false",
   "--passWithNoTests=false",
