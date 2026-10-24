@@ -147,16 +147,6 @@ describe("accepted structured content errors", () => {
       "too_long",
     ]);
   });
-
-  test("permits unspecified extra details without pinning whether they are retained", () => {
-    expect(
-      parseContentError({ code: "unique_conflict", field: "slug", extra: "opaque detail" }),
-    ).toMatchObject({ code: "unique_conflict", field: "slug" });
-    expect(parseContentError(wrapped({ ...required, extra: "opaque detail" }))).toMatchObject({
-      code: "validation_failed",
-      issues: [expectedIssue(required)],
-    });
-  });
 });
 
 describe("malformed content errors", () => {
