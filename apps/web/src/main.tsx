@@ -6,6 +6,10 @@ import './index.css'
 
 const router = createAppRouter()
 
+document
+  .querySelectorAll('head > title, head > meta[name="description"]')
+  .forEach((element) => element.remove())
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <RouterProvider router={router} />
