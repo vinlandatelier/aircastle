@@ -1,8 +1,6 @@
 import { test, expect, visit } from './support'
 
-test('[shell:R7] normal production build exposes no fixture data or scenario override', async ({
-  page,
-}) => {
+test('normal production build exposes no fixture data or scenario override', async ({ page }) => {
   await visit(page, 'normal', '/dash/workspaces/demo/projects/demo/collections?scenario=long-text')
   await expect(
     page.getByRole('button', { name: 'Switch project: Acme Inc / Technical Blog', exact: true }),

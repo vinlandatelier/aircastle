@@ -36,7 +36,7 @@ async function shellColors(page: Page) {
   })
 }
 
-test('shell:R5 explicit Dark and Light change rendered colors, radio, storage and favicon and survive reload', async ({
+test('explicit Dark and Light change rendered colors, radio, storage and favicon and survive reload', async ({
   page,
 }) => {
   await visit(page)
@@ -78,7 +78,7 @@ test('shell:R5 explicit Dark and Light change rendered colors, radio, storage an
   await expect.poll(() => shellColors(page)).toEqual(light)
 })
 
-test('shell:R5 System follows live browser preference without replacing stored System selection', async ({
+test('System follows live browser preference without replacing stored System selection', async ({
   page,
 }) => {
   await page.emulateMedia({ colorScheme: 'light' })
@@ -103,10 +103,7 @@ test('shell:R5 System follows live browser preference without replacing stored S
   await expectTheme(page, 'light', 'system')
 })
 
-test('shell:R5 a fresh context does not inherit explicit theme selection', async ({
-  page,
-  browser,
-}) => {
+test('a fresh context does not inherit explicit theme selection', async ({ page, browser }) => {
   await visit(page)
   await selectTheme(page, 'Dark')
   await expectTheme(page, 'dark', 'dark')
@@ -130,7 +127,7 @@ test('shell:R5 a fresh context does not inherit explicit theme selection', async
   }
 })
 
-test('shell:R6 project filtering selects Marketing Site, closes and excludes the current project', async ({
+test('project filtering selects Marketing Site, closes and excludes the current project', async ({
   page,
 }) => {
   await visit(page)
@@ -160,7 +157,7 @@ test('shell:R6 project filtering selects Marketing Site, closes and excludes the
   await expect(selected).toBeFocused()
 })
 
-test('shell:R6 no project matches shows an empty state and clearing restores candidates', async ({
+test('no project matches shows an empty state and clearing restores candidates', async ({
   page,
 }) => {
   await visit(page)
@@ -182,7 +179,7 @@ test('shell:R6 no project matches shows an empty state and clearing restores can
   await expect(current).toBeVisible()
 })
 
-test('shell:R6 empty-candidates fixture preserves the valid current project', async ({ page }) => {
+test('empty-candidates fixture preserves the valid current project', async ({ page }) => {
   await visit(page, 'empty-candidates')
   const current = page.getByRole('button', {
     name: 'Switch project: Acme Inc / Technical Blog',
@@ -203,7 +200,7 @@ test('shell:R6 empty-candidates fixture preserves the valid current project', as
   await expect(current).toBeFocused()
 })
 
-test('shell:R6 account menu presents the default identity and Escape restores its trigger', async ({
+test('account menu presents the default identity and Escape restores its trigger', async ({
   page,
 }) => {
   await visit(page)

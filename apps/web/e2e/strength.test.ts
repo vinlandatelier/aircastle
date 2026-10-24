@@ -10,22 +10,20 @@ const expectedBrowserCases: Record<string, { file: string; titles: string[] }> =
   entry: {
     file: 'startup.spec.ts',
     titles: [
-      'shell:R2 normal built entry loads assets and redirects to Collections',
-      'shell:R2 direct Settings entry survives reload in the same context',
+      'normal built entry loads assets and redirects to Collections',
+      'direct Settings entry survives reload in the same context',
     ],
   },
   sidebar: {
     file: 'navigation.spec.ts',
     titles: [
-      'shell:R3 desktop collapse changes rendered width and survives client navigation',
-      'shell:R3 desktop collapse and mobile drawer state remain independent across resizing',
+      'desktop collapse changes rendered width and survives client navigation',
+      'desktop collapse and mobile drawer state remain independent across resizing',
     ],
   },
   containment: {
     file: 'stress.spec.ts',
-    titles: [
-      'T5 shell:R7 shell:R8 long-text popup: viewport containment keeps extreme candidates within reach',
-    ],
+    titles: ['long-text popup: viewport containment keeps extreme candidates within reach'],
   },
 }
 

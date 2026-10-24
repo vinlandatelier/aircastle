@@ -4,13 +4,13 @@ Follow [ARCHITECTURE.md](../../ARCHITECTURE.md#web-app-structure) for the web ap
 
 ## Verification
 
-Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defines requirement IDs, test placement, red evidence, fault checks, and completion evidence.
+Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defines test placement, observable expectations, red evidence, fault checks, and completion evidence.
 
 - Install Chromium once with `vp -C apps/web exec playwright install chromium` from the repository root.
 - Run `vp run test-web` for fast component behavior, `vp run test-web:e2e` for built-browser journeys, and `vp run test-web:coverage` for V8 HTML/JSON reports over all frontend source.
 - Run `vp run verify-web` for frontend policy, types, lint, boundaries, component tests, fresh builds, and browser journeys. Run `vp run check` for the repository's required final check; it includes browser journeys and needs Docker and Chromium.
 - Focus browser runs by file and scenario, for example `vp run test-web:e2e stress.spec.ts --grep long-text`. Keep the full suite as the completion check.
-- Each command prints its output directory under `apps/web/reports/`. Read `receipt.json` for setup versus behavior failures, tested source, environment, counts, and cleanup; read `requirements.json` for passed, failed, and unexercised browser requirements.
+- Each command prints its output directory under `apps/web/reports/`. Read `receipt.json` for setup versus behavior failures, tested source, environment, counts, and cleanup. Its `cases` list records the selected tests by file and descriptive title, with status, errors, attempts, and browser metadata.
 - Read phase logs and JUnit/JSON reports for the failing assertion. Browser failures retain traces and screenshots under `browser/` when the page was reached. Open a trace with `vp -C apps/web exec playwright show-trace <trace.zip>`.
 - Read `coverage/index.html`, `coverage/coverage-summary.json`, and `coverage-info.json` together. Raw coverage includes shared UI wrappers and compiler-generated branches, excludes CSS, and has no percentage gate. Controlled fault checks establish selected test sensitivity, not a full mutation score.
 
