@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { test, expect } from './support'
 
-test('shell:R5 favicons embed small light and dark brand icons', async ({ request }) => {
+test('favicons embed small light and dark brand icons', async ({ request }) => {
   const icons: Buffer[] = []
   for (const theme of ['light', 'dark']) {
     const favicon = await request.get(`/brand/favicon-${theme}.svg`)
@@ -18,9 +18,7 @@ test('shell:R5 favicons embed small light and dark brand icons', async ({ reques
 })
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`shell:R5 sign-in favicon follows saved ${theme} preference over system theme`, async ({
-    page,
-  }) => {
+  test(`sign-in favicon follows saved ${theme} preference over system theme`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme === 'light' ? 'dark' : 'light' })
     await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
     await page.goto('/sign-in')
@@ -32,7 +30,7 @@ for (const theme of ['light', 'dark'] as const) {
   })
 }
 
-test('shell:R5 sign-in favicon follows live system theme changes', async ({ page }) => {
+test('sign-in favicon follows live system theme changes', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await page.goto('/sign-in')
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/brand/favicon-light.svg')

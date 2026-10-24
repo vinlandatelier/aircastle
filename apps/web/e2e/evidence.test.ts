@@ -2,10 +2,10 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync }
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vite-plus/test'
-import { browserOutcome, requirementResults } from '../scripts/evidence'
-import { originalWeb, readJson, runWeb } from './command-copy'
+import { browserOutcome } from '../scripts/evidence'
+import { copyWeb, originalWeb, readJson, runWeb } from '../scripts/verification-sandbox'
 
-describe('[R1 R9 R10] verification evidence', () => {
+describe('verification evidence', () => {
   it('accepts only executed passing tests', () => {
     expect(
       browserOutcome({ stats: { expected: 2, unexpected: 0, skipped: 0, flaky: 0 }, errors: [] }),
@@ -38,38 +38,35 @@ describe('[R1 R9 R10] verification evidence', () => {
       browserOutcome({ stats: { expected: 1, unexpected: 0, skipped: 0, flaky: 1 } }),
     ).toThrow('Retries')
   })
-  it('does not report unexercised requirements as passed', () => {
-    expect(
-      requirementResults(
-        [
-          { title: '[R2] entry', status: 'passed' },
-          { title: '[R3] toggle', status: 'failed' },
-        ],
-        ['R2', 'R3', 'R5'],
-      ),
-    ).toEqual({ R2: 'passed', R3: 'failed', R5: 'not exercised' })
-    expect(
-      requirementResults(
-        [
-          { title: '[R2] first', status: 'passed' },
-          { title: '[R2] second', status: 'failed' },
-        ],
-        ['R2'],
-      ),
-    ).toEqual({ R2: 'failed' })
-    expect(
-      requirementResults(
-        [
-          { title: 'R2 passed', status: 'passed' },
-          { title: 'R2 skipped', status: 'skipped' },
-        ],
-        ['R2'],
-      ),
-    ).toEqual({ R2: 'not exercised' })
-  })
 })
 
-it('[R9] coverage inventories unimported source and excludes tests in a disposable app copy', () => {
+it('runs a new descriptive browser test without registration or runner changes', () => {
+  const copy = copyWeb()
+  try {
+    writeFileSync(
+      path.join(copy.directory, 'e2e/new-feature.spec.ts'),
+      "import { test, visit } from './support'\ntest.describe('document navigation', () => { test('opens the workspace', async ({page}) => { await visit(page) }) })\n",
+    )
+    const output = path.join(copy.directory, 'reports/new-feature')
+    const result = runWeb(copy.directory, output, ['e2e', 'new-feature.spec.ts'])
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+    const receipt = readJson(output, 'receipt.json')
+    expect(receipt.status).toBe('passed')
+    expect(receipt.counts).toMatchObject({ executed: 1, failed: 0, skipped: 0, retries: 0 })
+    expect(receipt.cases).toHaveLength(1)
+    expect(receipt.cases[0]).toMatchObject({
+      title: 'new-feature.spec.ts > document navigation > opens the workspace',
+      status: 'passed',
+      errors: [],
+    })
+    expect(receipt.cases[0].attempts).toHaveLength(1)
+    expect(receipt.cases[0].attempts[0]).toMatchObject({ status: 'passed', retry: 0 })
+  } finally {
+    copy.remove()
+  }
+}, 180_000)
+
+it('coverage inventories unimported source and excludes tests in a disposable app copy', () => {
   const original = path.resolve(import.meta.dirname, '..')
   const copy = mkdtempSync(path.join(tmpdir(), 'aircastle-coverage-'))
   try {
@@ -110,14 +107,11 @@ it('[R9] coverage inventories unimported source and excludes tests in a disposab
   }
 }, 90_000)
 
-it('[R1 R9 R10] command reports real title hierarchy, attempts and unexercised requirements', () => {
+it('focused command reports only executed cases with their title hierarchy and attempts', () => {
   const output = mkdtempSync(path.join(tmpdir(), 'aircastle-emitted-report-'))
   try {
     const result = runWeb(originalWeb, output, ['e2e', '--grep', 'Back and Forward follow'])
     expect(result.status, result.stdout + result.stderr).toBe(0)
-    const requirements = readJson(output, 'requirements.json')
-    expect(requirements.R2).toBe('passed')
-    expect(requirements.R3).toBe('not exercised')
     const receipt = readJson(output, 'receipt.json')
     expect(receipt.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/)
     expect(receipt.runtime.node).toBeTruthy()
@@ -126,7 +120,7 @@ it('[R1 R9 R10] command reports real title hierarchy, attempts and unexercised r
     expect(receipt.servingMode).toBe('built preview')
     expect(receipt.cases).toHaveLength(1)
     const actual = receipt.cases[0]
-    expect(actual.title).toContain('R2 routes and history')
+    expect(actual.title).toContain('routes and history')
     expect(actual.title).toContain('Back and Forward follow')
     expect(actual.scenario).toBe('normal')
     expect(actual.viewport).toEqual({ width: 1440, height: 900 })

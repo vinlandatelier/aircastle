@@ -47,23 +47,6 @@ export function browserOutcome(value: unknown): {
   }
 }
 
-export function requirementResults(
-  cases: { title: string; status: string }[],
-  requirements: string[],
-): Record<string, string> {
-  return Object.fromEntries(
-    requirements.map((requirement) => {
-      const selected = cases.filter((item) => item.title.match(/\bR\d+\b/g)?.includes(requirement))
-      const status = selected.some((item) => ['failed', 'timedOut'].includes(item.status))
-        ? 'failed'
-        : selected.length > 0 && selected.every((item) => item.status === 'passed')
-          ? 'passed'
-          : 'not exercised'
-      return [requirement, status]
-    }),
-  )
-}
-
 export type BrowserCase = {
   title: string
   status: string
