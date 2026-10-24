@@ -1,0 +1,42 @@
+import { test, expect } from './support'
+
+const landingTitle = 'Aircastle: The Headless CMS with Next-Generation Agentic Capabilities'
+const landingDescription =
+  'Aircastle is a code-first, headless CMS with agentic capabilities designed to automate the slow, manual parts of managing written content.'
+
+test('shell:R2 marketing entry keeps its URL and exact metadata before and after startup', async ({
+  page,
+  request,
+}) => {
+  const html = await (await request.get('/')).text()
+  expect(html).toContain(`<title>${landingTitle}</title>`)
+  expect(html).toContain(landingDescription)
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveTitle(landingTitle)
+  await expect(page.locator('head title')).toHaveCount(1)
+  await expect(page.locator('meta[name="description"]')).toHaveCount(1)
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    landingDescription,
+  )
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCount(0)
+})
+
+test('shell:R2 sign-in and dashboard metadata follows navigation and history', async ({ page }) => {
+  await page.goto('/sign-in')
+  await expect(page).toHaveTitle('Aircastle - Sign in')
+  await expect(page.locator('head title')).toHaveCount(1)
+  await expect(page.locator('meta[name="description"]')).toHaveCount(1)
+  await page.getByRole('link', { name: 'Home', exact: true }).click()
+  await expect(page).toHaveTitle('Aircastle - Collections')
+  await page.getByRole('link', { name: 'Tasks', exact: true }).click()
+  await expect(page).toHaveTitle('Aircastle - Tasks')
+  await page.goBack()
+  await expect(page).toHaveTitle('Aircastle - Collections')
+  await page.goBack()
+  await expect(page).toHaveTitle('Aircastle - Sign in')
+  await page.reload()
+  await expect(page).toHaveTitle('Aircastle - Sign in')
+  await expect(page.locator('head title')).toHaveCount(1)
+})

@@ -48,7 +48,7 @@ describe('[shell:R1 shell:R10] real command contract', () => {
       writeFileSync(
         html,
         readFileSync(html, 'utf8').replace(
-          '<title>Aircastle</title>',
+          '<title>Aircastle: The Headless CMS with Next-Generation Agentic Capabilities</title>',
           '<title>Aircastle fresh-build proof</title>',
         ),
       )
