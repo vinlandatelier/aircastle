@@ -13,7 +13,8 @@ function applyRecoveryTheme() {
     let stored: string | null
     try {
       stored = localStorage.getItem(themeStorageKey)
-    } catch {
+    } catch (error) {
+      if (!(error instanceof DOMException)) throw error
       stored = null
     }
     if (stored === 'light' || stored === 'dark') {
