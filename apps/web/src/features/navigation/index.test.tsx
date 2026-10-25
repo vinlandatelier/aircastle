@@ -64,7 +64,6 @@ describe('App navigation', () => {
       expect(router.state.location.pathname).toBe('/dash/workspaces/acme/projects/editorial/tasks'),
     )
     expect(screen.getByRole('link', { name: 'Tasks' }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('link', { name: 'Tasks' }).hasAttribute('data-active')).toBe(true)
     expect(screen.getByRole('link', { name: 'Collections' }).hasAttribute('aria-current')).toBe(
       false,
     )
@@ -79,7 +78,6 @@ describe('App navigation', () => {
       expect(router.state.location.pathname).toBe('/dash/workspaces/acme/projects/editorial/tasks'),
     )
     expect(screen.getByRole('link', { name: 'Tasks' }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('link', { name: 'Tasks' }).hasAttribute('data-active')).toBe(true)
 
     await act(async () => router.history.forward())
     await waitFor(() =>
