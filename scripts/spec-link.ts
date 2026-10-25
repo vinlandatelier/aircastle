@@ -4,6 +4,7 @@ const featureTitle = /^\s*feat\b/i;
 const specHeading = /^##\s+Spec\s*$/im;
 const nextHeading = /^##\s/m;
 const htmlComment = /<!--[\s\S]*?(?:-->|$)/g;
+const codeFence = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[`~]*[ \t]*$|(?![\s\S]))/gm;
 const specReference = [
   /\bhttps?:\/\/[^\s<>]+\.[^\s<>]+/i,
   /(?:^|[\s(])(?:[\w.-]+\/[\w.-]+)?#\d+\b/,
@@ -11,7 +12,7 @@ const specReference = [
 ];
 
 const specSection = (body: string) => {
-  const visible = body.replace(htmlComment, "");
+  const visible = body.replace(codeFence, "").replace(htmlComment, "");
   const heading = specHeading.exec(visible);
   if (heading === null) return undefined;
   const rest = visible.slice(heading.index + heading[0].length);

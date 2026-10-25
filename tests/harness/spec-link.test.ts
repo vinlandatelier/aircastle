@@ -19,6 +19,12 @@ test.each([
   ["n/a", withSpec("n/a: refactor")],
   ["a placeholder", withSpec("<link to the spec>, R1")],
   ["a link only in another section", `${withSpec("")}\nhttps://example.com/spec\n`],
+  [
+    "a Spec heading only inside a code fence",
+    "## Problem\n\n```md\n## Spec\n\nhttps://example.com/spec\n```\n",
+  ],
+  ["a link only inside a code fence", withSpec("```\nhttps://example.com/spec\n```")],
+  ["a link only inside an unclosed code fence", withSpec("~~~\n#12")],
 ])("a feat PR with %s fails", (_case, body) => {
   expect(checkSpecLink("feat(api): add drafts", body).ok).toBe(false);
 });
@@ -28,6 +34,8 @@ test.each([
   ["an issue reference", "#12 (R1, R2)"],
   ["a repo path", "`docs/specs/drafts.md` R1"],
   ["a feat:spec record path", ".feat/drafts/feature.json R1-R3"],
+  ["a link after a code fence", "```\nR1\n```\n#12"],
+  ["a link after a CRLF code fence", "```\r\nR1\r\n```\r\n#12"],
 ])("a feat PR with %s passes", (_case, spec) => {
   expect(checkSpecLink("feat: add drafts", withSpec(spec))).toEqual({ ok: true });
 });
