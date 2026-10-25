@@ -157,6 +157,7 @@ describe("malformed content errors", () => {
     ["missing code", {}],
     ["nonstrings as code", { code: 1 }],
     ["unknown code", { code: "unknown_error" }],
+    ["array-wrapped code", { code: ["unauthorized"] }],
     ["missing issues", { code: "validation_failed" }],
     ["null issues", { code: "validation_failed", issues: null }],
     ["object issues", { code: "validation_failed", issues: {} }],
@@ -177,6 +178,7 @@ describe("malformed content errors", () => {
     ["missing issue code", { path: ["title"], message }],
     ["numeric issue code", { code: 1, path: ["title"], message }],
     ["unknown issue code", { code: "bad_field", path: ["title"], message }],
+    ["array-wrapped issue code", { code: ["required"], path: ["title"], message }],
     ["missing message", { code: "required", path: ["title"] }],
     ["numeric message", { ...required, message: 1 }],
     ["null message", { ...required, message: null }],
@@ -205,6 +207,10 @@ describe("malformed content errors", () => {
     [
       "numeric received type",
       { code: "invalid_type", path: ["title"], message, expected: "string", received: 1 },
+    ],
+    [
+      "array-wrapped received type",
+      { code: "invalid_type", path: ["title"], message, expected: "string", received: ["string"] },
     ],
     [
       "unknown received type",

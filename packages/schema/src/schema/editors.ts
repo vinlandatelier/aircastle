@@ -1,27 +1,27 @@
 import type { CodeLanguage, IssuePath, SchemaIssue, TextEditorDescription } from "./contract.ts";
 import type { Modifier } from "./declarations.ts";
 import { schemaIssue } from "./errors.ts";
-import { receivedType } from "./records.ts";
+import { isMember, receivedType } from "./records.ts";
 
-const languages: readonly CodeLanguage[] = [
-  "plaintext",
-  "javascript",
-  "typescript",
-  "json",
-  "html",
-  "css",
-  "markdown",
-  "sql",
-];
+/** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
+const languages = {
+  plaintext: "plaintext",
+  javascript: "javascript",
+  typescript: "typescript",
+  json: "json",
+  html: "html",
+  css: "css",
+  markdown: "markdown",
+  sql: "sql",
+} satisfies { [Name in CodeLanguage]: Name };
 type EditorModifier = Extract<Modifier, { kind: "editor" }>;
 type EditorResult =
   | { ok: true; editor: TextEditorDescription }
   | { ok: false; issues: SchemaIssue[] };
 
+/** Compares serialized editors, which relies on `normalizeEditor` building each editor with a stable key order. */
 export function equalEditor(left: TextEditorDescription, right: TextEditorDescription): boolean {
-  if (left.type === "textarea") return right.type === "textarea" && left.rows === right.rows;
-  if (left.type === "code") return right.type === "code" && left.language === right.language;
-  return right.type === "radio";
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export function normalizeEditor(modifier: EditorModifier, path: IssuePath): EditorResult {
@@ -61,7 +61,7 @@ export function normalizeEditor(modifier: EditorModifier, path: IssuePath): Edit
   }
   if (name === "textarea") {
     const rows = options.has("rows") ? options.get("rows") : 4;
-    if (typeof rows !== "number" || !Number.isInteger(rows) || rows <= 0)
+    if (!Number.isInteger(rows) || Number(rows) <= 0)
       issues.push(
         schemaIssue(path, {
           code: "invalid_editor_options",
@@ -75,7 +75,7 @@ export function normalizeEditor(modifier: EditorModifier, path: IssuePath): Edit
   }
   if (name === "code") {
     const language = options.has("language") ? options.get("language") : "plaintext";
-    if (!languages.some((allowed) => allowed === language))
+    if (!isMember(languages, language))
       issues.push(
         schemaIssue(path, {
           code: "invalid_editor_options",

@@ -18,7 +18,7 @@ export interface TextRules {
 
 const stringType = type("string");
 const unpairedSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const segmenter = new Intl.Segmenter();
 
 function graphemeLength(value: string): number {
   let count = 0;
@@ -48,13 +48,14 @@ export function validateValue(
   if (issues.length) return issues;
   if (rules.min !== undefined || rules.max !== undefined) {
     const actual = graphemeLength(value);
-    if (rules.min !== undefined && actual < rules.min)
+    const { min = 0, max = Infinity } = rules;
+    if (actual < min)
       issues.push(
-        validationIssue(path, { code: "too_short", minimum: rules.min, actual, unit: "graphemes" }),
+        validationIssue(path, { code: "too_short", minimum: min, actual, unit: "graphemes" }),
       );
-    if (rules.max !== undefined && actual > rules.max)
+    if (actual > max)
       issues.push(
-        validationIssue(path, { code: "too_long", maximum: rules.max, actual, unit: "graphemes" }),
+        validationIssue(path, { code: "too_long", maximum: max, actual, unit: "graphemes" }),
       );
   }
   if (rules.format === "email" && !isEmail(value))

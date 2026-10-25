@@ -1,4 +1,10 @@
-import { collection, text, type CodeLanguage } from "@aircastle/schema";
+import {
+  collection,
+  SchemaError,
+  text,
+  type CodeLanguage,
+  type CollectionDescription,
+} from "@aircastle/schema";
 import { describe, expect, test } from "vite-plus/test";
 import {
   compileDescription,
@@ -141,14 +147,16 @@ describe("wire declaration rejection", () => {
     "describeCollections rejects reserved collection %s independently",
     (name) => {
       const definitions = Object.fromEntries([[name, collection({ title: text() })]]);
-      expect(() => describeCollections(definitions)).toThrow();
+      expect(() => describeCollections(definitions)).toThrow(
+        new TypeError("Invalid collection description"),
+      );
     },
   );
 
   test("describeCollections rejects a reserved id alongside otherwise valid fields", () => {
     expect(() =>
       describeCollections({ articles: collection({ title: text(), id: text() }) }),
-    ).toThrow();
+    ).toThrow(new TypeError("Invalid collection description"));
   });
 
   test("parseCollections rejects a reserved id alongside otherwise valid fields", () => {
@@ -197,6 +205,102 @@ describe("wire declaration rejection", () => {
         { name: "articles", description: { fields: { title: { ...field(), ...overrides } } } },
       ]),
     ).toEqual({ ok: false, error: { code: "invalid_request" } });
+  });
+});
+
+describe("wire field values are validated by the schema compiler", () => {
+  const base = field({ required: false, choices: ["draft", "published"] });
+  test.each([
+    ["string minimum", { min: "1" }, { code: "invalid_bound", constraint: "min" }],
+    ["null maximum", { max: null }, { code: "invalid_bound", constraint: "max" }],
+    [
+      "non-array choices",
+      { choices: "draft" },
+      { code: "invalid_choices", reason: "invalid_type" },
+    ],
+    [
+      "nonstrings in choices",
+      { choices: ["draft", 1] },
+      { code: "invalid_choices", reason: "invalid_type", index: 1 },
+    ],
+    ["numeric default", { default: 1 }, { code: "invalid_default" }],
+    [
+      "textarea nonnumeric rows",
+      { editor: { type: "textarea", rows: "7" } },
+      { code: "invalid_editor_options", option: "rows", reason: "invalid_value" },
+    ],
+    [
+      "textarea unknown option",
+      { editor: { type: "textarea", rows: 7, extra: true } },
+      { code: "invalid_editor_options", option: "extra", reason: "unknown_option" },
+    ],
+    [
+      "code unknown language",
+      { editor: { type: "code", language: "ruby" } },
+      { code: "invalid_editor_options", option: "language", reason: "invalid_value" },
+    ],
+    [
+      "code nonstring language",
+      { editor: { type: "code", language: 1 } },
+      { code: "invalid_editor_options", option: "language", reason: "invalid_value" },
+    ],
+    [
+      "radio unknown option",
+      { editor: { type: "radio", extra: true } },
+      { code: "invalid_editor_options", option: "extra", reason: "unknown_option" },
+    ],
+    [
+      "unknown editor",
+      { editor: { type: "richtext" } },
+      { code: "unknown_editor", editor: "richtext" },
+    ],
+    [
+      "missing editor type",
+      { editor: {} },
+      { code: "invalid_editor", expected: "string", received: "undefined" },
+    ],
+  ])("rejects %s as a schema issue", (_name, overrides, issue) => {
+    const malformed = { fields: { title: { ...base, ...overrides } } } as CollectionDescription;
+    let thrown: unknown;
+    try {
+      compileDescription(malformed);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(SchemaError);
+    expect((thrown as SchemaError).issues).toEqual([
+      expect.objectContaining({ ...issue, path: ["wire", "title"] }),
+    ]);
+  });
+
+  test.each([
+    ["textarea missing rows", { type: "textarea" }],
+    ["code missing language", { type: "code" }],
+  ])("rejects %s instead of applying the builder default", (_name, editor) => {
+    const malformed = { fields: { title: { ...base, editor } } } as CollectionDescription;
+    expect(() => compileDescription(malformed)).toThrow(
+      new TypeError("Invalid collection description"),
+    );
+  });
+
+  test("rejects an editor accessor without invoking supplied code", () => {
+    let called = false;
+    const editor = Object.defineProperty({}, "type", {
+      enumerable: true,
+      get() {
+        called = true;
+        return "radio";
+      },
+    });
+    expect(
+      parseCollections([
+        {
+          name: "articles",
+          description: description({ title: { ...base, editor: editor as never } }),
+        },
+      ]),
+    ).toEqual({ ok: false, error: { code: "invalid_request" } });
+    expect(called).toBe(false);
   });
 });
 

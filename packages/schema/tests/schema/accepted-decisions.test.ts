@@ -211,6 +211,20 @@ describe("approved configuration boundaries and names", () => {
     });
   }
 
+  const opaqueRecords: [string, object][] = [
+    ["a symbol key", { [Symbol("hidden")]: true }],
+    ["a non-enumerable key", Object.defineProperty({}, "hidden", { value: true })],
+    ["an accessor", Object.defineProperty({}, "hidden", { enumerable: true, get: () => true })],
+  ];
+  for (const [kind, value] of opaqueRecords) {
+    test(`a schema map with ${kind} reports record/object`, () => {
+      expectSchemaError(
+        () => api.compileSchema(value as Parameters<RuntimeApi["compileSchema"]>[0]),
+        [{ code: "invalid_definition", path: [], expected: "record", received: "object" }],
+      );
+    });
+  }
+
   test("arbitrary objects cannot impersonate collection or field declarations", () => {
     expectSchemaError(
       () => api.compileSchema({ articles: {} }),

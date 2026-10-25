@@ -4,7 +4,7 @@ import {
   parseContentError,
   validateStored,
 } from "@aircastle/contracts";
-import { compileSchema, SchemaError } from "@aircastle/schema";
+import { compileSchema, isPlainRecord, SchemaError } from "@aircastle/schema";
 import type {
   CollectionDefinitions,
   CollectionDescription,
@@ -81,23 +81,11 @@ export function defineConfig<const Collections extends CollectionDefinitions>(co
   };
 }
 
-function record(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object") return false;
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Reflect.ownKeys(value).every((key) => {
-    const property = Object.getOwnPropertyDescriptor(value, key);
-    return (
-      typeof key === "string" && property?.enumerable === true && Object.hasOwn(property, "value")
-    );
-  });
-}
-
 function responseResult(
   description: CollectionDescription,
   response: unknown,
 ): Result<ContentDocument> | undefined {
-  if (!record(response)) return undefined;
+  if (!isPlainRecord(response)) return undefined;
   if (response.ok === false) {
     if (Object.keys(response).some((key) => key !== "ok" && key !== "error")) return undefined;
     const error = parseContentError(response.error);
@@ -106,7 +94,7 @@ function responseResult(
   if (
     response.ok !== true ||
     Object.keys(response).some((key) => key !== "ok" && key !== "data") ||
-    !record(response.data)
+    !isPlainRecord(response.data)
   )
     return undefined;
   const document = response.data;

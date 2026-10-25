@@ -22,6 +22,13 @@ const vectors = [
     bytes: '{"fields":{"title":{"nullable":false,"required":true,"type":"text","unique":false}}}',
     digest: "cba60446f99c12f7e6acb7ddb9ec8beb0a18584a5fb498bf7a6237f033119325",
   },
+  {
+    name: "choices kept as an ordered array",
+    input: description({ title: field({ choices: ["draft", "published"] }) }),
+    bytes:
+      '{"fields":{"title":{"choices":["draft","published"],"nullable":false,"required":true,"type":"text","unique":false}}}',
+    digest: "065b107c124ae608ff3de01c781b1309fa6759d7f966af8b8b93026f33762d36",
+  },
 ];
 
 describe("canonical data contract identifiers", () => {
