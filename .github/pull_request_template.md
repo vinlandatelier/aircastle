@@ -1,13 +1,23 @@
-## Problem
+## What?
 
-## Change
+<!-- One or two sentences on what this PR changes. -->
 
-## Verification
+## Why
 
-<!-- Each check you ran, with its command and exit code. -->
+<!-- The problem this solves. Feature PRs: link the agreed spec or issue and name the requirements the tests cover. -->
 
-## Guardrail
+## How
 
-<!-- The check that stops this class of problem from coming back, and the result of a planted violation. Or "none: <reason>". -->
+<!-- The approach and any notable choices. -->
 
-## Decisions for the reviewer
+## Testing
+
+<!-- Each check you ran with its exit code. For a new guardrail, the planted violation and its failing result. -->
+
+## Screenshots (optional)
+
+<!-- UI changes only. -->
+
+## Anything else (optional)
+
+<!-- Free-form notes for the reviewer, under any heading you like. -->
