@@ -43,8 +43,8 @@ class TextField<
     readonly defaulted: Defaulted;
   };
 
-  constructor(modifiers: readonly Modifier[] = []) {
-    fields.set(this, Object.freeze([...modifiers]));
+  constructor(...modifiers: Modifier[]) {
+    fields.set(this, Object.freeze(modifiers));
     Object.freeze(this);
   }
 
@@ -54,7 +54,7 @@ class TextField<
     NextNullable extends boolean = Nullable,
     NextDefaulted extends boolean = Defaulted,
   >(modifier: Modifier): TextField<NextValue, NextOptional, NextNullable, NextDefaulted> {
-    return new TextField([...fields.get(this)!, Object.freeze(modifier)]);
+    return new TextField(...fields.get(this)!, Object.freeze(modifier));
   }
 
   min(value: number): TextField<Value, Optional, Nullable, Defaulted> {

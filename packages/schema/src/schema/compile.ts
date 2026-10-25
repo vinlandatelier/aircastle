@@ -90,18 +90,20 @@ function compileField(
     ) {
       issues.push(schemaIssue(path, { code: "invalid_bound", constraint }));
     } else {
-      rules[constraint] = limits.reduce(
-        (current, limit) =>
-          constraint === "min" ? Math.max(current, limit) : Math.min(current, limit),
-        constraint === "min" ? 0 : Number.MAX_SAFE_INTEGER,
-      );
+      rules.bounds = {
+        ...rules.bounds,
+        [constraint]: limits.reduce(
+          (current, limit) =>
+            constraint === "min" ? Math.max(current, limit) : Math.min(current, limit),
+          constraint === "min" ? 0 : Number.MAX_SAFE_INTEGER,
+        ),
+      };
     }
   }
-  const { min = 0, max = Number.MAX_SAFE_INTEGER } = rules;
+  const { min = 0, max = Number.MAX_SAFE_INTEGER } = rules.bounds ?? {};
   if (min > max) {
     issues.push(schemaIssue(path, { code: "conflicting_bounds", minimum: min, maximum: max }));
-    delete rules.min;
-    delete rules.max;
+    delete rules.bounds;
   }
   const choiceLists = distinct(values(modifiers, "choices"), equalChoices);
   if (choiceLists.length > 1) issues.push(schemaIssue(path, { code: "conflicting_choices" }));
@@ -222,8 +224,7 @@ function compiledCollection(
               required: !rules.optional && !Object.hasOwn(rules, "default"),
               nullable: rules.nullable,
               unique: rules.unique,
-              ...(rules.min === undefined ? {} : { min: rules.min }),
-              ...(rules.max === undefined ? {} : { max: rules.max }),
+              ...rules.bounds,
               ...(rules.format === undefined ? {} : { format: rules.format }),
               ...(rules.choices === undefined ? {} : { choices: [...rules.choices] }),
               ...(Object.hasOwn(rules, "default") ? { default: rules.default } : {}),
