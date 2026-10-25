@@ -3,6 +3,7 @@ import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vite-plus/test'
 import { assertArtifacts, liveRun } from './command-copy'
+import { landingTitle } from '../src/metadata'
 import { copyWeb, originalWeb, readJson, runWeb } from '../scripts/verification-sandbox'
 
 const temporary = () => mkdtempSync(path.join(tmpdir(), 'aircastle-run-'))
@@ -48,7 +49,7 @@ describe('real command contract', () => {
       writeFileSync(
         html,
         readFileSync(html, 'utf8').replace(
-          '<title>Aircastle: The Headless CMS with Next-Generation Agentic Capabilities</title>',
+          `<title>${landingTitle}</title>`,
           '<title>Aircastle fresh-build proof</title>',
         ),
       )

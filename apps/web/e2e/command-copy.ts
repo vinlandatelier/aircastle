@@ -4,6 +4,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { expect } from 'vite-plus/test'
 import { originalWeb, readJson } from '../scripts/verification-sandbox'
+import { landingTitle } from '../src/metadata'
 
 export function assertArtifacts(output: string, expectedTitle: string) {
   const report = readJson(output, 'browser.json')
@@ -65,9 +66,7 @@ export async function liveRun(output: string) {
     const response = await fetch(running.origin)
     expect(response.status).toBe(200)
     const html = await response.text()
-    expect(html).toContain(
-      '<title>Aircastle: The Headless CMS with Next-Generation Agentic Capabilities</title>',
-    )
+    expect(html).toContain(`<title>${landingTitle}</title>`)
     const script = html.match(/src="(\/assets\/[^"]+\.js)"/)
     expect(script).not.toBeNull()
     expect((await fetch(new URL(script![1]!, running.origin))).status).toBe(200)
