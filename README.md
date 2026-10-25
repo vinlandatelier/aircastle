@@ -50,7 +50,7 @@ Run common commands from the repository root:
 
 | Command | Scope |
 | --- | --- |
-| `vp run check` | Build, types, lint, runtime and database tests, browser journeys, and verification-tool integrity |
+| `vp run check` | Build, types, lint, unused code, runtime and database tests, browser journeys, and database runner checks |
 | `vp run test:db` | Disposable Postgres runner lifecycle checks |
 | `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases |
 | `vp run test-web` | Fast web component tests |
