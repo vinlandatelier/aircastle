@@ -3,10 +3,10 @@ const emailLabel = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
 
 export function isEmail(value: string): boolean {
   if (value.length > 254 || /\P{ASCII}/u.test(value)) return false;
-  const at = value.indexOf("@");
-  if (at < 1) return false;
-  const local = value.slice(0, at);
-  const labels = value.slice(at + 1).split(".");
+  const atSign = value.indexOf("@");
+  if (atSign < 1) return false;
+  const local = value.slice(0, atSign);
+  const labels = value.slice(atSign + 1).split(".");
   return (
     local.length <= 64 &&
     emailLocal.test(local) &&
