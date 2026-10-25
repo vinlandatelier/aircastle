@@ -7,7 +7,7 @@ import type {
   DocumentData,
   Result,
 } from "@aircastle/contracts";
-import { canonicalContract, parseCollections } from "@aircastle/contracts";
+import { canonicalContract, parseCollections, uniqueFields } from "@aircastle/contracts";
 import { identifier } from "./identifier.ts";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -131,9 +131,7 @@ export function projectTransaction(
       }
       await sql`DELETE FROM ${table("unique_values")} WHERE project_id = ${project}`;
       for (const collection of collections) {
-        const unique = Object.entries(collection.description.fields)
-          .filter(([, field]) => field.unique)
-          .map(([name]) => name);
+        const unique = uniqueFields(collection.description);
         if (unique.length === 0) continue;
         for (const stored of await documents(collection.name)) {
           for (const field of unique) {

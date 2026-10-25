@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import { createServer } from "node:net";
 import { expect, test } from "vite-plus/test";
 import postgres from "postgres";
+import { StorageUnavailable } from "@aircastle/core";
 import { postgresAdapter } from "./index.ts";
 import { databaseUrl, literalIdentifier, withDatabase } from "./test-support/database.ts";
 import type { Permission, PublishedCollection } from "@aircastle/contracts";
@@ -22,6 +24,23 @@ test("database control reaches pinned Postgres and preserves UTF-8 values", asyn
     expect(rows[0]?.version).toMatch(/^18\.6\b/);
     expect(rows[0]?.value).toBe("e\u0301🙂");
   });
+});
+
+test("an unreachable database surfaces as StorageUnavailable", async () => {
+  const server = createServer();
+  const port = await new Promise<number>((resolve) =>
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      resolve(typeof address === "object" && address !== null ? address.port : 0);
+    }),
+  );
+  await new Promise((resolve) => server.close(resolve));
+  const store = postgresAdapter({ url: `postgres://aircastle@127.0.0.1:${port}/aircastle` });
+  try {
+    await expect(store.initialize()).rejects.toBeInstanceOf(StorageUnavailable);
+  } finally {
+    await store.close();
+  }
 });
 
 test("initialization creates an owned namespace and is repeatable", async () => {
