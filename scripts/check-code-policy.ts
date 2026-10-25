@@ -15,13 +15,52 @@ export interface PolicyViolation {
     | "stale-catch-allowance";
 }
 
-interface SyntaxKey {
-  type: string;
-  name?: string;
-  value?: unknown;
-  expressions?: unknown[];
-  quasis?: { value: { cooked?: string | null } }[];
-  loc?: { start: { line: number; column: number } };
+/** A parsed Babel node, read through its `type` discriminant and runtime-checked fields. */
+interface SyntaxNode {
+  readonly type: string;
+  readonly [field: string]: unknown;
+}
+
+interface Position {
+  line: number;
+  column: number;
+}
+
+function isSyntaxNode(value: unknown): value is SyntaxNode {
+  return (
+    typeof value === "object" && value !== null && "type" in value && typeof value.type === "string"
+  );
+}
+
+function nodeAt(node: SyntaxNode, field: string): SyntaxNode | undefined {
+  const value = node[field];
+  return isSyntaxNode(value) ? value : undefined;
+}
+
+function listAt(node: SyntaxNode, field: string): readonly unknown[] {
+  const value = node[field];
+  return Array.isArray(value) ? value : [];
+}
+
+function textAt(node: SyntaxNode | undefined, field: string): string | undefined {
+  const value = node?.[field];
+  return typeof value === "string" ? value : undefined;
+}
+
+/** The node's one-based source position, or line 1 column 1 when the parser gave none. */
+function positionOf(node: SyntaxNode): Position {
+  const location = node.loc;
+  const start =
+    typeof location === "object" && location !== null && "start" in location
+      ? location.start
+      : undefined;
+  const line = typeof start === "object" && start !== null && "line" in start ? start.line : 1;
+  const column =
+    typeof start === "object" && start !== null && "column" in start ? start.column : 0;
+  return {
+    line: typeof line === "number" ? line : 1,
+    column: (typeof column === "number" ? column : 0) + 1,
+  };
 }
 
 const workspaceSource = /^(?:packages|apps)\/[^/]+\/src\//;
@@ -58,15 +97,19 @@ const deliberateCatchAllowances: Readonly<Record<string, { count: number; reason
   },
 };
 
-function bindingNames(pattern: unknown): string[] {
-  if (pattern === null || typeof pattern !== "object") return [];
-  const node = pattern as Record<string, unknown>;
-  if (node.type === "Identifier") return [node.name as string];
+function bindingNames(node: unknown): string[] {
+  if (!isSyntaxNode(node)) return [];
+  if (node.type === "Identifier") {
+    const name = textAt(node, "name");
+    return name === undefined ? [] : [name];
+  }
   if (node.type === "ObjectPattern")
-    return (node.properties as Record<string, unknown>[]).flatMap((entry) =>
-      bindingNames(entry.type === "RestElement" ? entry.argument : entry.value),
+    return listAt(node, "properties").flatMap((entry) =>
+      isSyntaxNode(entry)
+        ? bindingNames(entry.type === "RestElement" ? entry.argument : entry.value)
+        : [],
     );
-  if (node.type === "ArrayPattern") return (node.elements as unknown[]).flatMap(bindingNames);
+  if (node.type === "ArrayPattern") return listAt(node, "elements").flatMap(bindingNames);
   if (node.type === "AssignmentPattern") return bindingNames(node.left);
   if (node.type === "RestElement") return bindingNames(node.argument);
   return [];
@@ -76,20 +119,20 @@ function bindingNames(pattern: unknown): string[] {
 function readsAny(value: unknown, names: ReadonlySet<string>): boolean {
   if (Array.isArray(value)) return value.some((entry) => readsAny(entry, names));
   if (value === null || typeof value !== "object") return false;
-  const node = value as Record<string, unknown>;
-  if (node.type === "Identifier") return names.has(node.name as string);
-  if (node.type === "ExpressionStatement" && (node.expression as SyntaxKey).type === "Identifier")
+  const node = isSyntaxNode(value) ? value : undefined;
+  if (node?.type === "Identifier") return names.has(textAt(node, "name") ?? "");
+  if (node?.type === "ExpressionStatement" && nodeAt(node, "expression")?.type === "Identifier")
     return false;
-  if (node.type === "UnaryExpression" && node.operator === "void") return false;
-  return Object.entries(node).some(([key, child]) => {
+  if (node?.type === "UnaryExpression" && node.operator === "void") return false;
+  return Object.entries(value).some(([key, child]) => {
     if (["loc", "leadingComments", "innerComments", "trailingComments"].includes(key)) return false;
     if (
       key === "property" &&
-      (node.type === "MemberExpression" || node.type === "OptionalMemberExpression") &&
+      (node?.type === "MemberExpression" || node?.type === "OptionalMemberExpression") &&
       !node.computed
     )
       return false;
-    if (key === "key" && !node.computed) return false;
+    if (key === "key" && !node?.computed) return false;
     return readsAny(child, names);
   });
 }
@@ -99,31 +142,33 @@ const rejectionArguments = new Map([
   ["then", 1],
 ]);
 
-function rejectionHandler(node: Record<string, unknown>): Record<string, unknown> | undefined {
+function rejectionHandler(node: SyntaxNode): SyntaxNode | undefined {
   if (node.type !== "CallExpression" && node.type !== "OptionalCallExpression") return undefined;
-  const callee = node.callee as Record<string, unknown>;
-  const property = callee.property as SyntaxKey | undefined;
-  const position =
-    (callee.type === "MemberExpression" || callee.type === "OptionalMemberExpression") &&
+  const callee = nodeAt(node, "callee");
+  const property = callee && nodeAt(callee, "property");
+  const name =
+    (callee?.type === "MemberExpression" || callee?.type === "OptionalMemberExpression") &&
     !callee.computed &&
     property?.type === "Identifier"
-      ? rejectionArguments.get(property.name as string)
+      ? textAt(property, "name")
       : undefined;
+  const position = name === undefined ? undefined : rejectionArguments.get(name);
   if (position === undefined) return undefined;
-  const handler = (node.arguments as Record<string, unknown>[])[position];
-  return handler?.type === "ArrowFunctionExpression" || handler?.type === "FunctionExpression"
+  const handler = listAt(node, "arguments")[position];
+  return isSyntaxNode(handler) &&
+    (handler.type === "ArrowFunctionExpression" || handler.type === "FunctionExpression")
     ? handler
     : undefined;
 }
 
 /** Whether a catch clause or an inline promise rejection handler discards the error it receives. */
-function swallowsError(node: Record<string, unknown>): boolean {
+function swallowsError(node: SyntaxNode): boolean {
   const handler = rejectionHandler(node);
   const [param, body] =
     node.type === "CatchClause"
       ? [node.param, node.body]
       : handler
-        ? [(handler.params as unknown[])[0], handler.body]
+        ? [listAt(handler, "params")[0], handler.body]
         : [];
   if (body === undefined) return false;
   const names = new Set(bindingNames(param));
@@ -146,23 +191,32 @@ const moduleSpecifierKeys: Record<string, string> = {
   TSExternalModuleReference: "expression",
 };
 
-function moduleSpecifier(node: Record<string, unknown>): SyntaxKey | undefined {
-  const key = moduleSpecifierKeys[node.type as string];
-  const candidate = (
+function moduleSpecifier(node: SyntaxNode): { value: string; position: Position } | undefined {
+  const key = moduleSpecifierKeys[node.type];
+  const firstArgument = listAt(node, "arguments")[0];
+  const candidate =
     key !== undefined
-      ? node[key]
-      : node.type === "CallExpression" && (node.callee as SyntaxKey | undefined)?.type === "Import"
-        ? (node.arguments as unknown[])[0]
-        : undefined
-  ) as SyntaxKey | undefined;
-  const literal =
-    candidate?.type === "TSLiteralType"
-      ? (candidate as unknown as { literal: SyntaxKey }).literal
-      : candidate;
-  if (literal?.type === "StringLiteral") return literal;
-  if (literal?.type !== "TemplateLiteral" || literal.expressions?.length !== 0) return undefined;
-  const cooked = literal.quasis?.[0]?.value.cooked;
-  return typeof cooked === "string" ? { ...literal, value: cooked } : undefined;
+      ? nodeAt(node, key)
+      : node.type === "CallExpression" &&
+          nodeAt(node, "callee")?.type === "Import" &&
+          isSyntaxNode(firstArgument)
+        ? firstArgument
+        : undefined;
+  const literal = candidate?.type === "TSLiteralType" ? nodeAt(candidate, "literal") : candidate;
+  if (literal === undefined) return undefined;
+  const value = literal.type === "StringLiteral" ? textAt(literal, "value") : templateText(literal);
+  return value === undefined ? undefined : { value, position: positionOf(literal) };
+}
+
+function templateText(literal: SyntaxNode): string | undefined {
+  const { expressions } = literal;
+  if (literal.type !== "TemplateLiteral" || !Array.isArray(expressions) || expressions.length !== 0)
+    return undefined;
+  const quasi = listAt(literal, "quasis")[0];
+  const text = isSyntaxNode(quasi) ? quasi.value : undefined;
+  const cooked =
+    typeof text === "object" && text !== null && "cooked" in text ? text.cooked : undefined;
+  return typeof cooked === "string" ? cooked : undefined;
 }
 
 function owner(path: string, workspaces: readonly Workspace[]): Workspace | undefined {
@@ -255,40 +309,36 @@ export function inspectCode(
     "TSIndexSignature",
     "TSDeclareMethod",
   ]);
+  const inspectNode = (node: SyntaxNode): void => {
+    if (workspaceSource.test(file) && swallowsError(node))
+      swallowed.push({ ...positionOf(node), rule: "swallowed-error" });
+    const specifier = moduleSpecifier(node);
+    const boundary = specifier && inspectSpecifier(file, specifier.value, workspaces);
+    if (boundary) violations.push({ ...specifier.position, rule: boundary });
+    const { start } = node;
+    if (
+      (node.type.endsWith("Declaration") || declarationParts.has(node.type)) &&
+      typeof start === "number"
+    ) {
+      for (const leading of listAt(node, "leadingComments")) {
+        if (
+          isSyntaxNode(leading) &&
+          typeof leading.start === "number" &&
+          typeof leading.end === "number" &&
+          source.slice(leading.end, start).trim() === ""
+        )
+          documented.add(leading.start);
+      }
+    }
+  };
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) {
       value.forEach(visit);
       return;
     }
     if (value === null || typeof value !== "object") return;
-    const node = value as Record<string, unknown>;
-    if (workspaceSource.test(file) && swallowsError(node)) {
-      const start = (node.loc as SyntaxKey["loc"])?.start;
-      swallowed.push({
-        line: start?.line ?? 1,
-        column: (start?.column ?? 0) + 1,
-        rule: "swallowed-error",
-      });
-    }
-    const specifier = moduleSpecifier(node);
-    const boundary = specifier && inspectSpecifier(file, specifier.value as string, workspaces);
-    if (boundary)
-      violations.push({
-        line: specifier.loc?.start.line ?? 1,
-        column: (specifier.loc?.start.column ?? 0) + 1,
-        rule: boundary,
-      });
-    if (
-      typeof node.type === "string" &&
-      (node.type.endsWith("Declaration") || declarationParts.has(node.type)) &&
-      typeof node.start === "number" &&
-      Array.isArray(node.leadingComments)
-    ) {
-      for (const leading of node.leadingComments as { start: number; end: number }[]) {
-        if (source.slice(leading.end, node.start).trim() === "") documented.add(leading.start);
-      }
-    }
-    for (const [key, child] of Object.entries(node)) {
+    if (isSyntaxNode(value)) inspectNode(value);
+    for (const [key, child] of Object.entries(value)) {
       if (
         ![
           "comments",
@@ -338,26 +388,45 @@ const dependencyFields = [
   "optionalDependencies",
 ] as const;
 
-type Manifest = { name: string; workspaces?: string[] } & Partial<
-  Record<(typeof dependencyFields)[number], Record<string, string>>
->;
+interface Manifest {
+  name: string;
+  workspaces: string[];
+  dependencies: string[];
+}
+
+function readManifest(path: string): Manifest {
+  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+  const fields = new Map<string, unknown>(
+    typeof parsed === "object" && parsed !== null ? Object.entries(parsed) : [],
+  );
+  const name = fields.get("name");
+  if (typeof name !== "string") throw new Error(`${path} must have a string "name"`);
+  const workspaces = fields.get("workspaces");
+  return {
+    name,
+    workspaces: Array.isArray(workspaces)
+      ? workspaces.filter((pattern) => typeof pattern === "string")
+      : [],
+    dependencies: dependencyFields.flatMap((field) => {
+      const dependencies = fields.get(field);
+      return typeof dependencies === "object" && dependencies !== null
+        ? Object.keys(dependencies)
+        : [];
+    }),
+  };
+}
 
 function readWorkspaces(root: string, files: readonly string[]): Workspace[] {
   if (!files.includes("package.json")) return [];
-  const manifest = (directory: string) =>
-    JSON.parse(readFileSync(resolve(root, directory, "package.json"), "utf8")) as Manifest;
-  const globs = (manifest("").workspaces ?? []).map((pattern) => new Bun.Glob(pattern));
+  const manifest = (directory: string) => readManifest(resolve(root, directory, "package.json"));
+  const globs = manifest("").workspaces.map((pattern) => new Bun.Glob(pattern));
   const directories = files
     .filter((file) => file.endsWith("/package.json"))
     .map((file) => posix.dirname(file))
     .filter((directory) => globs.some((glob) => glob.match(directory)));
   return ["", ...directories].map((directory) => {
-    const { name, ...fields } = manifest(directory);
-    return {
-      directory,
-      name,
-      dependencies: dependencyFields.flatMap((field) => Object.keys(fields[field] ?? {})),
-    };
+    const { name, dependencies } = manifest(directory);
+    return { directory, name, dependencies };
   });
 }
 
