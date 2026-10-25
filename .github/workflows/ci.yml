@@ -18,11 +18,12 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       coverage_summary: ${{ steps.coverage-summary.outcome }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - name: Lint workflows
         run: |
           curl --fail --silent --show-error --location \
@@ -100,6 +101,9 @@ jobs:
           name: coverage-summary
           path: ${{ runner.temp }}/coverage.md
           retention-days: 1
+      - name: Mutation test changed schema and contracts code
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && github.event_name == 'pull_request' }}
+        run: vp run test:mutation:changed -- HEAD^1
   coverage-comment:
     name: Comment schema coverage
     needs: checks
