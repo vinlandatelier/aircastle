@@ -1,11 +1,9 @@
 import { expect } from "vite-plus/test";
 import type { SchemaIssue, ValidationIssue } from "../../src/index.ts";
 
-type ExpectedIssue<Issue> = Issue extends { message: string }
-  ? Omit<Issue, "message" | "causes"> & {
-      causes?: readonly ExpectedIssue<ValidationIssue>[];
-    }
-  : never;
+type ExpectedIssue<Issue> = Issue extends { causes: readonly ValidationIssue[] }
+  ? Omit<Issue, "message" | "causes"> & { causes: readonly ExpectedIssue<ValidationIssue>[] }
+  : Omit<Issue, "message">;
 
 export type ExpectedValidationIssue = ExpectedIssue<ValidationIssue>;
 export type ExpectedSchemaIssue = ExpectedIssue<SchemaIssue>;
@@ -49,8 +47,8 @@ function expectIssues(
     const issue = record(issues[index]);
     expect(typeof issue.message).toBe("string");
     expect((issue.message as string).trim().length).toBeGreaterThan(0);
+    expectOwnKeys(issue, [...Object.keys(wanted), "message"]);
     for (const [key, value] of Object.entries(wanted)) {
-      expect(Object.hasOwn(issue, key)).toBe(true);
       if (key === "causes") expectIssues(issue[key], value as ExpectedValidationIssue[]);
       else expect(issue[key]).toEqual(value);
     }
