@@ -110,7 +110,7 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute.addChildren([dashboardIndexRoute, ...pageRoutes]),
 ])
 
-export function createAppRouter(history?: RouterHistory) {
+export function createAppRouter(history: RouterHistory) {
   return createRouter({
     routeTree,
     history,
