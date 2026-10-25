@@ -11,6 +11,7 @@
   },
   "workspaces": {
     ".": {
+      "entry": ["scripts/ai-automation/sandbox.ts"],
       "vitest": {
         "config": ["vite.content.config.ts", "vite.db.config.ts"]
       },

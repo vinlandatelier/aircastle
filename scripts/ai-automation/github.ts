@@ -1,6 +1,5 @@
 import {
   authorize,
-  controlPath,
   digest,
   integer,
   operationId,
@@ -666,11 +665,11 @@ export class Coordinator {
       await this.finish(claim, "stale");
       return "stale";
     }
-    if (commands === null || (job.snapshot.fork && job.snapshot.changedPaths.some(controlPath))) {
+    if (commands === null || job.snapshot.fork) {
       const reason =
         commands === null
           ? "scoped verification is unavailable for these paths. This patch is unverified; no verification commands ran"
-          : "this fork changes automation/configuration. Selected scoped checks passed";
+          : "the PR comes from a fork, and its commits are never copied into a branch of this repository. Selected scoped checks passed";
       await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
         body: `Fix for reviewed SHA ${job.snapshot.head} is patch-only because ${reason}. No branch was promoted. Download artifact ai-model-${job.id} from https://github.com/${this.options.repository}/actions/runs/${this.options.run}. It contains a unified patch and original structured edits.`,
       });

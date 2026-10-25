@@ -1,14 +1,14 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { Coordinator } from "./github.ts";
+import { renderPatch } from "./materialize.ts";
 import {
-  Coordinator,
   digest,
   fixSchema,
   integer,
   prompt,
   record,
   reviewSchema,
-  renderPatch,
   sha,
   text,
   validateEdits,
@@ -165,7 +165,7 @@ async function main(): Promise<void> {
     );
     const result = await runModel(
       job.selection,
-      prompt(job),
+      prompt(job, await readFile(resolve(root, "AGENTS.md"), "utf8")),
       job.task === "fix" ? fixSchema : reviewSchema,
     );
     const valid =

@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { Coordinator, digest, type Job } from "./index.ts";
+import { Coordinator } from "./github.ts";
+import { digest, type Job } from "./index.ts";
 import { verificationPlan } from "./checks.ts";
 import { snapshot, invocation } from "./fixtures.ts";
 
@@ -28,10 +29,10 @@ const job: Job = {
 const config = {
   version: 1 as const,
   roles: {
-    codexReviewer: { provider: "openai" as const, model: "review", effort: "high" },
-    codexImplementer: { provider: "openai" as const, model: "fix", effort: "high" },
-    claudeReviewer: { provider: "anthropic" as const, model: "review", effort: "high" },
-    claudeImplementer: { provider: "anthropic" as const, model: "fix", effort: "high" },
+    codexReviewer: { provider: "openai" as const, model: "review", effort: "high" as const },
+    codexImplementer: { provider: "openai" as const, model: "fix", effort: "high" as const },
+    claudeReviewer: { provider: "anthropic" as const, model: "review", effort: "high" as const },
+    claudeImplementer: { provider: "anthropic" as const, model: "fix", effort: "high" as const },
   },
 };
 
@@ -143,6 +144,7 @@ test("COMMENT publication binds commit_id and displays incomplete coverage", asy
   expect(writes[0]).toMatchObject({ event: "COMMENT", commit_id: snapshot.head });
   expect(writes[0]?.body).toContain("INCOMPLETE");
   expect(writes[0]?.body).toContain(snapshot.head);
+  expect(writes[0]?.body).toMatch(/^codexReviewer: advisory adversarial correctness review\n/);
 });
 test("pagination is bounded and explicitly fails incomplete state reads", async () => {
   let calls = 0;
@@ -208,11 +210,13 @@ test("immutable context refuses a PR whose head moves during collection", async 
   });
   await expect(coordinator.snapshot(7)).rejects.toThrow("Stale");
 });
-test("forks with automation changes produce only a patch notice", async () => {
+test("a fork PR fix is patch-only even when its scoped checks pass", async () => {
   const requests: string[] = [];
+  const messages: string[] = [];
   const coordinator = new Coordinator(options, async (url, init) => {
     const path = String(url);
     requests.push(path);
+    if (typeof init?.body === "string") messages.push(String(JSON.parse(init.body).body));
     if (path.includes("/members/")) return new Response(null, { status: 204 });
     if (path.endsWith("/users/member")) return Response.json(snapshot.author);
     if (path.endsWith("/pulls/7"))
@@ -232,7 +236,8 @@ test("forks with automation changes produce only a patch notice", async () => {
     snapshot: {
       ...snapshot,
       files: snapshot.files.map((file) => ({ ...file, path })),
-      changedPaths: [path, ".github/workflows/hostile.yml"],
+      fork: true,
+      changedPaths: [path],
     },
   };
   const fix = {
@@ -267,6 +272,7 @@ test("forks with automation changes produce only a patch notice", async () => {
     ),
   ).toBe("patch_only");
   expect(requests.some((url) => url.includes("/git/"))).toBe(false);
+  expect(messages.join("\n")).toContain("comes from a fork");
 });
 
 test.each([
@@ -434,10 +440,10 @@ test("scheduled reconciliation creates independent provider claims and a repeat 
     throw new Error(`Unexpected request ${path}`);
   });
   const roles = {
-    codexReviewer: { provider: "openai" as const, model: "review", effort: "high" },
-    codexImplementer: { provider: "openai" as const, model: "fix", effort: "high" },
-    claudeReviewer: { provider: "anthropic" as const, model: "review", effort: "high" },
-    claudeImplementer: { provider: "anthropic" as const, model: "fix", effort: "high" },
+    codexReviewer: { provider: "openai" as const, model: "review", effort: "high" as const },
+    codexImplementer: { provider: "openai" as const, model: "fix", effort: "high" as const },
+    claudeReviewer: { provider: "anthropic" as const, model: "review", effort: "high" as const },
+    claudeImplementer: { provider: "anthropic" as const, model: "fix", effort: "high" as const },
   };
   const jobs = await coordinator.prepare({ version: 1, roles });
   expect(jobs.map((j) => j.role)).toEqual(["codexReviewer", "claudeReviewer"]);
@@ -493,7 +499,7 @@ test("role names cannot silently route both independent reviewers to one provide
     reads++;
     return Response.json([]);
   });
-  const wrong = { provider: "openai" as const, model: "same-provider", effort: "high" };
+  const wrong = { provider: "openai" as const, model: "same-provider", effort: "high" as const };
   await expect(
     coordinator.prepare({
       version: 1,
