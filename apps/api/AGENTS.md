@@ -10,5 +10,5 @@
 - For the built API startup, CLI/SDK durability, request limits and shutdown, run `vp run build`, then `vp run db:test -- vp test tests/content-workflow.test.ts` from the repository root. The workflow uses the production entry and an isolated database.
 - Find Hono documentation through `https://hono.dev/llms.txt`; fetch individual pages with `Accept: text/markdown`.
 
-- Keep route schemas and handlers together and preserve inferred router return types. Use ArkType with `describeRoute`/`resolver` for OpenAPI and `satisfies typeof schema.infer` for response types. Keep typed-client assertions in feature tests.
+- Keep route schemas and handlers together and preserve inferred router return types. When a route declares a schema, use ArkType with `describeRoute`/`resolver` for OpenAPI and `satisfies typeof schema.infer` for the response type, as `features/health` does. Content routes have no ArkType schemas yet: their `describeRoute` calls set only a summary and tags, and their handlers check input by hand. Keep typed-client assertions in feature tests.
 - Keep each feature's public factory in `index.ts`; extract distinct request and response responsibilities into private supporting files as needed. See the feature pattern in `ARCHITECTURE.md`.

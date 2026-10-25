@@ -58,7 +58,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - For documentation-only changes, inspect the edited text, links, and diff. Do not run executable test suites.
 - Reuse passing evidence for unchanged code, dependencies, configuration, and environment. Repeat a check only when its inputs change, it fails, or a new finding requires it. Record the command, exit code, and revision or content hash; setup failures do not establish behavior.
 - Use one focused audit of the completed change. Follow up on named findings and affected code instead of restarting a broad review. The author checks the reviewer's evidence and log; do not create recursive audit chains.
-- `.github/workflows/ci.yml` runs the required `Lint, typecheck and test` check. Each step runs one package script; to reproduce a failed step, run that script locally.
+- `.github/workflows/ci.yml` runs the required `Lint, typecheck and test` check. Each `vp run` step runs one package script; rerun that script locally to reproduce a failure.
 
 ## Public documentation
 
