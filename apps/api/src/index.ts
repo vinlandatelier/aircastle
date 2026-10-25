@@ -1,7 +1,7 @@
 import pino from "pino";
 import { postgresAdapter } from "@aircastle/adapter-postgres";
 import { createAircastle } from "@aircastle/core";
-import { createApp } from "./app.ts";
+import { cmsErrorReporter, createApp } from "./app.ts";
 import { readConfig } from "./config.ts";
 
 const config = readConfig(process.env);
@@ -12,7 +12,7 @@ const database = postgresAdapter({
     ? {}
     : { namespace: process.env.AIRCASTLE_DATABASE_NAMESPACE }),
 });
-const cms = await createAircastle({ database });
+const cms = await createAircastle({ database, report: cmsErrorReporter(logger) });
 try {
   const configuredLimit = process.env.AIRCASTLE_MAX_REQUEST_BYTES;
   const maxRequestBytes = configuredLimit === undefined ? 1_048_576 : Number(configuredLimit);

@@ -19,6 +19,9 @@ import type {
   PublishedCollection,
   Result,
 } from "@aircastle/contracts";
+import { ErrorSummary } from "./error-summary.ts";
+
+export { ErrorSummary };
 
 export interface ProjectTransaction {
   state(): Promise<ProjectState>;
@@ -84,6 +87,8 @@ export interface ContentService {
 export interface AircastleRuntime extends ContentService {
   close(): Promise<void>;
 }
+/** Receives a summary of each unexpected error after it becomes an `internal_error` result. */
+export type ReportError = (error: ErrorSummary) => void;
 type SimpleCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
 const failure = (code: SimpleCode): { ok: false; error: { code: SimpleCode } } => ({
   ok: false,
@@ -98,7 +103,12 @@ class RejectedOperation extends Error {
   }
 }
 
-async function attempt<Value>(operation: () => Promise<Result<Value>>): Promise<Result<Value>> {
+class CorruptDocument extends Error {}
+
+async function attempt<Value>(
+  report: ReportError,
+  operation: () => Promise<Result<Value>>,
+): Promise<Result<Value>> {
   try {
     return await operation();
   } catch (error) {
@@ -110,6 +120,7 @@ async function attempt<Value>(operation: () => Promise<Result<Value>>): Promise<
       error.code === "unavailable"
     )
       return failure("unavailable");
+    report(ErrorSummary.of(error));
     return failure("internal_error");
   }
 }
@@ -130,9 +141,9 @@ async function publicationFor(
   return { revision, contracts: Object.fromEntries(entries) };
 }
 
-export function createService(store: ContentStore): ContentService {
+export function createService(store: ContentStore, report: ReportError): ContentService {
   const authorize = (access: Access, permission: Permission): Promise<Result<null>> =>
-    attempt(async () => {
+    attempt(report, async () => {
       if (!access.apiKey) return failure("unauthorized");
       const decision = await store.authorize(access.project, verifier(access.apiKey), permission);
       return decision === "authorized" ? { ok: true, data: null } : failure(decision);
@@ -142,7 +153,7 @@ export function createService(store: ContentStore): ContentService {
     permission: Permission,
     operation: () => Promise<Result<Value>>,
   ): Promise<Result<Value>> =>
-    attempt(async () => {
+    attempt(report, async () => {
       const decision = await authorize(access, permission);
       return decision.ok ? operation() : decision;
     });
@@ -240,8 +251,10 @@ export function createService(store: ContentStore): ContentService {
           if (!client) return failure("schema_mismatch");
           const document = await transaction.read(collectionName, id);
           if (!document) return failure("not_found");
-          if (!validateStored(collection.description, storedData(document)))
+          if (!validateStored(collection.description, storedData(document))) {
+            report(ErrorSummary.of(new CorruptDocument()));
             return failure("internal_error");
+          }
           return projectDocument(client, collection.description, document);
         });
       }),
@@ -250,6 +263,7 @@ export function createService(store: ContentStore): ContentService {
 
 export async function createAircastle(config: {
   database: ContentStore;
+  report: ReportError;
 }): Promise<AircastleRuntime> {
   try {
     await config.database.initialize();
@@ -261,7 +275,7 @@ export async function createAircastle(config: {
       });
     throw error;
   }
-  const service = createService(config.database);
+  const service = createService(config.database, config.report);
   let state: "running" | "closing" | "closed" = "running";
   let closing: Promise<void> | undefined;
   const pending = new Set<Promise<unknown>>();

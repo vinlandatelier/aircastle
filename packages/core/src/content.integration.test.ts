@@ -8,7 +8,7 @@ import type {
 } from "@aircastle/contracts";
 import { postgresAdapter } from "@aircastle/adapter-postgres";
 import { createService, type Access, type ContentService, type ContentStore } from "./index.ts";
-import { articles, permissions, successful } from "./test-support/fixtures.ts";
+import { articles, failOnReport, permissions, successful } from "./test-support/fixtures.ts";
 
 interface Fixture {
   access: Access;
@@ -40,7 +40,7 @@ async function withCms(operation: (fixture: Fixture) => Promise<void>) {
     await operation({
       access,
       store: () => store,
-      cms: () => createService(store),
+      cms: () => createService(store, failOnReport),
       provision,
       reopen: async () => {
         await store.close();

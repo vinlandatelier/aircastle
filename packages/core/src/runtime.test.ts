@@ -1,10 +1,16 @@
 import { expect, test } from "vite-plus/test";
 import { createAircastle } from "./index.ts";
-import { access, collections, controlledStore, deferred } from "./test-support/fixtures.ts";
+import {
+  access,
+  collections,
+  controlledStore,
+  deferred,
+  failOnReport,
+} from "./test-support/fixtures.ts";
 
 test("runtime initializes owned storage before serving operations", async () => {
   const { store, observations } = controlledStore();
-  const runtime = await createAircastle({ database: store });
+  const runtime = await createAircastle({ database: store, report: failOnReport });
   expect(observations.initialized).toBeGreaterThan(0);
   expect(await runtime.schema(access)).toEqual({
     ok: true,
@@ -21,13 +27,15 @@ test("failed startup releases resources and rejects startup", async () => {
       throw failure;
     },
   });
-  await expect(createAircastle({ database: store })).rejects.toBeInstanceOf(Error);
+  await expect(createAircastle({ database: store, report: failOnReport })).rejects.toBeInstanceOf(
+    Error,
+  );
   expect(observations.closed).toBe(1);
 });
 
 test("repeated close releases owned resources only once", async () => {
   const { store, observations } = controlledStore();
-  const runtime = await createAircastle({ database: store });
+  const runtime = await createAircastle({ database: store, report: failOnReport });
   await Promise.all([runtime.close(), runtime.close(), runtime.close()]);
   await runtime.close();
   expect(observations.closed).toBe(1);
@@ -36,7 +44,7 @@ test("repeated close releases owned resources only once", async () => {
 test("close drains an admitted operation and refuses new operations", async () => {
   const gate = deferred<void>();
   const { store, observations } = controlledStore({ beforeTransaction: () => gate.promise });
-  const runtime = await createAircastle({ database: store });
+  const runtime = await createAircastle({ database: store, report: failOnReport });
   const admitted = runtime.schema(access);
   try {
     await new Promise<void>((resolve) => setImmediate(resolve));

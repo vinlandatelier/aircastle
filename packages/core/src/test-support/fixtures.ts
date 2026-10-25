@@ -6,7 +6,7 @@ import type {
   PublishedCollection,
   Result,
 } from "@aircastle/contracts";
-import type { Access, ContentStore, ProjectTransaction } from "../index.ts";
+import type { Access, ContentStore, ErrorSummary, ProjectTransaction } from "../index.ts";
 import { expect } from "vite-plus/test";
 
 const project = "11111111-1111-4111-8111-111111111111";
@@ -135,3 +135,8 @@ export function controlledStore(
     snapshotDocuments: () => structuredClone(documents),
   };
 }
+
+/** Fails the operation, and so the test, when an unexpected error is reported. */
+export const failOnReport = (summary: ErrorSummary) => {
+  throw summary;
+};

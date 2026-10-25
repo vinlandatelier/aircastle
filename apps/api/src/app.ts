@@ -4,9 +4,14 @@ import { requestId } from "hono/request-id";
 import { openAPIRouteHandler } from "hono-openapi";
 import { pinoLogger } from "hono-pino";
 import type { Logger } from "pino";
-import type { ContentService } from "@aircastle/core";
+import type { ContentService, ReportError } from "@aircastle/core";
 import { contentRoutes } from "./features/content/index.ts";
 import { health } from "./features/health/index.ts";
+
+/** Logs the summary of each unexpected CMS error. */
+export function cmsErrorReporter(logger: Logger): ReportError {
+  return (summary) => logger.error({ err: summary }, "Unexpected CMS error");
+}
 
 export function createApp({
   logger,

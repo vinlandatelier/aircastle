@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ContentError, Result } from "@aircastle/contracts";
-import type { Access, ContentService } from "@aircastle/core";
+import { ErrorSummary, type Access, type ContentService } from "@aircastle/core";
 
 const statuses: Record<ContentError["code"], ContentfulStatusCode> = {
   invalid_request: 400,
@@ -80,8 +80,8 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
   const { cms, maxRequestBytes = 1_048_576 } = options;
   if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes < 1)
     throw new Error("maxRequestBytes must be a positive safe integer");
-  const app = new Hono().onError((_error, c) => {
-    c.error = new Error("Content operation failed");
+  const app = new Hono().onError((error, c) => {
+    c.error = ErrorSummary.of(error);
     return reply(c, failure("internal_error"));
   });
   return app
