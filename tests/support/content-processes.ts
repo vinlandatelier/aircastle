@@ -98,7 +98,6 @@ export async function standaloneServer(
     cwd: repository,
     env: {
       ...process.env,
-      AIRCASTLE_MAX_REQUEST_BYTES: "1048576",
       ...env,
       DATABASE_URL: process.env.DATABASE_URL ?? "",
       AIRCASTLE_DATABASE_NAMESPACE: namespace,

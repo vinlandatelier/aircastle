@@ -1,6 +1,6 @@
 # API agent tools
 
-- `src/app.ts` exports `createApp({ logger })`. `src/index.ts` reads configuration and starts Bun; `src/cli.ts` exports a quiet app for CLI use.
+- `src/app.ts` exports `createApp({ logger, cms, maxRequestBytes })`. `src/index.ts` reads configuration and starts Bun; `src/cli.ts` exports a quiet app for CLI use.
 - The CLI entry loads the app through native module resolution because the pinned CLI bundles CommonJS dependencies incorrectly. Its working directory is `apps/api`, set by the root command.
 - From the repository root, run `vp run hono-api --help` first.
 - Inspect routes with `vp run hono-api routes src/cli.ts`.
