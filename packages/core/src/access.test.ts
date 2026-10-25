@@ -78,7 +78,7 @@ test("read-only keys cannot create or publish but can read", async () => {
   const saved = { id: documentId, title: "Hello", slug: "hello", status: "draft" };
   const { store } = controlledStore({
     authorization: (permission) => (permission === "content:read" ? "authorized" : "forbidden"),
-    documents: [saved],
+    documents: { articles: [saved] },
   });
   const cms = createService(store, failOnReport);
   expect(await cms.create(access, "articles", contract, { title: "Hello", slug: "hello" })).toEqual(

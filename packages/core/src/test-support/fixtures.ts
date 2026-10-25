@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   CollectionDescription,
   ContentDocument,
@@ -50,7 +51,7 @@ export function deferred<Value>() {
 export function controlledStore(
   options: {
     state?: ProjectState;
-    documents?: ContentDocument[];
+    documents?: Readonly<Record<string, ContentDocument[]>>;
     contracts?: Readonly<Record<string, CollectionDescription>>;
     authorization?:
       | "authorized"
@@ -62,7 +63,13 @@ export function controlledStore(
   } = {},
 ) {
   let state = structuredClone(options.state ?? { revision: "revision-start", collections });
-  const documents = structuredClone(options.documents ?? []);
+  let documents = new Map(Object.entries(structuredClone(options.documents ?? {})));
+  let inserted = 0;
+  const active = (collection: string) => {
+    if (!state.collections.some((entry) => entry.name === collection))
+      throw new Error("Unknown collection");
+    return documents.get(collection) ?? [];
+  };
   const contracts = new Map(Object.entries(options.contracts ?? { [contract]: articles }));
   const observations = {
     initialized: 0,
@@ -76,7 +83,7 @@ export function controlledStore(
       const value = contracts.get(id);
       return value === undefined ? undefined : structuredClone(value);
     },
-    documents: async () => structuredClone(documents),
+    documents: async (collection) => structuredClone(active(collection)),
     activate: async (next, publication) => {
       state = { revision: publication.revision, collections: structuredClone(next) };
       for (const entry of next) {
@@ -84,12 +91,21 @@ export function controlledStore(
         if (id !== undefined) contracts.set(id, structuredClone(entry.description));
       }
     },
-    insert: async (_collection, data) => {
-      const saved = { ...structuredClone(data), id: documentId };
-      documents.push(saved);
+    insert: async (collection, data, uniqueFields) => {
+      const existing = active(collection);
+      const conflict = uniqueFields.find(
+        (field) =>
+          typeof data[field] === "string" &&
+          existing.some((document) => document[field] === data[field]),
+      );
+      if (conflict !== undefined)
+        return { ok: false, error: { code: "unique_conflict", field: conflict } };
+      const saved = { ...structuredClone(data), id: inserted++ === 0 ? documentId : randomUUID() };
+      documents.set(collection, [...existing, saved]);
       return { ok: true, data: structuredClone(saved) };
     },
-    read: async (_collection, id) => structuredClone(documents.find((entry) => entry.id === id)),
+    read: async (collection, id) =>
+      structuredClone(active(collection).find((entry) => entry.id === id)),
   };
   const store: ContentStore = {
     initialize: async () => {
@@ -108,12 +124,14 @@ export function controlledStore(
       await options.beforeTransaction?.();
       const originalState = structuredClone(state);
       const originalDocuments = structuredClone(documents);
+      const originalInserted = inserted;
       const originalContracts = new Map(contracts);
       try {
         return await operation(transaction);
       } catch (error) {
         state = originalState;
-        documents.splice(0, documents.length, ...originalDocuments);
+        documents = originalDocuments;
+        inserted = originalInserted;
         contracts.clear();
         for (const [id, description] of originalContracts) contracts.set(id, description);
         throw error;
@@ -127,7 +145,7 @@ export function controlledStore(
     store,
     observations,
     snapshot: () => structuredClone(state),
-    snapshotDocuments: () => structuredClone(documents),
+    snapshotDocuments: (collection: string) => structuredClone(documents.get(collection) ?? []),
   };
 }
 
