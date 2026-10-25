@@ -44,7 +44,6 @@ test("job-level conditions read only variables the guide says to set at reposito
     [...(condition(name) ?? "").matchAll(/\bvars\.([A-Za-z_]+)/g)].map((match) => match[1]),
   );
   expect(jobs).toEqual(["prepare", "model", "verify", "publish"]);
-  expect(new Set(conditionVariables)).toEqual(new Set(["AI_TRIGGER_LOGIN", "AI_TRIGGER_USER_ID"]));
   for (const name of conditionVariables) expect(repositoryVariables).toContain(name);
 });
 

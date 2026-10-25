@@ -235,6 +235,36 @@ test("a failed run still writes a receipt with the failure and no token", async 
   expect(receipt).not.toContain("oauth-secret");
 });
 
+test("a token cut by the stderr tail boundaries leaves no fragment in the error", async () => {
+  const token = `sk-ant-oat01-${"Q7f".repeat(16)}`;
+  await fakeClaude(unauthenticated, 1, `${token}${"\n".repeat(4_076)}done`);
+  vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", token);
+  const message = await runModel(selection, "review", schema).then(
+    () => "",
+    (error: unknown) => (error instanceof Error ? error.message : ""),
+  );
+  expect(message).toContain('stderr="[redacted] done"');
+  expect(message).not.toContain("Q7f");
+
+  await fakeClaude(unauthenticated, 1, `${"a ".repeat(200)}${token}${" b".repeat(146)}`);
+  vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", token);
+  const tail = await runModel(selection, "review", schema).then(
+    () => "",
+    (error: unknown) => (error instanceof Error ? error.message : ""),
+  );
+  expect(tail).toContain(`stderr=${JSON.stringify(" b".repeat(146).trim())}`);
+});
+
+test("a receipt that cannot be written still rejects with the provider error", async () => {
+  await fakeClaude(unauthenticated, 1, "rate limited");
+  const blocker = join(await directory(), "file");
+  await writeFile(blocker, "");
+  vi.stubEnv("AI_MODEL_RECEIPTS_DIR", join(blocker, "receipts"));
+  const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  await expect(runModel(selection, "review", schema)).rejects.toThrow(/^provider_failed: /);
+  expect(logged).toHaveBeenCalledWith(expect.stringContaining("provider_receipt_unavailable"));
+});
+
 test("a run the timeout killed reports provider_timeout", async () => {
   await fakeClaude("", "TERM");
   await expect(runModel(selection, "review", schema)).rejects.toThrow(

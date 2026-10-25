@@ -26,7 +26,6 @@ const efforts: Record<Effort, true> = {
 };
 const maxOutputBytes = 64 * 1_048_576;
 const runTimeoutMs = 25 * 60_000;
-const stderrTailBytes = 4_096;
 const detailChars = 300;
 /** Structured output takes two turns, the answer and its acceptance. The rest allow schema retries. */
 const maxTurns = 4;
@@ -83,20 +82,19 @@ function claude(args: string[], prompt: string, directory: string, token: string
       stdio: ["pipe", "pipe", "pipe"],
       timeout: runTimeoutMs,
     });
-    const chunks: Buffer[] = [];
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
     let size = 0;
-    let stderr = Buffer.alloc(0);
     let failure: Error | null = null;
-    child.stdout.on("data", (chunk: Buffer) => {
+    const collect = (chunks: Buffer[]) => (chunk: Buffer) => {
       size += chunk.byteLength;
       if (size > maxOutputBytes) {
         failure = new Error("provider_output_limit");
         child.kill();
       } else chunks.push(chunk);
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr = Buffer.concat([stderr, chunk]).subarray(-stderrTailBytes);
-    });
+    };
+    child.stdout.on("data", collect(stdout));
+    child.stderr.on("data", collect(stderr));
     child.on("error", (error) => {
       failure ??= new Error("provider_unavailable", { cause: error });
     });
@@ -106,8 +104,8 @@ function claude(args: string[], prompt: string, directory: string, token: string
         resolve({
           code,
           signal,
-          stdout: Buffer.concat(chunks).toString("utf8"),
-          stderr: stderr.toString("utf8"),
+          stdout: Buffer.concat(stdout).toString("utf8"),
+          stderr: Buffer.concat(stderr).toString("utf8"),
         });
     });
     child.stdin.on("error", () => undefined);
@@ -115,7 +113,10 @@ function claude(args: string[], prompt: string, directory: string, token: string
   });
 }
 
-/** Makes CLI text safe for logs: no token, no control characters, bounded length. */
+/**
+ * Makes CLI text safe for logs: no token, no control characters, bounded length. Redaction runs on
+ * the whole text before truncation, and a truncated tail drops its cut first word.
+ */
 function sanitize(text: string, token: string, keep: "head" | "tail"): string {
   const clean = text
     .replaceAll(token, "[redacted]")
@@ -123,7 +124,10 @@ function sanitize(text: string, token: string, keep: "head" | "tail"): string {
     .replace(/[^\x20-\x7e]+/g, " ")
     .replace(/ {2,}/g, " ")
     .trim();
-  return keep === "head" ? clean.slice(0, detailChars) : clean.slice(-detailChars);
+  if (clean.length <= detailChars) return clean;
+  return keep === "head"
+    ? clean.slice(0, detailChars)
+    : clean.slice(-detailChars).replace(/^\S*\s*/, "");
 }
 
 /**
@@ -253,7 +257,14 @@ export async function runModel(
         failure: error instanceof Error ? error.message : "provider_failed",
       },
       token,
-    );
+    ).catch((receiptError: unknown) => {
+      console.error(
+        JSON.stringify({
+          kind: "model_receipt_failure",
+          error: receiptError instanceof Error ? receiptError.message : "provider_receipt_failed",
+        }),
+      );
+    });
     throw error;
   }
   const { response, value } = accepted;
