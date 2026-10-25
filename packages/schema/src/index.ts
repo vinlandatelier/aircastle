@@ -3,6 +3,7 @@ export type {
   CollectionDescription,
   CompiledCollection,
   CompiledSchema,
+  DecodeResult,
   IssuePath,
   ReceivedType,
   SchemaIssue,

@@ -125,14 +125,14 @@ export function compileField(
           continue;
         }
         accepted.push(choice);
-        const causes = validateValue(choice, rules, path);
-        if (causes[0]) {
+        const checked = validateValue(choice, rules, path);
+        if (!checked.ok) {
           issues.push(
             schemaIssue(path, {
               code: "invalid_choices",
               reason: "violates_constraints",
               index,
-              causes: [causes[0], ...causes.slice(1)],
+              causes: checked.issues,
             }),
           );
           valid = false;
@@ -167,13 +167,9 @@ export function compileField(
       );
   }
   if (defaults.length === 1) {
-    const value = defaults[0];
-    const causes = validateValue(value, rules, path);
-    if (causes[0])
-      issues.push(
-        schemaIssue(path, { code: "invalid_default", causes: [causes[0], ...causes.slice(1)] }),
-      );
-    else if (typeof value === "string" || value === null) rules.default = value;
+    const checked = validateValue(defaults[0], rules, path);
+    if (checked.ok) rules.default = checked.value;
+    else issues.push(schemaIssue(path, { code: "invalid_default", causes: checked.issues }));
   }
   issues.sort((left, right) => issueOrder[left.code] - issueOrder[right.code]);
   return { rules: Object.freeze(rules), issues };
@@ -204,9 +200,9 @@ export function compiledCollection(
             continue;
           }
         }
-        const failures = validateValue(value, rules, [name]);
-        if (failures.length) issues.push(...failures);
-        else if (typeof value === "string" || value === null) output.push([name, value]);
+        const checked = validateValue(value, rules, [name]);
+        if (checked.ok) output.push([name, checked.value]);
+        else issues.push(...checked.issues);
       }
       for (const name of [...values.keys()].filter((name) => !knownNames.has(name)).sort()) {
         issues.push(validationIssue([name], { code: "unknown_field" }));

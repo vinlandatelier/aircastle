@@ -59,6 +59,10 @@ export type ValidationResult<Output extends object> =
   | { readonly ok: true; readonly data: Output }
   | { readonly ok: false; readonly issues: NonemptyIssues<ValidationIssue> };
 
+export type DecodeResult<Output extends object> =
+  | { readonly ok: true; readonly data: Output }
+  | { readonly ok: false; readonly issues: NonemptyIssues<SchemaIssue> };
+
 export type SchemaIssue = IssueDetails &
   (
     | {

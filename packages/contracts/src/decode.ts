@@ -57,11 +57,9 @@ export function decodeDescription(
   const decoded = decodeCollection(value);
   if (!decoded.ok)
     return { ok: false, issue: { reason: "invalid_schema", path, issues: decoded.issues } };
-  const invalid = Object.keys(decoded.collection.describe().fields).find(
-    (name) => !fieldName(name),
-  );
+  const invalid = Object.keys(decoded.data.describe().fields).find((name) => !fieldName(name));
   if (invalid !== undefined) return rejected("invalid_name", [...path, "fields", invalid]);
-  return { ok: true, data: decoded.collection };
+  return { ok: true, data: decoded.data };
 }
 
 /** Decodes published collections from untrusted input and reports why input was rejected. */

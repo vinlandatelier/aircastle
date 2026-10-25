@@ -86,7 +86,7 @@ test("decodeCollection reads back every description that compileSchema emits", (
     fc.property(declarations, (fields) => {
       const description = compileCollection(fields).describe();
       const decoded = schema.decodeCollection(JSON.parse(JSON.stringify(description)));
-      expect(decoded.ok && decoded.collection.describe()).toEqual(description);
+      expect(decoded.ok && decoded.data.describe()).toEqual(description);
     }),
     propertyParameters,
   );

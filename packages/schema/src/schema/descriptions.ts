@@ -1,4 +1,4 @@
-import type { CompiledCollection, IssuePath, NonemptyIssues, SchemaIssue } from "./contract.ts";
+import type { CompiledCollection, DecodeResult, IssuePath, SchemaIssue } from "./contract.ts";
 import { compiledCollection, compileField } from "./compile.ts";
 import type { Modifier } from "./declarations.ts";
 import { schemaIssue } from "./errors.ts";
@@ -73,9 +73,7 @@ function fieldModifiers(value: unknown, path: IssuePath): FieldModifiers {
  */
 export function decodeCollection(
   description: unknown,
-):
-  | { readonly ok: true; readonly collection: CompiledCollection<Record<string, string | null>> }
-  | { readonly ok: false; readonly issues: NonemptyIssues<SchemaIssue> } {
+): DecodeResult<CompiledCollection<Record<string, string | null>>> {
   if (
     !isPlainRecord(description) ||
     !Object.keys(description).every((key) => key === "fields") ||
@@ -96,5 +94,5 @@ export function decodeCollection(
   }
   return issues[0]
     ? { ok: false, issues: [issues[0], ...issues.slice(1)] }
-    : { ok: true, collection: compiledCollection(fields) };
+    : { ok: true, data: compiledCollection(fields) };
 }
