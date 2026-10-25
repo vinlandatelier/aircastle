@@ -4,7 +4,7 @@ import { requestId } from "hono/request-id";
 import { openAPIRouteHandler } from "hono-openapi";
 import { pinoLogger } from "hono-pino";
 import type { Logger } from "pino";
-import type { ContentService, ReportError } from "@aircastle/core";
+import { ErrorSummary, type ContentService, type ReportError } from "@aircastle/core";
 import { contentRoutes } from "./features/content/index.ts";
 import { health } from "./features/health/index.ts";
 
@@ -40,7 +40,10 @@ export function createApp({
         },
       }),
     )
-    .onError((_error, c) => c.json({ error: "Internal server error" }, 500))
+    .onError((error, c) => {
+      c.error = ErrorSummary.of(error);
+      return c.json({ error: "Internal server error" }, 500);
+    })
     .basePath("/api")
     .route("/", health);
 

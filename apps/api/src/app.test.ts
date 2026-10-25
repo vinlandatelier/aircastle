@@ -56,23 +56,36 @@ describe("API", () => {
     }
   });
 
-  test("returns a generic 500 and logs an unexpected error once", async () => {
+  test("returns a generic 500 and logs an unexpected error once as a sanitized summary", async () => {
+    const secret = "postgres://admin:hunter2@db/prod";
+    class ConnectionFailure extends Error {}
+    function connectToDatabase(): never {
+      throw Object.assign(
+        new ConnectionFailure(`could not connect to ${secret}`, { cause: new Error(secret) }),
+        { code: "ECONNREFUSED", url: secret },
+      );
+    }
     const { logger, lines } = captureLogs();
     const app = createApp({ logger });
-    app.get("/broken", () => {
-      throw new Error("internal failure detail");
-    });
+    app.get("/broken", () => connectToDatabase());
     const response = await app.request("/api/broken");
+    const body = await response.text();
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Internal server error" });
+    expect(JSON.parse(body)).toEqual({ error: "Internal server error" });
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0]!)).toMatchObject({
       level: 50,
       reqId: response.headers.get("x-request-id"),
       res: { status: 500 },
-      err: { message: "internal failure detail", stack: expect.any(String) },
+      err: {
+        type: "ErrorSummary",
+        message: "ConnectionFailure",
+        code: "ECONNREFUSED",
+        stack: expect.stringContaining("connectToDatabase"),
+      },
     });
+    expect(body + lines.join("")).not.toContain("hunter2");
   });
 
   test("concurrent requests receive distinct correlated IDs", async () => {
