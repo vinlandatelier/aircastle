@@ -3,26 +3,14 @@ import {
   compileSchema,
   isPlainRecord,
   SchemaError,
-  text,
+  uncheckedText,
   type CollectionDescription,
   type CompiledCollection,
   type IssuePath,
+  type UncheckedModifier,
 } from "@aircastle/schema";
 
 type FieldIdentity = Parameters<typeof collection>[0][string];
-/** The text builder fed unchecked wire values. `compileSchema` validates every modifier value. */
-interface WireText extends FieldIdentity {
-  min: (value: unknown) => WireText;
-  max: (value: unknown) => WireText;
-  optional: () => WireText;
-  nullable: () => WireText;
-  unique: () => WireText;
-  default: (value: unknown) => WireText;
-  oneOf: (values: unknown) => WireText;
-  email: () => WireText;
-  url: () => WireText;
-  editor: (name: unknown, options: unknown) => WireText;
-}
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const reservedCollections = new Set([
   "then",
@@ -80,7 +68,7 @@ function rejected(
   return { ok: false, issue: { reason, path } };
 }
 
-function wireField(value: unknown, path: IssuePath): Decoded<WireText> {
+function wireField(value: unknown, path: IssuePath): Decoded<FieldIdentity> {
   if (
     !isPlainRecord(value) ||
     !knownKeys(value, fieldKeys) ||
@@ -90,23 +78,23 @@ function wireField(value: unknown, path: IssuePath): Decoded<WireText> {
     typeof value.unique !== "boolean"
   )
     return rejected("invalid_field", path);
-  /** The runtime builder stores any modifier value and `compileSchema` validates it, so wire values go in unchecked. */
-  let builder = text() as WireText;
-  if (!value.required) builder = builder.optional();
-  if (value.nullable) builder = builder.nullable();
-  if (value.unique) builder = builder.unique();
+  const modifiers: UncheckedModifier[] = [];
+  if (!value.required) modifiers.push({ kind: "optional" });
+  if (value.nullable) modifiers.push({ kind: "nullable" });
+  if (value.unique) modifiers.push({ kind: "unique" });
   for (const constraint of ["min", "max"] as const) {
-    if (Object.hasOwn(value, constraint)) builder = builder[constraint](value[constraint]);
+    if (Object.hasOwn(value, constraint))
+      modifiers.push({ kind: constraint, value: value[constraint] });
   }
-  if (Object.hasOwn(value, "choices")) builder = builder.oneOf(value.choices);
+  if (Object.hasOwn(value, "choices")) modifiers.push({ kind: "choices", value: value.choices });
   if (Object.hasOwn(value, "format")) {
-    if (value.format === "email") builder = builder.email();
-    else if (value.format === "url") builder = builder.url();
-    else return rejected("invalid_field", [...path, "format"]);
+    if (value.format !== "email" && value.format !== "url")
+      return rejected("invalid_field", [...path, "format"]);
+    modifiers.push({ kind: "format", value: value.format });
   }
   if (Object.hasOwn(value, "default")) {
     if (value.required) return rejected("invalid_field", [...path, "default"]);
-    builder = builder.default(value.default);
+    modifiers.push({ kind: "default", value: value.default });
   }
   if (Object.hasOwn(value, "editor")) {
     if (!isPlainRecord(value.editor)) return rejected("invalid_field", [...path, "editor"]);
@@ -116,9 +104,9 @@ function wireField(value: unknown, path: IssuePath): Decoded<WireText> {
       (type === "code" && !Object.hasOwn(options, "language"))
     )
       return rejected("invalid_field", [...path, "editor"]);
-    builder = builder.editor(type, options);
+    modifiers.push({ kind: "editor", name: type, options });
   }
-  return { ok: true, data: builder };
+  return { ok: true, data: uncheckedText(modifiers) };
 }
 
 export function decodeDescription(

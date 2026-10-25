@@ -114,6 +114,7 @@ function compileField(
     else {
       let valid = true;
       const firstIndices = new Map<string, number>();
+      const accepted: string[] = [];
       for (const [index, choice] of choices.entries()) {
         if (typeof choice !== "string") {
           issues.push(
@@ -122,6 +123,7 @@ function compileField(
           valid = false;
           continue;
         }
+        accepted.push(choice);
         const causes = validateValue(choice, rules, path);
         if (causes[0]) {
           issues.push(
@@ -140,7 +142,7 @@ function compileField(
           valid = false;
         } else firstIndices.set(choice, index);
       }
-      if (valid) rules.choices = Object.freeze([...choices] as string[]);
+      if (valid) rules.choices = Object.freeze(accepted);
     }
   }
   const editors: TextEditorDescription[] = [];
@@ -236,9 +238,19 @@ function compiledCollection(
   });
 }
 
+/** The runtime compiler builds one collection per declared name, so the declarations carry the output types. */
 export function compileSchema<const Collections extends CollectionDefinitions>(
   definitions: Collections,
-): CompiledSchema<{ [Name in keyof Collections]: InferOutput<Collections[Name]> }> {
+): CompiledSchema<{ [Name in keyof Collections]: InferOutput<Collections[Name]> }>;
+export function compileSchema(
+  definitions: unknown,
+): CompiledSchema<Record<string, Record<string, unknown>>> {
+  return compileUnknown(definitions);
+}
+
+function compileUnknown(
+  definitions: unknown,
+): CompiledSchema<Record<string, Record<string, unknown>>> {
   const root = snapshotRecord(definitions);
   if (!root.ok)
     throw new SchemaError([
@@ -288,7 +300,12 @@ export function compileSchema<const Collections extends CollectionDefinitions>(
     compiled.push([name, compiledCollection(fields)]);
   }
   if (issues[0]) throw new SchemaError([issues[0], ...issues.slice(1)]);
-  return Object.freeze(Object.fromEntries(compiled)) as CompiledSchema<{
-    [Name in keyof Collections]: InferOutput<Collections[Name]>;
-  }>;
+  return Object.freeze(Object.fromEntries(compiled));
+}
+
+/** Narrows untrusted collection declarations, such as a loaded config module, by throwing the `SchemaError` that `compileSchema` would throw. */
+export function assertCollectionDefinitions(
+  definitions: unknown,
+): asserts definitions is CollectionDefinitions {
+  compileUnknown(definitions);
 }

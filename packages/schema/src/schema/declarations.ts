@@ -14,6 +14,23 @@ export type Modifier =
       readonly options: RecordSnapshot | undefined;
     };
 
+/** A text field modifier decoded from untrusted input. `compileSchema` reports every invalid value. */
+export type UncheckedModifier =
+  | Exclude<Modifier, { kind: "editor" }>
+  | { readonly kind: "editor"; readonly name: unknown; readonly options: unknown };
+
+function storedModifier(modifier: UncheckedModifier): Modifier {
+  if (modifier.kind === "choices")
+    return Object.freeze({ kind: "choices", value: snapshotChoices(modifier.value) });
+  if (modifier.kind === "editor")
+    return Object.freeze({
+      kind: "editor",
+      name: modifier.name,
+      options: modifier.options === undefined ? undefined : snapshotRecord(modifier.options),
+    });
+  return Object.freeze(modifier);
+}
+
 const fields = new WeakMap<object, readonly Modifier[]>();
 const collections = new WeakMap<object, RecordSnapshot>();
 
@@ -53,8 +70,8 @@ class TextField<
     NextOptional extends boolean = Optional,
     NextNullable extends boolean = Nullable,
     NextDefaulted extends boolean = Defaulted,
-  >(modifier: Modifier): TextField<NextValue, NextOptional, NextNullable, NextDefaulted> {
-    return new TextField([...fields.get(this)!, Object.freeze(modifier)]);
+  >(modifier: UncheckedModifier): TextField<NextValue, NextOptional, NextNullable, NextDefaulted> {
+    return new TextField([...fields.get(this)!, storedModifier(modifier)]);
   }
 
   min(value: number): TextField<Value, Optional, Nullable, Defaulted> {
@@ -77,7 +94,7 @@ class TextField<
   oneOf<const Choices extends readonly string[]>(
     values: Choices,
   ): TextField<Choices[number], Optional, Nullable, Defaulted> {
-    return this.#append<Choices[number]>({ kind: "choices", value: snapshotChoices(values) });
+    return this.#append<Choices[number]>({ kind: "choices", value: values });
   }
   email(): TextField<Value, Optional, Nullable, Defaulted> {
     return this.#append({ kind: "format", value: "email" });
@@ -101,11 +118,7 @@ class TextField<
     options?: Readonly<Record<string, never>>,
   ): TextField<Value, Optional, Nullable, Defaulted>;
   editor(name: unknown, options?: unknown): TextField<Value, Optional, Nullable, Defaulted> {
-    return this.#append({
-      kind: "editor",
-      name,
-      options: options === undefined ? undefined : snapshotRecord(options),
-    });
+    return this.#append({ kind: "editor", name, options });
   }
 }
 
@@ -123,20 +136,25 @@ export function text(): TextField {
   return new TextField();
 }
 
+/** Builds a text field from modifiers decoded from untrusted input, such as a wire description. */
+export function uncheckedText(
+  modifiers: readonly UncheckedModifier[],
+): TextField<string, boolean, boolean, boolean> {
+  return new TextField(modifiers.map(storedModifier));
+}
+
 export function collection<const Fields extends Readonly<Record<string, FieldIdentity>>>(
   definition: Fields,
 ): Collection<Fields> {
   return new Collection(definition);
 }
 
-/** `WeakMap.get` returns `undefined` for primitives, so any value can be looked up. */
 export function fieldDefinition(value: unknown): readonly Modifier[] | undefined {
-  return fields.get(value as object);
+  return value instanceof TextField ? fields.get(value) : undefined;
 }
 
-/** `WeakMap.get` returns `undefined` for primitives, so any value can be looked up. */
 export function collectionDefinition(value: unknown): RecordSnapshot | undefined {
-  return collections.get(value as object);
+  return value instanceof Collection ? collections.get(value) : undefined;
 }
 
 type FieldValue<Field extends FieldIdentity> =

@@ -40,3 +40,61 @@ test("isMember matches self-keyed table names strictly", () => {
     expect(schema.isMember(table, value)).toBe(false);
   }
 });
+
+test("assertCollectionDefinitions accepts declared collections and throws compileSchema's issues otherwise", () => {
+  const declared: unknown = { articles: schema.collection({ title: schema.text() }) };
+  schema.assertCollectionDefinitions(declared);
+  expect(Object.keys(schema.compileSchema(declared))).toEqual(["articles"]);
+
+  for (const value of [null, { articles: { title: "text" } }, { articles: schema.text() }]) {
+    let thrown: unknown;
+    try {
+      schema.assertCollectionDefinitions(value);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(schema.SchemaError);
+    expect(thrown).toMatchObject({ issues: [{ code: "invalid_definition" }] });
+  }
+});
+
+test("uncheckedText builds the same field as the typed builder and leaves validation to compileSchema", () => {
+  const choices: unknown[] = ["draft", "published"];
+  const unchecked = schema.uncheckedText([
+    { kind: "optional" },
+    { kind: "nullable" },
+    { kind: "unique" },
+    { kind: "min", value: 1 },
+    { kind: "max", value: 20 },
+    { kind: "choices", value: choices },
+    { kind: "default", value: "draft" },
+    { kind: "editor", name: "radio", options: undefined },
+  ]);
+  choices.push("archived");
+  const typed = schema
+    .text()
+    .optional()
+    .nullable()
+    .unique()
+    .min(1)
+    .max(20)
+    .oneOf(["draft", "published"])
+    .default("draft")
+    .editor("radio");
+  const described = (field: Parameters<typeof schema.collection>[0][string]) =>
+    schema.compileSchema({ articles: schema.collection({ status: field }) }).articles.describe();
+  expect(described(unchecked)).toEqual(described(typed));
+
+  const code = schema.uncheckedText([
+    { kind: "editor", name: "code", options: { language: "sql" } },
+    { kind: "format", value: "email" },
+  ]);
+  expect(described(code).fields.status).toMatchObject({
+    format: "email",
+    editor: { type: "code", language: "sql" },
+  });
+
+  expect(() => described(schema.uncheckedText([{ kind: "min", value: "1" }]))).toThrow(
+    schema.SchemaError,
+  );
+});

@@ -6,52 +6,38 @@ import {
   ListTodoIcon,
   SettingsIcon,
   UsersIcon,
+  type LucideIcon,
 } from 'lucide-react'
+
+function dashboardPage<const Segment extends string>(
+  segment: Segment,
+  title: string,
+  icon: LucideIcon,
+) {
+  return {
+    title,
+    segment,
+    path: `/dash/workspaces/$workspaceId/projects/$projectId/${segment}` as const,
+    icon,
+  }
+}
 
 export const navigationGroups = [
   {
     label: 'Product',
     items: [
-      {
-        title: 'Tasks',
-        path: '/dash/workspaces/$workspaceId/projects/$projectId/tasks',
-        icon: ListTodoIcon,
-      },
-      {
-        title: 'Collections',
-        path: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
-        icon: LayoutGridIcon,
-      },
-      {
-        title: 'Media Library',
-        path: '/dash/workspaces/$workspaceId/projects/$projectId/media',
-        icon: ImagesIcon,
-      },
-      {
-        title: 'Analytics',
-        path: '/dash/workspaces/$workspaceId/projects/$projectId/analytics',
-        icon: BarChart3Icon,
-      },
+      dashboardPage('tasks', 'Tasks', ListTodoIcon),
+      dashboardPage('collections', 'Collections', LayoutGridIcon),
+      dashboardPage('media', 'Media Library', ImagesIcon),
+      dashboardPage('analytics', 'Analytics', BarChart3Icon),
     ],
   },
   {
     label: 'Administration',
     items: [
-      {
-        title: 'Users',
-        path: '/dash/workspaces/$workspaceId/projects/$projectId/users',
-        icon: UsersIcon,
-      },
-      {
-        title: 'Access Tokens',
-        path: '/dash/workspaces/$workspaceId/projects/$projectId/access-tokens',
-        icon: KeyRoundIcon,
-      },
-      {
-        title: 'Settings',
-        path: '/dash/workspaces/$workspaceId/projects/$projectId/settings',
-        icon: SettingsIcon,
-      },
+      dashboardPage('users', 'Users', UsersIcon),
+      dashboardPage('access-tokens', 'Access Tokens', KeyRoundIcon),
+      dashboardPage('settings', 'Settings', SettingsIcon),
     ],
   },
 ] as const

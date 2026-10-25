@@ -8,7 +8,7 @@ const frames = Array.from({ length: 16 }, (_, index) => ({
     '--frame-angle': `${index * 5 - 28}deg`,
     opacity: 0.06 + index * 0.025,
     animationDelay: `${-index * 0.8}s`,
-  } as CSSProperties,
+  } satisfies CSSProperties,
 }))
 
 export function FloatingFrames() {
