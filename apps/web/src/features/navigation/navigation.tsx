@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import { SearchIcon } from 'lucide-react'
-import { navigationGroups } from './pages'
+import { navigationGroups } from '@/features/navigation/pages'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import {

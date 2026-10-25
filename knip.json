@@ -23,6 +23,7 @@
       "entry": ["src/{index,cli}.ts"]
     },
     "apps/web": {
+      "entry": ["e2e/fixture-modules/*.ts"],
       "vitest": {
         "config": ["vite.config.ts", "vite.verification.config.ts"]
       },

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 
-import { initialProject, projects } from './data'
+import { initialProject, projects } from '@/components/shell/data'
 
 export function ProjectSwitcher() {
   const [open, setOpen] = useState(false)

@@ -1,4 +1,4 @@
-export const scenarios = [
+const scenarios = [
   'normal',
   'long-text',
   'unicode',

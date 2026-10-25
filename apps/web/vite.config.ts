@@ -3,7 +3,21 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, lazyPlugins } from 'vite-plus'
-import { fixtureBuild } from './e2e/fixture-build'
+const source = (path: string) => new URL(path, import.meta.url).pathname
+const fixtureModules =
+  process.env.WEB_FIXTURES === '1'
+    ? [
+        {
+          find: /^@\/components\/shell\/data$/,
+          replacement: source('./e2e/fixture-modules/shell-data.ts'),
+        },
+        {
+          find: /^@\/features\/navigation\/pages$/,
+          replacement: source('./e2e/fixture-modules/navigation-pages.ts'),
+        },
+      ]
+    : []
+
 export default defineConfig({
   test: {
     environment: 'happy-dom',
@@ -22,7 +36,7 @@ export default defineConfig({
   cacheDir: process.env.WEB_RUN_DIR ? `${process.env.WEB_RUN_DIR}/cache` : 'node_modules/.vite',
   publicDir: process.env.WEB_PUBLIC_DIR ?? 'public',
   build: { outDir: process.env.WEB_BUILD_DIR ?? 'dist' },
-  resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
+  resolve: { alias: [...fixtureModules, { find: '@', replacement: source('./src') }] },
   server: {
     port: 43121,
     strictPort: true,
@@ -31,10 +45,5 @@ export default defineConfig({
     },
   },
   preview: { port: 43121, strictPort: true },
-  plugins: lazyPlugins(() => [
-    tailwindcss(),
-    react(),
-    babel({ presets: [reactCompilerPreset()] }),
-    ...(process.env.WEB_FIXTURES === '1' ? [fixtureBuild()] : []),
-  ]),
+  plugins: lazyPlugins(() => [tailwindcss(), react(), babel({ presets: [reactCompilerPreset()] })]),
 })

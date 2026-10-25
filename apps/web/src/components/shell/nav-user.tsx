@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { UserIcon, SettingsIcon, CreditCardIcon, LogOutIcon } from 'lucide-react'
 
-import { user } from './data'
+import { user } from '@/components/shell/data'
 
 export function NavUser() {
   return (

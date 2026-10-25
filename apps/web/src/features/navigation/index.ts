@@ -1,4 +1,4 @@
-import { navigationGroups } from './pages'
+import { navigationGroups } from '@/features/navigation/pages'
 
 export { SidebarNavigation, PageSearch } from './navigation'
 
