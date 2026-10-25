@@ -77,6 +77,7 @@ describe("published collection descriptions", () => {
   test.each([
     ["non-array root", {}],
     ["null root", null],
+    ["non-array iterable root", new Set([{ name: "articles", description: description() }])],
     ["null collection", [null]],
     [
       "unknown collection property",
@@ -90,6 +91,7 @@ describe("published collection descriptions", () => {
       ],
     ],
     ["invalid collection identifier", [{ name: "article-posts", description: description() }]],
+    ["non-string collection name", [{ name: ["articles"], description: description() }]],
     ["reserved collection", [{ name: "then", description: description() }]],
     ["unknown description property", [{ name: "articles", description: { fields: {}, extra: 1 } }]],
     ["missing fields", [{ name: "articles", description: {} }]],

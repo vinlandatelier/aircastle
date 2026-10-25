@@ -1,8 +1,9 @@
 import {
   collection,
   compileSchema,
+  isMember,
+  isPlainRecord,
   text,
-  type CodeLanguage,
   type CollectionDefinitions,
   type CollectionDescription,
   type CompiledCollection,
@@ -53,23 +54,24 @@ export interface Lockfile {
 }
 
 type FieldIdentity = Parameters<typeof collection>[0][string];
+/** The text builder fed unchecked wire values. `compileSchema` validates every modifier value. */
 interface WireText extends FieldIdentity {
-  min: (value: number) => WireText;
-  max: (value: number) => WireText;
+  min: (value: unknown) => WireText;
+  max: (value: unknown) => WireText;
   optional: () => WireText;
-  nullable: () => NullableWireText;
+  nullable: () => WireText;
   unique: () => WireText;
-  default: (value: string) => WireText;
-  oneOf: (values: readonly string[]) => WireText;
+  default: (value: unknown) => WireText;
+  oneOf: (values: unknown) => WireText;
   email: () => WireText;
   url: () => WireText;
-  editor: ((name: "textarea", options?: { rows?: number }) => WireText) &
-    ((name: "code", options?: { language?: CodeLanguage }) => WireText) &
-    ((name: "radio", options?: Readonly<Record<string, never>>) => WireText);
+  editor: (name: unknown, options: unknown) => WireText;
 }
-interface NullableWireText extends WireText {
-  default: (value: string | null) => WireText;
-}
+type PlainIssueCode = Exclude<
+  ValidationIssue["code"],
+  "invalid_type" | "too_short" | "too_long" | "invalid_choice"
+>;
+type PlainErrorCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
 
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const reservedCollections = new Set([
@@ -92,27 +94,47 @@ const fieldKeys = new Set([
   "format",
   "editor",
 ]);
-const languages: readonly string[] = [
-  "plaintext",
-  "javascript",
-  "typescript",
-  "json",
-  "html",
-  "css",
-  "markdown",
-  "sql",
-];
+/** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
+const plainIssueCodes = {
+  required: "required",
+  invalid_document: "invalid_document",
+  invalid_unicode: "invalid_unicode",
+  invalid_character: "invalid_character",
+  invalid_email: "invalid_email",
+  invalid_url: "invalid_url",
+  unknown_field: "unknown_field",
+} satisfies { [Name in PlainIssueCode]: Name };
+/** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
+const receivedTypes = {
+  string: "string",
+  number: "number",
+  boolean: "boolean",
+  null: "null",
+  undefined: "undefined",
+  array: "array",
+  object: "object",
+  bigint: "bigint",
+  symbol: "symbol",
+  function: "function",
+} satisfies { [Name in ReceivedType]: Name };
+/** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
+const plainErrorCodes = {
+  invalid_request: "invalid_request",
+  unauthorized: "unauthorized",
+  forbidden: "forbidden",
+  not_found: "not_found",
+  schema_mismatch: "schema_mismatch",
+  schema_conflict: "schema_conflict",
+  migration_required: "migration_required",
+  payload_too_large: "payload_too_large",
+  internal_error: "internal_error",
+  unavailable: "unavailable",
+  transport_error: "transport_error",
+  unknown_write_outcome: "unknown_write_outcome",
+} satisfies { [Name in PlainErrorCode]: Name };
 
-function record(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object") return false;
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Reflect.ownKeys(value).every((key) => {
-    const property = Object.getOwnPropertyDescriptor(value, key);
-    return (
-      typeof key === "string" && property?.enumerable === true && Object.hasOwn(property, "value")
-    );
-  });
+function isCount(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0;
 }
 
 function knownKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
@@ -133,7 +155,7 @@ function malformed(): never {
 
 function wireField(value: unknown): WireText {
   if (
-    !record(value) ||
+    !isPlainRecord(value) ||
     !knownKeys(value, fieldKeys) ||
     value.type !== "text" ||
     typeof value.required !== "boolean" ||
@@ -141,61 +163,43 @@ function wireField(value: unknown): WireText {
     typeof value.unique !== "boolean"
   )
     malformed();
-  let builder: WireText = text();
+  /** The runtime builder stores any modifier value and `compileSchema` validates it, so wire values go in unchecked. */
+  let builder = text() as WireText;
   if (!value.required) builder = builder.optional();
-  if (Object.hasOwn(value, "default")) {
-    const fallback = value.default;
-    if (value.required || (typeof fallback !== "string" && fallback !== null)) malformed();
-    if (value.nullable) builder = builder.nullable().default(fallback);
-    else if (fallback === null) malformed();
-    else builder = builder.default(fallback);
-  } else if (value.nullable) builder = builder.nullable();
+  if (value.nullable) builder = builder.nullable();
   if (value.unique) builder = builder.unique();
   for (const constraint of ["min", "max"] as const) {
-    if (Object.hasOwn(value, constraint)) {
-      const bound = value[constraint];
-      if (typeof bound !== "number") malformed();
-      builder = builder[constraint](bound);
-    }
+    if (Object.hasOwn(value, constraint)) builder = builder[constraint](value[constraint]);
   }
-  if (Object.hasOwn(value, "choices")) {
-    if (
-      !Array.isArray(value.choices) ||
-      !value.choices.every((choice: unknown) => typeof choice === "string")
-    )
-      malformed();
-    builder = builder.oneOf(value.choices);
-  }
+  if (Object.hasOwn(value, "choices")) builder = builder.oneOf(value.choices);
   if (Object.hasOwn(value, "format")) {
     if (value.format === "email") builder = builder.email();
     else if (value.format === "url") builder = builder.url();
     else malformed();
   }
+  if (Object.hasOwn(value, "default")) {
+    if (value.required) malformed();
+    builder = builder.default(value.default);
+  }
   if (Object.hasOwn(value, "editor")) {
-    const editor = value.editor;
-    if (!record(editor)) malformed();
-    if (editor.type === "textarea") {
-      if (!knownKeys(editor, new Set(["type", "rows"])) || typeof editor.rows !== "number")
-        malformed();
-      builder = builder.editor("textarea", { rows: editor.rows });
-    } else if (editor.type === "code") {
-      if (
-        !knownKeys(editor, new Set(["type", "language"])) ||
-        typeof editor.language !== "string" ||
-        !languages.includes(editor.language)
-      )
-        malformed();
-      builder = builder.editor("code", { language: editor.language as CodeLanguage });
-    } else if (editor.type === "radio") {
-      if (!knownKeys(editor, new Set(["type"]))) malformed();
-      builder = builder.editor("radio");
-    } else malformed();
+    if (!isPlainRecord(value.editor)) malformed();
+    const { type, ...options } = value.editor;
+    if (
+      (type === "textarea" && !Object.hasOwn(options, "rows")) ||
+      (type === "code" && !Object.hasOwn(options, "language"))
+    )
+      malformed();
+    builder = builder.editor(type, options);
   }
   return builder;
 }
 
 function decodedDescription(value: unknown): CompiledCollection<DocumentData> {
-  if (!record(value) || !knownKeys(value, new Set(["fields"])) || !record(value.fields))
+  if (
+    !isPlainRecord(value) ||
+    !knownKeys(value, new Set(["fields"])) ||
+    !isPlainRecord(value.fields)
+  )
     malformed();
   const fields: Record<string, FieldIdentity> = Object.create(null);
   for (const [name, field] of Object.entries(value.fields)) {
@@ -221,7 +225,7 @@ export function parseCollections(input: unknown): Result<PublishedCollection[]> 
     const collections: PublishedCollection[] = [];
     for (const entry of input) {
       if (
-        !record(entry) ||
+        !isPlainRecord(entry) ||
         !knownKeys(entry, new Set(["name", "description"])) ||
         !collectionName(entry.name) ||
         names.has(entry.name)
@@ -250,16 +254,14 @@ function canonical(value: unknown): string {
     if (Array.isArray(entry)) return entry.map(sorted);
     if (entry !== null && typeof entry === "object") {
       return Object.fromEntries(
-        Object.entries(entry)
-          .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-          .map(([key, child]) => [key, sorted(child)]),
+        Object.keys(entry)
+          .sort()
+          .map((key) => [key, sorted(Reflect.get(entry, key))]),
       );
     }
     return entry;
   };
-  const result = JSON.stringify(sorted(value));
-  if (result === undefined) malformed();
-  return result;
+  return JSON.stringify(sorted(value));
 }
 
 export function sameSchema(
@@ -311,7 +313,6 @@ export function compatibleForCreate(
     return (
       !(source.nullable && !target.nullable) &&
       !(!source.required && target.required) &&
-      Object.hasOwn(source, "default") === Object.hasOwn(target, "default") &&
       source.default === target.default &&
       source.unique === target.unique &&
       (source.min ?? -Infinity) >= (target.min ?? -Infinity) &&
@@ -331,13 +332,14 @@ export function uniqueFields(description: CollectionDescription): string[] {
 }
 
 export function validateStored(description: CollectionDescription, data: unknown): boolean {
-  if (!record(data)) return false;
   const result = compileDescription(description).validate(data);
+  if (!result.ok) return false;
+  /** `validate` succeeded, so `data` is a plain record of data properties. */
+  const stored = data as Readonly<Record<string, unknown>>;
   return (
-    result.ok &&
-    Object.keys(data).length === Object.keys(result.data).length &&
+    Object.keys(stored).length === Object.keys(result.data).length &&
     Object.entries(result.data).every(
-      ([key, value]) => Object.hasOwn(data, key) && data[key] === value,
+      ([key, value]) => Object.hasOwn(stored, key) && stored[key] === value,
     )
   );
 }
@@ -359,69 +361,23 @@ export function projectDocument(
 }
 
 function issue(input: unknown): ValidationIssue | undefined {
-  if (
-    !record(input) ||
-    typeof input.code !== "string" ||
-    typeof input.message !== "string" ||
-    !Array.isArray(input.path)
-  )
+  if (!isPlainRecord(input) || typeof input.message !== "string" || !Array.isArray(input.path))
     return undefined;
   const path: (string | number)[] = [];
   for (const value of input.path) {
-    if (
-      typeof value !== "string" &&
-      !(typeof value === "number" && Number.isInteger(value) && value >= 0)
-    )
-      return undefined;
+    if (typeof value !== "string" && !isCount(value)) return undefined;
     path.push(value);
   }
   const details = { path, message: input.message };
+  if (isMember(plainIssueCodes, input.code)) return { ...details, code: input.code };
   switch (input.code) {
-    case "required":
-    case "invalid_document":
-    case "invalid_unicode":
-    case "invalid_character":
-    case "invalid_email":
-    case "invalid_url":
-    case "unknown_field":
-      return { ...details, code: input.code };
     case "invalid_type":
-      if (
-        input.expected !== "string" ||
-        typeof input.received !== "string" ||
-        ![
-          "string",
-          "number",
-          "boolean",
-          "null",
-          "undefined",
-          "array",
-          "object",
-          "bigint",
-          "symbol",
-          "function",
-        ].includes(input.received)
-      )
-        return undefined;
-      return {
-        ...details,
-        code: "invalid_type",
-        expected: "string",
-        received: input.received as ReceivedType,
-      };
+      if (input.expected !== "string" || !isMember(receivedTypes, input.received)) return undefined;
+      return { ...details, code: "invalid_type", expected: "string", received: input.received };
     case "too_short":
     case "too_long": {
       const bound = input.code === "too_short" ? input.minimum : input.maximum;
-      if (
-        typeof bound !== "number" ||
-        !Number.isInteger(bound) ||
-        bound < 0 ||
-        typeof input.actual !== "number" ||
-        !Number.isInteger(input.actual) ||
-        input.actual < 0 ||
-        input.unit !== "graphemes"
-      )
-        return undefined;
+      if (!isCount(bound) || !isCount(input.actual) || input.unit !== "graphemes") return undefined;
       return input.code === "too_short"
         ? { ...details, code: "too_short", minimum: bound, actual: input.actual, unit: "graphemes" }
         : { ...details, code: "too_long", maximum: bound, actual: input.actual, unit: "graphemes" };
@@ -434,13 +390,12 @@ function issue(input: unknown): ValidationIssue | undefined {
       )
         return undefined;
       return { ...details, code: "invalid_choice", allowed: [...input.allowed] };
-    default:
-      return undefined;
   }
+  return undefined;
 }
 
 export function parseContentError(input: unknown): ContentError | undefined {
-  if (!record(input)) return undefined;
+  if (!isPlainRecord(input)) return undefined;
   if (input.code === "validation_failed") {
     if (!Array.isArray(input.issues) || input.issues.length === 0) return undefined;
     const issues: ValidationIssue[] = [];
@@ -456,21 +411,5 @@ export function parseContentError(input: unknown): ContentError | undefined {
       ? { code: "unique_conflict", field: input.field }
       : undefined;
   }
-  switch (input.code) {
-    case "invalid_request":
-    case "unauthorized":
-    case "forbidden":
-    case "not_found":
-    case "schema_mismatch":
-    case "schema_conflict":
-    case "migration_required":
-    case "payload_too_large":
-    case "internal_error":
-    case "unavailable":
-    case "transport_error":
-    case "unknown_write_outcome":
-      return { code: input.code };
-    default:
-      return undefined;
-  }
+  return isMember(plainErrorCodes, input.code) ? { code: input.code } : undefined;
 }

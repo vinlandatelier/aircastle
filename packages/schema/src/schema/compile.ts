@@ -86,10 +86,7 @@ function compileField(
     const limits = values(modifiers, constraint);
     if (!limits.length) continue;
     if (
-      !limits.every(
-        (value): value is number =>
-          typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
-      )
+      !limits.every((value): value is number => Number.isSafeInteger(value) && Number(value) >= 0)
     ) {
       issues.push(schemaIssue(path, { code: "invalid_bound", constraint }));
     } else {
@@ -100,10 +97,9 @@ function compileField(
       );
     }
   }
-  if (rules.min !== undefined && rules.max !== undefined && rules.min > rules.max) {
-    issues.push(
-      schemaIssue(path, { code: "conflicting_bounds", minimum: rules.min, maximum: rules.max }),
-    );
+  const { min = 0, max = Number.MAX_SAFE_INTEGER } = rules;
+  if (min > max) {
+    issues.push(schemaIssue(path, { code: "conflicting_bounds", minimum: min, maximum: max }));
     delete rules.min;
     delete rules.max;
   }

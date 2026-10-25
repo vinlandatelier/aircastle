@@ -129,7 +129,29 @@ describe("declaration compilation", () => {
     {
       name: "nonstring choices",
       build: (t) => t.oneOf([42] as unknown as string[]),
-      issues: [{ code: "invalid_choices", path, reason: "invalid_type" }],
+      issues: [{ code: "invalid_choices", path, reason: "invalid_type", index: 0 }],
+    },
+    {
+      name: "holes in a sparse choice list",
+      build: (t) => {
+        const sparse: string[] = [];
+        sparse[0] = "a";
+        sparse[2] = "b";
+        return t.oneOf(sparse);
+      },
+      issues: [{ code: "invalid_choices", path, reason: "invalid_type", index: 1 }],
+    },
+    {
+      name: "an array choice list repeated as a non-array value",
+      build: (t) => t.oneOf(["a"]).oneOf("a" as unknown as string[]),
+      issues: [{ code: "conflicting_choices", path }],
+    },
+    {
+      name: "an array-wrapped code language",
+      build: (t) => t.editor("code", { language: ["sql"] }),
+      issues: [
+        { code: "invalid_editor_options", path, option: "language", reason: "invalid_value" },
+      ],
     },
     {
       name: "duplicate choices",
@@ -334,5 +356,29 @@ describe("declaration compilation", () => {
       return;
     }
     throw new Error("Expected invalid default compilation to fail");
+  });
+
+  test("a non-array choice list is one whole-value issue without an element index", () => {
+    let thrown: unknown;
+    try {
+      compileCollection(api, { title: api.text().oneOf("draft" as unknown as string[]) });
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as { issues?: unknown }).issues).toStrictEqual([
+      {
+        code: "invalid_choices",
+        reason: "invalid_type",
+        path,
+        message: "Invalid schema declaration: invalid choices.",
+      },
+    ]);
+  });
+
+  test("field builders and collection declarations are frozen", () => {
+    const field = api.text();
+    for (const value of [field, field.min(1), api.collection({ title: field })]) {
+      expect(Object.isFrozen(value)).toBe(true);
+    }
   });
 });
