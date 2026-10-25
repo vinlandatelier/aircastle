@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { expect, test } from "vite-plus/test";
 import { collection, text } from "@aircastle/schema";
@@ -8,6 +7,7 @@ import { createClient, defineConfig } from "@aircastle/client";
 import { postgresAdapter } from "@aircastle/adapter-postgres";
 import { provisionDevelopment } from "@aircastle/core";
 import {
+  bindLoopbackPort,
   developerApp,
   execute,
   repository,
@@ -173,14 +173,7 @@ test(
     const server = await standaloneServer(namespace);
     try {
       await server.close();
-      const listener = createServer();
-      await new Promise<void>((resolve, reject) => {
-        listener.once("error", reject);
-        listener.listen(Number(new URL(server.url).port), "127.0.0.1", resolve);
-      });
-      await new Promise<void>((resolve, reject) => {
-        listener.close((error) => (error ? reject(error) : resolve()));
-      });
+      await bindLoopbackPort(Number(new URL(server.url).port));
     } finally {
       await server.close();
     }

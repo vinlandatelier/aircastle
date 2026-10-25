@@ -71,11 +71,11 @@ async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T |
   }
 }
 
-async function reservePort() {
+export async function bindLoopbackPort(port: number) {
   const reservation = createServer();
   await new Promise<void>((resolve, reject) => {
     reservation.once("error", reject);
-    reservation.listen(0, "127.0.0.1", resolve);
+    reservation.listen(port, "127.0.0.1", resolve);
   });
   try {
     const address = reservation.address();
@@ -92,7 +92,7 @@ export async function standaloneServer(
   namespace: string,
   env: Record<string, string | undefined> = {},
 ) {
-  const port = await reservePort();
+  const port = await bindLoopbackPort(0);
   const url = `http://127.0.0.1:${port}`;
   const child = spawn("bun", ["apps/api/dist/index.js"], {
     cwd: repository,
@@ -171,7 +171,9 @@ export async function standaloneServer(
     try {
       await stop(false);
     } catch (cleanupError) {
-      throw new AggregateError([error, cleanupError], "Built API startup and cleanup failed");
+      throw new AggregateError([error, cleanupError], "Built API startup and cleanup failed", {
+        cause: cleanupError,
+      });
     }
     throw error;
   }
