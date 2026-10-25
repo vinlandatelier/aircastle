@@ -32,7 +32,7 @@ Only approved branches go in `prs.json`. The publish job takes at most `GARDENER
 
 - Never push, never call the GitHub API, never merge or approve anything, and never ask for a token.
 - Never read or print credentials. Never set or use provider API keys.
-- Do not edit `.github/workflows/`. The publish token cannot push workflow changes. Report such findings as held for the owner.
+- Do not edit `.github/workflows/`. The publish job skips any branch that changes them. Report such findings as held for the owner.
 - At most `GARDENER_MAX_PRS` branches, two review rounds per branch, and the deadline above.
 - Run Postgres-backed commands through `vp run db:test -- <command>`. Use `vp run <script>` for package scripts.
 - Follow the change and verification rules in `AGENTS.md`. Do not run repository-wide suites such as `vp run check`, `vp run test`, `vp run test:all` or `vp run test:prepared`.

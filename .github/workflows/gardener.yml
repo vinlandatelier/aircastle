@@ -22,8 +22,9 @@ jobs:
   audit:
     if: >-
       github.ref == 'refs/heads/main' && github.repository_owner == 'vinlandatelier' &&
-      vars.AI_TRIGGER_LOGIN != '' &&
-      (github.event_name == 'schedule' || github.triggering_actor == vars.AI_TRIGGER_LOGIN)
+      vars.AI_TRIGGER_LOGIN != '' && vars.AI_TRIGGER_USER_ID != '' &&
+      (github.event_name == 'schedule' || (github.triggering_actor == vars.AI_TRIGGER_LOGIN &&
+      github.event.sender.id == vars.AI_TRIGGER_USER_ID))
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     environment: ai-automation
@@ -89,10 +90,19 @@ jobs:
     if: ${{ !cancelled() && needs.audit.outputs.count != '' && needs.audit.outputs.count != '0' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: ai-automation
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        id: app
+        with:
+          app-id: ${{ vars.AI_APP_ID }}
+          private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
+          owner: vinlandatelier
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -104,7 +114,7 @@ jobs:
           path: ${{ runner.temp }}/gardener
       - name: Open labeled pull requests
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           set -euo pipefail
           dir="$RUNNER_TEMP/gardener"
@@ -119,6 +129,10 @@ jobs:
               exit 1
             fi
             git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/$branch"
+            if [ -n "$(git diff --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- .github/workflows)" ]; then
+              echo "::error::$branch changes workflow files. Skipped."
+              continue
+            fi
             if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
               echo "::notice::$branch already exists. Skipped."
               continue

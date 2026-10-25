@@ -44,6 +44,23 @@ function secretReferences(source: string): string[] {
   return [...source.matchAll(/\bsecrets\b(?:\.\w+)?/g)].map((match) => match[0]);
 }
 
+function job(source: string, name: string): string {
+  const start = source.indexOf(`\n  ${name}:\n`);
+  if (start === -1) return "";
+  const next = source.slice(start + 1).search(/\n {2}\S/);
+  return next === -1 ? source.slice(start) : source.slice(start, start + 1 + next);
+}
+
+function appTokenUses(source: string): string[] {
+  return [...source.matchAll(/actions\/create-github-app-token|steps\.app\.outputs\.token/g)].map(
+    (match) => match[0],
+  );
+}
+
+function appTokenPermissions(source: string): string[] {
+  return [...source.matchAll(/permission-[\w-]+:\s*\S+/g)].map((match) => match[0]);
+}
+
 function mergeCalls(path: string, source: string): string[] {
   return mergePatterns
     .filter((pattern) => pattern.test(source))
@@ -54,19 +71,32 @@ function claudeCodeVersion(source: string): string | undefined {
   return /npm install --global @anthropic-ai\/claude-code@(\S+)/.exec(source)?.[1];
 }
 
-test("the gardener can write branches and pull requests and nothing else", () => {
+test("the workflow token stays read-only in both jobs", () => {
   expect(permissionEntries(gardener)).toEqual([
     "{}",
     "contents: read",
     "pull-requests: read",
-    "contents: write",
-    "pull-requests: write",
+    "contents: read",
   ]);
 });
 
-test("the gardener reads no secret except the Claude subscription token", () => {
-  expect(new Set(secretReferences(gardener))).toEqual(new Set(["secrets.CLAUDE_CODE_OAUTH_TOKEN"]));
-  expect(gardener.match(/secrets\.CLAUDE_CODE_OAUTH_TOKEN/g)).toHaveLength(1);
+test("the audit job reads only the Claude token and the publish job only the App key", () => {
+  expect(secretReferences(job(gardener, "audit"))).toEqual(["secrets.CLAUDE_CODE_OAUTH_TOKEN"]);
+  expect(secretReferences(job(gardener, "publish"))).toEqual(["secrets.AI_APP_PRIVATE_KEY"]);
+  expect(secretReferences(gardener)).toHaveLength(2);
+});
+
+test("only the publish job mints the App token, scoped to branches and pull requests", () => {
+  expect(appTokenUses(job(gardener, "audit"))).toEqual([]);
+  expect(appTokenUses(gardener)).toEqual(appTokenUses(job(gardener, "publish")));
+  expect(appTokenUses(job(gardener, "publish"))).toEqual([
+    "actions/create-github-app-token",
+    "steps.app.outputs.token",
+  ]);
+  expect(appTokenPermissions(gardener)).toEqual([
+    "permission-contents: write",
+    "permission-pull-requests: write",
+  ]);
 });
 
 test("AI automation never merges, approves for merge, or enables auto-merge", () => {
@@ -99,6 +129,14 @@ test("permission checks catch broadened or added rights", () => {
   ).toEqual(["contents: write", "actions: write"]);
 });
 
+test("job sections end at the next job", () => {
+  const source =
+    "jobs:\n  audit:\n    steps:\n      - run: a\n  publish:\n    steps:\n      - run: b\n";
+  expect(job(source, "audit")).not.toContain("run: b");
+  expect(job(source, "publish")).toContain("run: b");
+  expect(job(source, "missing")).toBe("");
+});
+
 test("secret checks catch any other secret reference", () => {
   expect(secretReferences("secrets: inherit\n${{ secrets['X'] }}\n${{ secrets.OTHER }}")).toEqual([
     "secrets",
@@ -107,12 +145,18 @@ test("secret checks catch any other secret reference", () => {
   ]);
 });
 
-test("the gardener runs one at a time, only from main, only for the trigger login or the schedule", () => {
+test("the gardener runs one at a time, only from main, only for the trigger account or the schedule", () => {
   expect(gardener).toContain("concurrency:\n  group: gardener\n  cancel-in-progress: false\n");
   expect(gardener).toContain("github.ref == 'refs/heads/main'");
-  expect(gardener).toContain("vars.AI_TRIGGER_LOGIN != ''");
+  expect(gardener).toContain("vars.AI_TRIGGER_LOGIN != '' && vars.AI_TRIGGER_USER_ID != ''");
   expect(gardener).toContain(
-    "(github.event_name == 'schedule' || github.triggering_actor == vars.AI_TRIGGER_LOGIN)",
+    "(github.event_name == 'schedule' || (github.triggering_actor == vars.AI_TRIGGER_LOGIN &&\n      github.event.sender.id == vars.AI_TRIGGER_USER_ID))",
+  );
+});
+
+test("the publish job skips branches that change workflow files", () => {
+  expect(job(gardener, "publish")).toContain(
+    'git diff --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- .github/workflows',
   );
 });
 
