@@ -19,7 +19,7 @@ describe("declaration compilation", () => {
   const path = ["articles", "title"];
 
   for (const constraint of ["min", "max"] as const) {
-    for (const invalid of [
+    test.for([
       -1,
       1.5,
       NaN,
@@ -32,15 +32,13 @@ describe("declaration compilation", () => {
       true,
       1n,
       {},
-    ]) {
-      test(`rejects ${constraint} bound ${String(invalid)} during compilation`, () => {
-        const field = api.text()[constraint](invalid as number);
-        expectSchemaError(
-          () => compileCollection(api, { title: field }),
-          [{ code: "invalid_bound", path, constraint }],
-        );
-      });
-    }
+    ])(`rejects ${constraint} bound %o during compilation`, (invalid) => {
+      const field = api.text()[constraint](invalid as number);
+      expectSchemaError(
+        () => compileCollection(api, { title: field }),
+        [{ code: "invalid_bound", path, constraint }],
+      );
+    });
     test(`does not discard an invalid ${constraint} when followed by a valid bound`, () => {
       const field = api.text()[constraint](-1)[constraint](3);
       expectSchemaError(

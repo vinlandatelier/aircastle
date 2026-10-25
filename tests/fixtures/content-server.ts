@@ -15,7 +15,7 @@ let closing = false;
 const close = async () => {
   if (closing) return;
   closing = true;
-  server.stop(false);
+  await server.stop(false);
   await cms.close();
   process.exit(0);
 };

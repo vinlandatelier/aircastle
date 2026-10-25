@@ -251,7 +251,7 @@ test("explicit reconciliation previews and confirms the exact baseline", async (
     expect(result.output).toContain("REVIEW=");
     expect(result.output).toContain("articles");
     expect(posts(requests)).toHaveLength(1);
-    expect((posts(requests)[0]?.body as { baseline: string }).baseline).toBe("reviewed-revision");
+    expect(posts(requests)[0]?.body).toMatchObject({ baseline: "reviewed-revision" });
     expect(JSON.parse(await readFile(join(cwd, "aircastle.lock"), "utf8")).revision).toBe(
       "revision-published",
     );
