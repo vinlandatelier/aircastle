@@ -8,6 +8,7 @@ import {
   controlledStore,
   documentId,
   otherProject,
+  failOnReport,
 } from "./test-support/fixtures.ts";
 
 for (const permission of [
@@ -17,7 +18,7 @@ for (const permission of [
 ] satisfies Permission[]) {
   test(`authorized key can request ${permission}`, async () => {
     const { store, observations } = controlledStore();
-    expect(await createService(store).authorize(access, permission)).toEqual({
+    expect(await createService(store, failOnReport).authorize(access, permission)).toEqual({
       ok: true,
       data: null,
     });
@@ -29,7 +30,7 @@ for (const permission of [
 
   test(`invalid key cannot request ${permission}`, async () => {
     const { store } = controlledStore({ authorization: "unauthorized" });
-    expect(await createService(store).authorize(access, permission)).toEqual({
+    expect(await createService(store, failOnReport).authorize(access, permission)).toEqual({
       ok: false,
       error: { code: "unauthorized" },
     });
@@ -37,7 +38,7 @@ for (const permission of [
 
   test(`a key lacking ${permission} receives forbidden`, async () => {
     const { store } = controlledStore({ authorization: "forbidden" });
-    expect(await createService(store).authorize(access, permission)).toEqual({
+    expect(await createService(store, failOnReport).authorize(access, permission)).toEqual({
       ok: false,
       error: { code: "forbidden" },
     });
@@ -46,7 +47,7 @@ for (const permission of [
 
 test("foreign target does not expand project authority", async () => {
   const { store } = controlledStore({ authorization: "forbidden" });
-  const cms = createService(store);
+  const cms = createService(store, failOnReport);
   expect(
     await cms.findById(
       { ...access, project: otherProject },
@@ -59,7 +60,7 @@ test("foreign target does not expand project authority", async () => {
 
 test("unauthorized requests do not reveal collection or schema state", async () => {
   const { store } = controlledStore({ authorization: "unauthorized" });
-  const cms = createService(store);
+  const cms = createService(store, failOnReport);
   const results = await Promise.all([
     cms.schema(access),
     cms.create(access, "unknown", contract, { title: "Hello", slug: "hello" }),
@@ -79,7 +80,7 @@ test("read-only keys cannot create or publish but can read", async () => {
     authorization: (permission) => (permission === "content:read" ? "authorized" : "forbidden"),
     documents: [saved],
   });
-  const cms = createService(store);
+  const cms = createService(store, failOnReport);
   expect(await cms.create(access, "articles", contract, { title: "Hello", slug: "hello" })).toEqual(
     { ok: false, error: { code: "forbidden" } },
   );

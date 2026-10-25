@@ -1,8 +1,13 @@
 import { expect, test } from "vite-plus/test";
 import pino from "pino";
 import type { ContentError, Permission, Result } from "@aircastle/contracts";
-import type { Access, ContentService } from "@aircastle/core";
-import { createApp } from "../../app.ts";
+import {
+  createService,
+  type Access,
+  type ContentService,
+  type ContentStore,
+} from "@aircastle/core";
+import { cmsErrorReporter, createApp } from "../../app.ts";
 
 const project = "11111111-1111-4111-8111-111111111111";
 const documentId = "22222222-2222-4222-8222-222222222222";
@@ -11,6 +16,12 @@ const document = { id: documentId, title: "Hello", slug: "hello" };
 const base = `/api/projects/${project}`;
 const documents = `${base}/collections/articles/documents`;
 const authorization = "Bearer test-secret";
+
+function captureLogs() {
+  const lines: string[] = [];
+  const logger = pino({ level: "info" }, { write: (line) => lines.push(line) });
+  return { logger, records: () => lines.map((line) => JSON.parse(line)) };
+}
 
 function fixture(error?: ContentError) {
   const calls: { operation: string; access: Access; args: unknown[] }[] = [];
@@ -254,15 +265,69 @@ test("schema endpoints translate publication envelopes and revisions", async () 
   expect(calls.find((call) => call.operation === "publish")?.args).toEqual([request]);
 });
 
-test("unexpected content failures return a safe envelope", async () => {
-  const { cms, headers } = fixture();
-  cms.create = async () => {
-    throw new Error("SQL with a private test-secret");
-  };
-  const app = createApp({ logger: pino({ level: "silent" }), cms });
-  const response = await app.request(documents, { method: "POST", headers, body: "{}" });
+const secret = "secret-4b1d";
+
+class StorageDriverError extends Error {}
+
+function failStorageQuery(): never {
+  throw Object.assign(
+    new StorageDriverError(`insert failed for ${secret}\n    at ${secret}`, {
+      cause: new Error(secret),
+    }),
+    { code: "XX000", query: `select * from keys where key = '${secret}'`, parameters: [secret] },
+  );
+}
+
+async function expectSanitizedFailure(response: Response, logs: ReturnType<typeof captureLogs>) {
   expect(response.status).toBe(500);
-  expect(await response.json()).toEqual({ ok: false, error: { code: "internal_error" } });
+  const body = await response.text();
+  expect(JSON.parse(body)).toEqual({ ok: false, error: { code: "internal_error" } });
+  const errors = logs.records().flatMap((record) => (record.err ? [record.err] : []));
+  expect(errors).toHaveLength(1);
+  expect(JSON.stringify(errors[0])).toContain("StorageDriverError");
+  expect(errors[0]).toMatchObject({
+    code: "XX000",
+    stack: expect.stringContaining("failStorageQuery"),
+  });
+  expect(
+    body +
+      logs
+        .records()
+        .map((record) => JSON.stringify(record))
+        .join(""),
+  ).not.toContain(secret);
+}
+
+test("unexpected route failures log a sanitized summary and return a safe envelope", async () => {
+  const { cms, headers } = fixture();
+  cms.create = async () => failStorageQuery();
+  const logs = captureLogs();
+  const app = createApp({ logger: logs.logger, cms });
+  await expectSanitizedFailure(
+    await app.request(documents, { method: "POST", headers, body: "{}" }),
+    logs,
+  );
+});
+
+test("errors the CMS turns into internal_error are logged as a sanitized summary", async () => {
+  const store: ContentStore = {
+    initialize: async () => {},
+    provision: async () => {
+      throw new Error("provision is not used here");
+    },
+    authorize: async () => "authorized",
+    transaction: async () => failStorageQuery(),
+    close: async () => {},
+  };
+  const logs = captureLogs();
+  const app = createApp({
+    logger: logs.logger,
+    cms: createService(store, cmsErrorReporter(logs.logger)),
+  });
+  await expectSanitizedFailure(
+    await app.request(`${base}/schema`, { headers: { authorization } }),
+    logs,
+  );
 });
 
 test("a false Content-Length cannot bypass the actual request byte budget", async () => {
