@@ -7,7 +7,7 @@ import {
   fixSchema,
   integer,
   prompt,
-  record,
+  requireObject,
   reviewSchema,
   sha,
   text,
@@ -52,9 +52,9 @@ async function output(path: string, value: unknown): Promise<void> {
   await writeFile(path, JSON.stringify(value));
 }
 function inputJob(value: unknown): Job {
-  const job = record(value),
-    snapshot = record(job.snapshot),
-    selection = record(job.selection);
+  const job = requireObject(value),
+    snapshot = requireObject(job.snapshot),
+    selection = requireObject(job.selection);
   if (
     job.version !== 1 ||
     !/^[a-f0-9]{64}$/.test(String(job.id)) ||
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
       "claudeReviewer",
       "claudeImplementer",
     ] as const) {
-      const result = record(
+      const result = requireObject(
         await runModel(config.roles[role], 'Return {"ready":true} using the requested schema.', {
           type: "object",
           properties: { ready: { type: "boolean" } },
@@ -127,9 +127,9 @@ async function main(): Promise<void> {
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
     let immediate: number | undefined;
     if (process.env.GITHUB_EVENT_NAME === "issue_comment") {
-      const event = record(await json(required("GITHUB_EVENT_PATH")));
-      if (event.action === "created" && record(event.issue).pull_request)
-        immediate = integer(record(event.comment).id);
+      const event = requireObject(await json(required("GITHUB_EVENT_PATH")));
+      if (event.action === "created" && requireObject(event.issue).pull_request)
+        immediate = integer(requireObject(event.comment).id);
     }
     const jobs = await api.prepare(config, immediate);
     await mkdir(`${target}/plan`, { recursive: true });
@@ -184,7 +184,7 @@ async function main(): Promise<void> {
       await output(`${target}/verification/${id}.json`, { id, skipped: "review-only" });
       return;
     }
-    const model = record(await json(modelPath)) as unknown as ModelOutput;
+    const model = requireObject(await json(modelPath)) as unknown as ModelOutput;
     const receipt = await verify(job, model, required("GITHUB_REPOSITORY"));
     await output(`${target}/verification/${id}.json`, receipt);
     if (receipt.commands !== null && !receipt.passed)
@@ -211,7 +211,7 @@ async function main(): Promise<void> {
     throw new Error("Publisher immutable context revalidation failed");
   let model: ModelOutput;
   try {
-    model = record(await json(modelPath)) as unknown as ModelOutput;
+    model = requireObject(await json(modelPath)) as unknown as ModelOutput;
   } catch {
     await api.finish(claim, "failed");
     throw new Error("Model output unavailable; no successful review or fix was produced");

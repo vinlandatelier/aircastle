@@ -18,7 +18,7 @@ const keywords = new Set([
 ]);
 const types = ["object", "array", "string", "number", "integer", "boolean", "null"];
 
-export function record(value: unknown): value is Record<string, unknown> {
+export function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -32,20 +32,20 @@ export function anthropicSchema(schema: Record<string, unknown>): Record<string,
     delete result[key];
   }
   if (descriptions.length) result.description = descriptions.join(" ");
-  if (record(schema.properties))
+  if (isJsonObject(schema.properties))
     result.properties = Object.fromEntries(
       Object.entries(schema.properties).map(([key, value]) => [
         key,
         anthropicSchema(value as Record<string, unknown>),
       ]),
     );
-  if (record(schema.items)) result.items = anthropicSchema(schema.items);
+  if (isJsonObject(schema.items)) result.items = anthropicSchema(schema.items);
   if (Array.isArray(schema.anyOf)) result.anyOf = schema.anyOf.map((item) => anthropicSchema(item));
   return result;
 }
 
 export function checkSchema(schema: unknown, depth = 0): asserts schema is Record<string, unknown> {
-  if (!record(schema) || depth > 16 || Object.keys(schema).some((key) => !keywords.has(key)))
+  if (!isJsonObject(schema) || depth > 16 || Object.keys(schema).some((key) => !keywords.has(key)))
     throw new Error("unsupported_schema");
   if (schema.anyOf !== undefined) {
     if (Object.keys(schema).some((key) => !["anyOf", "description", "title"].includes(key)))
@@ -60,7 +60,7 @@ export function checkSchema(schema: unknown, depth = 0): asserts schema is Recor
     throw new Error("unsupported_schema");
   if (acceptedTypes.includes("object")) {
     if (
-      !record(schema.properties) ||
+      !isJsonObject(schema.properties) ||
       schema.additionalProperties !== false ||
       !Array.isArray(schema.required) ||
       schema.required.some((key) => typeof key !== "string") ||
@@ -99,7 +99,7 @@ export function matches(schema: Record<string, unknown>, value: unknown): boolea
     return false;
   if (Object.hasOwn(schema, "const") && JSON.stringify(schema.const) !== JSON.stringify(value))
     return false;
-  if (record(value)) {
+  if (isJsonObject(value)) {
     const properties = schema.properties as Record<string, Record<string, unknown>>;
     if (
       Object.keys(value).some((key) => !Object.hasOwn(properties, key)) ||

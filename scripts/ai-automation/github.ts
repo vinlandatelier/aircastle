@@ -4,7 +4,7 @@ import {
   integer,
   operationId,
   parseCommand,
-  record,
+  requireObject,
   renderReview,
   safePath,
   sha,
@@ -43,7 +43,7 @@ type Cursor = { version: 1; prPage: number; issue: StreamCursor; inline: StreamC
 const marker = "<!-- aircastle-ai:v1 -->\n";
 const cursorMarker = "<!-- aircastle-ai-cursor:v1 -->\n";
 function identity(value: unknown): Identity {
-  const user = record(value);
+  const user = requireObject(value);
   const login = text(user.login, 100);
   if (!/^[\w[\]-]+$/.test(login)) throw new Error("Invalid identity");
   return { id: integer(user.id), login, type: text(user.type, 40) };
@@ -145,8 +145,8 @@ export class Coordinator {
   async receipts(number: number): Promise<StoredReceipt[]> {
     const comments = await this.list(`${this.root}/issues/${integer(number)}/comments`);
     return comments.flatMap((raw) => {
-      const comment = record(raw),
-        user = record(comment.user);
+      const comment = requireObject(raw),
+        user = requireObject(comment.user);
       if (
         user.id !== this.options.botId ||
         user.type !== "Bot" ||
@@ -154,7 +154,7 @@ export class Coordinator {
         !comment.body.startsWith(marker)
       )
         return [];
-      const value = record(JSON.parse(comment.body.slice(marker.length)));
+      const value = requireObject(JSON.parse(comment.body.slice(marker.length)));
       if (
         value.version !== 1 ||
         !/^[a-f0-9]{64}$/.test(String(value.id)) ||
@@ -200,7 +200,7 @@ export class Coordinator {
       });
       return { commentId: prior.commentId, receipt };
     }
-    const posted = record(
+    const posted = requireObject(
       await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
         body: marker + JSON.stringify(receipt),
       }),
@@ -214,13 +214,13 @@ export class Coordinator {
   }
   async current(job: Job): Promise<boolean> {
     if ((await this.membership(job.requester.login)) !== "member") return false;
-    const user = record(await this.api(`/users/${encodeURIComponent(job.requester.login)}`));
+    const user = requireObject(await this.api(`/users/${encodeURIComponent(job.requester.login)}`));
     if (user.id !== job.requester.id || user.type !== "User") return false;
-    const pr = record(await this.api(`${this.root}/pulls/${job.snapshot.number}`));
+    const pr = requireObject(await this.api(`${this.root}/pulls/${job.snapshot.number}`));
     return (
       pr.state === "open" &&
-      record(pr.head).sha === job.snapshot.head &&
-      record(pr.base).sha === job.snapshot.base
+      requireObject(pr.head).sha === job.snapshot.head &&
+      requireObject(pr.base).sha === job.snapshot.base
     );
   }
   async publishReview(
@@ -237,8 +237,10 @@ export class Coordinator {
     const receiptMarker = `<!-- aircastle-ai-result:${job.id} -->`;
     if (
       !reviews.some((raw) => {
-        const r = record(raw);
-        return record(r.user).id === this.options.botId && String(r.body).endsWith(receiptMarker);
+        const r = requireObject(raw);
+        return (
+          requireObject(r.user).id === this.options.botId && String(r.body).endsWith(receiptMarker)
+        );
       })
     ) {
       await this.api(`${this.root}/pulls/${job.snapshot.number}/reviews`, "POST", {
@@ -251,11 +253,11 @@ export class Coordinator {
     return "published";
   }
   async snapshot(number: number, bound?: Receipt["job"]["snapshot"]): Promise<Snapshot> {
-    const pr = record(await this.api(`${this.root}/pulls/${integer(number)}`));
-    const head = record(pr.head),
-      base = record(pr.base),
-      headRepo = record(head.repo),
-      baseRepo = record(base.repo);
+    const pr = requireObject(await this.api(`${this.root}/pulls/${integer(number)}`));
+    const head = requireObject(pr.head),
+      base = requireObject(pr.base),
+      headRepo = requireObject(head.repo),
+      baseRepo = requireObject(base.repo);
     const revision = {
       repositoryId: integer(baseRepo.id),
       number,
@@ -271,14 +273,14 @@ export class Coordinator {
       (bound && (bound.head !== revision.head || bound.base !== revision.base))
     )
       throw new Error("Stale revision");
-    const comparison = record(
+    const comparison = requireObject(
       await this.api(`${this.root}/compare/${revision.base}...${revision.head}?per_page=1`),
     );
     const compared = array(comparison.files);
     const changed = compared.slice(0, 300);
-    const paths = changed.map((raw) => safePath(record(raw).filename));
-    const commit = record(await this.api(`${this.root}/git/commits/${revision.head}`));
-    const tree = sha(record(commit.tree).sha);
+    const paths = changed.map((raw) => safePath(requireObject(raw).filename));
+    const commit = requireObject(await this.api(`${this.root}/git/commits/${revision.head}`));
+    const tree = sha(requireObject(commit.tree).sha);
     const files: SourceFile[] = [],
       omitted: string[] = compared.length >= 300 ? ["comparison reached the 300-file bound"] : [];
     const capture = (file: SourceFile): void => {
@@ -287,7 +289,7 @@ export class Coordinator {
       else files.push(file);
     };
     for (const raw of changed) {
-      const file = record(raw),
+      const file = requireObject(raw),
         path = safePath(file.filename);
       if (files.length >= 40) {
         omitted.push(path);
@@ -306,7 +308,7 @@ export class Coordinator {
         continue;
       }
       if (sha(file.sha) !== entry.sha) throw new Error("Stale diff blob");
-      const blob = record(await this.api(`${this.root}/git/blobs/${entry.sha}`));
+      const blob = requireObject(await this.api(`${this.root}/git/blobs/${entry.sha}`));
       if (blob.encoding !== "base64" || Number(blob.size) > 80000) {
         omitted.push(`${path}: oversized or unavailable blob`);
         continue;
@@ -321,11 +323,11 @@ export class Coordinator {
       }
       capture({ path, sha: entry.sha, mode: entry.mode, text: source, patch });
     }
-    const final = record(await this.api(`${this.root}/pulls/${number}`));
+    const final = requireObject(await this.api(`${this.root}/pulls/${number}`));
     if (
       final.state !== "open" ||
-      record(final.head).sha !== revision.head ||
-      record(final.base).sha !== revision.base
+      requireObject(final.head).sha !== revision.head ||
+      requireObject(final.base).sha !== revision.base
     )
       throw new Error("Stale revision during context collection");
     return {
@@ -344,10 +346,10 @@ export class Coordinator {
     const parts = safePath(path).split("/");
     let tree = sha(commit);
     for (let i = 0; i < parts.length; i++) {
-      const result = record(await this.api(`${this.root}/git/trees/${tree}`));
+      const result = requireObject(await this.api(`${this.root}/git/trees/${tree}`));
       if (result.truncated) throw new Error("Git tree truncated");
       const found = array(result.tree)
-        .map(record)
+        .map(requireObject)
         .find((entry) => entry.path === parts[i]);
       if (!found) return null;
       if (i < parts.length - 1 && found.mode !== "040000")
@@ -374,15 +376,17 @@ export class Coordinator {
       .at(-1);
     if (!prior) return "Initial full base-to-head review.";
     const old = prior.receipt.job.snapshot.head;
-    const compare = record(await this.api(`${this.root}/compare/${sha(old)}...${sha(head)}`));
+    const compare = requireObject(
+      await this.api(`${this.root}/compare/${sha(old)}...${sha(head)}`),
+    );
     if (!["ahead", "identical"].includes(String(compare.status)))
       return `History rewritten since ${old}; perform a full review.`;
     const reviews = await this.list(`${this.root}/pulls/${number}/reviews`);
     const review = reviews
-      .map(record)
+      .map(requireObject)
       .find(
         (r) =>
-          record(r.user).id === this.options.botId &&
+          requireObject(r.user).id === this.options.botId &&
           String(r.body).endsWith(`<!-- aircastle-ai-result:${prior.receipt.id} -->`),
       );
     return review
@@ -393,7 +397,7 @@ export class Coordinator {
     raw: unknown,
     source: Comment["source"],
   ): Promise<{ number: number; comment: Comment } | null> {
-    const c = record(raw);
+    const c = requireObject(raw);
     if (
       typeof c.body !== "string" ||
       !parseCommand(c.body) ||
@@ -414,7 +418,7 @@ export class Coordinator {
       const comments = await this.list(`${this.root}/pulls/${number}/comments`);
       const root = c.in_reply_to_id ?? c.id;
       const relevant = comments
-        .map(record)
+        .map(requireObject)
         .filter((r) => r.id === root || r.in_reply_to_id === root || r.id === c.id);
       if (!relevant.some((r) => r.id === root)) throw new Error("Inline root context unavailable");
       const trusted = new Map<string, boolean>();
@@ -455,17 +459,17 @@ export class Coordinator {
   async cursor(): Promise<{ commentId: number | null; value: Cursor }> {
     const comments = await this.list(`${this.root}/issues/${this.options.stateIssue}/comments`);
     const owned = comments
-      .map(record)
+      .map(requireObject)
       .find(
         (c) =>
-          record(c.user).id === this.options.botId &&
-          record(c.user).type === "Bot" &&
+          requireObject(c.user).id === this.options.botId &&
+          requireObject(c.user).type === "Bot" &&
           String(c.body).startsWith(cursorMarker),
       );
     if (owned) {
-      const value = record(JSON.parse(String(owned.body).slice(cursorMarker.length)));
+      const value = requireObject(JSON.parse(String(owned.body).slice(cursorMarker.length)));
       integer(value.prPage);
-      for (const stream of [record(value.issue), record(value.inline)]) {
+      for (const stream of [requireObject(value.issue), requireObject(value.inline)]) {
         integer(stream.page);
         if (
           !Number.isFinite(Date.parse(String(stream.since))) ||
@@ -498,23 +502,23 @@ export class Coordinator {
       const response = await this.request(`${this.root}/pulls/${number}`);
       if (response.status === 404) return true;
       if (response.status !== 200) throw new Error("PR lookup unavailable");
-      const pr = record(response.data);
+      const pr = requireObject(response.data);
       if (pr.state !== "open") return true;
       const requester = command?.author ?? identity(pr.user);
       if (requester.type !== "User" || (await this.membership(requester.login)) !== "member")
         return true;
       const existing = await this.receipts(number);
-      const base = record(pr.base),
-        head = record(pr.head);
+      const base = requireObject(pr.base),
+        head = requireObject(pr.head);
       const bare: Snapshot = {
-        repositoryId: integer(record(base.repo).id),
+        repositoryId: integer(requireObject(base.repo).id),
         number,
         base: sha(base.sha),
         head: sha(head.sha),
-        headRepositoryId: integer(record(head.repo).id),
+        headRepositoryId: integer(requireObject(head.repo).id),
         baseRef: text(base.ref, 200),
         author: identity(pr.user),
-        fork: record(head.repo).id !== record(base.repo).id,
+        fork: requireObject(head.repo).id !== requireObject(base.repo).id,
         tree: sha(head.sha),
         files: [],
         omitted: [],
@@ -566,7 +570,7 @@ export class Coordinator {
     };
     const manual = async (raw: unknown, source: Comment["source"]): Promise<boolean> => {
       try {
-        const c = record(raw);
+        const c = requireObject(raw);
         if (typeof c.body !== "string" || !parseCommand(c.body)) return true;
         if ((await this.membership(identity(c.user).login)) !== "member") return true;
         const accepted = await this.command(raw, source);
@@ -617,7 +621,7 @@ export class Coordinator {
     );
     let consumed = true;
     for (const raw of prs) {
-      const number = integer(record(raw).number);
+      const number = integer(requireObject(raw).number);
       try {
         for (const role of ["codexReviewer", "claudeReviewer"] as const)
           if (!(await queue(number, role))) {
@@ -695,10 +699,10 @@ export class Coordinator {
       `${this.root}/pulls?state=all&head=vinlandatelier:${encodeURIComponent(branch)}`,
     );
     const prior = pullRequests
-      .map(record)
+      .map(requireObject)
       .find(
         (pr) =>
-          record(pr.user).id === this.options.botId &&
+          requireObject(pr.user).id === this.options.botId &&
           String(pr.body).endsWith(`<!-- aircastle-ai-fix:${job.id} -->`),
       );
     if (prior) {
@@ -718,7 +722,7 @@ export class Coordinator {
           sha: null,
         });
       else {
-        const blob = record(
+        const blob = requireObject(
           await this.api(`${this.root}/git/blobs`, "POST", {
             content: edit.content,
             encoding: "utf-8",
@@ -732,19 +736,19 @@ export class Coordinator {
         });
       }
     }
-    const tree = record(
+    const tree = requireObject(
       await this.api(`${this.root}/git/trees`, "POST", {
         base_tree: job.snapshot.tree,
         tree: entries,
       }),
     );
-    const parent = record(await this.api(`${this.root}/git/commits/${job.snapshot.head}`));
+    const parent = requireObject(await this.api(`${this.root}/git/commits/${job.snapshot.head}`));
     const author = {
       name: "Aircastle AI",
       email: "aircastle-ai@users.noreply.github.com",
-      date: text(record(parent.committer).date, 40),
+      date: text(requireObject(parent.committer).date, 40),
     };
-    const commit = record(
+    const commit = requireObject(
       await this.api(`${this.root}/git/commits`, "POST", {
         author,
         committer: author,
@@ -763,9 +767,9 @@ export class Coordinator {
         ref: `refs/heads/${branch}`,
         sha: sha(commit.sha),
       });
-    else if (ref.status !== 200 || record(record(ref.data).object).sha !== commit.sha)
+    else if (ref.status !== 200 || requireObject(requireObject(ref.data).object).sha !== commit.sha)
       throw new Error("Existing fix branch differs; refusing overwrite");
-    const pr = record(
+    const pr = requireObject(
       await this.api(`${this.root}/pulls`, "POST", {
         title: `AI fix for #${job.snapshot.number}: ${fix.summary.slice(0, 100)}`,
         head: branch,
@@ -777,20 +781,20 @@ export class Coordinator {
     return text(pr.html_url, 1000);
   }
   async setup(): Promise<void> {
-    const repo = record(await this.api(this.root));
+    const repo = requireObject(await this.api(this.root));
     if (repo.private !== false || repo.default_branch !== "main")
       throw new Error("setup_required: public repository with default main required");
-    const environment = record(await this.api(`${this.root}/environments/ai-automation`));
-    const policy = record(environment.deployment_branch_policy);
+    const environment = requireObject(await this.api(`${this.root}/environments/ai-automation`));
+    const policy = requireObject(environment.deployment_branch_policy);
     if (policy.custom_branch_policies !== true || policy.protected_branches !== false)
       throw new Error("setup_required: exact main environment branch restriction required");
-    const branches = record(
+    const branches = requireObject(
       await this.api(`${this.root}/environments/ai-automation/deployment-branch-policies`),
     );
-    const policies = array(branches.branch_policies).map(record);
+    const policies = array(branches.branch_policies).map(requireObject);
     if (policies.length !== 1 || policies[0]?.name !== "main" || policies[0]?.type !== "branch")
       throw new Error("setup_required: environment must allow only main, no tags");
-    const bot = record(await this.api(`/user/${this.options.botId}`));
+    const bot = requireObject(await this.api(`/user/${this.options.botId}`));
     if (bot.type !== "Bot" || (this.options.botLogin && bot.login !== this.options.botLogin))
       throw new Error("setup_required: configured bot identity must be a bot");
     const members = await this.request("/orgs/vinlandatelier/members?per_page=1");

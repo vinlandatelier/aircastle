@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createInterface } from "node:readline/promises";
 import { ConfigurationError, defineConfig } from "@aircastle/client";
-import { SchemaError } from "@aircastle/schema";
+import { isPlainRecord, SchemaError } from "@aircastle/schema";
 import {
   contractId,
   describeCollections,
@@ -29,7 +29,7 @@ export interface PushOptions {
   output?: (message: string) => void;
 }
 
-function record(value: unknown): value is Record<string, unknown> {
+function isNonArrayObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function exact(value: Record<string, unknown>, keys: string[]) {
@@ -42,11 +42,11 @@ function revision(value: unknown): value is string {
 }
 function lockfile(value: unknown): value is Lockfile {
   return (
-    record(value) &&
+    isPlainRecord(value) &&
     exact(value, ["format", "target", "revision"]) &&
     value.format === 1 &&
     revision(value.revision) &&
-    record(value.target) &&
+    isPlainRecord(value.target) &&
     exact(value.target, ["url", "project"]) &&
     typeof value.target.url === "string" &&
     typeof value.target.project === "string"
@@ -56,7 +56,7 @@ async function existing(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, "utf8");
   } catch (error) {
-    if (record(error) && error.code === "ENOENT") return undefined;
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
     throw error;
   }
 }
@@ -76,15 +76,15 @@ function publication(
   expected: readonly PublishedCollection[],
 ): value is Publication {
   return (
-    record(value) &&
+    isPlainRecord(value) &&
     exact(value, ["revision", "contracts"]) &&
     revision(value.revision) &&
-    record(value.contracts) &&
+    isPlainRecord(value.contracts) &&
     Object.keys(value.contracts).length === expected.length &&
     expected.every(
       ({ name }) =>
         Object.hasOwn(value.contracts as object, name) &&
-        record(value.contracts) &&
+        isPlainRecord(value.contracts) &&
         typeof value.contracts[name] === "string" &&
         /^v1:[0-9a-f]{64}$/.test(value.contracts[name]),
     )
@@ -112,7 +112,8 @@ export async function push(options: PushOptions = {}): Promise<number> {
     const imported: unknown = (
       await import(pathToFileURL(join(cwd, "aircastle.config.ts")).href + `?push=${randomUUID()}`)
     ).default;
-    if (!record(imported)) return fail("invalid_request", "Expected an Aircastle configuration");
+    if (!isNonArrayObject(imported))
+      return fail("invalid_request", "Expected an Aircastle configuration");
     const config = defineConfig(imported as unknown as Parameters<typeof defineConfig>[0]);
     const collections = describeCollections(config.collections);
     const apiKey = options.apiKey ?? process.env.AIRCASTLE_API_KEY;
@@ -154,7 +155,7 @@ export async function push(options: PushOptions = {}): Promise<number> {
       } catch {
         return { ok: false, error: { code: unknownCode } };
       }
-      if (!record(envelope)) return { ok: false, error: { code: unknownCode } };
+      if (!isPlainRecord(envelope)) return { ok: false, error: { code: unknownCode } };
       if (envelope.ok === false && !response.ok) {
         const error = parseContentError(envelope.error);
         if (error) return { ok: false, error };
@@ -169,7 +170,7 @@ export async function push(options: PushOptions = {}): Promise<number> {
       return 1;
     }
     if (
-      !record(remote.data) ||
+      !isPlainRecord(remote.data) ||
       !exact(remote.data, ["revision", "collections"]) ||
       !(remote.data.revision === null || revision(remote.data.revision))
     )
