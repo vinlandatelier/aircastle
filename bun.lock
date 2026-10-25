@@ -6,9 +6,7 @@
       "name": "aircastle",
       "devDependencies": {
         "@aircastle/adapter-postgres": "workspace:*",
-        "@aircastle/cli": "workspace:*",
         "@aircastle/client": "workspace:*",
-        "@aircastle/contracts": "workspace:*",
         "@aircastle/core": "workspace:*",
         "@aircastle/schema": "workspace:*",
         "@babel/parser": "7.28.5",

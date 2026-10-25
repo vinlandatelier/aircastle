@@ -9,7 +9,7 @@ import {
   BarChart3Icon,
 } from 'lucide-react'
 
-export type SidebarNavItem = {
+type SidebarNavItem = {
   title: string
   path?: string
   icon?: ReactNode
