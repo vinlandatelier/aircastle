@@ -48,9 +48,8 @@ export function verificationPlan(edits: Edit[]): string[][] | null {
  * Returns the verification receipt only when it belongs to this operation and these edits,
  * and its result matches the plan: passed for scoped checks, not passed for patch-only scopes.
  */
-export function boundVerification(job: Job, edits: Edit[], value: unknown): Verification | null {
-  if (!isRecord(value)) return null;
-  const receipt = value;
+export function boundVerification(job: Job, edits: Edit[], receipt: unknown): Verification | null {
+  if (!isRecord(receipt)) return null;
   const commands = verificationPlan(edits);
   if (
     receipt.id !== job.id ||

@@ -40,7 +40,8 @@ export function anthropicSchema(schema: Record<string, unknown>): Record<string,
       ]),
     );
   if (isJsonObject(schema.items)) result.items = anthropicSchema(schema.items);
-  if (Array.isArray(schema.anyOf)) result.anyOf = schema.anyOf.map((item) => anthropicSchema(item));
+  if (Array.isArray(schema.anyOf))
+    result.anyOf = schema.anyOf.map((item) => anthropicSchema(subschema(item)));
   return result;
 }
 
@@ -90,7 +91,7 @@ function subschema(value: unknown): Record<string, unknown> {
 
 export function matches(schema: Record<string, unknown>, value: unknown): boolean {
   if (Array.isArray(schema.anyOf))
-    return schema.anyOf.some((item: Record<string, unknown>) => matches(item, value));
+    return schema.anyOf.some((item) => matches(subschema(item), value));
   const acceptedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
   const actualType = value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
   if (

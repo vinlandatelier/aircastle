@@ -220,11 +220,7 @@ export function parseJob(value: unknown): Job {
   sha(value.snapshot.base);
   integer(value.snapshot.number);
   text(value.selection.model, 200);
-  text(value.selection.effort, 40);
-  if (value.task === "request") {
-    text(value.implementation.model, 200);
-    text(value.implementation.effort, 40);
-  }
+  if (value.task === "request") text(value.implementation.model, 200);
   return value;
 }
 export function isReceipt(value: unknown): value is Receipt {
