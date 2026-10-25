@@ -10,9 +10,9 @@ test("native Bun transport sends an uncertain create once even after a pooled re
   });
   const result = JSON.parse(output);
   expect(result.healthy).toEqual({
-    writes: 1,
+    attempts: 1,
     result: { ok: false, error: { code: "unknown_write_outcome" } },
   });
-  expect(result.faulted.writes).toBeGreaterThan(1);
+  expect(result.faulted.attempts).toBeGreaterThan(1);
   expect(result.faulted.failed).toBe(true);
 });
