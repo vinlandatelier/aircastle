@@ -1,13 +1,9 @@
-import { beforeAll, describe, expect, test } from "vite-plus/test";
-import { compileCollection, requireSchemaApi, type RuntimeApi } from "../support/api.ts";
+import { describe, expect, test } from "vite-plus/test";
+import { text } from "../../src/index.ts";
+import { compileCollection } from "../support/collections.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";
 
 describe("strict text, bounds and Unicode", () => {
-  let api: RuntimeApi;
-  beforeAll(() => {
-    api = requireSchemaApi();
-  });
-
   const wrongTypes: [string, unknown][] = [
     ["number", 0],
     ["number", NaN],
@@ -24,7 +20,7 @@ describe("strict text, bounds and Unicode", () => {
   ];
   for (const [received, value] of wrongTypes) {
     test(`does not coerce ${received}: ${String(value)}`, () => {
-      const collection = compileCollection(api, { title: api.text() });
+      const collection = compileCollection({ title: text() });
       expectFailure(collection.validate({ title: value }), [
         {
           code: "invalid_type",
@@ -55,7 +51,7 @@ describe("strict text, bounds and Unicode", () => {
     "e\u0301",
   ]) {
     test(`preserves text ${JSON.stringify(value)}`, () => {
-      expectSuccess(compileCollection(api, { title: api.text() }).validate({ title: value }), {
+      expectSuccess(compileCollection({ title: text() }).validate({ title: value }), {
         title: value,
       });
     });
@@ -63,7 +59,7 @@ describe("strict text, bounds and Unicode", () => {
 
   test("plain text has no format-imposed character maximum", () => {
     const value = "a".repeat(100_000);
-    expectSuccess(compileCollection(api, { title: api.text() }).validate({ title: value }), {
+    expectSuccess(compileCollection({ title: text() }).validate({ title: value }), {
       title: value,
     });
   });
@@ -79,13 +75,13 @@ describe("strict text, bounds and Unicode", () => {
   ] as const) {
     test(`counts and preserves ${JSON.stringify(value)} as ${count} graphemes`, () => {
       expectSuccess(
-        compileCollection(api, { title: api.text().min(count).max(count) }).validate({
+        compileCollection({ title: text().min(count).max(count) }).validate({
           title: value,
         }),
         { title: value },
       );
       expectFailure(
-        compileCollection(api, { title: api.text().max(count - 1) }).validate({ title: value }),
+        compileCollection({ title: text().max(count - 1) }).validate({ title: value }),
         [
           {
             code: "too_long",
@@ -100,7 +96,7 @@ describe("strict text, bounds and Unicode", () => {
   }
 
   test("bounds are inclusive at both ends", () => {
-    const collection = compileCollection(api, { title: api.text().min(2).max(4) });
+    const collection = compileCollection({ title: text().min(2).max(4) });
     for (const title of ["aa", "aaa", "aaaa"])
       expectSuccess(collection.validate({ title }), { title });
     expectFailure(collection.validate({ title: "a" }), [
@@ -112,26 +108,25 @@ describe("strict text, bounds and Unicode", () => {
   });
 
   test("zero is valid and whitespace contributes to length", () => {
-    expectSuccess(
-      compileCollection(api, { title: api.text().min(0).max(0) }).validate({ title: "" }),
-      { title: "" },
-    );
-    expectFailure(compileCollection(api, { title: api.text().max(0) }).validate({ title: " " }), [
+    expectSuccess(compileCollection({ title: text().min(0).max(0) }).validate({ title: "" }), {
+      title: "",
+    });
+    expectFailure(compileCollection({ title: text().max(0) }).validate({ title: " " }), [
       { code: "too_long", path: ["title"], maximum: 0, actual: 1, unit: "graphemes" },
     ]);
-    expectSuccess(compileCollection(api, { title: api.text().min(1) }).validate({ title: " " }), {
+    expectSuccess(compileCollection({ title: text().min(1) }).validate({ title: " " }), {
       title: " ",
     });
   });
 
   test("repeated bounds retain the strictest value in either order", () => {
-    for (const field of [api.text().min(5).min(3), api.text().min(3).min(5)]) {
-      expectFailure(compileCollection(api, { title: field }).validate({ title: "abcd" }), [
+    for (const field of [text().min(5).min(3), text().min(3).min(5)]) {
+      expectFailure(compileCollection({ title: field }).validate({ title: "abcd" }), [
         { code: "too_short", path: ["title"], minimum: 5, actual: 4, unit: "graphemes" },
       ]);
     }
-    for (const field of [api.text().max(3).max(5), api.text().max(5).max(3)]) {
-      expectFailure(compileCollection(api, { title: field }).validate({ title: "abcd" }), [
+    for (const field of [text().max(3).max(5), text().max(5).max(3)]) {
+      expectFailure(compileCollection({ title: field }).validate({ title: "abcd" }), [
         { code: "too_long", path: ["title"], maximum: 3, actual: 4, unit: "graphemes" },
       ]);
     }
@@ -147,7 +142,7 @@ describe("strict text, bounds and Unicode", () => {
   ]) {
     test(`rejects malformed UTF-16 ${JSON.stringify(value)}`, () => {
       expectFailure(
-        compileCollection(api, { title: api.text().min(10).email() }).validate({ title: value }),
+        compileCollection({ title: text().min(10).email() }).validate({ title: value }),
         [{ code: "invalid_unicode", path: ["title"] }],
       );
     });
@@ -155,14 +150,14 @@ describe("strict text, bounds and Unicode", () => {
 
   test("NUL is rejected without dependent failures", () => {
     expectFailure(
-      compileCollection(api, { title: api.text().min(10).email() }).validate({ title: "a\u0000" }),
+      compileCollection({ title: text().min(10).email() }).validate({ title: "a\u0000" }),
       [{ code: "invalid_character", path: ["title"] }],
     );
   });
 
   test("Unicode and NUL issues both appear, in order, without dependent failures", () => {
     expectFailure(
-      compileCollection(api, { title: api.text().min(10).email() }).validate({
+      compileCollection({ title: text().min(10).email() }).validate({
         title: "x\u0000\uD800",
       }),
       [
@@ -178,7 +173,7 @@ describe("strict text, bounds and Unicode", () => {
   ] as const) {
     test(`${code} diagnostics do not echo submitted text`, () => {
       const marker = "private-text-content-marker";
-      const result = compileCollection(api, { title: api.text() }).validate({
+      const result = compileCollection({ title: text() }).validate({
         title: marker + suffix,
       });
       expectFailure(result, [{ code, path: ["title"] }]);
@@ -187,8 +182,8 @@ describe("strict text, bounds and Unicode", () => {
   }
 
   test("choices match exact strings and preserve declaration order in issues", () => {
-    const collection = compileCollection(api, {
-      title: api.text().oneOf(["published", "draft", "é", ""]),
+    const collection = compileCollection({
+      title: text().oneOf(["published", "draft", "é", ""]),
     });
     for (const title of ["published", "draft", "é", ""])
       expectSuccess(collection.validate({ title }), { title });

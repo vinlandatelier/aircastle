@@ -1,11 +1,7 @@
-import { beforeAll, describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 import type { ReceivedType } from "../../src/index.ts";
-import {
-  compileCollection,
-  requireSchemaApi,
-  type RuntimeApi,
-  type RuntimeText,
-} from "../support/api.ts";
+import { collection, compileSchema, text } from "../../src/index.ts";
+import { compileCollection, type TextBuilder } from "../support/collections.ts";
 import {
   expectFailure,
   expectOwnKeys,
@@ -14,21 +10,17 @@ import {
 } from "../support/assertions.ts";
 
 describe("approved declaration and metadata decisions", () => {
-  let api: RuntimeApi;
-  beforeAll(() => {
-    api = requireSchemaApi();
-  });
   const path = ["articles", "title"];
 
   for (const configure of [
-    (t: RuntimeText) => t,
-    (t: RuntimeText) => t.optional(),
-    (t: RuntimeText) => t.nullable(),
+    (t: TextBuilder) => t,
+    (t: TextBuilder) => t.optional(),
+    (t: TextBuilder) => t.nullable(),
   ]) {
     test(`undefined default is invalid before presence resolution: ${configure.toString()}`, () => {
-      const field = configure(api.text()).default(undefined as unknown as string);
+      const field = configure(text()).default(undefined as unknown as string);
       expectSchemaError(
-        () => compileCollection(api, { title: field }),
+        () => compileCollection({ title: field }),
         [
           {
             code: "invalid_default",
@@ -46,9 +38,9 @@ describe("approved declaration and metadata decisions", () => {
       calls++;
       return "Generated";
     };
-    const field = api.text().default(value as unknown as string);
+    const field = text().default(value as unknown as string);
     expectSchemaError(
-      () => compileCollection(api, { title: field }),
+      () => compileCollection({ title: field }),
       [
         {
           code: "invalid_default",
@@ -61,9 +53,9 @@ describe("approved declaration and metadata decisions", () => {
   });
 
   test("invalid bounds are deduplicated per constraint and ordered min then max", () => {
-    const field = api.text().max(-1).min(-1).max(-2).min(NaN).default("Valid text");
+    const field = text().max(-1).min(-1).max(-2).min(NaN).default("Valid text");
     expectSchemaError(
-      () => compileCollection(api, { title: field }),
+      () => compileCollection({ title: field }),
       [
         { code: "invalid_bound", path, constraint: "min" },
         { code: "invalid_bound", path, constraint: "max" },
@@ -72,9 +64,9 @@ describe("approved declaration and metadata decisions", () => {
   });
 
   test("an invalid minimum does not hide a default violating an independent maximum", () => {
-    const field = api.text().min(-1).max(2).default("long");
+    const field = text().min(-1).max(2).default("long");
     expectSchemaError(
-      () => compileCollection(api, { title: field }),
+      () => compileCollection({ title: field }),
       [
         { code: "invalid_bound", path, constraint: "min" },
         {
@@ -87,22 +79,25 @@ describe("approved declaration and metadata decisions", () => {
   });
 
   test("contradictory bounds suppress checks against the invalid range", () => {
-    const field = api.text().min(6).max(3).default("abcd");
+    const field = text().min(6).max(3).default("abcd");
     expectSchemaError(
-      () => compileCollection(api, { title: field }),
+      () => compileCollection({ title: field }),
       [{ code: "conflicting_bounds", path, minimum: 6, maximum: 3 }],
     );
   });
 
   test("conflicted choices and formats suppress their dependent default checks", () => {
-    const choices = api.text().oneOf(["a"]).oneOf(["b"]).default("c");
-    const format = api.text().email().url().default("not a formatted value");
+    const choices = text()
+      .oneOf(["a"])
+      .oneOf(["b"])
+      .default("c" as "b");
+    const format = text().email().url().default("not a formatted value");
     expectSchemaError(
-      () => compileCollection(api, { title: choices }),
+      () => compileCollection({ title: choices }),
       [{ code: "conflicting_choices", path }],
     );
     expectSchemaError(
-      () => compileCollection(api, { title: format }),
+      () => compileCollection({ title: format }),
       [{ code: "conflicting_formats", path }],
     );
   });
@@ -119,16 +114,19 @@ describe("approved declaration and metadata decisions", () => {
   ];
   for (const [received, value] of badArguments) {
     test(`a non-string editor name reports its type: ${received}`, () => {
-      const field = api.text().editor(value as string, { unsupported: true });
+      const field = text().editor(
+        value as "radio",
+        { unsupported: true } as unknown as Record<string, never>,
+      );
       expectSchemaError(
-        () => compileCollection(api, { title: field }),
+        () => compileCollection({ title: field }),
         [{ code: "invalid_editor", path, expected: "string", received }],
       );
     });
   }
 
   test("plain input metadata omits editor", () => {
-    const field = compileCollection(api, { title: api.text() }).describe().fields.title!;
+    const field = compileCollection({ title: text() }).describe().fields.title!;
     expect(field).toEqual({ type: "text", required: true, nullable: false, unique: false });
     expectOwnKeys(field, ["type", "required", "nullable", "unique"]);
   });
@@ -136,24 +134,24 @@ describe("approved declaration and metadata decisions", () => {
   test("explicit and implicit editor defaults are equivalent", () => {
     const cases = [
       {
-        field: api.text().editor("textarea").editor("textarea", { rows: 4 }),
-        baseline: api.text().editor("textarea"),
+        field: text().editor("textarea").editor("textarea", { rows: 4 }),
+        baseline: text().editor("textarea"),
         editor: { type: "textarea", rows: 4 },
       },
       {
-        field: api.text().editor("code", { language: "plaintext" }).editor("code"),
-        baseline: api.text().editor("code"),
+        field: text().editor("code", { language: "plaintext" }).editor("code"),
+        baseline: text().editor("code"),
         editor: { type: "code", language: "plaintext" },
       },
       {
-        field: api.text().oneOf(["a"]).editor("radio").editor("radio", {}),
-        baseline: api.text().oneOf(["a"]).editor("radio"),
+        field: text().oneOf(["a"]).editor("radio").editor("radio", {}),
+        baseline: text().oneOf(["a"]).editor("radio"),
         editor: { type: "radio" },
       },
     ] as const;
     for (const entry of cases) {
-      const collection = compileCollection(api, { title: entry.field });
-      const baseline = compileCollection(api, { title: entry.baseline });
+      const collection = compileCollection({ title: entry.field });
+      const baseline = compileCollection({ title: entry.baseline });
       expect(collection.describe().fields.title!.editor).toEqual(entry.editor);
       expect(collection.describe()).toEqual(baseline.describe());
       expectSuccess(collection.validate({ title: "a" }), { title: "a" });
@@ -164,8 +162,8 @@ describe("approved declaration and metadata decisions", () => {
   });
 
   test("returned description mutation cannot change the compiled schema", () => {
-    const collection = compileCollection(api, {
-      title: api.text().min(2).oneOf(["draft", "published"]).default("draft").editor("textarea"),
+    const collection = compileCollection({
+      title: text().min(2).oneOf(["draft", "published"]).default("draft").editor("textarea"),
     });
     const initial = collection.describe();
     const expected = JSON.parse(JSON.stringify(initial));
@@ -184,11 +182,6 @@ describe("approved declaration and metadata decisions", () => {
 });
 
 describe("approved configuration boundaries and names", () => {
-  let api: RuntimeApi;
-  beforeAll(() => {
-    api = requireSchemaApi();
-  });
-
   const invalidRecords: [ReceivedType, unknown][] = [
     ["null", null],
     ["undefined", undefined],
@@ -198,14 +191,14 @@ describe("approved configuration boundaries and names", () => {
   for (const [received, value] of invalidRecords) {
     test(`malformed schema map reports record/${received}`, () => {
       expectSchemaError(
-        () => api.compileSchema(value as Parameters<RuntimeApi["compileSchema"]>[0]),
+        () => compileSchema(value as Parameters<typeof compileSchema>[0]),
         [{ code: "invalid_definition", path: [], expected: "record", received }],
       );
     });
     test(`malformed field map reports record/${received}`, () => {
-      const declaration = api.collection(value as Parameters<RuntimeApi["collection"]>[0]);
+      const declaration = collection(value as Parameters<typeof collection>[0]);
       expectSchemaError(
-        () => api.compileSchema({ articles: declaration }),
+        () => compileSchema({ articles: declaration }),
         [{ code: "invalid_definition", path: ["articles"], expected: "record", received }],
       );
     });
@@ -219,7 +212,7 @@ describe("approved configuration boundaries and names", () => {
   for (const [kind, value] of opaqueRecords) {
     test(`a schema map with ${kind} reports record/object`, () => {
       expectSchemaError(
-        () => api.compileSchema(value as Parameters<RuntimeApi["compileSchema"]>[0]),
+        () => compileSchema(value as Parameters<typeof compileSchema>[0]),
         [{ code: "invalid_definition", path: [], expected: "record", received: "object" }],
       );
     });
@@ -227,7 +220,7 @@ describe("approved configuration boundaries and names", () => {
 
   test("arbitrary objects cannot impersonate collection or field declarations", () => {
     expectSchemaError(
-      () => api.compileSchema({ articles: {} }),
+      () => compileSchema({ articles: {} as ReturnType<typeof collection> }),
       [
         {
           code: "invalid_definition",
@@ -237,9 +230,9 @@ describe("approved configuration boundaries and names", () => {
         },
       ],
     );
-    const declaration = api.collection({ title: {} as RuntimeText });
+    const declaration = collection({ title: {} as TextBuilder });
     expectSchemaError(
-      () => api.compileSchema({ articles: declaration }),
+      () => compileSchema({ articles: declaration }),
       [
         {
           code: "invalid_definition",
@@ -252,8 +245,8 @@ describe("approved configuration boundaries and names", () => {
   });
 
   test("empty schemas and collections are valid", () => {
-    expect(Object.keys(api.compileSchema({}))).toEqual([]);
-    const collection = compileCollection(api, {});
+    expect(Object.keys(compileSchema({}))).toEqual([]);
+    const collection = compileCollection({});
     expectSuccess(collection.validate({}), {});
     expect(collection.describe()).toEqual({ fields: {} });
     expectFailure(collection.validate({ unknown: true }), [
@@ -263,8 +256,8 @@ describe("approved configuration boundaries and names", () => {
 
   for (const name of ["", "__proto__", "constructor", "toString", "10", "é", "e\u0301"]) {
     test(`collection and field names are safe own keys: ${JSON.stringify(name)}`, () => {
-      const fields = Object.fromEntries([[name, api.text()]]);
-      const schema = api.compileSchema(Object.fromEntries([[name, api.collection(fields)]]));
+      const fields = Object.fromEntries([[name, text()]]);
+      const schema = compileSchema(Object.fromEntries([[name, collection(fields)]]));
       expect(Object.hasOwn(schema, name)).toBe(true);
       const input = Object.fromEntries([[name, "Kept"]]);
       const inputPrototype = Object.getPrototypeOf(input);
@@ -275,8 +268,8 @@ describe("approved configuration boundaries and names", () => {
   }
 
   test("declared fields follow JavaScript own-key order", () => {
-    const fields = { "10": api.text(), "2": api.text(), alpha: api.text(), "01": api.text() };
-    expectFailure(compileCollection(api, fields).validate({}), [
+    const fields = { "10": text(), "2": text(), alpha: text(), "01": text() };
+    expectFailure(compileCollection(fields).validate({}), [
       { code: "required", path: ["2"] },
       { code: "required", path: ["10"] },
       { code: "required", path: ["alpha"] },
@@ -288,7 +281,7 @@ describe("approved configuration boundaries and names", () => {
     const input = Object.fromEntries(
       ["\uE000", "😀", "ä", "z", "a", "A", "2", "10"].map((name) => [name, true]),
     );
-    expectFailure(compileCollection(api, {}).validate(input), [
+    expectFailure(compileCollection({}).validate(input), [
       { code: "unknown_field", path: ["10"] },
       { code: "unknown_field", path: ["2"] },
       { code: "unknown_field", path: ["A"] },

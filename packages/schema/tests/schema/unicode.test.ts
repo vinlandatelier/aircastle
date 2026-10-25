@@ -1,6 +1,7 @@
 import { beforeAll, describe, test } from "vite-plus/test";
 import type { CompiledCollection } from "../../src/index.ts";
-import { compileCollection, requireSchemaApi } from "../support/api.ts";
+import { text } from "../../src/index.ts";
+import { compileCollection } from "../support/collections.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";
 import { loadRuntimeGraphemeFixtures } from "../support/unicode.ts";
 
@@ -9,12 +10,11 @@ describe("Unicode fixtures under the approved Intl policy", () => {
   type Compiled = CompiledCollection<Record<string, unknown>>;
   const collections = new Map<number, { exact: Compiled; shorter: Compiled; longer: Compiled }>();
   beforeAll(() => {
-    const api = requireSchemaApi();
     for (const count of new Set(fixtures.map((fixture) => fixture.graphemes))) {
       collections.set(count, {
-        exact: compileCollection(api, { body: api.text().min(count).max(count) }),
-        shorter: compileCollection(api, { body: api.text().max(count - 1) }),
-        longer: compileCollection(api, { body: api.text().min(count + 1) }),
+        exact: compileCollection({ body: text().min(count).max(count) }),
+        shorter: compileCollection({ body: text().max(count - 1) }),
+        longer: compileCollection({ body: text().min(count + 1) }),
       });
     }
   });
