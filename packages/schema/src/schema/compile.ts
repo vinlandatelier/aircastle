@@ -21,6 +21,7 @@ import { validateValue, type TextRules } from "./values.ts";
 
 type MutableRules = { -readonly [Key in keyof TextRules]: TextRules[Key] };
 const issueOrder: Record<SchemaIssue["code"], number> = {
+  invalid_description: 0,
   invalid_definition: 0,
   conflicting_defaults: 1,
   conflicting_formats: 2,
@@ -63,7 +64,7 @@ function equalChoices(left: unknown, right: unknown): boolean {
   );
 }
 
-function compileField(
+export function compileField(
   modifiers: readonly Modifier[],
   path: IssuePath,
 ): { rules: TextRules; issues: SchemaIssue[] } {
@@ -178,9 +179,9 @@ function compileField(
   return { rules: Object.freeze(rules), issues };
 }
 
-function compiledCollection(
+export function compiledCollection(
   fields: readonly (readonly [string, TextRules])[],
-): CompiledCollection<Record<string, unknown>> {
+): CompiledCollection<Record<string, string | null>> {
   const knownNames = new Set(fields.map(([name]) => name));
   return Object.freeze({
     validate(input: unknown) {
@@ -191,7 +192,7 @@ function compiledCollection(
           issues: [validationIssue([], { code: "invalid_document" })] as const,
         };
       const values = new Map(snapshot.entries);
-      const output: [string, unknown][] = [];
+      const output: [string, string | null][] = [];
       const issues: ValidationIssue[] = [];
       for (const [name, rules] of fields) {
         let value = values.get(name);
@@ -205,7 +206,7 @@ function compiledCollection(
         }
         const failures = validateValue(value, rules, [name]);
         if (failures.length) issues.push(...failures);
-        else output.push([name, value]);
+        else if (typeof value === "string" || value === null) output.push([name, value]);
       }
       for (const name of [...values.keys()].filter((name) => !knownNames.has(name)).sort()) {
         issues.push(validationIssue([name], { code: "unknown_field" }));

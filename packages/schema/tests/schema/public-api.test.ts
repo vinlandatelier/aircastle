@@ -1,5 +1,10 @@
 import { expect, test } from "vite-plus/test";
+import fc from "fast-check";
 import * as schema from "../../src/index.ts";
+import { compileCollection } from "../support/collections.ts";
+import { propertyParameters } from "../support/properties.ts";
+
+const plain = { type: "text", required: true, nullable: false, unique: false };
 
 test("invalid compilation throws an instance of the public SchemaError constructor", () => {
   expect(typeof schema.SchemaError).toBe("function");
@@ -58,43 +63,77 @@ test("assertCollectionDefinitions accepts declared collections and throws compil
   }
 });
 
-test("uncheckedText builds the same field as the typed builder and leaves validation to compileSchema", () => {
-  const choices: unknown[] = ["draft", "published"];
-  const unchecked = schema.uncheckedText([
-    { kind: "optional" },
-    { kind: "nullable" },
-    { kind: "unique" },
-    { kind: "min", value: 1 },
-    { kind: "max", value: 20 },
-    { kind: "choices", value: choices },
-    { kind: "default", value: "draft" },
-    { kind: "editor", name: "radio", options: undefined },
-  ]);
-  choices.push("archived");
-  const typed = schema
-    .text()
-    .optional()
-    .nullable()
-    .unique()
-    .min(1)
-    .max(20)
-    .oneOf(["draft", "published"])
-    .default("draft")
-    .editor("radio");
-  const described = (field: Parameters<typeof schema.collection>[0][string]) =>
-    schema.compileSchema({ articles: schema.collection({ status: field }) }).articles.describe();
-  expect(described(unchecked)).toEqual(described(typed));
+const declaredFields = fc.constantFrom(
+  schema.text(),
+  schema.text().optional().unique(),
+  schema.text().nullable().default(null),
+  schema.text().min(1).max(5),
+  schema.text().email().optional(),
+  schema.text().url().nullable(),
+  schema.text().oneOf(["draft", "published"]).default("draft").editor("radio"),
+  schema.text().max(80).editor("textarea", { rows: 3 }),
+  schema.text().editor("code", { language: "sql" }),
+  schema.text().editor("textarea"),
+);
 
-  const code = schema.uncheckedText([
-    { kind: "editor", name: "code", options: { language: "sql" } },
-    { kind: "format", value: "email" },
-  ]);
-  expect(described(code).fields.status).toMatchObject({
-    format: "email",
-    editor: { type: "code", language: "sql" },
-  });
-
-  expect(() => described(schema.uncheckedText([{ kind: "min", value: "1" }]))).toThrow(
-    schema.SchemaError,
+test("decodeCollection reads back every description that compileSchema emits", () => {
+  const declarations = fc.dictionary(
+    fc.constantFrom("title", "slug", "__proto__", "toString"),
+    declaredFields,
+    { maxKeys: 4 },
   );
+  fc.assert(
+    fc.property(declarations, (fields) => {
+      const description = compileCollection(fields).describe();
+      const decoded = schema.decodeCollection(JSON.parse(JSON.stringify(description)));
+      expect(decoded.ok && decoded.collection.describe()).toEqual(description);
+    }),
+    propertyParameters,
+  );
+});
+
+test.each([
+  ["a non-record description", null, [{ code: "invalid_description", path: [] }]],
+  [
+    "an unknown description key",
+    { fields: {}, extra: 1 },
+    [{ code: "invalid_description", path: [] }],
+  ],
+  ["non-record fields", { fields: [] }, [{ code: "invalid_description", path: [] }]],
+  [
+    "an unknown field key",
+    { fields: { title: { ...plain, extra: 1 } } },
+    [{ code: "invalid_description", path: ["fields", "title"] }],
+  ],
+  [
+    "a non-text field",
+    { fields: { title: { ...plain, type: "number" } } },
+    [{ code: "invalid_description", path: ["fields", "title"] }],
+  ],
+  [
+    "an unsupported format",
+    { fields: { title: { ...plain, format: "uuid" } } },
+    [{ code: "invalid_description", path: ["fields", "title", "format"] }],
+  ],
+  [
+    "a default on a required field",
+    { fields: { title: { ...plain, default: "a" } } },
+    [{ code: "invalid_description", path: ["fields", "title", "default"] }],
+  ],
+  [
+    "a textarea without rows",
+    { fields: { title: { ...plain, editor: { type: "textarea" } } } },
+    [{ code: "invalid_description", path: ["fields", "title", "editor"] }],
+  ],
+  [
+    "issues in several fields",
+    { fields: { title: { ...plain, min: "1" }, slug: { ...plain, editor: null } } },
+    [
+      { code: "invalid_bound", path: ["fields", "title"] },
+      { code: "invalid_description", path: ["fields", "slug", "editor"] },
+    ],
+  ],
+])("decodeCollection rejects %s with schema issues", (_name, description, issues) => {
+  const decoded = schema.decodeCollection(description);
+  expect(decoded.ok || decoded.issues.map(({ code, path }) => ({ code, path }))).toEqual(issues);
 });

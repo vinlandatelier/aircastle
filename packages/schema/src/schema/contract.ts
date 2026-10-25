@@ -62,6 +62,10 @@ export type ValidationResult<Output extends object> =
 export type SchemaIssue = IssueDetails &
   (
     | {
+        /** A description decoded from untrusted input has the wrong shape. The path locates the rejected value. */
+        readonly code: "invalid_description";
+      }
+    | {
         readonly code: "invalid_definition";
         readonly expected: "record" | "collection" | "field";
         readonly received: ReceivedType;
