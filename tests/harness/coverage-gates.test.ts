@@ -4,6 +4,17 @@ import { pathToFileURL } from "node:url";
 import { expect, test } from "vite-plus/test";
 
 const ungatedWorkspaces = new Set(["apps/web"]);
+const testSupportExcludes = new Set(["src/test-support/**", "src/support/**"]);
+const untestableEntryFiles: Record<string, Record<string, string>> = {
+  "apps/api": {
+    "src/index.ts":
+      "server startup: reads env, awaits the database, calls Bun.serve, traps signals",
+    "src/cli.ts": "Hono CLI entry, loaded only through require in a CLI subprocess",
+  },
+  "packages/cli": {
+    "src/cli.ts": "bin entry that parses argv; covered by subprocess tests",
+  },
+};
 const testedWorkspaces = ["packages", "apps"]
   .flatMap((parent) => readdirSync(resolve(parent)).map((name) => `${parent}/${name}`))
   .filter((directory) => existsSync(resolve(directory, "package.json")))
@@ -31,8 +42,9 @@ test.each(testedWorkspaces)("%s runs its tests behind coverage thresholds", asyn
         coverage?: {
           provider?: string;
           include?: string[];
+          exclude?: string[];
           reporter?: string[];
-          thresholds?: object;
+          thresholds?: Record<string, unknown>;
         };
       };
     };
@@ -47,4 +59,11 @@ test.each(testedWorkspaces)("%s runs its tests behind coverage thresholds", asyn
     "lines",
     "statements",
   ]);
+  for (const threshold of Object.values(coverage?.thresholds ?? {}))
+    expect(threshold).toBeGreaterThan(0);
+  const allowedEntryFiles = Object.keys(untestableEntryFiles[directory] ?? {});
+  for (const pattern of coverage?.exclude ?? [])
+    expect(testSupportExcludes.has(pattern) || allowedEntryFiles.includes(pattern), pattern).toBe(
+      true,
+    );
 });

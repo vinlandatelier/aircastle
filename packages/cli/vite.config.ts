@@ -9,8 +9,9 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
+      exclude: ["src/cli.ts"],
       reporter: ["text", "json-summary"],
-      thresholds: { statements: 0, branches: 0, functions: 0, lines: 0 },
+      thresholds: { statements: 83, branches: 84, functions: 93, lines: 84 },
     },
   },
   pack: { entry: ["src/index.ts"], format: "esm", target: "es2022", dts: true, clean: true },
