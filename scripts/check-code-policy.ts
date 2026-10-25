@@ -10,7 +10,9 @@ export interface PolicyViolation {
     | "type-suppression"
     | "unsafe-sql"
     | "cross-workspace-relative-import"
-    | "undeclared-workspace-import";
+    | "undeclared-workspace-import"
+    | "swallowed-error"
+    | "stale-catch-allowance";
 }
 
 const rawSqlFiles = new Set([
@@ -33,6 +35,112 @@ const namesUnsafe = (key: SyntaxKey, computed: boolean) =>
   (key.type === "TemplateLiteral" &&
     key.expressions?.length === 0 &&
     key.quasis?.[0]?.value.cooked === "unsafe");
+
+const workspaceSource = /^(?:packages|apps)\/[^/]+\/src\//;
+
+/** Catch clauses that deliberately map every failure to one outcome, as the exact count per file. */
+const deliberateCatchAllowances: Readonly<Record<string, { count: number; reason: string }>> = {
+  "apps/api/src/index.ts": {
+    count: 1,
+    reason: "Shutdown reports any close failure as exit code 1.",
+  },
+  "apps/api/src/features/content/request.ts": {
+    count: 2,
+    reason:
+      "A failed request body stream is an invalid request, and cancelling an oversized body is best effort before payload_too_large.",
+  },
+  "packages/core/src/index.ts": {
+    count: 1,
+    reason:
+      "Pending-operation tracking only untracks a rejected operation; its caller still receives the rejection.",
+  },
+  "packages/cli/src/index.ts": {
+    count: 2,
+    reason:
+      "Lockfile cleanup ignores a temporary file that is already gone or can't be removed, and a schema exchange reports any fetch or response-body failure as transport_error, or unknown_write_outcome for a write.",
+  },
+  "packages/client/src/index.ts": {
+    count: 1,
+    reason:
+      "A document request reports any fetch or response-body failure as one transport or unknown-write result.",
+  },
+  "packages/client/src/test-support/native-transport.ts": {
+    count: 1,
+    reason: "The probe measures whether native fetch rejects a reset connection at all.",
+  },
+};
+
+function bindingNames(pattern: unknown): string[] {
+  if (pattern === null || typeof pattern !== "object") return [];
+  const node = pattern as Record<string, unknown>;
+  if (node.type === "Identifier") return [node.name as string];
+  if (node.type === "ObjectPattern")
+    return (node.properties as Record<string, unknown>[]).flatMap((entry) =>
+      bindingNames(entry.type === "RestElement" ? entry.argument : entry.value),
+    );
+  if (node.type === "ArrayPattern") return (node.elements as unknown[]).flatMap(bindingNames);
+  if (node.type === "AssignmentPattern") return bindingNames(node.left);
+  if (node.type === "RestElement") return bindingNames(node.argument);
+  return [];
+}
+
+/** Whether code reads one of the names, ignoring property keys and reads that only discard the value. */
+function readsAny(value: unknown, names: ReadonlySet<string>): boolean {
+  if (Array.isArray(value)) return value.some((entry) => readsAny(entry, names));
+  if (value === null || typeof value !== "object") return false;
+  const node = value as Record<string, unknown>;
+  if (node.type === "Identifier") return names.has(node.name as string);
+  if (node.type === "ExpressionStatement" && (node.expression as SyntaxKey).type === "Identifier")
+    return false;
+  if (node.type === "UnaryExpression" && node.operator === "void") return false;
+  return Object.entries(node).some(([key, child]) => {
+    if (["loc", "leadingComments", "innerComments", "trailingComments"].includes(key)) return false;
+    if (
+      key === "property" &&
+      (node.type === "MemberExpression" || node.type === "OptionalMemberExpression") &&
+      !node.computed
+    )
+      return false;
+    if (key === "key" && !node.computed) return false;
+    return readsAny(child, names);
+  });
+}
+
+const rejectionArguments = new Map([
+  ["catch", 0],
+  ["then", 1],
+]);
+
+function rejectionHandler(node: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (node.type !== "CallExpression" && node.type !== "OptionalCallExpression") return undefined;
+  const callee = node.callee as Record<string, unknown>;
+  const property = callee.property as SyntaxKey | undefined;
+  const position =
+    (callee.type === "MemberExpression" || callee.type === "OptionalMemberExpression") &&
+    !callee.computed &&
+    property?.type === "Identifier"
+      ? rejectionArguments.get(property.name as string)
+      : undefined;
+  if (position === undefined) return undefined;
+  const handler = (node.arguments as Record<string, unknown>[])[position];
+  return handler?.type === "ArrowFunctionExpression" || handler?.type === "FunctionExpression"
+    ? handler
+    : undefined;
+}
+
+/** Whether a catch clause or an inline promise rejection handler discards the error it receives. */
+function swallowsError(node: Record<string, unknown>): boolean {
+  const handler = rejectionHandler(node);
+  const [param, body] =
+    node.type === "CatchClause"
+      ? [node.param, node.body]
+      : handler
+        ? [(handler.params as unknown[])[0], handler.body]
+        : [];
+  if (body === undefined) return false;
+  const names = new Set(bindingNames(param));
+  return names.size === 0 || !readsAny(body, names);
+}
 
 /** A package in the repository, where the root package has the directory "". */
 export interface Workspace {
@@ -135,6 +243,7 @@ export function inspectCode(
   const ast = parse(source, { sourceType: "unambiguous", plugins });
   const documented = new Set<number>();
   const violations: PolicyViolation[] = [];
+  const swallowed: PolicyViolation[] = [];
   const declarationParts = new Set([
     "ClassMethod",
     "ClassPrivateMethod",
@@ -175,6 +284,14 @@ export function inspectCode(
         });
       }
     }
+    if (workspaceSource.test(file) && swallowsError(node)) {
+      const start = (node.loc as SyntaxKey["loc"])?.start;
+      swallowed.push({
+        line: start?.line ?? 1,
+        column: (start?.column ?? 0) + 1,
+        rule: "swallowed-error",
+      });
+    }
     const specifier = moduleSpecifier(node);
     const boundary = specifier && inspectSpecifier(file, specifier.value as string, workspaces);
     if (boundary)
@@ -208,6 +325,15 @@ export function inspectCode(
     }
   };
   visit(ast.program);
+  const allowance = Object.hasOwn(deliberateCatchAllowances, file)
+    ? deliberateCatchAllowances[file]!.count
+    : 0;
+  if (swallowed.length !== allowance)
+    violations.push(
+      ...(swallowed.length > allowance
+        ? swallowed.slice(allowance)
+        : [{ line: 1, column: 1, rule: "stale-catch-allowance" as const }]),
+    );
   for (const comment of ast.comments ?? []) {
     const rule = /@ts-(?:expect-error|ignore|nocheck)\b/i.test(comment.value)
       ? "type-suppression"

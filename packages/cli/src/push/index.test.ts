@@ -313,8 +313,9 @@ function jsonLines(output: string): unknown[] {
   return output.split(/\r?\n/).flatMap((line) => {
     try {
       return [JSON.parse(line) as unknown];
-    } catch {
-      return [];
+    } catch (error) {
+      if (error instanceof SyntaxError) return [];
+      throw error;
     }
   });
 }

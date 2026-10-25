@@ -1,4 +1,7 @@
 import type { CollectionDescription, TextFieldDescription } from "@aircastle/schema";
+import { expect } from "vite-plus/test";
+import { decodeCollections } from "../decode.ts";
+import { parseCollections } from "../index.ts";
 
 export function field(overrides: Partial<TextFieldDescription> = {}): TextFieldDescription {
   return { type: "text", required: true, nullable: false, unique: false, ...overrides };
@@ -32,4 +35,21 @@ export function freezeDeep<Value>(value: Value): Value {
     Object.freeze(value);
   }
   return value;
+}
+
+/** Asserts that input is publicly an invalid request and returns the decoder's reason, with schema issues reduced to their codes and paths. */
+export function rejection(input: unknown): unknown {
+  expect(parseCollections(input)).toEqual({ ok: false, error: { code: "invalid_request" } });
+  const decoded = decodeCollections(input);
+  if (decoded.ok || decoded.issue.reason !== "invalid_schema")
+    return decoded.ok ? decoded : decoded.issue;
+  return {
+    reason: "invalid_schema",
+    issues: decoded.issue.issues.map(({ code, path }) => ({ code, path })),
+  };
+}
+
+/** The `rejection` summary for one schema issue on a field of the decoded collection. */
+export function schemaRejection(code: string, name = "title") {
+  return { reason: "invalid_schema", issues: [{ code, path: ["wire", name] }] };
 }

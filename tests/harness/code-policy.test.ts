@@ -284,3 +284,70 @@ test("the policy command enforces workspace import boundaries from package manif
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+const swallowed = (file: string, source: string) =>
+  inspectCode(file, source).filter((entry) => entry.rule === "swallowed-error");
+
+test.each([
+  ["bare catch", "try { run(); } catch {}"],
+  ["bare catch with a fallback", "try { run(); } catch { return fallback; }"],
+  ["unused binding", "try { run(); } catch (error) { return fallback; }"],
+  ["void read", "try { run(); } catch (error) { void error; return fallback; }"],
+  ["discarded read", "try { run(); } catch (error) { error; return fallback; }"],
+  ["unused destructured binding", "try { run(); } catch ({ message }) { return fallback; }"],
+  [
+    "binding name used only as an object key",
+    "try { run(); } catch (error) { return { error: 1 }; }",
+  ],
+  ["binding name used only as a property", "try { run(); } catch (error) { return value.error; }"],
+  ["promise handler without a parameter", "promise.catch(() => fallback);"],
+  ["promise handler with an unused parameter", "promise.catch((error) => fallback);"],
+  ["optional promise handler", "promise?.catch(function () { return fallback; });"],
+  ["then rejection handler", "promise.then(use, () => fallback);"],
+])("rejects catch clauses in package source that swallow the error: %s", (_name, source) => {
+  expect(swallowed("packages/core/src/value.ts", `function value() { ${source} }`)).toHaveLength(1);
+});
+
+test.each([
+  ["rethrow", "try { run(); } catch (error) { throw error; }"],
+  [
+    "expected error narrowed and others rethrown",
+    "try { run(); } catch (error) { if (error instanceof SyntaxError) return fallback; throw error; }",
+  ],
+  ["reported", "try { run(); } catch (error) { report(error); }"],
+  ["destructured and used", "try { run(); } catch ({ message }) { report(message); }"],
+  ["computed key", "try { run(); } catch (error) { return { [error]: 1 }; }"],
+  ["promise handler that rethrows", "promise.catch((error) => { throw error; });"],
+  ["handler passed by reference", "promise.catch(report);"],
+  ["then fulfilment handler only", "promise.then(() => fallback);"],
+  ["then rejection handler that reports", "promise.then(use, (error) => report(error));"],
+])("accepts catch clauses that use the bound error: %s", (_name, source) => {
+  expect(swallowed("packages/core/src/value.test.ts", `function value() { ${source} }`)).toEqual(
+    [],
+  );
+});
+
+test("checks swallowed errors only in package and app source", () => {
+  for (const file of [
+    "scripts/value.ts",
+    "packages/core/tests/value.ts",
+    "apps/api/tests/value.ts",
+  ])
+    expect(swallowed(file, "try { run(); } catch {}")).toEqual([]);
+  expect(swallowed("apps/web/src/value.ts", "try { run(); } catch {}")).toHaveLength(1);
+});
+
+test("allows only the counted deliberate catch-alls in a listed file", () => {
+  const catchAll = "try { run(); } catch { fallback(); }\n";
+  expect(swallowed("packages/cli/src/index.ts", catchAll + catchAll)).toEqual([]);
+  expect(swallowed("packages/cli/src/index.ts", catchAll + catchAll + catchAll)).toEqual([
+    { line: 3, column: 16, rule: "swallowed-error" },
+  ]);
+  expect(swallowed("packages/cli/src/other.ts", catchAll)).toHaveLength(1);
+});
+
+test("rejects an allowance that no longer matches its file", () => {
+  expect(
+    inspectCode("packages/cli/src/index.ts", "try { run(); } catch { fallback(); }\n"),
+  ).toEqual([{ line: 1, column: 1, rule: "stale-catch-allowance" }]);
+});
