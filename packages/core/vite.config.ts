@@ -8,6 +8,13 @@ export default defineConfig({
     maxWorkers: 2,
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      exclude: ["src/test-support/**"],
+      reporter: ["text", "json-summary"],
+      thresholds: { statements: 89, branches: 77, functions: 92, lines: 94 },
+    },
   },
   pack: { entry: ["src/index.ts"], format: "esm", target: "es2022", dts: true, clean: true },
 });
