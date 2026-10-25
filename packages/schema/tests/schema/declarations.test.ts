@@ -367,21 +367,19 @@ describe("declaration compilation", () => {
   });
 
   test("schema issue messages name the issue code in words", () => {
-    let thrown: unknown;
-    try {
+    expect(() =>
       compileCollection({
         title: text().min(3).max(1),
         body: text().oneOf("draft" as unknown as string[]),
-      });
-    } catch (error) {
-      thrown = error;
-    }
-    expect(
-      (thrown as { issues: { message: string }[] }).issues.map(({ message }) => message),
-    ).toEqual([
-      "Invalid schema declaration: conflicting bounds.",
-      "Invalid schema declaration: invalid choices.",
-    ]);
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          expect.objectContaining({ message: "Invalid schema declaration: conflicting bounds." }),
+          expect.objectContaining({ message: "Invalid schema declaration: invalid choices." }),
+        ],
+      }),
+    );
   });
 
   test("field builders and collection declarations are frozen", () => {

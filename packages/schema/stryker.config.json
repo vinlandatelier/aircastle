@@ -23,6 +23,6 @@
     "tsconfig*.json"
   ],
   "commandRunner": {
-    "command": "bun run test:schema --bail 1 --maxWorkers 1"
+    "command": "vp test tests/schema --bail 1 --maxWorkers 1"
   }
 }

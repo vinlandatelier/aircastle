@@ -1,24 +1,35 @@
 import { expect, test } from "vite-plus/test";
-import { mutationScope } from "../../scripts/mutate-changed.ts";
+import {
+  changedLines,
+  mutationScope,
+  testFilters,
+  undetectedMutants,
+} from "../../scripts/mutate-changed.ts";
 
 const schema = {
   packageDir: "packages/schema",
   mutate: ["src/schema/**/*.ts", "!src/schema/contract.ts"],
+  tests: { include: ["tests/**/*.test.ts"], filters: ["tests/schema"] },
+  lines: [
+    { path: "packages/schema/src/schema/compile.ts", lines: [[83, 83] as const] },
+    { path: "packages/schema/src/schema/formats.ts", lines: [[3, 4] as const, [23, 23] as const] },
+  ],
   exists: () => true,
 };
 
-test("changes outside the package's test inputs skip mutation testing", () => {
+test("changes outside the tests and setup the Stryker command runs skip mutation testing", () => {
   for (const changed of [
     [],
     ["apps/web/src/main.tsx", "packages/contracts/src/index.ts"],
     ["packages/schema-extra/src/schema/compile.ts"],
     ["packages/schema/scripts/classify-mutations.ts"],
+    ["packages/schema/tests/harness/mutation-report.test.ts"],
   ]) {
     expect(mutationScope({ ...schema, changed }), changed.join()).toEqual({ kind: "skip" });
   }
 });
 
-test("changes limited to mutated source files mutate only those files", () => {
+test("changes limited to mutated source files mutate only their changed lines", () => {
   expect(
     mutationScope({
       ...schema,
@@ -28,12 +39,30 @@ test("changes limited to mutated source files mutate only those files", () => {
         "packages/schema/src/schema/formats.ts",
       ],
     }),
-  ).toEqual({ kind: "files", files: ["src/schema/compile.ts", "src/schema/formats.ts"] });
+  ).toEqual({
+    kind: "lines",
+    targets: [
+      "src/schema/compile.ts:83-83",
+      "src/schema/formats.ts:3-4",
+      "src/schema/formats.ts:23-23",
+    ],
+  });
 });
 
-test("changes to tests, configuration or unmutated sources mutate the whole package", () => {
+test("source changes that only delete lines have nothing to mutate", () => {
+  expect(
+    mutationScope({
+      ...schema,
+      changed: ["packages/schema/src/schema/values.ts"],
+    }),
+  ).toEqual({ kind: "skip" });
+});
+
+test("changes to run tests, their helpers, setup or unmutated sources mutate the whole package", () => {
   for (const file of [
     "tests/schema/compile.test.ts",
+    "tests/support/assertions.ts",
+    "tests/fixtures/unicode/15.1.0/GraphemeBreakTest.txt",
     "stryker.config.json",
     "vite.config.ts",
     "package.json",
@@ -50,6 +79,16 @@ test("changes to tests, configuration or unmutated sources mutate the whole pack
   }
 });
 
+test("a command without path filters runs every included test file", () => {
+  expect(
+    mutationScope({
+      ...schema,
+      tests: { include: ["tests/**/*.test.ts"], filters: [] },
+      changed: ["packages/schema/tests/harness/mutation-report.test.ts"],
+    }),
+  ).toEqual({ kind: "all" });
+});
+
 test("deleting a mutated source file mutates the whole package", () => {
   expect(
     mutationScope({
@@ -58,4 +97,68 @@ test("deleting a mutated source file mutates the whole package", () => {
       exists: (path) => path !== "packages/schema/src/schema/formats.ts",
     }),
   ).toEqual({ kind: "all" });
+});
+
+test("changed lines come from the new side of each zero-context hunk", () => {
+  const diff = [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -3 +3 @@ export function a() {",
+    "@@ -10,0 +11,2 @@",
+    "@@ -20,4 +22,0 @@",
+    "diff --git a/src/gone.ts b/src/gone.ts",
+    "--- a/src/gone.ts",
+    "+++ /dev/null",
+    "@@ -1,5 +0,0 @@",
+    "diff --git a/src/new.ts b/src/new.ts",
+    "--- /dev/null",
+    "+++ b/src/new.ts",
+    "@@ -0,0 +1,4 @@",
+  ].join("\n");
+  expect(changedLines(diff)).toEqual([
+    {
+      path: "src/a.ts",
+      lines: [
+        [3, 3],
+        [11, 12],
+      ],
+    },
+    { path: "src/new.ts", lines: [[1, 4]] },
+  ]);
+});
+
+test("test filters are the paths before the first flag of a vp test command", () => {
+  expect(testFilters("vp test tests/schema --bail 1 --maxWorkers 1")).toEqual(["tests/schema"]);
+  expect(testFilters("vp test src")).toEqual(["src"]);
+  expect(testFilters("vp test --bail 1")).toEqual([]);
+  expect(() => testFilters("bun run test:schema --bail 1")).toThrow(/vp test/);
+});
+
+test("undetected mutants are the survived and uncovered ones with their location", () => {
+  const mutant = (status: string, line: number, replacement?: string) => ({
+    status,
+    mutatorName: "ConditionalExpression",
+    location: { start: { line, column: 6 }, end: { line, column: 9 } },
+    ...(replacement === undefined ? {} : { replacement }),
+  });
+  expect(
+    undetectedMutants({
+      files: {
+        "src/schema/formats.ts": {
+          mutants: [
+            mutant("Killed", 1, "true"),
+            mutant("Survived", 2, "true"),
+            mutant("Timeout", 3),
+            mutant("NoCoverage", 4),
+            mutant("CompileError", 5),
+          ],
+        },
+      },
+    }),
+  ).toEqual([
+    "src/schema/formats.ts:2:6 ConditionalExpression true",
+    "src/schema/formats.ts:4:6 ConditionalExpression",
+  ]);
+  expect(() => undetectedMutants({ files: { "a.ts": { mutants: {} } } })).toThrow(/mutants/);
 });

@@ -79,7 +79,7 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
 
-`.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. On pull requests, the required check runs `scripts/mutate-changed.ts`, which mutation tests only the packages whose sources, tests or test setup changed. It mutates the changed source files alone, or the whole package when tests or setup changed. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
+`.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. On pull requests, the required check runs `scripts/mutate-changed.ts`, which mutation tests only the packages whose sources, the tests their Stryker command runs, or test setup changed. For source-only changes it mutates the changed lines and fails on any surviving mutant there. When tests or setup changed it mutates the whole package against the 99% threshold. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
 
 ## Feature pattern
 
