@@ -1,3 +1,5 @@
+<!-- Keep the visible part readable in 30 seconds: 2 to 5 short bullets per section, one idea each, plain words and numbers. Put verbose material in <details> blocks. -->
+
 ## What?
 
 <!-- One or two sentences on what this PR changes. -->
