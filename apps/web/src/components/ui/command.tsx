@@ -16,7 +16,12 @@ const substringFirst: NonNullable<React.ComponentProps<typeof CommandPrimitive>[
   value,
   query,
   keywords,
-) => (value.toLowerCase().includes(query.toLowerCase()) ? 1 : defaultFilter(value, query, keywords))
+) => {
+  const index = value.toLowerCase().indexOf(query.toLowerCase())
+  if (index === -1) return defaultFilter(value, query, keywords) / 2
+  if (index === 0) return 1
+  return /[\s\-_/]/.test(value[index - 1]!) ? 0.9 : 0.8
+}
 
 function Command({
   className,
