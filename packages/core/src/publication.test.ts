@@ -81,7 +81,9 @@ test("one invalid collection rejects the whole project publication", async () =>
 for (const title of ["a", "four"]) {
   test(`tightening title rejects existing value ${JSON.stringify(title)} without changing content`, async () => {
     const saved = { id: documentId, title, slug: "saved", status: "draft" };
-    const { store, snapshot, snapshotDocuments } = controlledStore({ documents: [saved] });
+    const { store, snapshot, snapshotDocuments } = controlledStore({
+      documents: { articles: [saved] },
+    });
     const changed = collection({
       fields: { ...articles.fields, title: { ...articles.fields.title!, min: 5 } },
     });
@@ -92,13 +94,13 @@ for (const title of ["a", "four"]) {
       }),
     ).toEqual({ ok: false, error: { code: "migration_required" } });
     expect(snapshot()).toEqual({ revision: "revision-start", collections });
-    expect(snapshotDocuments()).toEqual([saved]);
+    expect(snapshotDocuments("articles")).toEqual([saved]);
   });
 }
 
 test("tightening accepts existing values already within the proposed rules", async () => {
   const { store, snapshot } = controlledStore({
-    documents: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }],
+    documents: { articles: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }] },
   });
   const changed = collection({
     fields: { ...articles.fields, title: { ...articles.fields.title!, min: 5 } },
@@ -115,7 +117,7 @@ test("tightening accepts existing values already within the proposed rules", asy
 
 test("a new default that would fill existing content requires migration", async () => {
   const { store } = controlledStore({
-    documents: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }],
+    documents: { articles: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }] },
   });
   const changed = collection({
     fields: {

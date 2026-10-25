@@ -19,7 +19,7 @@ test("create validates the active schema, applies defaults and returns the saved
     }),
   );
   expect(result).toEqual({ id: documentId, title: "Hello", slug: "hello", status: "draft" });
-  expect(snapshotDocuments()).toEqual([
+  expect(snapshotDocuments("articles")).toEqual([
     { id: documentId, title: "Hello", slug: "hello", status: "draft" },
   ]);
 });
@@ -40,7 +40,7 @@ test("independent invalid fields aggregate in declaration order and persist noth
   ]);
   expect(result.error.issues[1]).toMatchObject({ expected: "string", received: "number" });
   expect(result.error.issues[2]).toMatchObject({ allowed: ["draft", "published"] });
-  expect(snapshotDocuments()).toEqual([]);
+  expect(snapshotDocuments("articles")).toEqual([]);
 });
 
 for (const input of [
@@ -56,13 +56,13 @@ for (const input of [
       input,
     );
     expect(result).toMatchObject({ ok: false, error: { code: "validation_failed" } });
-    expect(snapshotDocuments()).toEqual([]);
+    expect(snapshotDocuments("articles")).toEqual([]);
   });
 }
 
 test("stored reads preserve omitted optional fields and never synthesize defaults", async () => {
   const saved = { id: documentId, title: "Hello", slug: "hello", status: "draft" };
-  const { store } = controlledStore({ documents: [saved] });
+  const { store } = controlledStore({ documents: { articles: [saved] } });
   expect(
     await createService(store, failOnReport).findById(access, "articles", contract, documentId),
   ).toEqual({
@@ -73,7 +73,7 @@ test("stored reads preserve omitted optional fields and never synthesize default
 
 test("explicit nullable null survives a read", async () => {
   const saved = { id: documentId, title: "Hello", slug: "hello", summary: null, status: "draft" };
-  const { store } = controlledStore({ documents: [saved] });
+  const { store } = controlledStore({ documents: { articles: [saved] } });
   expect(
     await createService(store, failOnReport).findById(access, "articles", contract, documentId),
   ).toEqual({
@@ -86,7 +86,11 @@ test("older clients read only their declared fields plus id", async () => {
   const old = { fields: { title: articles.fields.title!, slug: articles.fields.slug! } };
   const { store } = controlledStore({
     contracts: { [contract]: old },
-    documents: [{ id: documentId, title: "Hello", slug: "hello", summary: "New", status: "draft" }],
+    documents: {
+      articles: [
+        { id: documentId, title: "Hello", slug: "hello", summary: "New", status: "draft" },
+      ],
+    },
   });
   expect(
     await createService(store, failOnReport).findById(access, "articles", contract, documentId),
@@ -104,7 +108,7 @@ test("a defaulted client output field cannot be manufactured during a read", asy
       collections: [{ name: "articles", description: withoutStatus }],
     },
     contracts: { [contract]: articles },
-    documents: [{ id: documentId, title: "Hello", slug: "hello" }],
+    documents: { articles: [{ id: documentId, title: "Hello", slug: "hello" }] },
   });
   expect(
     await createService(store, failOnReport).findById(access, "articles", contract, documentId),
@@ -116,7 +120,7 @@ test("a defaulted client output field cannot be manufactured during a read", asy
 
 test("corrupt authoritative stored data is a reported internal_error rather than repaired content", async () => {
   const { store } = controlledStore({
-    documents: [{ id: documentId, title: "Hello", slug: "hello" }],
+    documents: { articles: [{ id: documentId, title: "Hello", slug: "hello" }] },
   });
   const reported: unknown[] = [];
   expect(
@@ -144,7 +148,7 @@ test("incompatible old create contract is rejected even when this title passes",
       slug: "hello",
     }),
   ).toEqual({ ok: false, error: { code: "schema_mismatch" } });
-  expect(snapshotDocuments()).toEqual([]);
+  expect(snapshotDocuments("articles")).toEqual([]);
 });
 
 test("schema compatibility precedes document field validation", async () => {
@@ -155,7 +159,7 @@ test("schema compatibility precedes document field validation", async () => {
     ok: false,
     error: { code: "schema_mismatch" },
   });
-  expect(snapshotDocuments()).toEqual([]);
+  expect(snapshotDocuments("articles")).toEqual([]);
 });
 
 test("collection absence is distinct from document absence", async () => {
@@ -228,7 +232,7 @@ test("a persistence unique conflict retains its structured field detail", async 
       slug: "taken",
     }),
   ).toEqual({ ok: false, error: { code: "unique_conflict", field: "slug" } });
-  expect(snapshotDocuments()).toEqual([]);
+  expect(snapshotDocuments("articles")).toEqual([]);
 });
 
 test("unexpected storage failures are reported without exposing internal details", async () => {
@@ -273,5 +277,5 @@ test("a compatible stricter client cannot receive invalid output or leave a spec
     slug: "must-not-persist",
   });
   expect(result).toEqual({ ok: false, error: { code: "schema_mismatch" } });
-  expect(snapshotDocuments()).toEqual([]);
+  expect(snapshotDocuments("articles")).toEqual([]);
 });

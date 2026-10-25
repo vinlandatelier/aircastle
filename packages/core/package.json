@@ -9,6 +9,9 @@
       "development": "./src/index.ts",
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
+    },
+    "./testing": {
+      "development": "./src/test-support/store-contract.ts"
     }
   },
   "scripts": {
