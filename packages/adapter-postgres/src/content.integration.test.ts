@@ -45,10 +45,10 @@ const failOnReport = (summary: ErrorSummary) => {
 
 interface Fixture {
   access: Access;
-  store(): ContentStore;
-  cms(): ContentService;
-  reopen(): Promise<void>;
-  provision(projectName: string): Promise<Access>;
+  store: () => ContentStore;
+  cms: () => ContentService;
+  reopen: () => Promise<void>;
+  provision: (projectName: string) => Promise<Access>;
 }
 
 async function withCms(operation: (fixture: Fixture) => Promise<void>) {

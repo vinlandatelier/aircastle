@@ -25,16 +25,19 @@ import { ErrorSummary } from "./error-summary.ts";
 export { ErrorSummary };
 
 export interface ProjectTransaction {
-  state(): Promise<ProjectState>;
-  contract(id: string): Promise<CollectionDescription | undefined>;
-  documents(collection: string): Promise<ContentDocument[]>;
-  activate(collections: readonly PublishedCollection[], publication: Publication): Promise<void>;
-  insert(
+  state: () => Promise<ProjectState>;
+  contract: (id: string) => Promise<CollectionDescription | undefined>;
+  documents: (collection: string) => Promise<ContentDocument[]>;
+  activate: (
+    collections: readonly PublishedCollection[],
+    publication: Publication,
+  ) => Promise<void>;
+  insert: (
     collection: string,
     data: DocumentData,
     uniqueFields: readonly string[],
-  ): Promise<Result<ContentDocument>>;
-  read(collection: string, id: string): Promise<ContentDocument | undefined>;
+  ) => Promise<Result<ContentDocument>>;
+  read: (collection: string, id: string) => Promise<ContentDocument | undefined>;
 }
 export interface ProvisionedProject {
   workspace: string;
@@ -62,24 +65,24 @@ export class StorageUnavailable extends Error {
 }
 /** Persistence for projects and content. Throws {@link StorageUnavailable} for retryable outages. */
 export interface ContentStore {
-  initialize(): Promise<void>;
-  provision(options: {
+  initialize: () => Promise<void>;
+  provision: (options: {
     verifier: string;
     permissions: readonly Permission[];
     key: KeyMode;
     workspaceName: string;
     projectName: string;
-  }): Promise<ProvisionedProject>;
-  authorize(
+  }) => Promise<ProvisionedProject>;
+  authorize: (
     project: string,
     verifier: string,
     permission: Permission,
-  ): Promise<"authorized" | "unauthorized" | "forbidden">;
-  transaction<Value>(
+  ) => Promise<"authorized" | "unauthorized" | "forbidden">;
+  transaction: <Value>(
     project: string,
     operation: (transaction: ProjectTransaction) => Promise<Value>,
-  ): Promise<Value>;
-  close(): Promise<void>;
+  ) => Promise<Value>;
+  close: () => Promise<void>;
 }
 export interface Access {
   project: string;
@@ -106,7 +109,7 @@ export interface ContentService {
   ) => Promise<Result<ContentDocument>>;
 }
 export interface AircastleRuntime extends ContentService {
-  close(): Promise<void>;
+  close: () => Promise<void>;
 }
 /** Receives a summary of each unexpected error after it becomes an `internal_error` result. */
 export type ReportError = (error: ErrorSummary) => void;
