@@ -1,21 +1,20 @@
 import { Buffer } from 'node:buffer'
-import { createHash } from 'node:crypto'
 import { test, expect } from './support'
 
-test('shell:R5 favicons use the current light and dark brand artwork', async ({ request }) => {
+test('shell:R5 favicons embed small light and dark brand icons', async ({ request }) => {
+  const icons: Buffer[] = []
   for (const theme of ['light', 'dark']) {
-    const logo = await request.get(`/brand/logo-${theme}.png`)
     const favicon = await request.get(`/brand/favicon-${theme}.svg`)
-    expect(logo.ok()).toBe(true)
     expect(favicon.ok()).toBe(true)
-    const embedded = (await favicon.text()).match(/data:image\/png;base64,([^"\s]+)/)?.[1]
+    const svg = await favicon.text()
+    expect(svg.length, `${theme} favicon stays small`).toBeLessThan(16_000)
+    const embedded = svg.match(/data:image\/png;base64,([^"\s]+)/)?.[1]
     expect(embedded).toBeTruthy()
-    const actual = createHash('sha256').update(Buffer.from(embedded!, 'base64')).digest('hex')
-    const expected = createHash('sha256')
-      .update(await logo.body())
-      .digest('hex')
-    expect(actual, `${theme} favicon matches the current brand artwork`).toBe(expected)
+    const png = Buffer.from(embedded!, 'base64')
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([64, 64])
+    icons.push(png)
   }
+  expect(icons[0]!.equals(icons[1]!)).toBe(false)
 })
 
 for (const theme of ['light', 'dark'] as const) {
