@@ -5,6 +5,12 @@ const rawSql = {
   message:
     "Write SQL with tagged templates. Quote identifiers with identifier() from identifier.ts.",
 };
+const processRunner =
+  "Run browser servers through webServer in apps/web/playwright.config.ts and checks through package scripts, not hand-built runners.";
+const processRunnerProperties = ["Bun", "getBuiltinModule"].map((property) => ({
+  property,
+  message: processRunner,
+}));
 const bunEnv = {
   object: "Bun",
   property: "env",
@@ -90,6 +96,58 @@ export default defineConfig({
       typeCheck: true,
     },
     overrides: [
+      {
+        files: ["apps/web/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                ...["bun"].map((name) => ({
+                  name,
+                  importNames: ["$", "spawn", "spawnSync"],
+                  message: processRunner,
+                })),
+                ...["module", "node:module"].map((name) => ({
+                  name,
+                  importNames: ["createRequire"],
+                  message: processRunner,
+                })),
+                ...["vite", "vite-plus"].map((name) => ({
+                  name,
+                  importNames: ["build", "createServer", "preview"],
+                  message: processRunner,
+                })),
+              ],
+              patterns: [
+                {
+                  regex:
+                    "^(node:)?(child_process|cluster|worker_threads)$|^(execa|zx|cross-spawn|tinyexec|nano-spawn)(/|$)",
+                  message: processRunner,
+                },
+              ],
+            },
+          ],
+          "no-restricted-properties": ["error", rawSql, ...processRunnerProperties],
+          "no-restricted-globals": ["error", { name: "Bun", message: processRunner }],
+          "import/no-dynamic-require": ["error", { esmodule: true }],
+        },
+      },
+      {
+        files: ["apps/web/e2e/**"],
+        rules: {
+          "no-restricted-properties": [
+            "error",
+            rawSql,
+            ...processRunnerProperties,
+            ...["skip", "fixme"].map((property) => ({
+              object: "test",
+              property,
+              message: "A skipped journey passes without running. Fix or delete it.",
+            })),
+          ],
+        },
+      },
       {
         files: ["apps/*/src/**", "packages/*/src/**"],
         excludeFiles: ["**/*.test.{ts,tsx}", "**/test-support/**"],
