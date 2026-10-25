@@ -40,31 +40,62 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup
+        with:
+          cache-save: false
       - run: npm install --global @anthropic-ai/claude-code@2.1.308
+      - name: Prepare the command sandbox
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap socat
+          if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null)" = 1 ]; then
+            sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+            include if exists <local/bwrap>
+          }
+          EOF
+            sudo systemctl reload apparmor
+          fi
+          sudo systemctl stop docker.socket docker.service
+          if docker info > /dev/null 2>&1; then
+            echo "::error::Docker is still reachable. Its socket would bypass the sandbox."
+            exit 1
+          fi
       - name: List pull requests the gardener must not duplicate
         env:
           GH_TOKEN: ${{ github.token }}
+          AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}
         run: |
           mkdir -p "$RUNNER_TEMP/gardener/out"
           {
-            gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 500 --json number,title,state,headRefName,body
-            gh pr list --repo "$GITHUB_REPOSITORY" --state all --label gardener --limit 500 --json number,title,state,headRefName,body
-          } | jq -s 'add | unique_by(.number)' > "$RUNNER_TEMP/gardener/known-prs.json"
+            gh pr list --repo "$GITHUB_REPOSITORY" --state open --author "$AI_TRIGGER_LOGIN" --limit 500 --json number,title,state,headRefName
+            gh pr list --repo "$GITHUB_REPOSITORY" --state all --label gardener --limit 500 --json number,title,state,headRefName
+          } | jq -s 'add | unique_by(.number) | map({number, title, headRefName, state})' > "$RUNNER_TEMP/gardener/known-prs.json"
       - name: Run the gardener
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         run: |
           export GARDENER_OUT="$RUNNER_TEMP/gardener/out"
           export GARDENER_PRS="$RUNNER_TEMP/gardener/known-prs.json"
+          export CLAUDE_CONFIG_DIR="$RUNNER_TEMP/gardener/claude"
           GARDENER_DEADLINE=$(($(date +%s) + 150 * 60))
           export GARDENER_DEADLINE
+          mkdir -p "$CLAUDE_CONFIG_DIR"
+          jq --arg workspace "$GITHUB_WORKSPACE" --arg out "$GARDENER_OUT" --arg prs "$GARDENER_PRS" \
+            '.permissions.allow += ["Edit(/\($workspace)/**)", "Edit(/\($out)/**)", "Read(/\($prs))"]' \
+            .github/gardener-settings.json > "$CLAUDE_CONFIG_DIR/settings.json"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           timeout 155m claude -p "Follow .agents/skills/gardener/SKILL.md." \
             --model "$(jq -r .roles.implementer.model .github/ai-models.json)" \
             --effort "$(jq -r .roles.implementer.effort .github/ai-models.json)" \
-            --dangerously-skip-permissions \
-            --output-format stream-json --verbose > "$RUNNER_TEMP/gardener/transcript.jsonl"
+            --settings "$CLAUDE_CONFIG_DIR/settings.json" --add-dir "$GARDENER_OUT" \
+            --permission-prompts none --output-format json < /dev/null |
+            jq '{subtype, is_error, num_turns, duration_ms, denied: [.permission_denials[]?.tool_name]}'
       - id: bundle
         name: Bundle approved branches
         if: ${{ !cancelled() }}
@@ -82,7 +113,7 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: gardener
-          path: ${{ runner.temp }}/gardener
+          path: ${{ runner.temp }}/gardener/out
           if-no-files-found: ignore
           retention-days: 14
   publish:
@@ -111,13 +142,16 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: gardener
-          path: ${{ runner.temp }}/gardener
+          path: ${{ runner.temp }}/gardener/out
       - name: Open labeled pull requests
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           set -euo pipefail
           dir="$RUNNER_TEMP/gardener"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          held_paths=(.github .claude .agents/skills/gardener scripts/ai-automation scripts/ai-models tests/harness/gardener-workflow.test.ts tests/harness/ai-credentials.test.ts)
+          status=0
           gh label create gardener --repo "$GITHUB_REPOSITORY" --force \
             --color 2E7D32 --description "Opened by the scheduled gardener"
           git fetch --no-tags "$dir/out/branches.bundle" '+refs/heads/gardener/*:refs/remotes/gardener/*'
@@ -126,21 +160,35 @@ jobs:
             title=$(jq -r .title <<<"$entry")
             if [[ ! "$branch" =~ ^gardener/[a-z0-9]+(-[a-z0-9]+)*$ ]] || [[ -z "$title" || "$title" == *$'\n'* ]]; then
               echo "::error::Rejected a malformed manifest entry."
-              exit 1
-            fi
-            git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/$branch"
-            if [ -n "$(git diff --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- .github/workflows)" ]; then
-              echo "::error::$branch changes workflow files. Skipped."
+              status=1
               continue
             fi
-            if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
-              echo "::notice::$branch already exists. Skipped."
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/$branch"; then
+              echo "::error::$branch does not start from $GITHUB_SHA. Skipped."
+              status=1
+              continue
+            fi
+            if [ -n "$(git diff --no-renames --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- "${held_paths[@]}")" ]; then
+              echo "::warning::$branch changes automation or its guards. Held for the owner."
+              echo "- Held for the owner: \`$branch\` changes automation or its guards. $title" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            local_head=$(git rev-parse "refs/remotes/$branch")
+            remote_head=$(git ls-remote --heads "$remote" "refs/heads/$branch" | cut -f1)
+            if [ -n "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state all --json number --jq '.[].number')" ]; then
+              echo "::notice::$branch already has a pull request. Skipped."
+              continue
+            fi
+            if [ -z "$remote_head" ]; then
+              git push "$remote" "refs/remotes/$branch:refs/heads/$branch"
+            elif [ "$remote_head" != "$local_head" ]; then
+              echo "::error::$branch exists on the remote with other commits and no pull request. Skipped."
+              status=1
               continue
             fi
             jq -r .body <<<"$entry" > "$dir/body.md"
-            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-              "refs/remotes/$branch:refs/heads/$branch"
             gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
               --title "$title" --body-file "$dir/body.md" \
               --label gardener --label ready-for-human-approval
           done < <(jq -c --argjson max "$GARDENER_MAX_PRS" '.[:$max][]' "$dir/out/prs.json")
+          exit "$status"

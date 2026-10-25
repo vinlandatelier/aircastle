@@ -5,6 +5,7 @@ import { expect, test } from "vite-plus/test";
 const root = resolve(import.meta.dirname, "../..");
 const gardenerPath = ".github/workflows/gardener.yml";
 const gardener = readFileSync(join(root, gardenerPath), "utf8");
+const settingsPath = ".github/gardener-settings.json";
 const automation = [".github/workflows", "scripts/ai-automation", ".agents/skills/gardener"];
 const mergePatterns = [
   /gh\s+["']?pr["']?\s+["']?merge/i,
@@ -154,9 +155,77 @@ test("the gardener runs one at a time, only from main, only for the trigger acco
   );
 });
 
-test("the publish job skips branches that change workflow files", () => {
-  expect(job(gardener, "publish")).toContain(
-    'git diff --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- .github/workflows',
+test("the publish job holds branches that change automation or its guards", () => {
+  const publish = job(gardener, "publish");
+  expect(/^ +held_paths=\((.*)\)$/m.exec(publish)?.[1]?.split(" ")).toEqual([
+    ".github",
+    ".claude",
+    ".agents/skills/gardener",
+    "scripts/ai-automation",
+    "scripts/ai-models",
+    "tests/harness/gardener-workflow.test.ts",
+    "tests/harness/ai-credentials.test.ts",
+  ]);
+  expect(publish).toContain(
+    'git diff --no-renames --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- "${held_paths[@]}"',
+  );
+});
+
+test("Claude sees only number, title, branch and state of the owner's and gardener PRs", () => {
+  const queries = job(gardener, "audit")
+    .split("\n")
+    .filter((line) => /\bgh\s+pr\s+list\b/.test(line));
+  expect(queries).toHaveLength(2);
+  for (const query of queries) {
+    expect(query).toContain("--json number,title,state,headRefName");
+    expect(
+      query.includes('--author "$AI_TRIGGER_LOGIN"') !== query.includes("--label gardener"),
+    ).toBe(true);
+  }
+  expect(job(gardener, "audit")).toContain("map({number, title, headRefName, state})");
+  expect(job(gardener, "audit")).toContain("AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}");
+});
+
+test("the audit uploads only its output directory", () => {
+  expect([...gardener.matchAll(/^ +path: (.*)$/gm)].map((match) => match[1])).toEqual([
+    "${{ runner.temp }}/gardener/out",
+    "${{ runner.temp }}/gardener/out",
+  ]);
+});
+
+test("the audit job never saves the dependency cache", () => {
+  const setup = readFileSync(join(root, ".github/actions/setup/action.yml"), "utf8");
+  expect(setup).toContain("cache-save: ${{ inputs.cache-save }}");
+  expect(job(gardener, "audit")).toContain(
+    "      - uses: ./.github/actions/setup\n        with:\n          cache-save: false\n",
+  );
+});
+
+test("Claude runs with sandboxed commands and explicit tools instead of skipped permissions", () => {
+  const settings = JSON.parse(readFileSync(join(root, settingsPath), "utf8"));
+  expect(settings).toEqual({
+    permissions: {
+      defaultMode: "dontAsk",
+      allow: ["Bash", "Agent", "Skill", "TodoWrite"],
+      deny: ["WebFetch", "WebSearch", "Read(//proc/**)"],
+    },
+    sandbox: {
+      enabled: true,
+      failIfUnavailable: true,
+      allowUnsandboxedCommands: false,
+      autoAllowBashIfSandboxed: true,
+      network: { allowedDomains: ["registry.npmjs.org"], strictAllowlist: true },
+      credentials: { envVars: [{ name: "CLAUDE_CODE_OAUTH_TOKEN", mode: "deny" }] },
+    },
+  });
+  const audit = job(gardener, "audit");
+  expect(audit).not.toMatch(/dangerously|bypassPermissions|permission-mode/);
+  expect(audit).toContain(`.github/gardener-settings.json > "$CLAUDE_CONFIG_DIR/settings.json"`);
+  expect(audit).toContain('--settings "$CLAUDE_CONFIG_DIR/settings.json"');
+  expect(audit).toContain('CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"');
+  expect(audit.indexOf("sudo systemctl stop docker.socket docker.service")).toBeGreaterThan(-1);
+  expect(audit.indexOf("sudo systemctl stop docker.socket")).toBeLessThan(
+    audit.indexOf("claude -p"),
   );
 });
 
