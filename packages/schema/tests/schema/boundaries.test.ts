@@ -1,13 +1,9 @@
-import { beforeAll, describe, expect, test } from "vite-plus/test";
-import { compileCollection, requireSchemaApi, type RuntimeApi } from "../support/api.ts";
+import { describe, expect, test } from "vite-plus/test";
+import { text } from "../../src/index.ts";
+import { compileCollection } from "../support/collections.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";
 
 describe("document boundary and diagnostic order", () => {
-  let api: RuntimeApi;
-  beforeAll(() => {
-    api = requireSchemaApi();
-  });
-
   test.for(
     [
       null,
@@ -23,14 +19,14 @@ describe("document boundary and diagnostic order", () => {
       new (class Document {})(),
     ].map((value) => [value]),
   )("rejects non-document root %o", ([input]) => {
-    expectFailure(compileCollection(api, { title: api.text() }).validate(input), [
+    expectFailure(compileCollection({ title: text() }).validate(input), [
       { code: "invalid_document", path: [] },
     ]);
   });
 
   test("accepts null-prototype documents with own enumerable data fields", () => {
     const input = Object.assign(Object.create(null), { title: "Hi" });
-    expectSuccess(compileCollection(api, { title: api.text() }).validate(input), { title: "Hi" });
+    expectSuccess(compileCollection({ title: text() }).validate(input), { title: "Hi" });
   });
 
   test("rejects inherited field getters without reading inherited values", () => {
@@ -43,7 +39,7 @@ describe("document boundary and diagnostic order", () => {
       },
     });
     const input = Object.create(prototype);
-    expectFailure(compileCollection(api, { title: api.text() }).validate(input), [
+    expectFailure(compileCollection({ title: text() }).validate(input), [
       { code: "invalid_document", path: [] },
     ]);
     expect(reads).toBe(0);
@@ -51,7 +47,7 @@ describe("document boundary and diagnostic order", () => {
 
   test("a plain document must supply its own required field", () => {
     const name = "inheritedValueForSchemaTest";
-    const collection = compileCollection(api, { [name]: api.text() });
+    const collection = compileCollection({ [name]: text() });
     const previous = Object.getOwnPropertyDescriptor(Object.prototype, name);
     let reads = 0;
     let result: unknown;
@@ -82,7 +78,7 @@ describe("document boundary and diagnostic order", () => {
         throw new Error("Must not execute");
       },
     });
-    const result = compileCollection(api, { title: api.text() }).validate(input);
+    const result = compileCollection({ title: text() }).validate(input);
     expect(reads).toBe(0);
     expectFailure(result, [{ code: "invalid_document", path: [] }]);
   });
@@ -94,15 +90,15 @@ describe("document boundary and diagnostic order", () => {
         value: "x",
         enumerable: kind === "symbol",
       });
-      const result = compileCollection(api, { title: api.text() }).validate(input);
+      const result = compileCollection({ title: text() }).validate(input);
       expectFailure(result, [{ code: "invalid_document", path: [] }]);
     });
   }
 
   test("unknown keys follow declared fields and sort independently of input insertion order", () => {
-    const collection = compileCollection(api, {
-      title: api.text().min(10).email().oneOf(["ada@example.com"]),
-      subtitle: api.text(),
+    const collection = compileCollection({
+      title: text().min(10).email().oneOf(["ada@example.com"]),
+      subtitle: text(),
     });
     const input = { zebra: 1, title: "x", apple: 2, subtitle: false };
     const before = Object.getOwnPropertyDescriptors(input);
@@ -118,8 +114,8 @@ describe("document boundary and diagnostic order", () => {
   });
 
   test("required and wrong-type failures stop dependent field checks", () => {
-    const collection = compileCollection(api, {
-      title: api.text().min(10).email().oneOf(["ada@example.com"]),
+    const collection = compileCollection({
+      title: text().min(10).email().oneOf(["ada@example.com"]),
     });
     expectFailure(collection.validate({}), [{ code: "required", path: ["title"] }]);
     expectFailure(collection.validate({ title: 123 }), [
@@ -129,7 +125,7 @@ describe("document boundary and diagnostic order", () => {
 
   test("diagnostics do not echo a rejected wrong-type value", () => {
     const secret = "unique-private-input-marker";
-    const result = compileCollection(api, { title: api.text() }).validate({ title: { secret } });
+    const result = compileCollection({ title: text() }).validate({ title: { secret } });
     expectFailure(result, [
       { code: "invalid_type", path: ["title"], expected: "string", received: "object" },
     ]);

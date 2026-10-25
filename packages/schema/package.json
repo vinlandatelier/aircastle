@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "vp pack",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tests.json",
     "test": "vp test",
     "test:schema": "vp test tests/schema",
     "test:harness": "vp test tests/harness",

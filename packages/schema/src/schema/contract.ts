@@ -1,4 +1,3 @@
-/** Type contracts only. Runtime builders and validation arrive through TDD. */
 export type IssuePath = readonly (string | number)[];
 
 export type ReceivedType =
@@ -54,7 +53,7 @@ export type ValidationIssue = IssueDetails &
       }
   );
 
-type NonemptyIssues<Issue> = readonly [Issue, ...Issue[]];
+export type NonemptyIssues<Issue> = readonly [Issue, ...Issue[]];
 
 export type ValidationResult<Output extends object> =
   | { readonly ok: true; readonly data: Output }
@@ -118,12 +117,6 @@ export type SchemaIssue = IssueDetails &
         readonly reason: "requires_choices";
       }
   );
-
-/** Shape of the future exception; this is not a runtime constructor. */
-export interface SchemaError extends Error {
-  readonly name: "SchemaError";
-  readonly issues: NonemptyIssues<SchemaIssue>;
-}
 
 export type CodeLanguage =
   | "plaintext"
