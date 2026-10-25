@@ -1,7 +1,14 @@
 import { collection, compileSchema, text, type CollectionDescription } from "@aircastle/schema";
 import { describe, expect, test } from "vite-plus/test";
 import { compileDescription, describeCollections, parseCollections, sameSchema } from "./index.ts";
-import { articleDescription, description, field, freezeDeep } from "./support/fixtures.ts";
+import {
+  articleDescription,
+  description,
+  field,
+  freezeDeep,
+  rejection,
+  schemaRejection,
+} from "./support/fixtures.ts";
 
 describe("published collection descriptions", () => {
   test("describes the complete article declaration in declaration order", () => {
@@ -75,13 +82,18 @@ describe("published collection descriptions", () => {
   });
 
   test.each([
-    ["non-array root", {}],
-    ["null root", null],
-    ["non-array iterable root", new Set([{ name: "articles", description: description() }])],
-    ["null collection", [null]],
+    ["non-array root", {}, { reason: "invalid_collections", path: [] }],
+    ["null root", null, { reason: "invalid_collections", path: [] }],
+    [
+      "non-array iterable root",
+      new Set([{ name: "articles", description: description() }]),
+      { reason: "invalid_collections", path: [] },
+    ],
+    ["null collection", [null], { reason: "invalid_entry", path: [0] }],
     [
       "unknown collection property",
       [{ name: "articles", description: description(), extra: true }],
+      { reason: "invalid_entry", path: [0] },
     ],
     [
       "duplicate collection",
@@ -89,38 +101,77 @@ describe("published collection descriptions", () => {
         { name: "articles", description: description() },
         { name: "articles", description: description() },
       ],
+      { reason: "duplicate_name", path: [1, "name"] },
     ],
-    ["invalid collection identifier", [{ name: "article-posts", description: description() }]],
-    ["non-string collection name", [{ name: ["articles"], description: description() }]],
-    ["reserved collection", [{ name: "then", description: description() }]],
-    ["unknown description property", [{ name: "articles", description: { fields: {}, extra: 1 } }]],
-    ["missing fields", [{ name: "articles", description: {} }]],
-    ["array fields", [{ name: "articles", description: { fields: [] } }]],
-    ["reserved id field", [{ name: "articles", description: description({ id: field() }) }]],
+    [
+      "invalid collection identifier",
+      [{ name: "article-posts", description: description() }],
+      { reason: "invalid_name", path: [0, "name"] },
+    ],
+    [
+      "non-string collection name",
+      [{ name: ["articles"], description: description() }],
+      { reason: "invalid_name", path: [0, "name"] },
+    ],
+    [
+      "reserved collection",
+      [{ name: "then", description: description() }],
+      { reason: "invalid_name", path: [0, "name"] },
+    ],
+    [
+      "unknown description property",
+      [{ name: "articles", description: { fields: {}, extra: 1 } }],
+      { reason: "invalid_description", path: [0, "description"] },
+    ],
+    [
+      "missing fields",
+      [{ name: "articles", description: {} }],
+      { reason: "invalid_description", path: [0, "description"] },
+    ],
+    [
+      "array fields",
+      [{ name: "articles", description: { fields: [] } }],
+      { reason: "invalid_description", path: [0, "description"] },
+    ],
+    [
+      "reserved id field",
+      [{ name: "articles", description: description({ id: field() }) }],
+      { reason: "invalid_name", path: [0, "description", "fields", "id"] },
+    ],
     [
       "invalid field identifier",
       [{ name: "articles", description: description({ "display title": field() }) }],
+      { reason: "invalid_name", path: [0, "description", "fields", "display title"] },
     ],
-    ["null field", [{ name: "articles", description: { fields: { title: null } } }]],
+    [
+      "null field",
+      [{ name: "articles", description: { fields: { title: null } } }],
+      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+    ],
     [
       "unknown field kind",
       [{ name: "articles", description: { fields: { title: { ...field(), type: "number" } } } }],
+      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
     ],
     [
       "unknown field property",
       [{ name: "articles", description: { fields: { title: { ...field(), extra: true } } } }],
+      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
     ],
     [
       "invalid required flag",
       [{ name: "articles", description: { fields: { title: { ...field(), required: "yes" } } } }],
+      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
     ],
     [
       "invalid nullable flag",
       [{ name: "articles", description: { fields: { title: { ...field(), nullable: "yes" } } } }],
+      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
     ],
     [
       "invalid unique flag",
       [{ name: "articles", description: { fields: { title: { ...field(), unique: 1 } } } }],
+      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
     ],
     [
       "explicit undefined default",
@@ -130,6 +181,7 @@ describe("published collection descriptions", () => {
           description: { fields: { title: { ...field(), required: false, default: undefined } } },
         },
       ],
+      schemaRejection("invalid_default"),
     ],
     [
       "missing required flag",
@@ -139,18 +191,22 @@ describe("published collection descriptions", () => {
           description: { fields: { title: { type: "text", nullable: false, unique: false } } },
         },
       ],
+      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
     ],
     [
       "negative minimum",
       [{ name: "articles", description: description({ title: field({ min: -1 }) }) }],
+      schemaRejection("invalid_bound"),
     ],
     [
       "fractional maximum",
       [{ name: "articles", description: description({ title: field({ max: 1.5 }) }) }],
+      schemaRejection("invalid_bound"),
     ],
     [
       "contradictory bounds",
       [{ name: "articles", description: description({ title: field({ min: 5, max: 3 }) }) }],
+      schemaRejection("conflicting_bounds"),
     ],
     [
       "invalid default",
@@ -160,6 +216,7 @@ describe("published collection descriptions", () => {
           description: description({ title: field({ required: false, min: 5, default: "Hi" }) }),
         },
       ],
+      schemaRejection("invalid_default"),
     ],
     [
       "null default without nullable",
@@ -169,10 +226,12 @@ describe("published collection descriptions", () => {
           description: description({ title: field({ required: false, default: null }) }),
         },
       ],
+      schemaRejection("invalid_default"),
     ],
     [
       "empty choices",
       [{ name: "articles", description: description({ title: field({ choices: [] }) }) }],
+      schemaRejection("invalid_choices"),
     ],
     [
       "duplicate choices",
@@ -182,10 +241,12 @@ describe("published collection descriptions", () => {
           description: description({ title: field({ choices: ["draft", "draft"] }) }),
         },
       ],
+      schemaRejection("duplicate_choice"),
     ],
     [
       "invalid format",
       [{ name: "articles", description: { fields: { title: { ...field(), format: "uuid" } } } }],
+      { reason: "invalid_field", path: [0, "description", "fields", "title", "format"] },
     ],
     [
       "unknown editor",
@@ -195,6 +256,7 @@ describe("published collection descriptions", () => {
           description: { fields: { title: { ...field(), editor: { type: "richtext" } } } },
         },
       ],
+      schemaRejection("unknown_editor"),
     ],
     [
       "invalid textarea rows",
@@ -204,6 +266,7 @@ describe("published collection descriptions", () => {
           description: description({ title: field({ editor: { type: "textarea", rows: 0 } }) }),
         },
       ],
+      schemaRejection("invalid_editor_options"),
     ],
     [
       "radio without choices",
@@ -213,9 +276,10 @@ describe("published collection descriptions", () => {
           description: description({ title: field({ editor: { type: "radio" } }) }),
         },
       ],
+      schemaRejection("incompatible_editor"),
     ],
-  ])("rejects %s without partially accepting the project", (_name, invalid) => {
-    expect(parseCollections(invalid)).toEqual({ ok: false, error: { code: "invalid_request" } });
+  ])("rejects %s without partially accepting the project", (_name, invalid, reason) => {
+    expect(rejection(invalid)).toEqual(reason);
   });
 
   test("rejects accessors without invoking supplied code", () => {
@@ -227,7 +291,7 @@ describe("published collection descriptions", () => {
         return "articles";
       },
     });
-    expect(parseCollections([input])).toEqual({ ok: false, error: { code: "invalid_request" } });
+    expect(rejection([input])).toEqual({ reason: "invalid_entry", path: [0] });
     expect(called).toBe(false);
   });
 
@@ -249,11 +313,11 @@ describe("published collection descriptions", () => {
 
   test("a later invalid collection prevents an otherwise valid project parse", () => {
     expect(
-      parseCollections([
+      rejection([
         { name: "articles", description: articleDescription },
         { name: "bad-name", description: description() },
       ]),
-    ).toEqual({ ok: false, error: { code: "invalid_request" } });
+    ).toEqual({ reason: "invalid_name", path: [1, "name"] });
   });
 
   test("recompiles defaults and validation from a wire descriptor", () => {

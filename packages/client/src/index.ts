@@ -4,7 +4,7 @@ import {
   parseContentError,
   validateStored,
 } from "@aircastle/contracts";
-import { compileSchema, isPlainRecord, SchemaError } from "@aircastle/schema";
+import { compileSchema, isPlainRecord } from "@aircastle/schema";
 import type {
   CollectionDefinitions,
   CollectionDescription,
@@ -39,36 +39,41 @@ export class ConfigurationError extends Error {
 }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function parsedUrl(value: string | undefined): URL | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  try {
+    return new URL(value);
+  } catch (error) {
+    if (error instanceof TypeError) return undefined;
+    throw error;
+  }
+}
+
 export function defineConfig<const Collections extends CollectionDefinitions>(config: {
   url: string | undefined;
   project: string | undefined;
   collections: Collections;
 }): AircastleConfig<Collections> {
-  let url: URL;
-  try {
-    if (typeof config.url !== "string" || config.url.length === 0) throw new Error();
-    url = new URL(config.url);
-    if (
-      !["http:", "https:"].includes(url.protocol) ||
-      url.username ||
-      url.password ||
-      url.href.includes("?") ||
-      url.href.includes("#")
-    )
-      throw new Error();
-  } catch {
+  const url = parsedUrl(config.url);
+  if (
+    url === undefined ||
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.href.includes("?") ||
+    url.href.includes("#")
+  )
     throw new ConfigurationError(
       "url",
       "Use an HTTP(S) CMS URL without credentials, query or fragment.",
     );
-  }
   if (typeof config.project !== "string" || !uuid.test(config.project)) {
     throw new ConfigurationError("project", "Use a valid project UUID.");
   }
   try {
     describeCollections(config.collections);
   } catch (error) {
-    if (error instanceof SchemaError) throw error;
+    if (!(error instanceof TypeError)) throw error;
     throw new ConfigurationError(
       "collections",
       "Collection and field names must be valid and unreserved.",
@@ -143,20 +148,23 @@ export function createClient<const Collections extends CollectionDefinitions>(
       headers["content-type"] = "application/json";
       init.body = JSON.stringify(data);
     }
+    let response: Response;
+    let body: unknown;
     try {
-      const response = await fetch(endpoint, init);
-      const parsed = responseResult(description, await response.json());
-      if (!parsed || response.ok !== parsed.ok) return failed;
-      if (
-        parsed.ok &&
-        (response.status !== (method === "POST" ? 201 : 200) ||
-          (expectedId !== undefined && parsed.data.id.toLowerCase() !== expectedId))
-      )
-        return failed;
-      return parsed as Result<{ id: string } & Output>;
+      response = await fetch(endpoint, init);
+      body = await response.json();
     } catch {
       return failed;
     }
+    const parsed = responseResult(description, body);
+    if (!parsed || response.ok !== parsed.ok) return failed;
+    if (
+      parsed.ok &&
+      (response.status !== (method === "POST" ? 201 : 200) ||
+        (expectedId !== undefined && parsed.data.id.toLowerCase() !== expectedId))
+    )
+      return failed;
+    return parsed as Result<{ id: string } & Output>;
   }
 
   for (const name of Object.keys(config.collections) as (keyof Collections & string)[]) {

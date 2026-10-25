@@ -12,7 +12,7 @@ import {
   parseCollections,
   validateStored,
 } from "./index.ts";
-import { description, field } from "./support/fixtures.ts";
+import { description, field, rejection, schemaRejection } from "./support/fixtures.ts";
 
 const codeLanguages: Record<CodeLanguage, true> = {
   plaintext: true,
@@ -136,9 +136,9 @@ describe("wire declaration rejection", () => {
   test.each(["then", "close", "constructor", "prototype", "__proto__", "toJSON"])(
     "parseCollections rejects reserved collection %s independently",
     (name) => {
-      expect(parseCollections([{ name, description: description() }])).toEqual({
-        ok: false,
-        error: { code: "invalid_request" },
+      expect(rejection([{ name, description: description() }])).toEqual({
+        reason: "invalid_name",
+        path: [0, "name"],
       });
     },
   );
@@ -161,24 +161,62 @@ describe("wire declaration rejection", () => {
 
   test("parseCollections rejects a reserved id alongside otherwise valid fields", () => {
     expect(
-      parseCollections([
-        { name: "articles", description: description({ title: field(), id: field() }) },
-      ]),
-    ).toEqual({ ok: false, error: { code: "invalid_request" } });
+      rejection([{ name: "articles", description: description({ title: field(), id: field() }) }]),
+    ).toEqual({ reason: "invalid_name", path: [0, "description", "fields", "id"] });
   });
 
   test.each([
-    ["textarea unknown option", { type: "textarea", rows: 7, extra: true }],
-    ["textarea missing rows", { type: "textarea" }],
-    ["textarea nonnumeric rows", { type: "textarea", rows: "7" }],
-    ["code unknown option", { type: "code", language: "typescript", extra: true }],
-    ["code missing language", { type: "code" }],
-    ["code nonstring language", { type: "code", language: 1 }],
-    ["code unknown language", { type: "code", language: "ruby" }],
-    ["radio unknown option", { type: "radio", extra: true }],
-    ["editor primitive", "textarea"],
-    ["editor null", null],
-  ])("rejects %s", (_name, editor) => {
+    [
+      "textarea unknown option",
+      { type: "textarea", rows: 7, extra: true },
+      schemaRejection("invalid_editor_options", "status"),
+    ],
+    [
+      "textarea missing rows",
+      { type: "textarea" },
+      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
+    ],
+    [
+      "textarea nonnumeric rows",
+      { type: "textarea", rows: "7" },
+      schemaRejection("invalid_editor_options", "status"),
+    ],
+    [
+      "code unknown option",
+      { type: "code", language: "typescript", extra: true },
+      schemaRejection("invalid_editor_options", "status"),
+    ],
+    [
+      "code missing language",
+      { type: "code" },
+      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
+    ],
+    [
+      "code nonstring language",
+      { type: "code", language: 1 },
+      schemaRejection("invalid_editor_options", "status"),
+    ],
+    [
+      "code unknown language",
+      { type: "code", language: "ruby" },
+      schemaRejection("invalid_editor_options", "status"),
+    ],
+    [
+      "radio unknown option",
+      { type: "radio", extra: true },
+      schemaRejection("invalid_editor_options", "status"),
+    ],
+    [
+      "editor primitive",
+      "textarea",
+      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
+    ],
+    [
+      "editor null",
+      null,
+      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
+    ],
+  ])("rejects %s", (_name, editor, reason) => {
     const definition = {
       type: "text",
       required: true,
@@ -188,23 +226,27 @@ describe("wire declaration rejection", () => {
       editor,
     };
     expect(
-      parseCollections([{ name: "articles", description: { fields: { status: definition } } }]),
-    ).toEqual({ ok: false, error: { code: "invalid_request" } });
+      rejection([{ name: "articles", description: { fields: { status: definition } } }]),
+    ).toEqual(reason);
   });
 
   test.each([
-    ["string minimum", { min: "1" }],
-    ["null maximum", { max: null }],
-    ["nonstrings in choices", { choices: ["draft", 1] }],
-    ["non-array choices", { choices: "draft" }],
-    ["numeric default", { required: false, default: 1 }],
-    ["required input despite a default", { required: true, default: "draft" }],
-  ])("rejects malformed %s", (_name, overrides) => {
+    ["string minimum", { min: "1" }, schemaRejection("invalid_bound")],
+    ["null maximum", { max: null }, schemaRejection("invalid_bound")],
+    ["nonstrings in choices", { choices: ["draft", 1] }, schemaRejection("invalid_choices")],
+    ["non-array choices", { choices: "draft" }, schemaRejection("invalid_choices")],
+    ["numeric default", { required: false, default: 1 }, schemaRejection("invalid_default")],
+    [
+      "required input despite a default",
+      { required: true, default: "draft" },
+      { reason: "invalid_field", path: [0, "description", "fields", "title", "default"] },
+    ],
+  ])("rejects malformed %s", (_name, overrides, reason) => {
     expect(
-      parseCollections([
+      rejection([
         { name: "articles", description: { fields: { title: { ...field(), ...overrides } } } },
       ]),
-    ).toEqual({ ok: false, error: { code: "invalid_request" } });
+    ).toEqual(reason);
   });
 });
 
@@ -293,9 +335,17 @@ describe("wire field values are validated by the schema compiler", () => {
     ["code missing language", { type: "code" }],
   ])("rejects %s instead of applying the builder default", (_name, editor) => {
     const malformed = { fields: { title: { ...base, editor } } } as CollectionDescription;
-    expect(() => compileDescription(malformed)).toThrow(
-      new TypeError("Invalid collection description"),
-    );
+    let thrown: unknown;
+    try {
+      compileDescription(malformed);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toStrictEqual(new TypeError("Invalid collection description"));
+    expect((thrown as Error).cause).toStrictEqual({
+      reason: "invalid_field",
+      path: ["fields", "title", "editor"],
+    });
   });
 
   test("rejects an editor accessor without invoking supplied code", () => {
@@ -308,13 +358,13 @@ describe("wire field values are validated by the schema compiler", () => {
       },
     });
     expect(
-      parseCollections([
+      rejection([
         {
           name: "articles",
           description: description({ title: { ...base, editor: editor as never } }),
         },
       ]),
-    ).toEqual({ ok: false, error: { code: "invalid_request" } });
+    ).toEqual({ reason: "invalid_field", path: [0, "description", "fields", "title", "editor"] });
     expect(called).toBe(false);
   });
 });
@@ -330,7 +380,7 @@ describe("saved optional presence", () => {
 
 test("unknown editor kinds stay invalid when valid choices could satisfy a radio editor", () => {
   expect(
-    parseCollections([
+    rejection([
       {
         name: "articles",
         description: {
@@ -340,5 +390,5 @@ test("unknown editor kinds stay invalid when valid choices could satisfy a radio
         },
       },
     ]),
-  ).toEqual({ ok: false, error: { code: "invalid_request" } });
+  ).toEqual(schemaRejection("unknown_editor", "status"));
 });

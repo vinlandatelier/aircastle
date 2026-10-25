@@ -125,7 +125,8 @@ export async function push(options: PushOptions = {}): Promise<number> {
       let parsed: unknown;
       try {
         parsed = JSON.parse(original);
-      } catch {
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
         return fail("invalid_request", "Malformed aircastle.lock");
       }
       if (!lockfile(parsed)) return fail("invalid_request", "Malformed aircastle.lock");
@@ -139,26 +140,28 @@ export async function push(options: PushOptions = {}): Promise<number> {
     const exchange = async (body?: unknown): Promise<Result<unknown>> => {
       const writing = body !== undefined;
       const unknownCode = writing ? "unknown_write_outcome" : "transport_error";
+      let response: Response;
+      let envelope: unknown;
       try {
-        const response = await request(url, {
+        response = await request(url, {
           method: writing ? "POST" : "GET",
           keepalive: false,
           headers,
           ...(writing ? { body: JSON.stringify(body) } : {}),
           signal: AbortSignal.timeout(30_000),
         });
-        const envelope: unknown = await response.json();
-        if (!record(envelope)) return { ok: false, error: { code: unknownCode } };
-        if (envelope.ok === false && !response.ok) {
-          const error = parseContentError(envelope.error);
-          if (error) return { ok: false, error };
-        }
-        if (envelope.ok === true && response.status === 200 && Object.hasOwn(envelope, "data"))
-          return { ok: true, data: envelope.data };
-        return { ok: false, error: { code: unknownCode } };
+        envelope = await response.json();
       } catch {
         return { ok: false, error: { code: unknownCode } };
       }
+      if (!record(envelope)) return { ok: false, error: { code: unknownCode } };
+      if (envelope.ok === false && !response.ok) {
+        const error = parseContentError(envelope.error);
+        if (error) return { ok: false, error };
+      }
+      if (envelope.ok === true && response.status === 200 && Object.hasOwn(envelope, "data"))
+        return { ok: true, data: envelope.data };
+      return { ok: false, error: { code: unknownCode } };
     };
     const remote = await exchange();
     if (!remote.ok) {

@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "mutate": ["src/index.ts"],
+  "mutate": ["src/index.ts", "src/decode.ts"],
   "testRunner": "command",
   "coverageAnalysis": "off",
   "disableTypeChecks": false,

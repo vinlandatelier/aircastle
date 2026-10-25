@@ -39,18 +39,24 @@ export async function jsonBody(c: Context, limit: number): Promise<Result<unknow
       }
       chunks.push(part.value);
     }
-
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    return { ok: true, data: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) };
   } catch {
     return failure("invalid_request");
   } finally {
     reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  try {
+    return { ok: true, data: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) };
+  } catch (error) {
+    if (error instanceof TypeError || error instanceof SyntaxError)
+      return failure("invalid_request");
+    throw error;
   }
 }

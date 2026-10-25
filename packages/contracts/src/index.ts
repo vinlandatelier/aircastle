@@ -1,15 +1,15 @@
 import {
-  collection,
   compileSchema,
   isMember,
   isPlainRecord,
-  text,
+  SchemaError,
   type CollectionDefinitions,
   type CollectionDescription,
   type CompiledCollection,
   type ValidationIssue,
   type ReceivedType,
 } from "@aircastle/schema";
+import { collectionName, decodeCollections, decodeDescription, fieldName } from "./decode.ts";
 
 export type { CollectionDescription, CollectionDefinitions } from "@aircastle/schema";
 export type DocumentData = Record<string, string | null>;
@@ -53,47 +53,12 @@ export interface Lockfile {
   revision: string;
 }
 
-type FieldIdentity = Parameters<typeof collection>[0][string];
-/** The text builder fed unchecked wire values. `compileSchema` validates every modifier value. */
-interface WireText extends FieldIdentity {
-  min: (value: unknown) => WireText;
-  max: (value: unknown) => WireText;
-  optional: () => WireText;
-  nullable: () => WireText;
-  unique: () => WireText;
-  default: (value: unknown) => WireText;
-  oneOf: (values: unknown) => WireText;
-  email: () => WireText;
-  url: () => WireText;
-  editor: (name: unknown, options: unknown) => WireText;
-}
 type PlainIssueCode = Exclude<
   ValidationIssue["code"],
   "invalid_type" | "too_short" | "too_long" | "invalid_choice"
 >;
 type PlainErrorCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
 
-const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const reservedCollections = new Set([
-  "then",
-  "close",
-  "constructor",
-  "prototype",
-  "__proto__",
-  "toJSON",
-]);
-const fieldKeys = new Set([
-  "type",
-  "required",
-  "nullable",
-  "unique",
-  "min",
-  "max",
-  "choices",
-  "default",
-  "format",
-  "editor",
-]);
 /** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
 const plainIssueCodes = {
   required: "required",
@@ -137,116 +102,28 @@ function isCount(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0;
 }
 
-function knownKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
-  return Object.keys(value).every((key) => allowed.has(key));
-}
-
-function collectionName(value: unknown): value is string {
-  return typeof value === "string" && identifier.test(value) && !reservedCollections.has(value);
-}
-
-function fieldName(value: string): boolean {
-  return identifier.test(value) && value !== "id";
-}
-
-function malformed(): never {
-  throw new TypeError("Invalid collection description");
-}
-
-function wireField(value: unknown): WireText {
-  if (
-    !isPlainRecord(value) ||
-    !knownKeys(value, fieldKeys) ||
-    value.type !== "text" ||
-    typeof value.required !== "boolean" ||
-    typeof value.nullable !== "boolean" ||
-    typeof value.unique !== "boolean"
-  )
-    malformed();
-  /** The runtime builder stores any modifier value and `compileSchema` validates it, so wire values go in unchecked. */
-  let builder = text() as WireText;
-  if (!value.required) builder = builder.optional();
-  if (value.nullable) builder = builder.nullable();
-  if (value.unique) builder = builder.unique();
-  for (const constraint of ["min", "max"] as const) {
-    if (Object.hasOwn(value, constraint)) builder = builder[constraint](value[constraint]);
-  }
-  if (Object.hasOwn(value, "choices")) builder = builder.oneOf(value.choices);
-  if (Object.hasOwn(value, "format")) {
-    if (value.format === "email") builder = builder.email();
-    else if (value.format === "url") builder = builder.url();
-    else malformed();
-  }
-  if (Object.hasOwn(value, "default")) {
-    if (value.required) malformed();
-    builder = builder.default(value.default);
-  }
-  if (Object.hasOwn(value, "editor")) {
-    if (!isPlainRecord(value.editor)) malformed();
-    const { type, ...options } = value.editor;
-    if (
-      (type === "textarea" && !Object.hasOwn(options, "rows")) ||
-      (type === "code" && !Object.hasOwn(options, "language"))
-    )
-      malformed();
-    builder = builder.editor(type, options);
-  }
-  return builder;
-}
-
-function decodedDescription(value: unknown): CompiledCollection<DocumentData> {
-  if (
-    !isPlainRecord(value) ||
-    !knownKeys(value, new Set(["fields"])) ||
-    !isPlainRecord(value.fields)
-  )
-    malformed();
-  const fields: Record<string, FieldIdentity> = Object.create(null);
-  for (const [name, field] of Object.entries(value.fields)) {
-    if (!fieldName(name)) malformed();
-    fields[name] = wireField(field);
-  }
-  return compileSchema({ wire: collection(fields) }).wire;
-}
-
 export function describeCollections(definitions: CollectionDefinitions): PublishedCollection[] {
   const compiled = compileSchema(definitions);
   return Object.entries(compiled).map(([name, definition]) => {
     const description = definition.describe();
-    if (!collectionName(name) || !Object.keys(description.fields).every(fieldName)) malformed();
+    if (!collectionName(name) || !Object.keys(description.fields).every(fieldName))
+      throw new TypeError("Invalid collection description");
     return { name, description };
   });
 }
 
 export function parseCollections(input: unknown): Result<PublishedCollection[]> {
-  try {
-    if (!Array.isArray(input)) malformed();
-    const names = new Set<string>();
-    const collections: PublishedCollection[] = [];
-    for (const entry of input) {
-      if (
-        !isPlainRecord(entry) ||
-        !knownKeys(entry, new Set(["name", "description"])) ||
-        !collectionName(entry.name) ||
-        names.has(entry.name)
-      )
-        malformed();
-      names.add(entry.name);
-      collections.push({
-        name: entry.name,
-        description: decodedDescription(entry.description).describe(),
-      });
-    }
-    return { ok: true, data: collections };
-  } catch {
-    return { ok: false, error: { code: "invalid_request" } };
-  }
+  const decoded = decodeCollections(input);
+  return decoded.ok ? decoded : { ok: false, error: { code: "invalid_request" } };
 }
 
 export function compileDescription(
   description: CollectionDescription,
 ): CompiledCollection<DocumentData> {
-  return decodedDescription(description);
+  const decoded = decodeDescription(description, []);
+  if (decoded.ok) return decoded.data;
+  if (decoded.issue.reason === "invalid_schema") throw new SchemaError(decoded.issue.issues);
+  throw new TypeError("Invalid collection description", { cause: decoded.issue });
 }
 
 function canonical(value: unknown): string {
