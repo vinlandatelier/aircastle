@@ -30,7 +30,7 @@
     "test:typecheck": "vp -C packages/schema run test:typecheck",
     "test:types": "bun run test:typecheck",
     "test:inference": "vp -C packages/schema run test:inference",
-    "check": "vp run build && vp run typecheck && vp run lint && vp run test:prepared",
+    "check": "vp run build && vp run typecheck && vp run lint && vp run knip && vp run test:prepared",
     "test:coverage": "vp -C packages/schema run test:coverage",
     "test-mutation": "vp -C packages/schema run test:mutation",
     "test:unicode": "vp -C packages/schema run test:unicode",
