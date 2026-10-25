@@ -35,6 +35,24 @@ test.each(["@ts-expect-error", "@ts-ignore", "@ts-nocheck"])(
 );
 
 test.each([
+  "v8 ignore next",
+  "v8 ignore start",
+  "c8 ignore next",
+  "istanbul ignore else",
+  "node:coverage disable",
+])("rejects the coverage hint %s even in documentation", (hint) => {
+  for (const source of [
+    `/* ${hint} */\nexport const value = 1;`,
+    `/** ${hint} */\nexport const value = 1;`,
+    `/** ${hint} @preserve */\nexport const value = 1;`,
+  ]) {
+    expect(inspectCode("value.ts", source).map((entry) => entry.rule)).toContain(
+      "coverage-suppression",
+    );
+  }
+});
+
+test.each([
   "/** Public API documentation. */\nexport const value = 1;",
   "interface Value { /** Public field. */ readonly field: string; }",
   "class Value { /** Public method. */ method() {} }",

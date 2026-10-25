@@ -8,6 +8,7 @@ export interface PolicyViolation {
   rule:
     | "ordinary-comment"
     | "type-suppression"
+    | "coverage-suppression"
     | "cross-workspace-relative-import"
     | "web-alias-escape"
     | "undeclared-workspace-import"
@@ -315,12 +316,14 @@ export function inspectCode(
   for (const comment of ast.comments ?? []) {
     const rule = /@ts-(?:expect-error|ignore|nocheck)\b/i.test(comment.value)
       ? "type-suppression"
-      : comment.type === "CommentBlock" &&
-          comment.value.startsWith("*") &&
-          !comment.value.startsWith("**") &&
-          documented.has(comment.start!)
-        ? undefined
-        : "ordinary-comment";
+      : /\b(?:v8|c8|istanbul|node:coverage)\s+(?:ignore|disable)\b/i.test(comment.value)
+        ? "coverage-suppression"
+        : comment.type === "CommentBlock" &&
+            comment.value.startsWith("*") &&
+            !comment.value.startsWith("**") &&
+            documented.has(comment.start!)
+          ? undefined
+          : "ordinary-comment";
     if (rule)
       violations.push({
         line: comment.loc?.start.line ?? 1,
