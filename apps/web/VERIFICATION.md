@@ -49,7 +49,7 @@ A surviving fault is a test gap or an equivalent change requiring explanation. I
 
 - Follow the root [verification rules](../../AGENTS.md#changes-and-verification). Run only the component tests, browser journeys, and package checks needed to verify the change and affected callers. Select files and cases rather than running the whole frontend suite by default.
 - Neither `vp run verify-web` nor `vp run check` is a required completion gate. Reserve full-suite runs for explicit user requests. A focused UI change does not require backend, database, mutation, or verification-tool suites.
-- When changing verification scripts, reporters, fixtures or configuration, select the affected files or cases through `vp run test-web:verification -- <file>`. Do not run its unrelated fault campaigns.
+- When changing verification scripts, reporters, fixtures or configuration, select the affected files or cases through `vp run test-web:verification <file>`. Do not run its unrelated fault campaigns.
 - Run `vp run test-web:coverage` when assessing coverage. Inspect raw covered/total counts and uncovered modules. The component-suite V8 report includes unimported source, excludes CSS, and includes compiler-generated branch effects. Browser journey results are separate evidence.
 - Preserve the command, revision/source fingerprint, executed/failed/skipped counts, intended red witness and final passing result. Use one focused independent review to challenge missing outcomes and assertions that could pass with broken behavior.
 
