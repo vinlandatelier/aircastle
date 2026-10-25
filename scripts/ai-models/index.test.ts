@@ -93,6 +93,7 @@ const completed = (text: string) => ({
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
@@ -361,4 +362,66 @@ test("Anthropic transport describes unsupported bounds while local validation st
     description: "Exact quote. {minLength: 12} {maxLength: 12000}",
   });
   expect(bounded).toEqual(original);
+});
+
+const okResponse = () =>
+  response({
+    model: anthropic.model,
+    stop_reason: "end_turn",
+    content: [{ type: "text", text: '{"ok":true}' }],
+  });
+
+test("rate limits and overloads before the stream starts are retried after the server's delay", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(new Response("busy", { status: 529 }))
+    .mockResolvedValueOnce(
+      new Response("slow down", { status: 429, headers: { "retry-after": "5" } }),
+    )
+    .mockResolvedValueOnce(okResponse());
+  vi.stubGlobal("fetch", fetcher);
+  const result = runModel(anthropic, "review", schema);
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(4_999);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(result).resolves.toEqual({ ok: true });
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});
+
+test("retries stop after three attempts and report the last status", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("OPENAI_API_KEY", "key-secret");
+  const fetcher = vi.fn(async () => new Response("down", { status: 503 }));
+  vi.stubGlobal("fetch", fetcher);
+  const result = runModel(openai, "review", schema);
+  const settled = expect(result).rejects.toThrow("provider_http_503");
+  await vi.runAllTimersAsync();
+  await settled;
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});
+
+test.each([400, 401, 404])("status %i is not retried", async (status) => {
+  vi.stubEnv("OPENAI_API_KEY", "key-secret");
+  const fetcher = vi.fn(async () => new Response("no", { status }));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(runModel(openai, "review", schema)).rejects.toThrow(`provider_http_${status}`);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+test("a retry-after delay is capped at one minute", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "3600" } }))
+    .mockResolvedValueOnce(okResponse());
+  vi.stubGlobal("fetch", fetcher);
+  const result = runModel(anthropic, "review", schema);
+  await vi.advanceTimersByTimeAsync(60_000);
+  await expect(result).resolves.toEqual({ ok: true });
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });

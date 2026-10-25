@@ -10,10 +10,6 @@ export type ModelSelection = { provider: Provider; model: string; effort: Effort
 export type ModelConfig = { version: 1; roles: Record<Role, ModelSelection> };
 
 const roles: Role[] = ["codexReviewer", "codexImplementer", "claudeReviewer", "claudeImplementer"];
-const efforts: Record<Provider, readonly Effort[]> = {
-  openai: ["low", "medium", "high", "xhigh", "max"],
-  anthropic: ["low", "medium", "high", "xhigh", "max"],
-};
 /**
  * Output cap per request, counting reasoning or thinking tokens as well as the visible answer.
  * OpenAI counts reasoning tokens against `max_output_tokens` and advises reserving at least
@@ -30,6 +26,23 @@ const outputTokenCaps: Record<Effort, number> = {
 };
 const maxStreamBytes = 64 * 1_048_576;
 const requestTimeoutMs = 25 * 60_000;
+/** Waits before the second and third attempt when the provider sends no `retry-after`. */
+const retryDelaysMs = [2_000, 8_000];
+const maxRetryDelayMs = 60_000;
+
+function effort(value: unknown): value is Effort {
+  return typeof value === "string" && Object.hasOwn(outputTokenCaps, value);
+}
+
+function retryDelay(response: Response, attempt: number): number | null {
+  if ((response.status !== 429 && response.status < 500) || attempt >= retryDelaysMs.length)
+    return null;
+  const requested = Number(response.headers.get("retry-after")) * 1000;
+  return Math.min(
+    Number.isFinite(requested) && requested > 0 ? requested : (retryDelaysMs[attempt] ?? 0),
+    maxRetryDelayMs,
+  );
+}
 
 function selection(value: unknown): ModelSelection {
   if (
@@ -38,12 +51,10 @@ function selection(value: unknown): ModelSelection {
     (value.provider !== "openai" && value.provider !== "anthropic") ||
     typeof value.model !== "string" ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value.model) ||
-    typeof value.effort !== "string"
+    !effort(value.effort)
   )
     throw new Error("invalid_model_config");
-  const effort = efforts[value.provider].find((candidate) => candidate === value.effort);
-  if (!effort) throw new Error("invalid_model_config");
-  return { provider: value.provider, model: value.model, effort };
+  return { provider: value.provider, model: value.model, effort: value.effort };
 }
 
 export function parseModelConfig(value: unknown): ModelConfig {
@@ -197,22 +208,20 @@ export async function runModel(
   let response: Response;
   let data: Record<string, unknown>;
   const started = Date.now();
+  const signal = AbortSignal.timeout(requestTimeoutMs);
   try {
-    response = await fetch(
-      chosen.provider === "openai"
-        ? "https://api.openai.com/v1/responses"
-        : "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        redirect: "error",
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(requestTimeoutMs),
-      },
-    );
-    if (!response.ok) {
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(
+        chosen.provider === "openai"
+          ? "https://api.openai.com/v1/responses"
+          : "https://api.anthropic.com/v1/messages",
+        { method: "POST", redirect: "error", headers, body: JSON.stringify(body), signal },
+      );
+      if (response.ok) break;
       await response.body?.cancel();
-      throw new Error(`provider_http_${response.status}`);
+      const delay = retryDelay(response, attempt);
+      if (delay === null) throw new Error(`provider_http_${response.status}`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
     if (!response.body) throw new Error("provider_invalid_response");
     data =
