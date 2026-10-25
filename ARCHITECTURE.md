@@ -81,6 +81,8 @@ Privileged workflows use the `ai-automation` environment, restricted to the `mai
 
 `.github/workflows/approval-label.yml` removes the `ready-for-human-approval` label when a pull request gets new commits, so the label never marks an unreviewed head. It never checks out pull request code.
 
+`.github/workflows/spec-link.yml` runs `scripts/spec-link.ts` from the base branch on each pull request. It fails a PR whose title starts with `feat` when the body's Spec section has no URL, issue reference, or repo path. It is a separate, non-required check.
+
 `.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
 
 ## Feature pattern
