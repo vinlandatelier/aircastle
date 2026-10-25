@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -28,11 +28,16 @@ export function execute(
 export async function developerApp() {
   const cwd = await mkdtemp(join(tmpdir(), "aircastle-developer-app-"));
   const client = pathToFileURL(join(repository, "packages/client/src/index.ts")).href;
-  const schema = import.meta.resolve("@aircastle/schema");
+  await mkdir(join(cwd, "node_modules/@aircastle"), { recursive: true });
+  await symlink(
+    join(repository, "packages/schema"),
+    join(cwd, "node_modules/@aircastle/schema"),
+    "dir",
+  );
   await writeFile(
     join(cwd, "aircastle.config.ts"),
     `import { defineConfig } from ${JSON.stringify(client)};
-import { collection, text } from ${JSON.stringify(schema)};
+import { collection, text } from "@aircastle/schema";
 export default defineConfig({ url: process.env.AIRCASTLE_URL, project: process.env.AIRCASTLE_PROJECT_ID, collections: {
 articles: collection({ title: text().min(1), slug: text().unique(), summary: text().optional(), status: text().oneOf(["draft", "published"]).default("draft") })
 } });`,
