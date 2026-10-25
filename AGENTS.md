@@ -53,7 +53,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Do not weaken assertions or skip failing checks to make an implementation pass.
 - Fix the class, not only the instance. When you fix a defect or a review finding, add or extend the check that would have caught it, following `.agents/skills/guardrails/SKILL.md`, and show it failing on a planted violation.
 - Before you change behavior that an earlier commit chose deliberately, read its history. Keep its intent or ask the user.
-- State the reason for every exemption, such as a lint override, knip ignore, policy allowance or type cast, where you declare it. If the file can't hold the reason, put it in the commit that adds the exemption.
+- State the reason for every exemption, such as a lint override, knip ignore, policy allowance or type cast, in the allowance's reason string, or else in the commit and PR body that add it.
 - Verify documentation and configuration changes directly; add executable tests when behavior changes.
 - Run only the checks necessary to verify the current change and its affected callers. Select the smallest relevant test files, cases, and package checks. Explain what each selected check proves before running it.
 - Do not run repository-wide suites or aggregate commands containing unrelated tests unless the user explicitly requests them. This includes `vp run check`, `vp run test`, `vp run test:all`, and `vp run test:prepared`. Completing, committing, or merging a task does not require a full-suite run.

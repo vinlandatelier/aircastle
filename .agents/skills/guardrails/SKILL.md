@@ -23,7 +23,7 @@ Put each rule at the highest layer that can express it.
 
 | Rule | Enforced in | See it fail |
 | --- | --- | --- |
-| Lint correctness errors fail, and so do warnings | `vite.config.ts` `lint.categories.correctness: "error"`; the `lint` script is `vp lint --deny-warnings` | `[3, 1].sort()` in a source file, then `vp run lint` |
+| Lint correctness errors fail | `vite.config.ts` `lint.categories.correctness: "error"`; the `lint` script is `vp lint --deny-warnings` | `[3, 1].sort()` in a source file, then `vp run lint` |
 | No `any`, no `@ts-` comments, no namespaces | `vite.config.ts` rules `typescript/no-explicit-any`, `typescript/ban-ts-comment`, `typescript/no-namespace` | `vp run lint` |
 | Exhaustive switches, only `Error` objects thrown | `typescript/switch-exhaustiveness-check`; `typescript/only-throw-error`, which allows only TanStack Router's `Redirect` | A switch missing a union member, or `throw "bad"`, then `vp run lint` |
 | Interface members are properties, not methods | `typescript/method-signature-style` | `read(): void` in an interface, then `vp run lint` |
@@ -34,11 +34,11 @@ Put each rule at the highest layer that can express it.
 | Web `@/` imports stay inside `apps/web/src` | `web-alias-escape` in `check-code-policy.ts` | `@/../vite.config.ts` in `apps/web/src`, then `vp run check:policy` |
 | Feature and web shell files are private outside their module | `tests/harness/module-boundaries.test.ts` | A relative import of another feature's file, then `vp test tests/harness/module-boundaries.test.ts` |
 | Source reads env only in `apps/api/src/config.ts` | `vite.config.ts` override for `apps/*/src`, `packages/*/src`: `node/no-process-env`, `Bun.env` in `no-restricted-properties`, `env` from `node:process` or `process` in `no-restricted-imports`. `packages/cli/src/index.ts` may read only `AIRCASTLE_API_KEY` | `Bun.env.X` in `packages/core/src`, then `vp run lint` |
-| No raw SQL through `.unsafe` | `no-restricted-properties` with the `rawSql` entry. Exempt: `packages/adapter-postgres/src/identifier.ts` and `src/test-support/database.ts` | `sql.unsafe(...)` or `const { unsafe } = sql`, then `vp run lint` |
+| No raw SQL through `.unsafe` | `no-restricted-properties` with the `rawSql` entry. Exempt: `packages/adapter-postgres/src/identifier.ts` and `packages/adapter-postgres/src/test-support/database.ts` | `sql.unsafe(...)` or `const { unsafe } = sql`, then `vp run lint` |
 | No ordinary comments, no type suppressions | `ordinary-comment` and `type-suppression` in `check-code-policy.ts` | `// note` in any TS file, then `vp run check:policy` |
 | Errors are not swallowed | `swallowed-error` in `check-code-policy.ts` for catch clauses and inline `.catch`/`.then` handlers in `apps/*/src` and `packages/*/src`. `deliberateCatchAllowances` lists the exact count per file with a reason; `stale-catch-allowance` fails when the count no longer matches. Lint adds `no-empty` and `preserve-caught-error` | `catch {}` in `packages/core/src`, then `vp run check:policy` |
 | Package exports list TypeScript source first under `development` | `tests/harness/package-exports.test.ts` | Remove the `development` condition, then `vp test tests/harness/package-exports.test.ts` |
-| Every `vp run` recipe names a real script, docs never use `bun run` | `tests/harness/command-recipes.test.ts` (skips `.agents/skills` and `.claude/skills`) | `vp run no-such-script` in a doc, then `vp test tests/harness/command-recipes.test.ts` |
+| Every `vp run` recipe names a real script, docs never use `bun run` | `tests/harness/command-recipes.test.ts` (skips `.claude/skills` and the vendored skills in `.agents/skills/SOURCES.json`) | A `vp run` of a missing script in a doc, then `vp test tests/harness/command-recipes.test.ts` |
 | `CLAUDE.md` and `.claude/skills/*` are symlinks to `AGENTS.md` and `.agents/skills/*` | `tests/harness/agent-instructions.test.ts` | A skill directory without its link, then `vp test tests/harness/agent-instructions.test.ts` |
 | Bun version comes from `.bun-version` | `tests/harness/bun-version.test.ts` (`packageManager`, `@types/bun` catalog, no `engines.bun`); `.github/actions/setup/action.yml` compares `bun --version` | A different version in `packageManager`, then `vp test tests/harness/bun-version.test.ts` |
 | TypeScript comes from the catalog, and every tsconfig sets `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess` | `tests/harness/typescript-config.test.ts` | Drop one flag from a tsconfig, then `vp test tests/harness/typescript-config.test.ts` |
