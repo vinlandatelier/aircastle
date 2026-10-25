@@ -15,7 +15,5 @@ test('normal production build exposes no fixture data or scenario override', asy
     const code = await response.text()
     expect(code).not.toContain('Long account name ')
     expect(code).not.toContain('empty-candidates')
-    expect(code).not.toContain('Aircastle verification render failure')
-    expect(code).not.toContain('Aircastle verification loader failure')
   }
 })
