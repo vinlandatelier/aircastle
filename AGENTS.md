@@ -48,7 +48,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Define observable behavior and relevant failure cases before implementing a feature.
 - For executable behavior changes, write or update tests first and confirm they fail for the intended reason before implementing the change.
 - Derive expected results from requirements and test through the module's public interface.
-- Feature PRs link the agreed spec and name the requirements their tests cover.
+- Feature PRs link the agreed spec or issue in the PR body's Why section and name the requirements their tests cover. The `Feature PRs link a spec` check enforces the link.
 - Keep changes focused and follow existing repository conventions.
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.

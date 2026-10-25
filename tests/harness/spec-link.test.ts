@@ -7,24 +7,25 @@ const template = readFileSync(
   resolve(import.meta.dirname, "../../.github/pull_request_template.md"),
   "utf8",
 );
-const withSpec = (spec: string) => template.replace(/(## Spec\n)/, `$1\n${spec}\n`);
+const withWhy = (why: string) => template.replace(/(## Why\n)/, `$1\n${why}\n`);
 
-test("the pull request template has a Spec section", () => {
-  expect(template).toMatch(/^## Spec$/m);
+test("the pull request template has a Why section", () => {
+  expect(template).toMatch(/^## Why$/m);
 });
 
 test.each([
   ["an unfilled template", template],
-  ["no Spec section", "## Problem\n\nhttps://github.com/o/r/issues/1\n"],
-  ["n/a", withSpec("n/a: refactor")],
-  ["a placeholder", withSpec("<link to the spec>, R1")],
-  ["a link only in another section", `${withSpec("")}\nhttps://example.com/spec\n`],
+  ["no Why section", "## What?\n\nhttps://github.com/o/r/issues/1\n"],
+  ["n/a", withWhy("n/a: refactor")],
+  ["a placeholder", withWhy("<link to the spec>, R1")],
+  ["a link only inside an HTML comment", withWhy("<!-- https://example.com/spec #12 -->")],
+  ["a link only in another section", `${withWhy("")}\nhttps://example.com/spec\n`],
   [
-    "a Spec heading only inside a code fence",
-    "## Problem\n\n```md\n## Spec\n\nhttps://example.com/spec\n```\n",
+    "a Why heading only inside a code fence",
+    "## What?\n\n```md\n## Why\n\nhttps://example.com/spec\n```\n",
   ],
-  ["a link only inside a code fence", withSpec("```\nhttps://example.com/spec\n```")],
-  ["a link only inside an unclosed code fence", withSpec("~~~\n#12")],
+  ["a link only inside a code fence", withWhy("```\nhttps://example.com/spec\n```")],
+  ["a link only inside an unclosed code fence", withWhy("~~~\n#12")],
 ])("a feat PR with %s fails", (_case, body) => {
   expect(checkSpecLink("feat(api): add drafts", body).ok).toBe(false);
 });
@@ -36,8 +37,8 @@ test.each([
   ["a feat:spec record path", ".feat/drafts/feature.json R1-R3"],
   ["a link after a code fence", "```\nR1\n```\n#12"],
   ["a link after a CRLF code fence", "```\r\nR1\r\n```\r\n#12"],
-])("a feat PR with %s passes", (_case, spec) => {
-  expect(checkSpecLink("feat: add drafts", withSpec(spec))).toEqual({ ok: true });
+])("a feat PR with %s in Why passes", (_case, why) => {
+  expect(checkSpecLink("feat: add drafts", withWhy(why))).toEqual({ ok: true });
 });
 
 test.each(["Feat: add drafts", "feat!: drop v1", " feat(web): add drafts"])(
@@ -47,8 +48,6 @@ test.each(["Feat: add drafts", "feat!: drop v1", " feat(web): add drafts"])(
   },
 );
 
-test("a fix PR with n/a passes", () => {
-  expect(checkSpecLink("fix(core): reject empty slugs", withSpec("n/a: bug fix"))).toEqual({
-    ok: true,
-  });
+test("a fix PR with an unfilled template passes", () => {
+  expect(checkSpecLink("fix(core): reject empty slugs", template)).toEqual({ ok: true });
 });
