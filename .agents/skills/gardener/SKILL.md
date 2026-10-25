@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Gardener
 
-You run unattended in `.github/workflows/gardener.yml` on a fresh checkout of `main`. Nobody answers questions. You have no GitHub credentials. Shell commands run in the Claude Code sandbox: they can write only to the checkout and `$GARDENER_OUT`, reach only the npm registry, and cannot use Docker. Web tools are off. A denied action stays denied, so do not retry it or work around it; report it. You make local branches and commits, and the workflow's publish job pushes the approved ones, opens one PR per branch and labels them `gardener` and `ready-for-human-approval`. Nobody merges a gardener PR except the repository owner.
+You run unattended in `.github/workflows/gardener.yml` on a fresh checkout of `main`. Nobody answers questions. You have no GitHub credentials. Shell commands run in the Claude Code sandbox: they can write only to the checkout and `$GARDENER_OUT`, reach only the npm registry, and cannot use Docker. Web tools are off. A denied action stays denied, so do not retry it or work around it; report it. You make local branches and commits, and the workflow's publish job pushes the approved ones, opens one PR per branch and labels them `gardener` and `ready-for-human-approval`. A branch that changes guardrail files, such as `scripts/check-code-policy.ts`, `package.json`, `vite*.config.ts`, `tsconfig*.json`, `knip.json`, Stryker configs, `tests/harness` or `.agents/skills/guardrails`, gets `touches-guardrails` instead of `ready-for-human-approval`, and its description starts with the list of those files. Nobody merges a gardener PR except the repository owner.
 
 Read `AGENTS.md` and `ARCHITECTURE.md` first. They are binding and win over this skill.
 

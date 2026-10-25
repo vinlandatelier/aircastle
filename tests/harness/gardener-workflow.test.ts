@@ -1,5 +1,15 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve } from "node:path";
 import { expect, test } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -169,6 +179,105 @@ test("the publish job holds branches that change automation or its guards", () =
   expect(publish).toContain(
     'git diff --no-renames --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- "${held_paths[@]}"',
   );
+});
+
+function publishLines(from: string, through: string): string {
+  const lines = job(gardener, "publish").split("\n");
+  const start = lines.findIndex((line) => line.trimStart().startsWith(from));
+  const end = lines.findIndex(
+    (line, index) => index >= start && line.trimStart().startsWith(through),
+  );
+  return lines
+    .slice(start, end + 1)
+    .map((line) => line.trimStart())
+    .join("\n");
+}
+
+function publishGardenerBranch(changes: Record<string, string>): {
+  labels: string[];
+  body: string;
+} {
+  const repo = mkdtempSync(join(tmpdir(), "gardener-labels-"));
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" }).trim();
+  try {
+    git("init", "-q");
+    git("config", "user.email", "gardener@example.com");
+    git("config", "user.name", "gardener");
+    git("config", "commit.gpgsign", "false");
+    writeFileSync(join(repo, "README.md"), "base\n");
+    git("add", ".");
+    git("commit", "-qm", "base");
+    const base = git("rev-parse", "HEAD");
+    for (const [path, content] of Object.entries(changes)) {
+      mkdirSync(dirname(join(repo, path)), { recursive: true });
+      writeFileSync(join(repo, path), content);
+    }
+    git("add", ".");
+    git("commit", "-qm", "change");
+    git("update-ref", "refs/remotes/gardener/fix-thing", "HEAD");
+    const script = [
+      'cd "$1"',
+      publishLines("guardrail_paths=(", "guardrail_paths=("),
+      publishLines("guardrails=$(", "jq -r .body"),
+      "printf '%s\\n' \"${labels[@]}\"",
+    ].join("\n");
+    const labels = execFileSync("bash", ["-euo", "pipefail", "-c", script, "bash", repo], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_SHA: base,
+        branch: "gardener/fix-thing",
+        dir: repo,
+        entry: JSON.stringify({ body: "Adds a check." }),
+      },
+    });
+    return {
+      labels: labels.split("\n").filter((line) => line && line !== "--label"),
+      body: readFileSync(join(repo, "body.md"), "utf8"),
+    };
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+}
+
+test("the publish job flags branches that change guardrails", () => {
+  const publish = job(gardener, "publish");
+  expect(/^ +guardrail_paths=\((.*)\)$/m.exec(publish)?.[1]?.split(" ")).toEqual([
+    "scripts/check-code-policy.ts",
+    "':(glob)**/package.json'",
+    "':(glob)**/vite*.config.ts'",
+    "':(glob)**/tsconfig*.json'",
+    "knip.json",
+    "':(glob)**/stryker*'",
+    "tests/harness",
+    ".agents/skills/guardrails",
+  ]);
+  expect(publish).toContain("gh label create touches-guardrails");
+  expect(publish).toContain('--body-file "$dir/body.md" "${labels[@]}"');
+});
+
+test.each([
+  ["vite.config.ts"],
+  ["packages/core/vite.config.ts"],
+  ["apps/web/vite.verification.config.ts"],
+  ["package.json"],
+  ["packages/schema/stryker.config.json"],
+  ["apps/web/tsconfig.app.json"],
+  ["tests/harness/new-guard.test.ts"],
+  [".agents/skills/guardrails/SKILL.md"],
+])("a gardener branch changing %s is labeled touches-guardrails", (path) => {
+  const published = publishGardenerBranch({ [path]: "changed\n", "src/fix.ts": "fix\n" });
+  expect(published.labels).toEqual(["gardener", "touches-guardrails"]);
+  expect(published.body).toBe(
+    `Touches guardrails: ${path}. Review these changes before approving.\n\nAdds a check.\n`,
+  );
+});
+
+test("a gardener branch without guardrail changes is ready for human approval", () => {
+  const published = publishGardenerBranch({ "packages/core/src/fix.ts": "fix\n" });
+  expect(published.labels).toEqual(["gardener", "ready-for-human-approval"]);
+  expect(published.body).toBe("Adds a check.\n");
 });
 
 test("Claude sees only number, title, branch and state of the owner's and gardener PRs", () => {

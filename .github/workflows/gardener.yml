@@ -151,9 +151,12 @@ jobs:
           dir="$RUNNER_TEMP/gardener"
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           held_paths=(.github .claude .agents/skills/gardener scripts/ai-automation scripts/ai-models tests/harness/gardener-workflow.test.ts tests/harness/ai-credentials.test.ts)
+          guardrail_paths=(scripts/check-code-policy.ts ':(glob)**/package.json' ':(glob)**/vite*.config.ts' ':(glob)**/tsconfig*.json' knip.json ':(glob)**/stryker*' tests/harness .agents/skills/guardrails)
           status=0
           gh label create gardener --repo "$GITHUB_REPOSITORY" --force \
             --color 2E7D32 --description "Opened by the scheduled gardener"
+          gh label create touches-guardrails --repo "$GITHUB_REPOSITORY" --force \
+            --color B71C1C --description "Gardener change to checks, configs or the harness"
           git fetch --no-tags "$dir/out/branches.bundle" '+refs/heads/gardener/*:refs/remotes/gardener/*'
           while IFS= read -r entry; do
             branch=$(jq -r .branch <<<"$entry")
@@ -186,9 +189,15 @@ jobs:
               status=1
               continue
             fi
-            jq -r .body <<<"$entry" > "$dir/body.md"
+            guardrails=$(git diff --no-renames --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- "${guardrail_paths[@]}" | paste -sd ' ' -)
+            labels=(--label gardener --label ready-for-human-approval)
+            : > "$dir/body.md"
+            if [ -n "$guardrails" ]; then
+              labels=(--label gardener --label touches-guardrails)
+              printf 'Touches guardrails: %s. Review these changes before approving.\n\n' "$guardrails" > "$dir/body.md"
+            fi
+            jq -r .body <<<"$entry" >> "$dir/body.md"
             gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
-              --title "$title" --body-file "$dir/body.md" \
-              --label gardener --label ready-for-human-approval
+              --title "$title" --body-file "$dir/body.md" "${labels[@]}"
           done < <(jq -c --argjson max "$GARDENER_MAX_PRS" '.[:$max][]' "$dir/out/prs.json")
           exit "$status"
