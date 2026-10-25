@@ -24,6 +24,15 @@ test.each([
     "a Why heading only inside a code fence",
     "## What?\n\n```md\n## Why\n\nhttps://example.com/spec\n```\n",
   ],
+  [
+    "a link only inside Agent details",
+    template.replace("</details>", "Spec: https://example.com/spec #12\n</details>"),
+  ],
+  [
+    "a Why heading and link only inside Agent details",
+    "## What?\n\n<details><summary>Agent details</summary>\n\n## Why\n\n#12\n</details>\n",
+  ],
+  ["a link only inside an unclosed details block", withWhy("<details>\n#12")],
   ["a link only inside a code fence", withWhy("```\nhttps://example.com/spec\n```")],
   ["a link only inside an unclosed code fence", withWhy("~~~\n#12")],
 ])("a feat PR with %s fails", (_case, body) => {

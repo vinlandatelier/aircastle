@@ -4,6 +4,7 @@ const featureTitle = /^\s*feat\b/i;
 const whyHeading = /^##\s+Why\s*$/im;
 const nextHeading = /^##\s/m;
 const htmlComment = /<!--[\s\S]*?(?:-->|$)/g;
+const detailsBlock = /<details\b[\s\S]*?(?:<\/details>|$)/gi;
 const codeFence = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[`~]*[ \t]*$|(?![\s\S]))/gm;
 const specReference = [
   /\bhttps?:\/\/[^\s<>]+\.[^\s<>]+/i,
@@ -12,7 +13,7 @@ const specReference = [
 ];
 
 const whySection = (body: string) => {
-  const visible = body.replace(codeFence, "").replace(htmlComment, "");
+  const visible = body.replace(codeFence, "").replace(htmlComment, "").replace(detailsBlock, "");
   const heading = whyHeading.exec(visible);
   if (heading === null) return undefined;
   const rest = visible.slice(heading.index + heading[0].length);
@@ -20,7 +21,7 @@ const whySection = (body: string) => {
   return end === null ? rest : rest.slice(0, end.index);
 };
 
-/** Feature PRs must link their agreed spec in the body's Why section. Other PRs pass. */
+/** Feature PRs must link their agreed spec in the body's visible Why section, outside comments, code fences and details blocks. Other PRs pass. */
 export const checkSpecLink = (title: string, body: string): SpecLinkResult => {
   if (!featureTitle.test(title)) return { ok: true };
   const section = whySection(body);
