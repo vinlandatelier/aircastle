@@ -1,4 +1,5 @@
 import { test, expect, visit } from './support'
+import { landingTitle } from '../src/metadata'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -14,9 +15,7 @@ test('normal built entry loads assets and redirects to Collections', async ({ pa
   await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/collections$/)
   await expect(page).toHaveTitle('Aircastle - Collections')
   const entry = await page.request.get('/')
-  expect(await entry.text()).toContain(
-    '<title>Aircastle: The Headless CMS with Next-Generation Agentic Capabilities</title>',
-  )
+  expect(await entry.text()).toContain(`<title>${landingTitle}</title>`)
   await expect(page.getByRole('banner').getByRole('link', { name: 'Aircastle' })).toBeVisible()
   await expect(page.getByRole('main')).toBeVisible()
   const navigation = page.getByRole('navigation', { name: 'Main navigation' })

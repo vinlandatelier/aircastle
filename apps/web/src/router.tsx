@@ -12,6 +12,7 @@ import { AppShell } from '@/components/shell'
 import { SignInPage } from '@/features/sign-in'
 import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { navigationPages } from '@/features/navigation'
+import { landingDescription, landingTitle } from '@/metadata'
 
 const rootRoute = createRootRoute({
   component: App,
@@ -20,8 +21,7 @@ const rootRoute = createRootRoute({
       { title: 'Aircastle' },
       {
         name: 'description',
-        content:
-          'Aircastle is a code-first, headless CMS with agentic capabilities designed to automate the slow, manual parts of managing written content.',
+        content: landingDescription,
       },
     ],
   }),
@@ -30,7 +30,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   head: () => ({
-    meta: [{ title: 'Aircastle: The Headless CMS with Next-Generation Agentic Capabilities' }],
+    meta: [{ title: landingTitle }],
   }),
   component: () => (
     <main

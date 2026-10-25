@@ -1,8 +1,5 @@
 import { test, expect } from './support'
-
-const landingTitle = 'Aircastle: The Headless CMS with Next-Generation Agentic Capabilities'
-const landingDescription =
-  'Aircastle is a code-first, headless CMS with agentic capabilities designed to automate the slow, manual parts of managing written content.'
+import { landingDescription, landingTitle } from '../src/metadata'
 
 test('marketing entry keeps its URL and exact metadata before and after startup', async ({
   page,
