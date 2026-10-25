@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@hono/cli": "1.0.0-rc.8",
-    "@types/bun": "1.4.4",
+    "@types/bun": "catalog:",
     "typescript": "7.0.2",
     "vite-plus": "catalog:"
   }

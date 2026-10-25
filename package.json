@@ -57,7 +57,7 @@
     "@aircastle/core": "workspace:*",
     "@aircastle/schema": "workspace:*",
     "@babel/parser": "7.28.5",
-    "@types/bun": "1.4.4",
+    "@types/bun": "catalog:",
     "knip": "6.42.1",
     "pino": "10.4.0",
     "postgres": "3.4.9",
@@ -69,11 +69,11 @@
     "vite": "catalog:"
   },
   "engines": {
-    "bun": "1.4.4",
     "node": "^22.22.1 || ^24.11.0 || >=26.0.0"
   },
   "packageManager": "bun@1.4.4",
   "catalog": {
+    "@types/bun": "1.4.4",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
     "vite-plus": "1.4.0"
   }
