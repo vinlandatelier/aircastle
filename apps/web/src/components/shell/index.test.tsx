@@ -51,4 +51,31 @@ describe('Aircastle app shell', () => {
       ).toBeTruthy()
     }
   })
+
+  it('offers page search with its keyboard shortcut', async () => {
+    await renderApp()
+    const search = within(screen.getByRole('banner')).getByRole('button', { name: 'Search pages' })
+    expect(search.textContent).toContain('Search...')
+    expect(search.textContent).toContain('⌘K')
+  })
+
+  it('shows Aircastle groups without the Efferd template copy', async () => {
+    await renderApp()
+    const sidebar = document.querySelector('[data-slot="sidebar"]')!
+    expect(within(sidebar as HTMLElement).getByText('Product')).toBeTruthy()
+    expect(within(sidebar as HTMLElement).getByText('Administration')).toBeTruthy()
+    expect(sidebar.textContent).not.toMatch(
+      /Dashboard|Projects|Team|Integrations|API Keys|Billing|Workspace|CHANGELOG|Product update|Learn more|Help Center|Documentation|Efferd/,
+    )
+    expect(document.body.textContent).not.toContain('Efferd')
+  })
+
+  it('places an expanded collapse control before the page content', async () => {
+    await renderApp()
+    const toggle = screen.getAllByRole('button', { name: 'Toggle Sidebar' })[0]!
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(
+      toggle.compareDocumentPosition(screen.getByRole('main')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
 })
