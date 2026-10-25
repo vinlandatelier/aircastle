@@ -1,0 +1,40 @@
+name: Stack check
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  stack:
+    name: Dependent PR is in a GitHub stack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check stack membership
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$BASE" = "$DEFAULT_BRANCH" ]; then
+            echo "PR #$PR targets $DEFAULT_BRANCH."
+            exit 0
+          fi
+          stack=$(gh api "repos/$REPO/stacks?pull_request=$PR" \
+            --jq "map(select(.open and any(.pull_requests[]; .number == $PR))) | first | .number // empty")
+          if [ -n "$stack" ]; then
+            echo "PR #$PR targets $BASE and is in open stack #$stack."
+            exit 0
+          fi
+          echo "::error::PR #$PR targets $BASE, not $DEFAULT_BRANCH, and is not in an open GitHub stack."
+          echo "If it depends on the PR for $BASE, link the chain from bottom to top, then rerun this check:"
+          echo "  gh stack link <bottom-pr> ... $PR"
+          echo "  gh run rerun $GITHUB_RUN_ID"
+          echo "If it is independent, retarget it: gh pr edit $PR --base $DEFAULT_BRANCH"
+          exit 1
