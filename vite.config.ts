@@ -1,5 +1,16 @@
 import { defineConfig } from "vite-plus";
 
+const rawSql = {
+  property: "unsafe",
+  message:
+    "Write SQL with tagged templates. Quote identifiers with identifier() from identifier.ts.",
+};
+const bunEnv = {
+  object: "Bun",
+  property: "env",
+  message: "Read environment variables in the entry point's config module.",
+};
+
 export default defineConfig({
   resolve: { conditions: ["development"] },
   test: {
@@ -64,6 +75,7 @@ export default defineConfig({
         { allow: [{ from: "package", package: "@tanstack/router-core", name: "Redirect" }] },
       ],
       "typescript/switch-exhaustiveness-check": "error",
+      "no-restricted-properties": ["error", rawSql],
     },
     ignorePatterns: [
       ".agents/skills/**",
@@ -84,14 +96,7 @@ export default defineConfig({
         plugins: ["node"],
         rules: {
           "node/no-process-env": "error",
-          "no-restricted-properties": [
-            "error",
-            {
-              object: "Bun",
-              property: "env",
-              message: "Read environment variables in the entry point's config module.",
-            },
-          ],
+          "no-restricted-properties": ["error", bunEnv, rawSql],
           "no-restricted-imports": [
             "error",
             {
@@ -109,9 +114,17 @@ export default defineConfig({
         plugins: ["node"],
         rules: {
           "node/no-process-env": "off",
-          "no-restricted-properties": "off",
+          "no-restricted-properties": ["error", rawSql],
           "no-restricted-imports": "off",
         },
+      },
+      {
+        files: ["packages/adapter-postgres/src/identifier.ts"],
+        rules: { "no-restricted-properties": ["error", bunEnv] },
+      },
+      {
+        files: ["packages/adapter-postgres/src/test-support/database.ts"],
+        rules: { "no-restricted-properties": "off" },
       },
       {
         files: ["packages/cli/src/index.ts"],
