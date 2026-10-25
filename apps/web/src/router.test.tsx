@@ -10,13 +10,18 @@ const marker = 'Aircastle route failure: private details'
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const router = await importOriginal<typeof import('@tanstack/react-router')>()
-  const createRootRoute: typeof router.createRootRoute = (options) =>
-    router.createRootRoute({
-      ...options,
-      loader: () => {
+  const createRootRoute: typeof router.createRootRoute = (options) => {
+    const route = router.createRootRoute(options)
+    const original = route.options.loader
+    Object.assign(route.options, {
+      loader: (context: unknown) => {
         if (fault.loader) throw new Error(marker)
+        if (typeof original === 'function') return Reflect.apply(original, undefined, [context])
+        return original && Reflect.apply(original.handler, original, [context])
       },
     })
+    return route
+  }
   return { ...router, createRootRoute }
 })
 
