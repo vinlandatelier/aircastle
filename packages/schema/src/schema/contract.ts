@@ -88,9 +88,18 @@ export type SchemaIssue = IssueDetails &
       }
     | {
         readonly code: "invalid_choices";
-        readonly reason: "empty" | "invalid_type" | "violates_constraints";
-        readonly index?: number;
-        readonly causes?: NonemptyIssues<ValidationIssue>;
+        readonly reason: "empty" | "invalid_type";
+      }
+    | {
+        readonly code: "invalid_choices";
+        readonly reason: "invalid_type";
+        readonly index: number;
+      }
+    | {
+        readonly code: "invalid_choices";
+        readonly reason: "violates_constraints";
+        readonly index: number;
+        readonly causes: NonemptyIssues<ValidationIssue>;
       }
     | {
         readonly code: "duplicate_choice";

@@ -152,7 +152,15 @@ describe("declaration compilation", () => {
     {
       name: "choices violating final constraints",
       build: (t) => t.oneOf(["a"]).min(2),
-      issues: [{ code: "invalid_choices", path, reason: "violates_constraints" }],
+      issues: [
+        {
+          code: "invalid_choices",
+          path,
+          reason: "violates_constraints",
+          index: 0,
+          causes: [{ code: "too_short", path, minimum: 2, actual: 1, unit: "graphemes" }],
+        },
+      ],
     },
     {
       name: "default outside choices",
@@ -352,20 +360,10 @@ describe("declaration compilation", () => {
   });
 
   test("a non-array choice list is one whole-value issue without an element index", () => {
-    let thrown: unknown;
-    try {
-      compileCollection({ title: text().oneOf("draft" as unknown as string[]) });
-    } catch (error) {
-      thrown = error;
-    }
-    expect((thrown as { issues?: unknown }).issues).toStrictEqual([
-      {
-        code: "invalid_choices",
-        reason: "invalid_type",
-        path,
-        message: "Invalid schema declaration: invalid choices.",
-      },
-    ]);
+    expectSchemaError(
+      () => compileCollection({ title: text().oneOf("draft" as unknown as string[]) }),
+      [{ code: "invalid_choices", path, reason: "invalid_type" }],
+    );
   });
 
   test("field builders and collection declarations are frozen", () => {

@@ -223,7 +223,22 @@ describe("wire field values are validated by the schema compiler", () => {
       { choices: ["draft", 1] },
       { code: "invalid_choices", reason: "invalid_type", index: 1 },
     ],
-    ["numeric default", { default: 1 }, { code: "invalid_default" }],
+    [
+      "numeric default",
+      { default: 1 },
+      {
+        code: "invalid_default",
+        causes: [
+          {
+            code: "invalid_type",
+            path: ["wire", "title"],
+            expected: "string",
+            received: "number",
+            message: "Expected a text value.",
+          },
+        ],
+      },
+    ],
     [
       "textarea nonnumeric rows",
       { editor: { type: "textarea", rows: "7" } },
@@ -268,8 +283,8 @@ describe("wire field values are validated by the schema compiler", () => {
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(SchemaError);
-    expect((thrown as SchemaError).issues).toEqual([
-      expect.objectContaining({ ...issue, path: ["wire", "title"] }),
+    expect((thrown as SchemaError).issues).toStrictEqual([
+      { ...issue, path: ["wire", "title"], message: expect.any(String) },
     ]);
   });
 
