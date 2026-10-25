@@ -55,9 +55,7 @@ describe('Sign in', () => {
     await user.click(screen.getByRole('link', { name: 'Home' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
-    expect(
-      await screen.findByRole('heading', { name: 'Your content. Defined in code.' }),
-    ).toBeTruthy()
+    expect(await screen.findByRole('navigation', { name: 'Marketing navigation' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Toggle Sidebar' })).toBeNull()
   })
 })

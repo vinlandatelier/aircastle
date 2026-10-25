@@ -10,7 +10,7 @@ test('marketing entry keeps its URL and exact metadata before and after startup'
   expect(html).toContain(landingDescription)
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Your content. Defined in code.', exact: true }),
+    page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
   ).toBeVisible()
   await expect(page).toHaveURL(/\/$/)
   await expect(page).toHaveTitle(landingTitle)
@@ -25,7 +25,7 @@ test('marketing entry keeps its URL and exact metadata before and after startup'
   await expect(page).toHaveTitle('Aircastle - Sign in')
   await page.goBack()
   await expect(
-    page.getByRole('heading', { name: 'Your content. Defined in code.', exact: true }),
+    page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
   ).toBeVisible()
   await expect(page).toHaveTitle(landingTitle)
   await expect(page.locator('head title')).toHaveCount(1)

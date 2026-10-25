@@ -1,36 +1,13 @@
-import { useEffect, useState } from 'react'
-import { cn } from 'cn'
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { MenuIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
-const navLinks = [
-  { label: 'Overview', href: '#overview' },
-  { label: 'Our stack', href: '#stack' },
-]
-
 export function Header() {
   const [open, setOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-
-  useEffect(() => {
-    const updateScrolled = () => setScrolled(window.scrollY > 0)
-    updateScrolled()
-    window.addEventListener('scroll', updateScrolled, { passive: true })
-    return () => window.removeEventListener('scroll', updateScrolled)
-  }, [])
-
   return (
-    <header
-      data-theme-scope={scrolled ? 'marketing' : 'hero'}
-      className={cn(
-        'sticky top-0 z-20 w-full border-b text-foreground motion-safe:transition-colors motion-safe:duration-200',
-        scrolled
-          ? 'border-border/50 bg-background/95 backdrop-blur-sm'
-          : 'border-transparent bg-transparent',
-      )}
-    >
+    <header className="sticky top-0 z-20 w-full border-b border-transparent text-foreground">
       <nav
         aria-label="Marketing navigation"
         className="mx-auto flex min-h-16 w-full max-w-5xl items-center justify-between gap-4 px-4"
@@ -43,15 +20,6 @@ export function Header() {
           <span aria-hidden="true" className="brand-logo block size-7" />
         </Link>
         <div className="hidden items-center gap-2 md:flex">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="rounded-lg px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              {link.label}
-            </a>
-          ))}
           <Link
             to="/sign-in"
             className="rounded-lg border px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
@@ -80,16 +48,6 @@ export function Header() {
                 aria-label="Mobile marketing navigation"
                 className="flex flex-col gap-2 px-4 pb-6"
               >
-                {navLinks.map((link) => (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setOpen(false)}
-                    className="rounded-lg px-3 py-2 hover:bg-muted"
-                  >
-                    {link.label}
-                  </a>
-                ))}
                 <Link
                   to="/sign-in"
                   onClick={() => setOpen(false)}

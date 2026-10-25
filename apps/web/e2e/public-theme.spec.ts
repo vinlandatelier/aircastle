@@ -75,7 +75,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expectPublic(page, theme === 'dark')
     await page.getByRole('link', { name: 'Home', exact: true }).click()
     await expect(
-      page.getByRole('heading', { name: 'Your content. Defined in code.', exact: true }),
+      page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
     ).toBeVisible()
     await page.goto('/dash')
     await expect(page.getByRole('button', { name: 'Choose theme' })).toBeVisible()
@@ -96,7 +96,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Escape')
     await page.goBack()
     await expect(
-      page.getByRole('heading', { name: 'Your content. Defined in code.', exact: true }),
+      page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
     ).toBeVisible()
     await page.goBack()
     await expectPublic(page, theme === 'dark')
