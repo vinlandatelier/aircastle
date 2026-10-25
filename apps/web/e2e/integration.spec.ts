@@ -1,4 +1,5 @@
 import { test, expect, visit, assertLayout, visibleSidebarTrigger } from './support'
+import { themeStorageKey } from '../src/theme'
 
 for (const scenario of ['normal', 'long-text'] as const) {
   test(`${scenario}: mobile project and Dark survive drawer and search navigation, route and theme survive reload`, async ({
@@ -31,7 +32,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await expect(page.getByRole('menu', { name: 'Theme', exact: true })).toBeHidden()
     await expect(page.locator('html')).toHaveClass(/\bdark\b/)
     await expect
-      .poll(() => page.evaluate(() => localStorage.getItem('aircastle-theme')))
+      .poll(() => page.evaluate((key) => localStorage.getItem(key), themeStorageKey))
       .toBe('dark')
     await expect
       .poll(() => header.evaluate((element) => getComputedStyle(element).backgroundColor))
@@ -99,7 +100,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/users(?:\?.*)?$/)
     await expect(page.locator('html')).toHaveClass(/\bdark\b/)
     await expect
-      .poll(() => page.evaluate(() => localStorage.getItem('aircastle-theme')))
+      .poll(() => page.evaluate((key) => localStorage.getItem(key), themeStorageKey))
       .toBe('dark')
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
       'href',

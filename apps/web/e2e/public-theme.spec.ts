@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './support'
+import { themeStorageKey } from '../src/theme'
 
 async function expectPaint(element: Locator, background: string, foreground?: string) {
   await expect
@@ -66,7 +67,10 @@ for (const theme of ['light', 'dark'] as const) {
   test(`public ${theme} palette matches Efferd and restores after dashboard navigation`, async ({
     page,
   }) => {
-    await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
+    await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+      key: themeStorageKey,
+      value: theme,
+    })
     await page.goto('/sign-in')
     await expectPublic(page, theme === 'dark')
     await page.getByRole('link', { name: 'Home', exact: true }).click()

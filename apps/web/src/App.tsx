@@ -1,6 +1,7 @@
 import { HeadContent, Outlet } from '@tanstack/react-router'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { useEffect } from 'react'
+import { themeStorageKey } from '@/theme'
 
 function ThemeFavicon() {
   const { resolvedTheme } = useTheme()
@@ -20,7 +21,7 @@ function App() {
     <ThemeProvider
       attribute="class"
       defaultTheme="system"
-      storageKey="aircastle-theme"
+      storageKey={themeStorageKey}
       enableSystem
     >
       <ThemeFavicon />

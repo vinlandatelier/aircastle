@@ -1,10 +1,14 @@
 import { test, expect } from './support'
+import { themeStorageKey } from '../src/theme'
 
 for (const theme of ['light', 'dark'] as const) {
   test(`unknown pages use the branded ${theme} recovery page on desktop and mobile`, async ({
     page,
   }) => {
-    await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
+    await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+      key: themeStorageKey,
+      value: theme,
+    })
     for (const viewport of [
       { width: 1440, height: 900 },
       { width: 390, height: 844 },

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect, visit } from './support'
+import { themeStorageKey } from '../src/theme'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -11,7 +12,9 @@ async function selectTheme(page: Page, name: 'Dark' | 'Light' | 'System') {
 
 async function expectTheme(page: Page, applied: 'dark' | 'light', stored: string) {
   await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${applied}\\b`))
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('aircastle-theme'))).toBe(stored)
+  await expect
+    .poll(() => page.evaluate((key) => localStorage.getItem(key), themeStorageKey))
+    .toBe(stored)
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
     'href',
     `/brand/favicon-${applied}.svg`,
@@ -113,7 +116,7 @@ test('a fresh context does not inherit explicit theme selection', async ({ page,
     await visit(other)
     await expect(other.locator('html')).toHaveClass(/\blight\b/)
     await expect
-      .poll(() => other.evaluate(() => localStorage.getItem('aircastle-theme')))
+      .poll(() => other.evaluate((key) => localStorage.getItem(key), themeStorageKey))
       .not.toBe('dark')
     await other.getByRole('button', { name: 'Choose theme' }).click()
     await expect(other.getByRole('menuitemradio', { name: 'System', exact: true })).toHaveAttribute(

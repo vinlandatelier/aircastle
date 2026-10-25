@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './support'
+import { themeStorageKey } from '../src/theme'
 
 type Fault = 'runtime' | 'rejection'
 
@@ -53,7 +54,7 @@ test.describe('mobile failure recovery', () => {
   })
 
   test('recovery keeps the saved dark theme and Home leaves the failed app', async ({ page }) => {
-    await page.addInitScript((key) => localStorage.setItem(key, 'dark'), 'aircastle-theme')
+    await page.addInitScript((key) => localStorage.setItem(key, 'dark'), themeStorageKey)
     await page.goto('/sign-in')
     await failAfterStartup(page, 'runtime')
     await expect(
