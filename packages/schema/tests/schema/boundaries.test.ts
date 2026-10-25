@@ -8,19 +8,21 @@ describe("document boundary and diagnostic order", () => {
     api = requireSchemaApi();
   });
 
-  test.for([
-    null,
-    undefined,
-    true,
-    7,
-    "text",
-    [],
-    1n,
-    Symbol("root"),
-    () => ({}),
-    new Date(0),
-    new (class Document {})(),
-  ])("rejects non-document root %o", (input) => {
+  test.for(
+    [
+      null,
+      undefined,
+      true,
+      7,
+      "text",
+      [],
+      1n,
+      Symbol("root"),
+      () => ({}),
+      new Date(0),
+      new (class Document {})(),
+    ].map((value) => [value]),
+  )("rejects non-document root %o", ([input]) => {
     expectFailure(compileCollection(api, { title: api.text() }).validate(input), [
       { code: "invalid_document", path: [] },
     ]);

@@ -19,20 +19,22 @@ describe("declaration compilation", () => {
   const path = ["articles", "title"];
 
   for (const constraint of ["min", "max"] as const) {
-    test.for([
-      -1,
-      1.5,
-      NaN,
-      Infinity,
-      -Infinity,
-      Number.MAX_SAFE_INTEGER + 1,
-      "3",
-      null,
-      undefined,
-      true,
-      1n,
-      {},
-    ])(`rejects ${constraint} bound %o during compilation`, (invalid) => {
+    test.for(
+      [
+        -1,
+        1.5,
+        NaN,
+        Infinity,
+        -Infinity,
+        Number.MAX_SAFE_INTEGER + 1,
+        "3",
+        null,
+        undefined,
+        true,
+        1n,
+        {},
+      ].map((value) => [value]),
+    )(`rejects ${constraint} bound %o during compilation`, ([invalid]) => {
       const field = api.text()[constraint](invalid as number);
       expectSchemaError(
         () => compileCollection(api, { title: field }),
