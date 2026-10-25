@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { expect, test } from "vite-plus/test";
-import { inspectCode } from "../../scripts/check-code-policy.ts";
+import { inspectCode, workspaceCycles, type Workspace } from "../../scripts/check-code-policy.ts";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -67,7 +67,7 @@ test.each([
 test("accepts raw SQL in the identifier helpers and unsafe-looking literals elsewhere", () => {
   for (const file of [
     "packages/adapter-postgres/src/identifier.ts",
-    "tests/support/content-database.ts",
+    "packages/adapter-postgres/src/test-support/database.ts",
   ])
     expect(inspectCode(file, "sql.unsafe(query);")).toEqual([]);
   expect(
@@ -141,6 +141,145 @@ test("the policy command preserves vendored shadcn code and checks authored skil
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(".agents/skills/worktree/sample.ts");
     expect(result.stderr).toContain("ordinary-comment");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+const workspaces: Workspace[] = [
+  { directory: "", name: "aircastle", dependencies: ["@aircastle/core", "@aircastle/contracts"] },
+  { directory: "packages/contracts", name: "@aircastle/contracts", dependencies: [] },
+  { directory: "packages/core", name: "@aircastle/core", dependencies: ["@aircastle/contracts"] },
+  { directory: "apps/api", name: "@aircastle/api", dependencies: ["@aircastle/core"] },
+];
+const boundaryRules = (file: string, source: string) =>
+  inspectCode(file, source, workspaces).map((violation) => violation.rule);
+
+test.each([
+  ["static import", 'import { value } from "../../contracts/src/index.ts";'],
+  ["type import", 'import type { Value } from "../../contracts/src/index.ts";'],
+  ["re-export", 'export * from "../../contracts/src/index.ts";'],
+  ["named re-export", 'export { value } from "../../contracts/src/index.ts";'],
+  ["dynamic import", 'const loaded = import("../../contracts/src/index.ts");'],
+  ["template dynamic import", "const loaded = import(`../../contracts/src/index.ts`);"],
+  ["import type query", 'type Value = import("../../contracts/src/index.ts").Value;'],
+  ["repository escape", 'import { value } from "../../../../outside.ts";'],
+])("rejects relative imports into another workspace: %s", (_name, source) => {
+  expect(boundaryRules("packages/core/src/value.ts", source)).toEqual([
+    "cross-workspace-relative-import",
+  ]);
+});
+
+test("rejects relative imports between the repository root and workspaces", () => {
+  expect(
+    boundaryRules("tests/fixtures/server.ts", 'import { app } from "../../apps/api/src/app.ts";'),
+  ).toEqual(["cross-workspace-relative-import"]);
+  expect(
+    boundaryRules(
+      "apps/api/src/value.ts",
+      'import { setup } from "../../../tests/support/setup.ts";',
+    ),
+  ).toEqual(["cross-workspace-relative-import"]);
+});
+
+test("accepts relative imports that stay inside their workspace", () => {
+  expect(
+    boundaryRules("packages/core/tests/value.test.ts", 'import { value } from "../src/index.ts";'),
+  ).toEqual([]);
+  expect(
+    boundaryRules("apps/api/src/features/content/index.ts", 'import { app } from "../../app.ts";'),
+  ).toEqual([]);
+  expect(
+    boundaryRules("tests/harness/value.test.ts", 'import { check } from "../../scripts/check.ts";'),
+  ).toEqual([]);
+});
+
+test("rejects workspace packages the importing package does not declare", () => {
+  expect(
+    boundaryRules("packages/contracts/src/value.ts", 'import { value } from "@aircastle/core";'),
+  ).toEqual(["undeclared-workspace-import"]);
+  expect(
+    boundaryRules("packages/core/src/value.ts", 'const api = import("@aircastle/api/routes");'),
+  ).toEqual(["undeclared-workspace-import"]);
+});
+
+test("accepts declared workspace packages, the package itself and external packages", () => {
+  expect(
+    boundaryRules(
+      "packages/core/src/value.ts",
+      'import { contract } from "@aircastle/contracts";\nimport { core } from "@aircastle/core";\nimport { hono } from "hono";',
+    ),
+  ).toEqual([]);
+  expect(boundaryRules("tests/value.test.ts", 'import { core } from "@aircastle/core";')).toEqual(
+    [],
+  );
+});
+
+test("reports workspace dependency cycles", () => {
+  expect(workspaceCycles(workspaces)).toEqual([]);
+  expect(
+    workspaceCycles(
+      [
+        ...workspaces,
+        {
+          directory: "packages/adapter",
+          name: "@aircastle/adapter",
+          dependencies: ["@aircastle/core"],
+        },
+      ].map((workspace) =>
+        workspace.name === "@aircastle/core"
+          ? { ...workspace, dependencies: [...workspace.dependencies, "@aircastle/adapter"] }
+          : workspace,
+      ),
+    ),
+  ).toEqual([["@aircastle/core", "@aircastle/adapter", "@aircastle/core"]]);
+});
+
+test("the policy command enforces workspace import boundaries from package manifests", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-boundary-policy-"));
+  const write = (file: string, content: string) => {
+    mkdirSync(join(directory, file, ".."), { recursive: true });
+    writeFileSync(join(directory, file), content);
+  };
+  const run = () =>
+    spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    write("package.json", JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
+    write("packages/one/package.json", JSON.stringify({ name: "@probe/one" }));
+    write("packages/two/package.json", JSON.stringify({ name: "@probe/two" }));
+    write("packages/two/src/index.ts", "export const two = 2;\n");
+    write("packages/one/src/index.ts", 'export { two } from "../../two/src/index.ts";\n');
+    const relative = run();
+    expect(relative.status).not.toBe(0);
+    expect(relative.stderr).toContain(
+      "packages/one/src/index.ts:1:21 cross-workspace-relative-import",
+    );
+
+    write("packages/one/src/index.ts", 'export { two } from "@probe/two";\n');
+    const undeclared = run();
+    expect(undeclared.status).not.toBe(0);
+    expect(undeclared.stderr).toContain(
+      "packages/one/src/index.ts:1:21 undeclared-workspace-import",
+    );
+
+    write(
+      "packages/one/package.json",
+      JSON.stringify({ name: "@probe/one", dependencies: { "@probe/two": "workspace:*" } }),
+    );
+    expect(run().status).toBe(0);
+
+    write(
+      "packages/two/package.json",
+      JSON.stringify({ name: "@probe/two", devDependencies: { "@probe/one": "workspace:*" } }),
+    );
+    const cycle = run();
+    expect(cycle.status).not.toBe(0);
+    expect(cycle.stderr).toContain("workspace-cycle @probe/one -> @probe/two -> @probe/one");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

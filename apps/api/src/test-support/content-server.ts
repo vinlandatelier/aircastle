@@ -1,7 +1,7 @@
 import pino from "pino";
 import { postgresAdapter } from "@aircastle/adapter-postgres";
 import { createAircastle } from "@aircastle/core";
-import { cmsErrorReporter, createApp } from "../../apps/api/src/app.ts";
+import { cmsErrorReporter, createApp } from "../app.ts";
 
 const database = postgresAdapter({
   url: process.env.DATABASE_URL ?? "",

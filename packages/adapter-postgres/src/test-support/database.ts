@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { postgresAdapter } from "@aircastle/adapter-postgres";
+import { postgresAdapter } from "../index.ts";
 import type { ContentStore } from "@aircastle/core";
 
 export const databaseUrl = () => {
