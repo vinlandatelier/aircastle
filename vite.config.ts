@@ -34,11 +34,13 @@ export default defineConfig({
         specifier: "vite-plus/oxlint-plugin",
       },
     ],
+    plugins: ["typescript", "unicorn", "oxc", "import"],
     categories: {
       correctness: "error",
     },
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
+      "import/no-cycle": "error",
       "no-case-declarations": "error",
       "no-empty": "error",
       "no-fallthrough": "error",

@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { applyEdits, record, sha, validateEdits, type Job } from "./index.ts";
+import { record, sha, validateEdits, type Job } from "./index.ts";
+import { applyEdits } from "./materialize.ts";
 import { verificationPlan } from "./checks.ts";
 
 function run(command: string, args: string[], cwd: string, timeout = 300000): void {

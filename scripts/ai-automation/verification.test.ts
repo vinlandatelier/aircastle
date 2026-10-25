@@ -3,7 +3,8 @@ import { mkdtemp, readFile, rm, writeFile, mkdir, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
-import { applyEdits, digest, type Edit, type Job } from "./index.ts";
+import { digest, type Edit, type Job } from "./index.ts";
+import { applyEdits, renderPatch } from "./materialize.ts";
 import { verificationPlan } from "./checks.ts";
 
 const edit: Edit = {
@@ -30,11 +31,11 @@ test("scoped verification runner executes only the selected behavior file", asyn
     );
     await writeFile(
       join(web, "vite.config.ts"),
-      'import { defineConfig } from "vite-plus"; export default defineConfig({ test: { environment: "happy-dom", maxWorkers: 1, include: ["src/**/*.test.tsx"] } });',
+      'import { defineConfig } from "vite-plus"; export default defineConfig({ test: { environment: "node", maxWorkers: 1, include: ["src/**/*.test.tsx"] } });',
     );
     await writeFile(
       join(web, "src/features/navigation/index.test.tsx"),
-      'import { test, expect } from "vite-plus/test"; test("selected", () => expect(document.body).toBeTruthy());',
+      'import { test, expect } from "vite-plus/test"; test("selected", () => expect(1).toBe(1));',
     );
     await writeFile(
       join(web, "src/unrelated.test.tsx"),
@@ -100,7 +101,6 @@ test("the real Node 24 CLI fails honestly when App credentials are absent", asyn
 });
 
 test("downloadable patch applies to the captured source including a missing final newline", async () => {
-  const { renderPatch } = await import("./index.ts");
   const { snapshot } = await import("./fixtures.ts");
   const { spawnSync } = await import("node:child_process");
   const root = await mkdtemp(join(tmpdir(), "aircastle-ai-patch-"));
@@ -129,7 +129,6 @@ test("downloadable patch applies to the captured source including a missing fina
 test.each(["create", "delete"] as const)(
   "downloadable patch supports an empty file %s",
   async (kind) => {
-    const { renderPatch } = await import("./index.ts");
     const { snapshot } = await import("./fixtures.ts");
     const { spawnSync } = await import("node:child_process");
     const root = await mkdtemp(join(tmpdir(), "aircastle-ai-empty-patch-"));

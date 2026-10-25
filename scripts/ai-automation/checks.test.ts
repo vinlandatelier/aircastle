@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import { expect, test, vi } from "vite-plus/test";
 import { verificationPlan } from "./checks.ts";
 import { digest, type Edit, type Job } from "./index.ts";
@@ -7,11 +7,9 @@ import { verify } from "./verify.ts";
 
 const docker = vi.hoisted(() => ({ calls: [] as string[][] }));
 vi.mock("node:child_process", () => ({
-  spawn: (_command: string, args: string[]) => {
+  spawnSync: (_command: string, args: string[]) => {
     docker.calls.push(args);
-    const child = new EventEmitter();
-    queueMicrotask(() => child.emit("close", 0));
-    return child;
+    return { status: 0 };
   },
 }));
 const install = ["bun", "install", "--frozen-lockfile", "--ignore-scripts"];
@@ -137,4 +135,19 @@ test("scoped verification host receipt binds exactly the selected commands", asy
   const receipt = await verify(job, output, "vinlandatelier/aircastle");
   expect(receipt).toMatchObject({ passed: true, commands, recipe: digest(commands) });
   expect(docker.calls.map((args) => args[0])).toEqual(["build", "run", "rm"]);
+});
+test("the verification image takes its toolchain versions from the repository files", async () => {
+  docker.calls.length = 0;
+  const { job, output } = input("apps/web/src/components/shell/app-header.tsx");
+  await verify(job, output, "vinlandatelier/aircastle");
+  const version = (file: string) => readFileSync(file, "utf8").trim();
+  const catalog = JSON.parse(readFileSync("package.json", "utf8")).catalog;
+  expect(docker.calls[0]).toEqual(
+    expect.arrayContaining([
+      `NODE_VERSION=${version(".node-version")}`,
+      `BUN_VERSION=${version(".bun-version")}`,
+      `VITE_PLUS_VERSION=${catalog["vite-plus"]}`,
+    ]),
+  );
+  expect(readFileSync("scripts/ai-automation/Dockerfile", "utf8")).not.toMatch(/\d+\.\d+\.\d+/);
 });

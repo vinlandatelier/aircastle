@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { chmod, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,17 @@ import { digest, validateEdits, type Job, type ModelOutput, type Verification } 
 import { verificationPlan } from "./checks.ts";
 
 export { verificationPlan } from "./checks.ts";
+
+async function toolchainVersions(): Promise<Record<string, string>> {
+  const root = new URL("../../", import.meta.url);
+  const read = async (file: string) => (await readFile(new URL(file, root), "utf8")).trim();
+  const manifest = JSON.parse(await read("package.json"));
+  return {
+    NODE_VERSION: await read(".node-version"),
+    BUN_VERSION: await read(".bun-version"),
+    VITE_PLUS_VERSION: String(manifest.catalog["vite-plus"]),
+  };
+}
 export async function verify(
   job: Job,
   output: ModelOutput,
@@ -37,30 +48,27 @@ export async function verify(
     await chmod(root, 0o755);
     const dockerfile = await readFile(new URL("./Dockerfile", import.meta.url), "utf8");
     if (!dockerfile.includes("@sha256:")) throw new Error("Verification image must be pinned");
-    const run = (args: string[], timeout: number): Promise<number> =>
-      new Promise((resolve, reject) => {
-        const child = spawn("docker", args, {
-          stdio: "inherit",
-          env: { PATH: process.env.PATH, HOME: process.env.HOME },
-        });
-        const timer = setTimeout(() => {
-          child.kill("SIGKILL");
-          resolve(124);
-        }, timeout);
-        child.once("error", (error) => {
-          clearTimeout(timer);
-          reject(error);
-        });
-        child.once("close", (code) => {
-          clearTimeout(timer);
-          resolve(code ?? 1);
-        });
+    const run = (args: string[], timeout: number): number => {
+      const result = spawnSync("docker", args, {
+        stdio: "inherit",
+        env: { PATH: process.env.PATH, HOME: process.env.HOME },
+        timeout,
+        killSignal: "SIGKILL",
       });
-    const image = `aircastle-ai-verifier:${digest(dockerfile).slice(0, 16)}`;
+      if (result.error && "code" in result.error && result.error.code === "ETIMEDOUT") return 124;
+      if (result.error) throw result.error;
+      return result.status ?? 1;
+    };
+    const toolchain = await toolchainVersions();
+    const image = `aircastle-ai-verifier:${digest([dockerfile, toolchain]).slice(0, 16)}`;
     if (
-      (await run(
+      run(
         [
           "build",
+          ...Object.entries(toolchain).flatMap(([name, value]) => [
+            "--build-arg",
+            `${name}=${value}`,
+          ]),
           "--tag",
           image,
           "--file",
@@ -68,11 +76,11 @@ export async function verify(
           new URL(".", import.meta.url).pathname,
         ],
         300000,
-      )) !== 0
+      ) !== 0
     )
       return receipt;
     receipt.passed =
-      (await run(
+      run(
         [
           "run",
           "--name",
@@ -94,8 +102,8 @@ export async function verify(
           image,
         ],
         1200000,
-      )) === 0;
-    await run(["rm", "--force", name], 10000);
+      ) === 0;
+    run(["rm", "--force", name], 10000);
     return receipt;
   } finally {
     await rm(root, { recursive: true, force: true });
