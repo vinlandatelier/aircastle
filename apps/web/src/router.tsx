@@ -6,7 +6,6 @@ import {
   Link,
   redirect,
   type RouterHistory,
-  type ErrorComponentProps,
 } from '@tanstack/react-router'
 import App from './App'
 import { AppShell } from '@/components/shell'
@@ -18,9 +17,6 @@ import { landingDescription, landingTitle } from '@/metadata'
 
 const rootRoute = createRootRoute({
   component: App,
-  errorComponent: ({ error }: ErrorComponentProps): never => {
-    throw error
-  },
   notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [
