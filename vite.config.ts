@@ -59,6 +59,11 @@ export default defineConfig({
       "typescript/no-require-imports": "error",
       "typescript/no-unnecessary-type-constraint": "error",
       "typescript/no-unsafe-function-type": "error",
+      "typescript/only-throw-error": [
+        "error",
+        { allow: [{ from: "package", package: "@tanstack/router-core", name: "Redirect" }] },
+      ],
+      "typescript/switch-exhaustiveness-check": "error",
     },
     ignorePatterns: [
       ".agents/skills/**",
