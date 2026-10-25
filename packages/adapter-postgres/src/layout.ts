@@ -1,6 +1,6 @@
 import type postgres from "postgres";
 
-export const quoteIdentifier = (value: string) => '"' + value.replaceAll('"', '""') + '"';
+const quoteIdentifier = (value: string) => '"' + value.replaceAll('"', '""') + '"';
 export const qualified = (namespace: string, table: string) =>
   `${quoteIdentifier(namespace)}.${quoteIdentifier(table)}`;
 

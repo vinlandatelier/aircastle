@@ -43,6 +43,9 @@ jobs:
       - name: Lint
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: vp run lint
+      - name: Find unused code
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: vp run knip
       - name: Test packages, contracts, CLI, SDK and Postgres
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: vp run test:prepared
