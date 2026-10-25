@@ -13,11 +13,12 @@ import {
   text,
   validateEdits,
   validateReview,
+  workflowOutputs,
   type Job,
   type ModelOutput,
-  type Verification,
 } from "./index.ts";
-import { verificationPlan, verify } from "./verify.ts";
+import { boundVerification } from "./checks.ts";
+import { verify } from "./verify.ts";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -133,17 +134,7 @@ async function main(): Promise<void> {
     const jobs = await api.prepare(config, immediate);
     await mkdir(`${target}/plan`, { recursive: true });
     for (const job of jobs) await output(`${target}/plan/${job.id}.json`, job);
-    const matrix = {
-      include: jobs.map((job) => ({
-        id: job.id,
-        provider: job.selection.provider,
-        task: job.task,
-      })),
-    };
-    await appendFile(
-      required("GITHUB_OUTPUT"),
-      `matrix=${JSON.stringify(matrix)}\nhas_jobs=${jobs.length > 0}\n`,
-    );
+    await appendFile(required("GITHUB_OUTPUT"), workflowOutputs(jobs));
     console.log(`Prepared ${jobs.length} authorized independent operations.`);
     return;
   }
@@ -233,18 +224,14 @@ async function main(): Promise<void> {
     throw new Error("Model result input binding mismatch");
   if (job.task === "review") console.log(await api.publishReview(original, model.result, claim));
   else {
-    const receipt = record(
-      await json(`${target}/verification/${id}.json`),
-    ) as unknown as Verification;
-    const commands = verificationPlan(validateEdits(model.result, original.snapshot).edits);
-    if (
-      required("AI_VERIFICATION_JOB_RESULT") !== "success" ||
-      receipt.recipe !== digest(commands) ||
-      digest(receipt.commands) !== digest(commands) ||
-      (commands === null && receipt.passed !== false)
-    ) {
+    const receipt = boundVerification(
+      original,
+      validateEdits(model.result, original.snapshot).edits,
+      await json(`${target}/verification/${id}.json`).catch(() => null),
+    );
+    if (!receipt) {
       await api.finish(claim, "failed");
-      throw new Error("Verification supervisor job did not succeed");
+      throw new Error("Verification receipt missing, failed, or bound to another operation");
     }
     console.log(await api.publishFix(original, model.result, receipt, claim));
   }

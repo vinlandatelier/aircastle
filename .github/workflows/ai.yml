@@ -11,7 +11,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
-    if: github.ref == 'refs/heads/main' && github.repository_owner == 'vinlandatelier'
+    if: >-
+      github.ref == 'refs/heads/main' && github.repository_owner == 'vinlandatelier' &&
+      (github.event_name != 'issue_comment' || (github.event.issue.pull_request &&
+      (contains(github.event.comment.body, '@codex') || contains(github.event.comment.body, '@claude')) &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: ai-automation
@@ -20,6 +24,8 @@ jobs:
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has_jobs: ${{ steps.plan.outputs.has_jobs }}
+      verify_matrix: ${{ steps.plan.outputs.verify_matrix }}
+      has_fixes: ${{ steps.plan.outputs.has_fixes }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -96,10 +102,10 @@ jobs:
           retention-days: 14
   verify:
     needs: [prepare, model]
-    if: always() && needs.prepare.outputs.has_jobs == 'true'
+    if: always() && needs.prepare.outputs.has_fixes == 'true'
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.prepare.outputs.verify_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -118,7 +124,6 @@ jobs:
           name: ai-plan
           path: ai-data/plan
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        if: matrix.task == 'fix'
         with:
           name: ai-model-${{ matrix.id }}
           path: ai-data/model
@@ -188,4 +193,3 @@ jobs:
           AI_STATE_ISSUE: ${{ vars.AI_STATE_ISSUE }}
           AI_ACTIVATED_AT: ${{ vars.AI_ACTIVATED_AT }}
           AI_CONTROL_SHA: ${{ github.sha }}
-          AI_VERIFICATION_JOB_RESULT: ${{ needs.verify.result }}

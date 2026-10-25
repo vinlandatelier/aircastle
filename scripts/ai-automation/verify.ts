@@ -6,8 +6,6 @@ import { digest, validateEdits, type Job, type ModelOutput, type Verification } 
 
 import { verificationPlan } from "./checks.ts";
 
-export { verificationPlan } from "./checks.ts";
-
 async function toolchainVersions(): Promise<Record<string, string>> {
   const root = new URL("../../", import.meta.url);
   const read = async (file: string) => (await readFile(new URL(file, root), "utf8")).trim();

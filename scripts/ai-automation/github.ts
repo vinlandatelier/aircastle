@@ -24,7 +24,7 @@ import {
   type Verification,
 } from "./index.ts";
 import type { ModelConfig, Role } from "../ai-models/index.ts";
-import { verificationPlan } from "./checks.ts";
+import { boundVerification, verificationPlan } from "./checks.ts";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type StoredReceipt = { commentId: number; receipt: Receipt };
@@ -173,7 +173,12 @@ export class Coordinator {
         prior.receipt.attempt >= 2 ||
         Date.now() - Date.parse(prior.receipt.at) < 30 * 60_000 ||
         prior.receipt.job.snapshot.head !== job.snapshot.head ||
-        prior.receipt.digest !== digest(job))
+        prior.receipt.digest !==
+          digest({
+            ...job,
+            control: prior.receipt.job.control,
+            selection: prior.receipt.job.selection,
+          }))
     )
       return null;
     const { files: _files, ...snapshot } = job.snapshot;
@@ -412,11 +417,22 @@ export class Coordinator {
         .map(record)
         .filter((r) => r.id === root || r.in_reply_to_id === root || r.id === c.id);
       if (!relevant.some((r) => r.id === root)) throw new Error("Inline root context unavailable");
+      const trusted = new Map<string, boolean>();
+      for (const r of relevant) {
+        const user = identity(r.user);
+        if (!trusted.has(user.login))
+          trusted.set(
+            user.login,
+            user.id === this.options.botId || (await this.membership(user.login)) === "member",
+          );
+      }
       thread = JSON.stringify(
         relevant.map((r) => ({
           id: r.id,
           author: identity(r.user).login,
-          body: r.body,
+          body: trusted.get(identity(r.user).login)
+            ? r.body
+            : "[omitted: not written by an organization member]",
           path: r.path,
           diff_hunk: r.diff_hunk,
           commit_id: r.commit_id,
@@ -621,7 +637,12 @@ export class Coordinator {
           )
             continue;
           const snapshot = await this.snapshot(number, original.snapshot);
-          const job = { ...original, snapshot };
+          const job: Job = {
+            ...original,
+            snapshot,
+            control: this.options.control,
+            selection: config.roles[original.role],
+          };
           if (await this.claim(job, existing)) jobs.push(job);
         }
       } catch (error) {
@@ -650,14 +671,7 @@ export class Coordinator {
   ): Promise<string> {
     const fix: Fix = validateEdits(raw, job.snapshot);
     const commands = verificationPlan(fix.edits);
-    if (
-      verification.id !== job.id ||
-      verification.digest !== digest(job) ||
-      verification.editsDigest !== digest(fix.edits) ||
-      verification.recipe !== digest(commands) ||
-      digest(verification.commands) !== digest(commands) ||
-      verification.passed !== (commands !== null)
-    ) {
+    if (!boundVerification(job, fix.edits, verification)) {
       await this.finish(claim, "failed");
       return "verification_failed";
     }
