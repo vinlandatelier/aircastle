@@ -3,12 +3,45 @@ import { expect, test } from "vite-plus/test";
 import type {
   CollectionDescription,
   ContentDocument,
+  Permission,
   PublishedCollection,
   Result,
 } from "@aircastle/contracts";
-import { postgresAdapter } from "@aircastle/adapter-postgres";
-import { createService, type Access, type ContentService, type ContentStore } from "./index.ts";
-import { articles, failOnReport, permissions, successful } from "./test-support/fixtures.ts";
+import {
+  createService,
+  type Access,
+  type ContentService,
+  type ContentStore,
+  type ErrorSummary,
+} from "@aircastle/core";
+import { postgresAdapter } from "./index.ts";
+
+const permissions: readonly Permission[] = ["content:read", "content:write", "schema:publish"];
+const articles: CollectionDescription = {
+  fields: {
+    title: { type: "text", required: true, nullable: false, unique: false, min: 1 },
+    slug: { type: "text", required: true, nullable: false, unique: true },
+    summary: { type: "text", required: false, nullable: true, unique: false },
+    status: {
+      type: "text",
+      required: false,
+      nullable: false,
+      unique: false,
+      choices: ["draft", "published"],
+      default: "draft",
+    },
+  },
+};
+
+function successful<Value>(result: Result<Value>): Value {
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error(`Expected success, received ${result.error.code}`);
+  return result.data;
+}
+
+const failOnReport = (summary: ErrorSummary) => {
+  throw summary;
+};
 
 interface Fixture {
   access: Access;

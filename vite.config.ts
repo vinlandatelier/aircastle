@@ -105,6 +105,40 @@ export default defineConfig({
           browser: true,
         },
       },
+      {
+        files: [
+          "apps/web/src/**",
+          "packages/contracts/src/**",
+          "packages/schema/src/**",
+          "packages/client/src/**",
+        ],
+        excludeFiles: ["**/*.test.{ts,tsx}", "**/test-support/**"],
+        plugins: ["import"],
+        rules: {
+          "import/no-nodejs-modules": "error",
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                {
+                  regex: "^(bun|postgres|pino)(:|/|$)",
+                  message: "Browser-safe code cannot import server runtimes or drivers.",
+                },
+                {
+                  group: [
+                    "@aircastle/**",
+                    "!@aircastle/contracts",
+                    "!@aircastle/schema",
+                    "!@aircastle/client",
+                  ],
+                  message:
+                    "Browser-safe code can import only the entry points of @aircastle/contracts, schema and client.",
+                },
+              ],
+            },
+          ],
+        },
+      },
     ],
   },
 });

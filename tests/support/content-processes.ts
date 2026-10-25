@@ -52,7 +52,7 @@ export async function standaloneServer(namespace: string) {
   });
   const child = execFile(
     "bun",
-    ["--conditions=development", "tests/fixtures/content-server.ts"],
+    ["--conditions=development", "apps/api/src/test-support/content-server.ts"],
     {
       cwd: repository,
       env: { ...process.env, AIRCASTLE_DATABASE_NAMESPACE: namespace },

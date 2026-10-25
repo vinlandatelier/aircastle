@@ -11,12 +11,14 @@
   },
   "workspaces": {
     ".": {
-      "entry": ["tests/fixtures/content-server.ts"],
       "vitest": {
         "config": ["vite.content.config.ts", "vite.db.config.ts"]
       },
       "ignoreDependencies": ["vite"],
       "ignoreExportsUsedInFile": true
+    },
+    "apps/api": {
+      "entry": ["src/{index,cli}.ts", "src/test-support/content-server.ts"]
     },
     "packages/client": {
       "entry": ["tests/types/**/*.ts"],

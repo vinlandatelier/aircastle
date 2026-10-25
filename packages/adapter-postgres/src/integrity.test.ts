@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "vite-plus/test";
 import type { Permission, PublishedCollection } from "@aircastle/contracts";
 import { postgresAdapter } from "./index.ts";
-import { withDatabase } from "../../../tests/support/content-database.ts";
+import { withDatabase } from "./test-support/database.ts";
 import {
   createForeignSentinel,
   insertDocumentRow,

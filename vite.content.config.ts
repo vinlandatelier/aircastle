@@ -15,7 +15,6 @@ export default defineConfig({
             "apps/api/src/features/content/**/*.test.ts",
             "apps/api/src/runtime.test.ts",
           ],
-          exclude: ["**/*.integration.test.ts"],
           environment: "node",
           maxWorkers: 2,
         },
@@ -25,7 +24,6 @@ export default defineConfig({
           name: "database",
           include: [
             "packages/adapter-postgres/src/**/*.test.ts",
-            "packages/core/src/**/*.integration.test.ts",
             "tests/content-workflow.test.ts",
             "scripts/dev-setup.test.ts",
           ],

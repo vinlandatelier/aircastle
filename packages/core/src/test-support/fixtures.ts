@@ -15,11 +15,6 @@ export const documentId = "33333333-3333-4333-8333-333333333333";
 export const otherProject = "44444444-4444-4444-8444-444444444444";
 export const contract = `v1:${"1".repeat(64)}`;
 export const access: Access = { project, apiKey: "ac_test_secret_never_store_raw" };
-export const permissions: readonly Permission[] = [
-  "content:read",
-  "content:write",
-  "schema:publish",
-];
 
 export const articles: CollectionDescription = {
   fields: {
