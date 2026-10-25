@@ -405,6 +405,7 @@ test('long-text multiword: trigger containment preserves all header controls', a
   await expect(trigger).toHaveAccessibleName(
     new RegExp(`^Switch project: Acme Inc / ${multiwordName.trimEnd()}$`),
   )
+  await expect(page.locator('[data-slot="popover-content"]')).toHaveCount(0)
   await assertLayout(page)
 })
 
