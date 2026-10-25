@@ -4,7 +4,8 @@ const project = "11111111-1111-4111-8111-111111111111";
 const id = "33333333-3333-4333-8333-333333333333";
 
 async function scenario(nativeReference: boolean) {
-  let writes = 0;
+  let answered = false;
+  let attempts = 0;
   const buffers = new Map<object, string>();
   const body = JSON.stringify({ ok: true, data: { id, title: "Hello" } });
   const listener = Bun.listen({
@@ -20,13 +21,14 @@ async function scenario(nativeReference: boolean) {
         const length = Number(headers.match(/content-length:\s*(\d+)/i)?.[1] ?? 0);
         if (buffer.length < boundary + 4 + length) return;
         buffers.set(socket, buffer.slice(boundary + 4 + length));
-        if (headers.startsWith("GET ")) {
+        if (answered) {
+          attempts += 1;
+          socket.end();
+        } else {
+          answered = true;
           socket.write(
             `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\nConnection: keep-alive\r\n\r\n${body}`,
           );
-        } else if (headers.startsWith("POST ")) {
-          writes += 1;
-          socket.end();
         }
       },
       close(socket) {
@@ -42,11 +44,11 @@ async function scenario(nativeReference: boolean) {
       await read.json();
       let failed = false;
       try {
-        await fetch(`${url}/write`, { method: "POST", body: JSON.stringify({ title: "Hello" }) });
+        await fetch(`${url}/retry`);
       } catch {
         failed = true;
       }
-      return { writes, failed };
+      return { attempts, failed };
     }
     const client = createClient({
       url,
@@ -57,7 +59,7 @@ async function scenario(nativeReference: boolean) {
     const read = await client.articles.findById(id);
     if (!read.ok) throw new Error("Warmup read failed: " + JSON.stringify(read));
     const result = await client.articles.create({ title: "Hello" });
-    return { writes, result };
+    return { attempts, result };
   } finally {
     listener.stop(true);
   }
