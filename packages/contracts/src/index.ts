@@ -319,6 +319,13 @@ export function compatibleForCreate(
   });
 }
 
+/** Names of the fields whose string values must be unique within the collection. */
+export function uniqueFields(description: CollectionDescription): string[] {
+  return Object.entries(description.fields)
+    .filter(([, field]) => field.unique)
+    .map(([name]) => name);
+}
+
 export function validateStored(description: CollectionDescription, data: unknown): boolean {
   if (!record(data)) return false;
   const result = compileDescription(description).validate(data);

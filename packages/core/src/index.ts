@@ -6,6 +6,7 @@ import {
   parseCollections,
   projectDocument,
   sameSchema,
+  uniqueFields,
   validateStored,
 } from "@aircastle/contracts";
 import type {
@@ -40,6 +41,17 @@ export interface ProvisionedProject {
   project: string;
   issued: boolean;
 }
+/**
+ * Thrown by a {@link ContentStore} when storage is temporarily unreachable and the operation can be
+ * retried. Core turns it into an `unavailable` result instead of an `internal_error`.
+ */
+export class StorageUnavailable extends Error {
+  constructor(options?: ErrorOptions) {
+    super("Storage is temporarily unavailable", options);
+    this.name = "StorageUnavailable";
+  }
+}
+/** Persistence for projects and content. Throws {@link StorageUnavailable} for retryable outages. */
 export interface ContentStore {
   initialize(): Promise<void>;
   provision(options: {
@@ -113,13 +125,7 @@ async function attempt<Value>(
     return await operation();
   } catch (error) {
     if (error instanceof RejectedOperation) return { ok: false, error: error.failure };
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "unavailable"
-    )
-      return failure("unavailable");
+    if (error instanceof StorageUnavailable) return failure("unavailable");
     report(ErrorSummary.of(error));
     return failure("internal_error");
   }
@@ -189,11 +195,7 @@ export function createService(store: ContentStore, report: ReportError): Content
             )
               return failure("migration_required");
             const documents = await transaction.documents(collection.name);
-            const unique = new Map(
-              Object.entries(next.fields)
-                .filter(([, field]) => field.unique)
-                .map(([name]) => [name, new Set<string>()]),
-            );
+            const unique = new Map(uniqueFields(next).map((name) => [name, new Set<string>()]));
             for (const document of documents) {
               if (!validateStored(next, storedData(document))) return failure("migration_required");
               for (const [field, values] of unique) {
@@ -228,10 +230,11 @@ export function createService(store: ContentStore, report: ReportError): Content
             id: randomUUID(),
           });
           if (!projected.ok) return projected;
-          const uniqueFields = Object.entries(collection.description.fields)
-            .filter(([, field]) => field.unique)
-            .map(([name]) => name);
-          const inserted = await transaction.insert(collectionName, validated.data, uniqueFields);
+          const inserted = await transaction.insert(
+            collectionName,
+            validated.data,
+            uniqueFields(collection.description),
+          );
           if (!inserted.ok) return inserted;
           const result = projectDocument(client, collection.description, inserted.data);
           if (!result.ok) throw new RejectedOperation(result.error);

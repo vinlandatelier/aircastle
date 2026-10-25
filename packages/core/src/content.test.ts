@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { createService, type ErrorSummary } from "./index.ts";
+import { createService, StorageUnavailable, type ErrorSummary } from "./index.ts";
 import {
   access,
   articles,
@@ -248,10 +248,10 @@ test("unexpected storage failures are reported without exposing internal details
   expect(reported[0]?.stack).not.toContain("never-expose");
 });
 
-test("unavailable storage is an expected failure and is not reported", async () => {
+test("a store that throws StorageUnavailable yields an unreported unavailable result", async () => {
   const { store } = controlledStore({
     beforeTransaction: async () => {
-      throw Object.assign(new Error("connection refused"), { code: "unavailable" });
+      throw new StorageUnavailable();
     },
   });
   const reported: unknown[] = [];

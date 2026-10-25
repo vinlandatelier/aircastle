@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import postgres from "postgres";
+import { StorageUnavailable } from "@aircastle/core";
 import type { ContentStore, ProjectTransaction } from "@aircastle/core";
 import { identifier } from "./identifier.ts";
 import { initializeLayout } from "./layout.ts";
@@ -54,9 +55,7 @@ async function databaseOperation<Value>(operation: () => Promise<Value>): Promis
           "ETIMEDOUT",
         ].includes(code)
       ) {
-        throw Object.assign(new Error("Storage is temporarily unavailable"), {
-          code: "unavailable",
-        });
+        throw new StorageUnavailable({ cause: error });
       }
     }
     throw error;
