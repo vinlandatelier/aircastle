@@ -53,7 +53,13 @@ test(
       await store.initialize();
       server = await standaloneServer(namespace);
       const provisioned = await provisionDevelopment(store);
-      expect(provisioned.apiKey).toEqual(expect.any(String));
+      expect(provisioned).toEqual({
+        workspace: expect.any(String),
+        project: expect.any(String),
+        issued: true,
+        apiKey: expect.any(String),
+      });
+      if (!provisioned.issued) throw new Error("Expected a new API key");
       const key = provisioned.apiKey;
       const env = {
         AIRCASTLE_URL: server.url,
@@ -105,8 +111,11 @@ test(
       const restarted = createClient({ ...config, url: server.url, apiKey: key });
       expect(await restarted.articles.findById(saved.id)).toEqual({ ok: true, data: saved });
       const rerun = await provisionDevelopment(store);
-      expect(rerun.project).toBe(provisioned.project);
-      expect(rerun.apiKey).toBeUndefined();
+      expect(rerun).toEqual({
+        workspace: provisioned.workspace,
+        project: provisioned.project,
+        issued: false,
+      });
       expect(await restarted.articles.findById(saved.id)).toEqual({ ok: true, data: saved });
     } finally {
       try {
@@ -131,6 +140,7 @@ test(
     try {
       await store.initialize();
       const provisioned = await provisionDevelopment(store);
+      if (!provisioned.issued) throw new Error("Expected a new API key");
       const server = await standaloneServer(namespace, { AIRCASTLE_MAX_REQUEST_BYTES: "128" });
       try {
         const endpoint = `${server.url}/api/projects/${provisioned.project}/schema`;

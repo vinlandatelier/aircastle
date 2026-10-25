@@ -78,9 +78,8 @@ export function postgresAdapter(options: PostgresOptions): ContentStore {
     provision: (request) =>
       databaseOperation(() =>
         sql.begin(async (transaction) => {
-          const workspaceName = request.workspaceName ?? "Development workspace";
-          const projectName = request.projectName ?? "Development project";
-          await transaction`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([namespace, "development"])}, 0))`;
+          const { workspaceName, projectName } = request;
+          await transaction`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([namespace, "provision"])}, 0))`;
           const workspaceKey = hash(workspaceName);
           await transaction`INSERT INTO ${table("workspaces")} (id, name) VALUES (${randomUUID()}, ${workspaceName}) ON CONFLICT (name_key) DO NOTHING`;
           const workspaces = await transaction<
@@ -101,7 +100,7 @@ export function postgresAdapter(options: PostgresOptions): ContentStore {
             { verifier: string }[]
           >`SELECT verifier FROM ${table("keys")} WHERE project_id = ${project.id} LIMIT 1`;
           let issued = false;
-          if (request.newKey || existing.length === 0) {
+          if (request.key === "issue" || existing.length === 0) {
             await transaction`INSERT INTO ${table("keys")} (verifier, project_id, permissions) VALUES (${request.verifier}, ${project.id}, ${transaction.json([...request.permissions])}::jsonb)`;
             issued = true;
           }

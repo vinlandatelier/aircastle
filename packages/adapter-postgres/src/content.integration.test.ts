@@ -63,7 +63,7 @@ async function withCms(operation: (fixture: Fixture) => Promise<void>) {
       const provisioned = await store.provision({
         verifier: createHash("sha256").update(apiKey).digest("hex"),
         permissions,
-        newKey: false,
+        key: "reuse",
         workspaceName: "Integration workspace",
         projectName,
       });

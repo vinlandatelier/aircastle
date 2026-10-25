@@ -3,6 +3,12 @@ import postgres from "postgres";
 import { postgresAdapter } from "../index.ts";
 import type { ContentStore } from "@aircastle/core";
 
+/** The workspace and project names that development provisioning uses. */
+export const development = {
+  workspaceName: "Development workspace",
+  projectName: "Development project",
+};
+
 export const databaseUrl = () => {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("Run these tests through vp run db:test");
