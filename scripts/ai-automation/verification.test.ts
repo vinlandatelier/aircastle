@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { mkdtemp, readFile, rm, writeFile, mkdir, symlink } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile, mkdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
@@ -19,7 +19,14 @@ test("scoped verification runner executes only the selected behavior file", asyn
   try {
     const web = join(root, "apps/web");
     await mkdir(join(web, "src/features/navigation"), { recursive: true });
-    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"));
+    await mkdir(join(root, "node_modules"));
+    for (const entry of await readdir(join(process.cwd(), "node_modules"))) {
+      if (!entry.startsWith("."))
+        await symlink(
+          join(process.cwd(), "node_modules", entry),
+          join(root, "node_modules", entry),
+        );
+    }
     await symlink(join(process.cwd(), "apps/web/node_modules"), join(web, "node_modules"));
     await writeFile(
       join(root, "package.json"),
