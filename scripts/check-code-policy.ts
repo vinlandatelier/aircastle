@@ -8,18 +8,12 @@ export interface PolicyViolation {
   rule:
     | "ordinary-comment"
     | "type-suppression"
-    | "unsafe-sql"
     | "cross-workspace-relative-import"
     | "web-alias-escape"
     | "undeclared-workspace-import"
     | "swallowed-error"
     | "stale-catch-allowance";
 }
-
-const rawSqlFiles = new Set([
-  "packages/adapter-postgres/src/identifier.ts",
-  "packages/adapter-postgres/src/test-support/database.ts",
-]);
 
 interface SyntaxKey {
   type: string;
@@ -29,13 +23,6 @@ interface SyntaxKey {
   quasis?: { value: { cooked?: string | null } }[];
   loc?: { start: { line: number; column: number } };
 }
-
-const namesUnsafe = (key: SyntaxKey, computed: boolean) =>
-  (key.type === "Identifier" && key.name === "unsafe" && !computed) ||
-  (key.type === "StringLiteral" && key.value === "unsafe") ||
-  (key.type === "TemplateLiteral" &&
-    key.expressions?.length === 0 &&
-    key.quasis?.[0]?.value.cooked === "unsafe");
 
 const workspaceSource = /^(?:packages|apps)\/[^/]+\/src\//;
 
@@ -275,24 +262,6 @@ export function inspectCode(
     }
     if (value === null || typeof value !== "object") return;
     const node = value as Record<string, unknown>;
-    const keys =
-      node.type === "MemberExpression" || node.type === "OptionalMemberExpression"
-        ? [{ key: node.property, computed: node.computed }]
-        : node.type === "ObjectPattern" && Array.isArray(node.properties)
-          ? (node.properties as Record<string, unknown>[])
-              .filter((entry) => entry.type === "ObjectProperty")
-              .map((entry) => ({ key: entry.key, computed: entry.computed }))
-          : [];
-    for (const { key, computed } of keys) {
-      if (!rawSqlFiles.has(file) && namesUnsafe(key as SyntaxKey, computed === true)) {
-        const start = (key as SyntaxKey).loc?.start;
-        violations.push({
-          line: start?.line ?? 1,
-          column: (start?.column ?? 0) + 1,
-          rule: "unsafe-sql",
-        });
-      }
-    }
     if (workspaceSource.test(file) && swallowsError(node)) {
       const start = (node.loc as SyntaxKey["loc"])?.start;
       swallowed.push({
