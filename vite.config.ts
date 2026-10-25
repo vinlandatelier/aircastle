@@ -141,7 +141,6 @@ export default defineConfig({
             rawSql,
             ...processRunnerProperties,
             ...["skip", "fixme"].map((property) => ({
-              object: "test",
               property,
               message: "A skipped journey passes without running. Fix or delete it.",
             })),
