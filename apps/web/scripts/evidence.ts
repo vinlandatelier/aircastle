@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import type { JSONReport, JSONReportSuite } from '@playwright/test/reporter'
 
-function record(value: unknown): Record<string, unknown> {
+function requireObject(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value))
     throw new Error('Invalid runner report')
   return value as Record<string, unknown>
@@ -14,8 +14,8 @@ export function browserOutcome(value: unknown): {
   retries: number
   status: 'passed' | 'failed'
 } {
-  const report = record(value)
-  const stats = record(report.stats)
+  const report = requireObject(value)
+  const stats = requireObject(report.stats)
   const counts = ['expected', 'unexpected', 'skipped', 'flaky'].map((key) => stats[key])
   if (
     !counts.every((count) => typeof count === 'number' && Number.isSafeInteger(count) && count >= 0)
@@ -24,7 +24,7 @@ export function browserOutcome(value: unknown): {
   if (report.errors !== undefined && !Array.isArray(report.errors))
     throw new Error('Invalid runner errors')
   if (Array.isArray(report.errors) && report.errors.length) {
-    const error = record(report.errors[0])
+    const error = requireObject(report.errors[0])
     const message =
       typeof error.message === 'string'
         ? error.message
@@ -59,7 +59,7 @@ export type BrowserCase = {
 }
 
 export function browserCases(value: unknown): BrowserCase[] {
-  const object = record(value)
+  const object = requireObject(value)
   if (!Array.isArray(object.suites)) throw new Error('Invalid browser suites')
   const report = object as unknown as JSONReport
   const cases: BrowserCase[] = []
@@ -71,7 +71,7 @@ export function browserCases(value: unknown): BrowserCase[] {
           const last = test.results.at(-1)
           const attachment = last?.attachments.find((item) => item.name === 'browser-environment')
           const environment = attachment?.body
-            ? record(JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8')))
+            ? requireObject(JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8')))
             : {}
           const viewport = environment.viewport as BrowserCase['viewport'] | undefined
           cases.push({

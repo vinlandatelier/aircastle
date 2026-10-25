@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { anthropicSchema, checkSchema, matches, record } from "./schema.ts";
+import { anthropicSchema, checkSchema, matches, isJsonObject } from "./schema.ts";
 
 export type Role = "codexReviewer" | "codexImplementer" | "claudeReviewer" | "claudeImplementer";
 export type Provider = "openai" | "anthropic";
@@ -46,7 +46,7 @@ function retryDelay(response: Response, attempt: number): number | null {
 
 function selection(value: unknown): ModelSelection {
   if (
-    !record(value) ||
+    !isJsonObject(value) ||
     Object.keys(value).sort().join() !== "effort,model,provider" ||
     (value.provider !== "openai" && value.provider !== "anthropic") ||
     typeof value.model !== "string" ||
@@ -59,10 +59,10 @@ function selection(value: unknown): ModelSelection {
 
 export function parseModelConfig(value: unknown): ModelConfig {
   if (
-    !record(value) ||
+    !isJsonObject(value) ||
     Object.keys(value).sort().join() !== "roles,version" ||
     value.version !== 1 ||
-    !record(value.roles) ||
+    !isJsonObject(value.roles) ||
     Object.keys(value.roles).sort().join() !== [...roles].sort().join()
   )
     throw new Error("invalid_model_config");
@@ -104,7 +104,7 @@ async function* serverEvents(
         } catch (error) {
           throw new Error("provider_invalid_json", { cause: error });
         }
-        if (!record(event)) throw new Error("provider_invalid_response");
+        if (!isJsonObject(event)) throw new Error("provider_invalid_response");
         yield event;
       }
     }
@@ -119,7 +119,7 @@ async function openaiResponse(body: ReadableStream<Uint8Array>): Promise<Record<
     if (
       ["response.completed", "response.incomplete", "response.failed"].includes(String(event.type))
     ) {
-      if (!record(event.response)) throw new Error("provider_invalid_response");
+      if (!isJsonObject(event.response)) throw new Error("provider_invalid_response");
       return event.response;
     }
   }
@@ -134,25 +134,25 @@ async function anthropicMessage(
   for await (const event of serverEvents(body)) {
     if (event.type === "error") throw new Error("provider_failed");
     if (event.type === "message_start") {
-      if (!record(event.message)) throw new Error("provider_invalid_response");
+      if (!isJsonObject(event.message)) throw new Error("provider_invalid_response");
       message = { ...event.message };
     } else if (event.type === "content_block_start") {
-      if (!Number.isSafeInteger(event.index) || !record(event.content_block))
+      if (!Number.isSafeInteger(event.index) || !isJsonObject(event.content_block))
         throw new Error("provider_invalid_response");
       content[Number(event.index)] = { ...event.content_block };
     } else if (event.type === "content_block_delta") {
       const block = content[Number(event.index)];
       const delta = event.delta;
-      if (!block || !record(delta)) throw new Error("provider_invalid_response");
+      if (!block || !isJsonObject(delta)) throw new Error("provider_invalid_response");
       if (delta.type === "text_delta" && typeof delta.text === "string")
         block.text = `${typeof block.text === "string" ? block.text : ""}${delta.text}`;
       if (delta.type === "thinking_delta" && typeof delta.thinking === "string")
         block.thinking = `${typeof block.thinking === "string" ? block.thinking : ""}${delta.thinking}`;
     } else if (event.type === "message_delta") {
-      if (!message || !record(event.delta)) throw new Error("provider_invalid_response");
+      if (!message || !isJsonObject(event.delta)) throw new Error("provider_invalid_response");
       Object.assign(message, event.delta);
-      if (record(event.usage))
-        message.usage = { ...(record(message.usage) ? message.usage : {}), ...event.usage };
+      if (isJsonObject(event.usage))
+        message.usage = { ...(isJsonObject(message.usage) ? message.usage : {}), ...event.usage };
     } else if (event.type === "message_stop") {
       if (!message) throw new Error("provider_invalid_response");
       return { ...message, content: Array.from(content) };
@@ -243,20 +243,20 @@ export async function runModel(
     if (data.status === "failed") throw new Error("provider_failed");
     if (data.status !== "completed") throw new Error("provider_incomplete");
     const output = Array.isArray(data.output) ? data.output : [];
-    const messages = output.filter((item) => record(item) && item.type === "message");
+    const messages = output.filter((item) => isJsonObject(item) && item.type === "message");
     if (
       output.some(
-        (item) => !record(item) || !["message", "reasoning"].includes(String(item.type)),
+        (item) => !isJsonObject(item) || !["message", "reasoning"].includes(String(item.type)),
       ) ||
       messages.length !== 1
     )
       throw new Error("provider_invalid_response");
     const content: unknown[] = Array.isArray(messages[0].content) ? messages[0].content : [];
-    if (content.some((item) => record(item) && item.type === "refusal"))
+    if (content.some((item) => isJsonObject(item) && item.type === "refusal"))
       throw new Error("provider_refused");
     if (
       content.length !== 1 ||
-      !record(content[0]) ||
+      !isJsonObject(content[0]) ||
       content[0].type !== "output_text" ||
       typeof content[0].text !== "string"
     )
@@ -269,12 +269,13 @@ export async function runModel(
     if (
       content.some(
         (item) =>
-          !record(item) || !["text", "thinking", "redacted_thinking"].includes(String(item.type)),
+          !isJsonObject(item) ||
+          !["text", "thinking", "redacted_thinking"].includes(String(item.type)),
       )
     )
       throw new Error("provider_invalid_response");
     const texts = content.filter(
-      (item): item is Record<string, unknown> => record(item) && item.type === "text",
+      (item): item is Record<string, unknown> => isJsonObject(item) && item.type === "text",
     );
     if (texts.length !== 1 || typeof texts[0]?.text !== "string")
       throw new Error("provider_invalid_response");
@@ -295,7 +296,7 @@ export async function runModel(
     effort: "sent_and_accepted",
     maxOutputTokens: outputTokenCaps[chosen.effort],
     durationMs: Date.now() - started,
-    usage: record(data.usage)
+    usage: isJsonObject(data.usage)
       ? Object.fromEntries(
           Object.entries(data.usage).filter(
             (entry) => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0,

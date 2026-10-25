@@ -110,7 +110,7 @@ export type Verification = {
 export function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
-export function record(value: unknown): Record<string, unknown> {
+export function requireObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Expected object");
   return value as Record<string, unknown>;
@@ -232,13 +232,13 @@ export async function authorize(
   };
 }
 export function validateReview(value: unknown, snapshot: Snapshot): Review {
-  const result = record(value);
+  const result = requireObject(value);
   const summary = text(result.summary);
   if (JSON.stringify(value).length > 40000) throw new Error("Review exceeds publication bound");
   if (!Array.isArray(result.findings) || result.findings.length > 30)
     throw new Error("Invalid findings");
   const findings = result.findings.map((raw): Finding => {
-    const f = record(raw);
+    const f = requireObject(raw);
     const severity = text(f.severity);
     if (!["critical", "high", "medium", "low", "advisory"].includes(severity))
       throw new Error("Invalid severity");
@@ -271,13 +271,13 @@ export function validateReview(value: unknown, snapshot: Snapshot): Review {
   return { summary, findings };
 }
 export function validateEdits(value: unknown, snapshot: Snapshot): Fix {
-  const result = record(value);
+  const result = requireObject(value);
   if (!Array.isArray(result.edits) || result.edits.length < 1 || result.edits.length > 12)
     throw new Error("Invalid edits");
   const paths = new Set<string>();
   let bytes = 0;
   const edits = result.edits.map((raw): Edit => {
-    const edit = record(raw),
+    const edit = requireObject(raw),
       path = safePath(edit.path);
     const file = snapshot.files.find((candidate) => candidate.path === path);
     if (
