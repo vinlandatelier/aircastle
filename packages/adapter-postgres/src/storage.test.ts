@@ -2,7 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "vite-plus/test";
 import postgres from "postgres";
 import { postgresAdapter } from "./index.ts";
-import { databaseUrl, withDatabase } from "../../../tests/support/content-database.ts";
+import {
+  databaseUrl,
+  literalIdentifier,
+  withDatabase,
+} from "../../../tests/support/content-database.ts";
 import type { Permission, PublishedCollection } from "@aircastle/contracts";
 
 const permissions: readonly Permission[] = ["content:read", "content:write", "schema:publish"];
@@ -387,8 +391,7 @@ test("database fixture creates and cleans one literal dotted namespace independe
   try {
     await withDatabase(
       async ({ sql }) => {
-        const identifier = '"' + namespace.replaceAll('"', '""') + '"';
-        await sql.unsafe(`CREATE SCHEMA ${identifier}`);
+        await sql`CREATE SCHEMA ${literalIdentifier(sql, namespace)}`;
         const rows = await sql<
           { exists: boolean }[]
         >`SELECT EXISTS (SELECT FROM pg_namespace WHERE nspname = ${namespace}) AS exists`;

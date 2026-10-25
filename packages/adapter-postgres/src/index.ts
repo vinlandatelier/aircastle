@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import postgres from "postgres";
 import type { ContentStore, ProjectTransaction } from "@aircastle/core";
-import { initializeLayout, qualified } from "./layout.ts";
+import { identifier } from "./identifier.ts";
+import { initializeLayout } from "./layout.ts";
 import { projectTransaction } from "./project.ts";
 
 export interface PostgresOptions {
@@ -69,7 +70,7 @@ export function postgresAdapter(options: PostgresOptions): ContentStore {
   if (typeof options.url !== "string" || options.url.length === 0)
     throw new Error("Postgres URL is required");
   const sql = postgres(options.url, { max: 10, onnotice: () => {} });
-  const table = (name: string) => qualified(namespace, name);
+  const table = (name: string) => identifier(sql, namespace, name);
   let closing: Promise<void> | undefined;
   return {
     initialize: () =>
@@ -82,39 +83,27 @@ export function postgresAdapter(options: PostgresOptions): ContentStore {
           const projectName = request.projectName ?? "Development project";
           await transaction`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([namespace, "development"])}, 0))`;
           const workspaceKey = hash(workspaceName);
-          await transaction.unsafe(
-            `INSERT INTO ${table("workspaces")} (id, name) VALUES ($1, $2) ON CONFLICT (name_key) DO NOTHING`,
-            [randomUUID(), workspaceName],
-          );
-          const workspaces = await transaction.unsafe<{ id: string; name: string }[]>(
-            `SELECT id, name FROM ${table("workspaces")} WHERE name_key = $1`,
-            [workspaceKey],
-          );
+          await transaction`INSERT INTO ${table("workspaces")} (id, name) VALUES (${randomUUID()}, ${workspaceName}) ON CONFLICT (name_key) DO NOTHING`;
+          const workspaces = await transaction<
+            { id: string; name: string }[]
+          >`SELECT id, name FROM ${table("workspaces")} WHERE name_key = ${workspaceKey}`;
           const workspace = workspaces[0];
           if (!workspace || workspace.name !== workspaceName)
             throw new Error("Workspace name hash collision");
           const projectKey = hash(projectName);
-          await transaction.unsafe(
-            `INSERT INTO ${table("projects")} (id, workspace_id, name) VALUES ($1, $2, $3) ON CONFLICT (workspace_id, name_key) DO NOTHING`,
-            [randomUUID(), workspace.id, projectName],
-          );
-          const projects = await transaction.unsafe<{ id: string; name: string }[]>(
-            `SELECT id, name FROM ${table("projects")} WHERE workspace_id = $1 AND name_key = $2 FOR UPDATE`,
-            [workspace.id, projectKey],
-          );
+          await transaction`INSERT INTO ${table("projects")} (id, workspace_id, name) VALUES (${randomUUID()}, ${workspace.id}, ${projectName}) ON CONFLICT (workspace_id, name_key) DO NOTHING`;
+          const projects = await transaction<
+            { id: string; name: string }[]
+          >`SELECT id, name FROM ${table("projects")} WHERE workspace_id = ${workspace.id} AND name_key = ${projectKey} FOR UPDATE`;
           const project = projects[0];
           if (!project || project.name !== projectName)
             throw new Error("Project name hash collision");
-          const existing = await transaction.unsafe<{ verifier: string }[]>(
-            `SELECT verifier FROM ${table("keys")} WHERE project_id = $1 LIMIT 1`,
-            [project.id],
-          );
+          const existing = await transaction<
+            { verifier: string }[]
+          >`SELECT verifier FROM ${table("keys")} WHERE project_id = ${project.id} LIMIT 1`;
           let issued = false;
           if (request.newKey || existing.length === 0) {
-            await transaction.unsafe(
-              `INSERT INTO ${table("keys")} (verifier, project_id, permissions) VALUES ($1, $2, $3::jsonb)`,
-              [request.verifier, project.id, transaction.json([...request.permissions])],
-            );
+            await transaction`INSERT INTO ${table("keys")} (verifier, project_id, permissions) VALUES (${request.verifier}, ${project.id}, ${transaction.json([...request.permissions])}::jsonb)`;
             issued = true;
           }
           return { workspace: workspace.id, project: project.id, issued };
@@ -122,10 +111,9 @@ export function postgresAdapter(options: PostgresOptions): ContentStore {
       ),
     authorize: (project, verifier, permission) =>
       databaseOperation(async () => {
-        const rows = await sql.unsafe<{ project_id: string; permissions: unknown }[]>(
-          `SELECT project_id, permissions FROM ${table("keys")} WHERE verifier = $1`,
-          [verifier],
-        );
+        const rows = await sql<
+          { project_id: string; permissions: unknown }[]
+        >`SELECT project_id, permissions FROM ${table("keys")} WHERE verifier = ${verifier}`;
         const key = rows[0];
         if (!key) return "unauthorized";
         if (
@@ -142,10 +130,9 @@ export function postgresAdapter(options: PostgresOptions): ContentStore {
     ) =>
       databaseOperation(async () => {
         const result = await sql.begin(async (transaction) => {
-          const rows = await transaction.unsafe<{ id: string }[]>(
-            `SELECT id FROM ${table("projects")} WHERE id = $1 FOR UPDATE`,
-            [project],
-          );
+          const rows = await transaction<
+            { id: string }[]
+          >`SELECT id FROM ${table("projects")} WHERE id = ${project} FOR UPDATE`;
           if (!rows[0]) throw new Error("Unknown project");
           return { value: await operation(projectTransaction(transaction, namespace, project)) };
         });

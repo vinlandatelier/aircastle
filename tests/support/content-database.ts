@@ -9,6 +9,10 @@ export const databaseUrl = () => {
   return url;
 };
 
+/** Quotes a name as one identifier fragment, keeping dots that `sql(name)` would split. */
+export const literalIdentifier = (sql: ReturnType<typeof postgres>, name: string) =>
+  sql.unsafe('"' + name.replaceAll('"', '""') + '"');
+
 export async function withDatabase<Value>(
   operation: (fixture: {
     sql: ReturnType<typeof postgres>;
@@ -38,8 +42,7 @@ export async function withDatabase<Value>(
       await close();
     } finally {
       try {
-        const identifier = '"' + namespace.replaceAll('"', '""') + '"';
-        await sql.unsafe(`DROP SCHEMA IF EXISTS ${identifier} CASCADE`);
+        await sql`DROP SCHEMA IF EXISTS ${literalIdentifier(sql, namespace)} CASCADE`;
       } finally {
         await sql.end();
       }
