@@ -10,17 +10,17 @@ function requireObject(value: unknown): Record<string, unknown> {
 }
 
 function requireList(value: unknown): unknown[] {
-  if (!Array.isArray(value)) throw new Error('Invalid browser report')
+  if (!Array.isArray(value)) throw new Error('Invalid runner report')
   return value
 }
 
 function requireString(value: unknown): string {
-  if (typeof value !== 'string') throw new Error('Invalid browser report')
+  if (typeof value !== 'string') throw new Error('Invalid runner report')
   return value
 }
 
 function requireNumber(value: unknown): number {
-  if (typeof value !== 'number') throw new Error('Invalid browser report')
+  if (typeof value !== 'number') throw new Error('Invalid runner report')
   return value
 }
 

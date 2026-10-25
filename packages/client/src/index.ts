@@ -113,6 +113,7 @@ type ClientOptions<Collections extends CollectionDefinitions> = AircastleConfig<
   fetch?: Fetch;
 };
 
+/** The returned object is built key by key from `config.collections`, so the declarations carry its collection names and output types. */
 export function createClient<const Collections extends CollectionDefinitions>(
   options: ClientOptions<Collections>,
 ): AircastleClient<Collections>;
