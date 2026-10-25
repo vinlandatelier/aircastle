@@ -71,6 +71,46 @@ export default defineConfig({
     },
     overrides: [
       {
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        excludeFiles: ["**/*.test.{ts,tsx}", "**/test-support/**"],
+        plugins: ["node"],
+        rules: {
+          "node/no-process-env": "error",
+          "no-restricted-properties": [
+            "error",
+            {
+              object: "Bun",
+              property: "env",
+              message: "Read environment variables in the entry point's config module.",
+            },
+          ],
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: ["node:process", "process"].map((name) => ({
+                name,
+                importNames: ["env"],
+                message: "Read environment variables in the entry point's config module.",
+              })),
+            },
+          ],
+        },
+      },
+      {
+        files: ["apps/api/src/config.ts"],
+        plugins: ["node"],
+        rules: {
+          "node/no-process-env": "off",
+          "no-restricted-properties": "off",
+          "no-restricted-imports": "off",
+        },
+      },
+      {
+        files: ["packages/cli/src/index.ts"],
+        plugins: ["node"],
+        rules: { "node/no-process-env": ["error", { allowedVariables: ["AIRCASTLE_API_KEY"] }] },
+      },
+      {
         files: ["packages/schema/tests/types/assert.ts"],
         rules: { "typescript/no-explicit-any": "off" },
       },
