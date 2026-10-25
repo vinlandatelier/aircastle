@@ -26,10 +26,12 @@ interface Position {
   column: number;
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null;
+}
+
 function isSyntaxNode(value: unknown): value is SyntaxNode {
-  return (
-    typeof value === "object" && value !== null && "type" in value && typeof value.type === "string"
-  );
+  return isRecord(value) && typeof value.type === "string";
 }
 
 function nodeAt(node: SyntaxNode, field: string): SyntaxNode | undefined {
@@ -49,14 +51,9 @@ function textAt(node: SyntaxNode | undefined, field: string): string | undefined
 
 /** The node's one-based source position, or line 1 column 1 when the parser gave none. */
 function positionOf(node: SyntaxNode): Position {
-  const location = node.loc;
-  const start =
-    typeof location === "object" && location !== null && "start" in location
-      ? location.start
-      : undefined;
-  const line = typeof start === "object" && start !== null && "line" in start ? start.line : 1;
-  const column =
-    typeof start === "object" && start !== null && "column" in start ? start.column : 0;
+  const start = isRecord(node.loc) ? node.loc.start : undefined;
+  const line = isRecord(start) ? start.line : undefined;
+  const column = isRecord(start) ? start.column : undefined;
   return {
     line: typeof line === "number" ? line : 1,
     column: (typeof column === "number" ? column : 0) + 1,
@@ -214,8 +211,7 @@ function templateText(literal: SyntaxNode): string | undefined {
     return undefined;
   const quasi = listAt(literal, "quasis")[0];
   const text = isSyntaxNode(quasi) ? quasi.value : undefined;
-  const cooked =
-    typeof text === "object" && text !== null && "cooked" in text ? text.cooked : undefined;
+  const cooked = isRecord(text) ? text.cooked : undefined;
   return typeof cooked === "string" ? cooked : undefined;
 }
 
@@ -396,22 +392,17 @@ interface Manifest {
 
 function readManifest(path: string): Manifest {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  const fields = new Map<string, unknown>(
-    typeof parsed === "object" && parsed !== null ? Object.entries(parsed) : [],
-  );
-  const name = fields.get("name");
+  const fields = isRecord(parsed) ? parsed : {};
+  const { name, workspaces } = fields;
   if (typeof name !== "string") throw new Error(`${path} must have a string "name"`);
-  const workspaces = fields.get("workspaces");
   return {
     name,
     workspaces: Array.isArray(workspaces)
       ? workspaces.filter((pattern) => typeof pattern === "string")
       : [],
     dependencies: dependencyFields.flatMap((field) => {
-      const dependencies = fields.get(field);
-      return typeof dependencies === "object" && dependencies !== null
-        ? Object.keys(dependencies)
-        : [];
+      const dependencies = fields[field];
+      return isRecord(dependencies) ? Object.keys(dependencies) : [];
     }),
   };
 }
