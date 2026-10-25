@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { RouterProvider } from '@tanstack/react-router'
+import { RouterProvider, createBrowserHistory } from '@tanstack/react-router'
 import { createAppRouter } from './router'
 import { AppErrorBoundary } from '@/features/error-recovery'
 import './index.css'
 
-const router = createAppRouter()
+const router = createAppRouter(createBrowserHistory())
 
 document
   .querySelectorAll('head > title, head > meta[name="description"]')

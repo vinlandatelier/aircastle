@@ -194,6 +194,28 @@ test("accepts relative imports that stay inside their workspace", () => {
   ).toEqual([]);
 });
 
+test.each([
+  ["into another workspace", 'import { app } from "@/../../api/src/app.ts";'],
+  ["into the web package", 'import { scenarios } from "@/../e2e/fixtures.ts";'],
+  ["after a nested segment", 'export * from "@/features/../../vite.config.ts";'],
+  ["to the package root", 'const web = import("@/..");'],
+  ["through a template literal", "const app = import(`@/../../api/src/app.ts`);"],
+  ["in an import type", 'type App = import("@/../../api/src/app.ts").App;'],
+])("rejects web @/ aliases that leave apps/web/src: %s", (_name, source) => {
+  expect(boundaryRules("apps/web/src/features/navigation/index.ts", source)).toEqual([
+    "web-alias-escape",
+  ]);
+});
+
+test("accepts web @/ aliases that stay inside apps/web/src", () => {
+  expect(
+    boundaryRules(
+      "apps/web/src/router.tsx",
+      'import { AppShell } from "@/components/shell";\nimport { pages } from "@/features/../features/navigation";\nimport { router } from "@tanstack/react-router";',
+    ),
+  ).toEqual([]);
+});
+
 test("rejects workspace packages the importing package does not declare", () => {
   expect(
     boundaryRules("packages/contracts/src/value.ts", 'import { value } from "@aircastle/core";'),

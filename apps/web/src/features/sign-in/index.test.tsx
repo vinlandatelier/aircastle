@@ -39,7 +39,7 @@ describe('Sign in', () => {
     for (const [name, href] of [
       ['Terms of Service', '/terms-of-service'],
       ['Privacy Policy', '/privacy-policy'],
-    ]) {
+    ] as const) {
       const link = screen.getByRole('link', { name })
       expect(link.getAttribute('href')).toBe(href)
       expect(link.getAttribute('target')).toBe('_blank')

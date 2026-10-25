@@ -65,7 +65,7 @@
     "@babel/parser": "7.28.5",
     "@types/bun": "catalog:",
     "knip": "6.42.1",
-    "typescript": "7.0.2",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },
@@ -79,6 +79,7 @@
   "packageManager": "bun@1.4.4",
   "catalog": {
     "@types/bun": "1.4.4",
+    "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
     "vite-plus": "1.4.0"
   }

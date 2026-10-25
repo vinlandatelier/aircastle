@@ -10,6 +10,7 @@ export interface PolicyViolation {
     | "type-suppression"
     | "unsafe-sql"
     | "cross-workspace-relative-import"
+    | "web-alias-escape"
     | "undeclared-workspace-import"
     | "swallowed-error"
     | "stale-catch-allowance";
@@ -188,11 +189,19 @@ function owner(path: string, workspaces: readonly Workspace[]): Workspace | unde
     .sort((left, right) => right.directory.length - left.directory.length)[0];
 }
 
+const webAliasRoot = "apps/web/src";
+
 function inspectSpecifier(
   file: string,
   specifier: string,
   workspaces: readonly Workspace[],
 ): PolicyViolation["rule"] | undefined {
+  if (file.startsWith("apps/web/") && (specifier === "@" || specifier.startsWith("@/"))) {
+    const target = posix.normalize(posix.join(webAliasRoot, specifier.slice(1)));
+    return target === webAliasRoot || target.startsWith(`${webAliasRoot}/`)
+      ? undefined
+      : "web-alias-escape";
+  }
   const importer = owner(file, workspaces);
   if (importer === undefined) return undefined;
   if (specifier === "." || specifier === ".." || /^\.\.?\//.test(specifier)) {
