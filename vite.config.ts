@@ -52,6 +52,7 @@ export default defineConfig({
       "preserve-caught-error": "error",
       "no-array-constructor": "error",
       "typescript/ban-ts-comment": "error",
+      "typescript/method-signature-style": "error",
       "typescript/no-empty-object-type": "error",
       "typescript/no-explicit-any": "error",
       "typescript/no-namespace": "error",

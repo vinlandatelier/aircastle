@@ -160,8 +160,8 @@ export interface CollectionDescription {
 }
 
 export interface CompiledCollection<Output extends object> {
-  validate(input: unknown): ValidationResult<Output>;
-  describe(): CollectionDescription;
+  validate: (input: unknown) => ValidationResult<Output>;
+  describe: () => CollectionDescription;
 }
 
 export type CompiledSchema<Outputs extends Record<string, object>> = {

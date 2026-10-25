@@ -2,24 +2,24 @@ import * as publicExports from "../../src/index.ts";
 import type { CompiledCollection } from "../../src/index.ts";
 
 export interface RuntimeText {
-  min(value: number): RuntimeText;
-  max(value: number): RuntimeText;
-  optional(): RuntimeText;
-  nullable(): RuntimeText;
-  default(value: string | null): RuntimeText;
-  oneOf(values: readonly string[]): RuntimeText;
-  email(): RuntimeText;
-  url(): RuntimeText;
-  unique(): RuntimeText;
-  editor(name: string, options?: Readonly<Record<string, unknown>>): RuntimeText;
+  min: (value: number) => RuntimeText;
+  max: (value: number) => RuntimeText;
+  optional: () => RuntimeText;
+  nullable: () => RuntimeText;
+  default: (value: string | null) => RuntimeText;
+  oneOf: (values: readonly string[]) => RuntimeText;
+  email: () => RuntimeText;
+  url: () => RuntimeText;
+  unique: () => RuntimeText;
+  editor: (name: string, options?: Readonly<Record<string, unknown>>) => RuntimeText;
 }
 
 export interface RuntimeApi {
-  text(): RuntimeText;
-  collection(fields: Readonly<Record<string, RuntimeText>>): unknown;
-  compileSchema(
+  text: () => RuntimeText;
+  collection: (fields: Readonly<Record<string, RuntimeText>>) => unknown;
+  compileSchema: (
     collections: Readonly<Record<string, unknown>>,
-  ): Record<string, CompiledCollection<Record<string, unknown>>>;
+  ) => Record<string, CompiledCollection<Record<string, unknown>>>;
 }
 
 export function requireSchemaApi(): RuntimeApi {

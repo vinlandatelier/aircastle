@@ -54,18 +54,21 @@ export interface Lockfile {
 
 type FieldIdentity = Parameters<typeof collection>[0][string];
 interface WireText extends FieldIdentity {
-  min(value: number): WireText;
-  max(value: number): WireText;
-  optional(): WireText;
-  nullable(): WireText;
-  unique(): WireText;
-  default(value: string | null): WireText;
-  oneOf(values: readonly string[]): WireText;
-  email(): WireText;
-  url(): WireText;
-  editor(name: "textarea", options?: { rows?: number }): WireText;
-  editor(name: "code", options?: { language?: CodeLanguage }): WireText;
-  editor(name: "radio", options?: Readonly<Record<string, never>>): WireText;
+  min: (value: number) => WireText;
+  max: (value: number) => WireText;
+  optional: () => WireText;
+  nullable: () => NullableWireText;
+  unique: () => WireText;
+  default: (value: string) => WireText;
+  oneOf: (values: readonly string[]) => WireText;
+  email: () => WireText;
+  url: () => WireText;
+  editor: ((name: "textarea", options?: { rows?: number }) => WireText) &
+    ((name: "code", options?: { language?: CodeLanguage }) => WireText) &
+    ((name: "radio", options?: Readonly<Record<string, never>>) => WireText);
+}
+interface NullableWireText extends WireText {
+  default: (value: string | null) => WireText;
 }
 
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -140,7 +143,13 @@ function wireField(value: unknown): WireText {
     malformed();
   let builder: WireText = text();
   if (!value.required) builder = builder.optional();
-  if (value.nullable) builder = builder.nullable();
+  if (Object.hasOwn(value, "default")) {
+    const fallback = value.default;
+    if (value.required || (typeof fallback !== "string" && fallback !== null)) malformed();
+    if (value.nullable) builder = builder.nullable().default(fallback);
+    else if (fallback === null) malformed();
+    else builder = builder.default(fallback);
+  } else if (value.nullable) builder = builder.nullable();
   if (value.unique) builder = builder.unique();
   for (const constraint of ["min", "max"] as const) {
     if (Object.hasOwn(value, constraint)) {
@@ -161,11 +170,6 @@ function wireField(value: unknown): WireText {
     if (value.format === "email") builder = builder.email();
     else if (value.format === "url") builder = builder.url();
     else malformed();
-  }
-  if (Object.hasOwn(value, "default")) {
-    if (value.required || (typeof value.default !== "string" && value.default !== null))
-      malformed();
-    builder = builder.default(value.default);
   }
   if (Object.hasOwn(value, "editor")) {
     const editor = value.editor;

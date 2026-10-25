@@ -199,7 +199,7 @@ export function operationId(input: Invocation): string {
 }
 export async function authorize(
   input: Invocation,
-  ports: { membership(login: string): Promise<Membership> },
+  ports: { membership: (login: string) => Promise<Membership> },
 ): Promise<Authorization> {
   const requester = input.kind === "automatic" ? input.snapshot.author : input.command.author;
   const parsed = input.kind === "manual" ? parseCommand(input.command.body) : null;

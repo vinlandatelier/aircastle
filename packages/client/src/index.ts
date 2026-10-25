@@ -22,10 +22,10 @@ export interface AircastleConfig<Collections extends CollectionDefinitions> {
 }
 export type AircastleClient<Collections extends CollectionDefinitions> = {
   [Name in keyof Collections]: {
-    create(
+    create: (
       input: InferInput<Collections[Name]>,
-    ): Promise<Result<{ id: string } & InferOutput<Collections[Name]>>>;
-    findById(id: string): Promise<Result<{ id: string } & InferOutput<Collections[Name]>>>;
+    ) => Promise<Result<{ id: string } & InferOutput<Collections[Name]>>>;
+    findById: (id: string) => Promise<Result<{ id: string } & InferOutput<Collections[Name]>>>;
   };
 };
 export class ConfigurationError extends Error {
