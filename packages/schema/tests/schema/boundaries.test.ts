@@ -8,7 +8,7 @@ describe("document boundary and diagnostic order", () => {
     api = requireSchemaApi();
   });
 
-  for (const input of [
+  test.for([
     null,
     undefined,
     true,
@@ -20,13 +20,11 @@ describe("document boundary and diagnostic order", () => {
     () => ({}),
     new Date(0),
     new (class Document {})(),
-  ]) {
-    test(`rejects non-document root ${String(input)}`, () => {
-      expectFailure(compileCollection(api, { title: api.text() }).validate(input), [
-        { code: "invalid_document", path: [] },
-      ]);
-    });
-  }
+  ])("rejects non-document root %o", (input) => {
+    expectFailure(compileCollection(api, { title: api.text() }).validate(input), [
+      { code: "invalid_document", path: [] },
+    ]);
+  });
 
   test("accepts null-prototype documents with own enumerable data fields", () => {
     const input = Object.assign(Object.create(null), { title: "Hi" });

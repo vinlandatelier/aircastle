@@ -18,7 +18,7 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 export function expectOwnKeys(value: object, expected: readonly string[]): void {
-  expect(Reflect.ownKeys(value).sort()).toEqual([...expected].sort());
+  expect(new Set(Reflect.ownKeys(value))).toEqual(new Set(expected));
 }
 
 export function expectData(actual: unknown, expected: Record<string, unknown>): void {

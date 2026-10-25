@@ -2,7 +2,7 @@ const emailLocal = /^[A-Za-z0-9!#$%&'*+\-/=?^_`{|}~]+(?:\.[A-Za-z0-9!#$%&'*+\-/=
 const emailLabel = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
 
 export function isEmail(value: string): boolean {
-  if (value.length > 254 || /[^\x00-\x7f]/.test(value)) return false;
+  if (value.length > 254 || /\P{ASCII}/u.test(value)) return false;
   const at = value.indexOf("@");
   if (at < 1 || at !== value.lastIndexOf("@")) return false;
   const local = value.slice(0, at);

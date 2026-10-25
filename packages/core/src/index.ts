@@ -62,24 +62,24 @@ export interface Access {
   apiKey: string;
 }
 export interface ContentService {
-  authorize(access: Access, permission: Permission): Promise<Result<null>>;
-  schema(access: Access): Promise<Result<ProjectState>>;
-  publish(
+  authorize: (access: Access, permission: Permission) => Promise<Result<null>>;
+  schema: (access: Access) => Promise<Result<ProjectState>>;
+  publish: (
     access: Access,
     request: { baseline: string | null; collections: unknown },
-  ): Promise<Result<Publication>>;
-  create(
+  ) => Promise<Result<Publication>>;
+  create: (
     access: Access,
     collection: string,
     contract: string,
     input: unknown,
-  ): Promise<Result<ContentDocument>>;
-  findById(
+  ) => Promise<Result<ContentDocument>>;
+  findById: (
     access: Access,
     collection: string,
     contract: string,
     id: string,
-  ): Promise<Result<ContentDocument>>;
+  ) => Promise<Result<ContentDocument>>;
 }
 export interface AircastleRuntime extends ContentService {
   close(): Promise<void>;
@@ -256,7 +256,9 @@ export async function createAircastle(config: {
   } catch (error) {
     const [cleanup] = await Promise.allSettled([config.database.close()]);
     if (cleanup?.status === "rejected")
-      throw new AggregateError([error, cleanup.reason], "Aircastle startup and cleanup failed");
+      throw new AggregateError([error, cleanup.reason], "Aircastle startup and cleanup failed", {
+        cause: error,
+      });
     throw error;
   }
   const service = createService(config.database);
