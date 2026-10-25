@@ -4,7 +4,12 @@ import { expect, test } from "vite-plus/test";
 import postgres from "postgres";
 import { StorageUnavailable } from "@aircastle/core";
 import { postgresAdapter } from "./index.ts";
-import { databaseUrl, literalIdentifier, withDatabase } from "./test-support/database.ts";
+import {
+  databaseUrl,
+  development,
+  literalIdentifier,
+  withDatabase,
+} from "./test-support/database.ts";
 import type { Permission, PublishedCollection } from "@aircastle/contracts";
 
 const permissions: readonly Permission[] = ["content:read", "content:write", "schema:publish"];
@@ -85,8 +90,8 @@ test("concurrent initializers converge on one owned development identity", async
     try {
       await Promise.all([store.initialize(), other.initialize()]);
       const projects = await Promise.all([
-        store.provision({ verifier, permissions, newKey: false }),
-        other.provision({ verifier, permissions, newKey: false }),
+        store.provision({ verifier, permissions, key: "reuse", ...development }),
+        other.provision({ verifier, permissions, key: "reuse", ...development }),
       ]);
       expect(projects[0]?.workspace).toBe(projects[1]?.workspace);
       expect(projects[0]?.project).toBe(projects[1]?.project);
@@ -106,7 +111,8 @@ test("key permissions and stored project binding control access", async () => {
     const project = await store.provision({
       verifier,
       permissions: ["content:read"],
-      newKey: false,
+      key: "reuse",
+      ...development,
     });
     expect(await store.authorize(project.project, verifier, "content:read")).toBe("authorized");
     expect(await store.authorize(project.project, verifier, "content:write")).toBe("forbidden");
@@ -121,19 +127,25 @@ test("key permissions and stored project binding control access", async () => {
 test("development identity reuse preserves keys and an explicit new key keeps the old key valid", async () => {
   await withDatabase(async ({ store }) => {
     await store.initialize();
-    const first = await store.provision({ verifier, permissions, newKey: false });
+    const first = await store.provision({ verifier, permissions, key: "reuse", ...development });
     const secondVerifier = createHash("sha256").update("second-secret").digest("hex");
     const repeated = await store.provision({
       verifier: secondVerifier,
       permissions,
-      newKey: false,
+      key: "reuse",
+      ...development,
     });
     expect(repeated).toEqual({ workspace: first.workspace, project: first.project, issued: false });
     expect(await store.authorize(first.project, verifier, "content:read")).toBe("authorized");
     expect(await store.authorize(first.project, secondVerifier, "content:read")).toBe(
       "unauthorized",
     );
-    const issued = await store.provision({ verifier: secondVerifier, permissions, newKey: true });
+    const issued = await store.provision({
+      verifier: secondVerifier,
+      permissions,
+      key: "issue",
+      ...development,
+    });
     expect(issued).toEqual({ workspace: first.workspace, project: first.project, issued: true });
     expect(await store.authorize(first.project, verifier, "content:read")).toBe("authorized");
     expect(await store.authorize(first.project, secondVerifier, "content:read")).toBe("authorized");
@@ -146,7 +158,7 @@ test("two projects in one namespace persist independent collections and document
     const first = await store.provision({
       verifier,
       permissions,
-      newKey: false,
+      key: "reuse",
       workspaceName: "Shared",
       projectName: "First",
     });
@@ -154,7 +166,7 @@ test("two projects in one namespace persist independent collections and document
     const second = await store.provision({
       verifier: secondVerifier,
       permissions,
-      newKey: false,
+      key: "reuse",
       workspaceName: "Shared",
       projectName: "Second",
     });
@@ -203,7 +215,7 @@ test("two projects in one namespace persist independent collections and document
 test("transaction rollback leaves no published state after a thrown operation", async () => {
   await withDatabase(async ({ store }) => {
     await store.initialize();
-    const project = await store.provision({ verifier, permissions, newKey: false });
+    const project = await store.provision({ verifier, permissions, key: "reuse", ...development });
     const failure = new Error("abort-publication");
     await expect(
       store.transaction(project.project, async (transaction) => {
@@ -224,7 +236,7 @@ test("transaction rollback leaves no published state after a thrown operation", 
 test("direct persistence enforces unique values across concurrent transactions", async () => {
   await withDatabase(async ({ store }) => {
     await store.initialize();
-    const project = await store.provision({ verifier, permissions, newKey: false });
+    const project = await store.provision({ verifier, permissions, key: "reuse", ...development });
     await store.transaction(project.project, (transaction) =>
       transaction.activate(collections, { revision: "initial", contracts: { articles: contract } }),
     );
@@ -248,7 +260,7 @@ test("direct persistence enforces unique values across concurrent transactions",
 test("publication, contract history and document presence survive opening a new adapter", async () => {
   await withDatabase(async ({ store, namespace, url, close }) => {
     await store.initialize();
-    const project = await store.provision({ verifier, permissions, newKey: false });
+    const project = await store.provision({ verifier, permissions, key: "reuse", ...development });
     await store.transaction(project.project, (transaction) =>
       transaction.activate(collections, { revision: "kept", contracts: { articles: contract } }),
     );
@@ -292,7 +304,7 @@ test("publication, contract history and document presence survive opening a new 
 test("stored records contain a verifier but never the raw issued secret", async () => {
   await withDatabase(async ({ sql, store, namespace }) => {
     await store.initialize();
-    const project = await store.provision({ verifier, permissions, newKey: false });
+    const project = await store.provision({ verifier, permissions, key: "reuse", ...development });
     expect(await store.authorize(project.project, verifier, "schema:publish")).toBe("authorized");
     const tables = await sql<
       { table_name: string }[]

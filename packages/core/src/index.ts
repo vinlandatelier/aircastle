@@ -42,6 +42,15 @@ export interface ProvisionedProject {
   issued: boolean;
 }
 /**
+ * How {@link ContentStore.provision} treats keys: `reuse` issues the key only when the project has
+ * none, and `issue` always adds it alongside the existing keys.
+ */
+export type KeyMode = "reuse" | "issue";
+/** A provisioned development project, with the API key when this call issued one. */
+export type DevelopmentProject =
+  | { workspace: string; project: string; issued: true; apiKey: string }
+  | { workspace: string; project: string; issued: false };
+/**
  * Thrown by a {@link ContentStore} when storage is temporarily unreachable and the operation can be
  * retried. Core turns it into an `unavailable` result instead of an `internal_error`.
  */
@@ -57,9 +66,9 @@ export interface ContentStore {
   provision(options: {
     verifier: string;
     permissions: readonly Permission[];
-    newKey: boolean;
-    workspaceName?: string;
-    projectName?: string;
+    key: KeyMode;
+    workspaceName: string;
+    projectName: string;
   }): Promise<ProvisionedProject>;
   authorize(
     project: string,
@@ -320,13 +329,17 @@ export async function createAircastle(config: {
 
 export async function provisionDevelopment(
   store: ContentStore,
-  options: { newKey?: boolean } = {},
-): Promise<ProvisionedProject & { apiKey?: string }> {
+  options: { key?: KeyMode } = {},
+): Promise<DevelopmentProject> {
   const apiKey = "ac_" + randomBytes(32).toString("base64url");
-  const project = await store.provision({
+  const { workspace, project, issued } = await store.provision({
     verifier: verifier(apiKey),
     permissions: ["content:read", "content:write", "schema:publish"],
-    newKey: options.newKey ?? false,
+    key: options.key ?? "reuse",
+    workspaceName: "Development workspace",
+    projectName: "Development project",
   });
-  return project.issued ? { ...project, apiKey } : project;
+  return issued
+    ? { workspace, project, issued: true, apiKey }
+    : { workspace, project, issued: false };
 }
