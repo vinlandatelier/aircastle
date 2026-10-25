@@ -3,6 +3,7 @@
 Follow [the architecture map](../ARCHITECTURE.md) for tooling ownership.
 
 - `ci.yml` owns deterministic pull-request verification. Its `Lint, typecheck and test` job is the only required status check.
+- `approval-label.yml` removes `ready-for-human-approval` when a PR gets new commits. It runs on `pull_request_target` and must never check out or run PR code.
 - AI reviews are advisory. Keep them outside the required status check, required approvals, and required conversation resolution. Never enable automatic merging.
 - Run privileged AI operations from trusted default-branch code with the `ai-automation` environment. Keep that environment restricted to the `main` branch, with no tag policies.
 - Current organization membership authorizes AI spending. Repository collaborator permissions and comment text do not prove membership.

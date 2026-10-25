@@ -1,0 +1,19 @@
+name: Clear stale approval label
+on:
+  pull_request_target:
+    types: [synchronize]
+permissions: {}
+jobs:
+  clear:
+    if: contains(github.event.pull_request.labels.*.name, 'ready-for-human-approval')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove ready-for-human-approval after new commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh api --method DELETE "repos/$REPOSITORY/issues/$PR_NUMBER/labels/ready-for-human-approval"
