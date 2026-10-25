@@ -4,16 +4,32 @@ import { join } from "node:path";
 import { anthropicSchema, checkSchema, matches, record } from "./schema.ts";
 
 export type Role = "codexReviewer" | "codexImplementer" | "claudeReviewer" | "claudeImplementer";
-export type ModelSelection = { provider: "openai" | "anthropic"; model: string; effort: string };
+export type Provider = "openai" | "anthropic";
+export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+export type ModelSelection = { provider: Provider; model: string; effort: Effort };
 export type ModelConfig = { version: 1; roles: Record<Role, ModelSelection> };
 
 const roles: Role[] = ["codexReviewer", "codexImplementer", "claudeReviewer", "claudeImplementer"];
-const efforts = {
+const efforts: Record<Provider, readonly Effort[]> = {
   openai: ["low", "medium", "high", "xhigh", "max"],
-  anthropic: ["low", "medium", "high", "max"],
+  anthropic: ["low", "medium", "high", "xhigh", "max"],
 };
-const maxBytes = 1_048_576;
-const maxOutputTokens = 8192;
+/**
+ * Output cap per request, counting reasoning or thinking tokens as well as the visible answer.
+ * OpenAI counts reasoning tokens against `max_output_tokens` and advises reserving at least
+ * 25,000. Anthropic counts thinking against `max_tokens` and advises at least 64,000 at `xhigh`
+ * and `max`. Every configured model accepts up to 128,000 output tokens. Both providers need a
+ * streamed response at these sizes.
+ */
+const outputTokenCaps: Record<Effort, number> = {
+  low: 64_000,
+  medium: 64_000,
+  high: 64_000,
+  xhigh: 128_000,
+  max: 128_000,
+};
+const maxStreamBytes = 64 * 1_048_576;
+const requestTimeoutMs = 25 * 60_000;
 
 function selection(value: unknown): ModelSelection {
   if (
@@ -22,11 +38,12 @@ function selection(value: unknown): ModelSelection {
     (value.provider !== "openai" && value.provider !== "anthropic") ||
     typeof value.model !== "string" ||
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value.model) ||
-    typeof value.effort !== "string" ||
-    !efforts[value.provider].includes(value.effort)
+    typeof value.effort !== "string"
   )
     throw new Error("invalid_model_config");
-  return { provider: value.provider, model: value.model, effort: value.effort };
+  const effort = efforts[value.provider].find((candidate) => candidate === value.effort);
+  if (!effort) throw new Error("invalid_model_config");
+  return { provider: value.provider, model: value.model, effort };
 }
 
 export function parseModelConfig(value: unknown): ModelConfig {
@@ -47,23 +64,90 @@ export function parseModelConfig(value: unknown): ModelConfig {
   return { version: 1, roles: result };
 }
 
-async function readResponse(response: Response): Promise<string> {
-  if (!response.body) throw new Error("provider_invalid_response");
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+async function* serverEvents(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<Record<string, unknown>> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
   let size = 0;
   try {
     while (true) {
       const part = await reader.read();
       if (part.done) break;
       size += part.value.byteLength;
-      if (size > maxBytes) throw new Error("provider_output_limit");
-      chunks.push(part.value);
+      if (size > maxStreamBytes) throw new Error("provider_output_limit");
+      buffer = (buffer + decoder.decode(part.value, { stream: true })).replaceAll("\r\n", "\n");
+      for (let end = buffer.indexOf("\n\n"); end !== -1; end = buffer.indexOf("\n\n")) {
+        const data = buffer
+          .slice(0, end)
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trimStart())
+          .join("\n");
+        buffer = buffer.slice(end + 2);
+        if (!data) continue;
+        let event: unknown;
+        try {
+          event = JSON.parse(data);
+        } catch (error) {
+          throw new Error("provider_invalid_json", { cause: error });
+        }
+        if (!record(event)) throw new Error("provider_invalid_response");
+        yield event;
+      }
     }
   } finally {
     await reader.cancel();
   }
-  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function openaiResponse(body: ReadableStream<Uint8Array>): Promise<Record<string, unknown>> {
+  for await (const event of serverEvents(body)) {
+    if (event.type === "error") throw new Error("provider_failed");
+    if (
+      ["response.completed", "response.incomplete", "response.failed"].includes(String(event.type))
+    ) {
+      if (!record(event.response)) throw new Error("provider_invalid_response");
+      return event.response;
+    }
+  }
+  throw new Error("provider_incomplete");
+}
+
+async function anthropicMessage(
+  body: ReadableStream<Uint8Array>,
+): Promise<Record<string, unknown>> {
+  let message: Record<string, unknown> | null = null;
+  const content: Record<string, unknown>[] = [];
+  for await (const event of serverEvents(body)) {
+    if (event.type === "error") throw new Error("provider_failed");
+    if (event.type === "message_start") {
+      if (!record(event.message)) throw new Error("provider_invalid_response");
+      message = { ...event.message };
+    } else if (event.type === "content_block_start") {
+      if (!Number.isSafeInteger(event.index) || !record(event.content_block))
+        throw new Error("provider_invalid_response");
+      content[Number(event.index)] = { ...event.content_block };
+    } else if (event.type === "content_block_delta") {
+      const block = content[Number(event.index)];
+      const delta = event.delta;
+      if (!block || !record(delta)) throw new Error("provider_invalid_response");
+      if (delta.type === "text_delta" && typeof delta.text === "string")
+        block.text = `${typeof block.text === "string" ? block.text : ""}${delta.text}`;
+      if (delta.type === "thinking_delta" && typeof delta.thinking === "string")
+        block.thinking = `${typeof block.thinking === "string" ? block.thinking : ""}${delta.thinking}`;
+    } else if (event.type === "message_delta") {
+      if (!message || !record(event.delta)) throw new Error("provider_invalid_response");
+      Object.assign(message, event.delta);
+      if (record(event.usage))
+        message.usage = { ...(record(message.usage) ? message.usage : {}), ...event.usage };
+    } else if (event.type === "message_stop") {
+      if (!message) throw new Error("provider_invalid_response");
+      return { ...message, content: Array.from(content) };
+    }
+  }
+  throw new Error("provider_incomplete");
 }
 
 export async function runModel(
@@ -89,7 +173,8 @@ export async function runModel(
           reasoning: { effort: chosen.effort },
           input: prompt,
           text: { format: { type: "json_schema", name: "result", strict: true, schema } },
-          max_output_tokens: maxOutputTokens,
+          max_output_tokens: outputTokenCaps[chosen.effort],
+          stream: true,
           store: false,
           service_tier: "default",
         }
@@ -100,7 +185,8 @@ export async function runModel(
             format: { type: "json_schema", schema: anthropicSchema(schema) },
           },
           messages: [{ role: "user", content: prompt }],
-          max_tokens: maxOutputTokens,
+          max_tokens: outputTokenCaps[chosen.effort],
+          stream: true,
         };
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (chosen.provider === "openai") headers.authorization = `Bearer ${key}`;
@@ -109,7 +195,7 @@ export async function runModel(
     headers["anthropic-version"] = "2023-06-01";
   }
   let response: Response;
-  let raw: string;
+  let data: Record<string, unknown>;
   const started = Date.now();
   try {
     response = await fetch(
@@ -121,29 +207,28 @@ export async function runModel(
         redirect: "error",
         headers,
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(requestTimeoutMs),
       },
     );
     if (!response.ok) {
       await response.body?.cancel();
       throw new Error(`provider_http_${response.status}`);
     }
-    raw = await readResponse(response);
+    if (!response.body) throw new Error("provider_invalid_response");
+    data =
+      chosen.provider === "openai"
+        ? await openaiResponse(response.body)
+        : await anthropicMessage(response.body);
   } catch (error) {
     if (
       error instanceof Error &&
-      /^provider_(http_\d{3}|output_limit|invalid_response)$/.test(error.message)
+      /^provider_(http_\d{3}|output_limit|invalid_response|invalid_json|failed|incomplete)$/.test(
+        error.message,
+      )
     )
       throw error;
-    throw new Error("provider_unavailable");
+    throw new Error("provider_unavailable", { cause: error });
   }
-  let data: unknown;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw new Error("provider_invalid_json");
-  }
-  if (!record(data)) throw new Error("provider_invalid_response");
   let text: string;
   if (chosen.provider === "openai") {
     if (data.status === "failed") throw new Error("provider_failed");
@@ -199,7 +284,7 @@ export async function runModel(
     selection: chosen,
     actualModel: data.model,
     effort: "sent_and_accepted",
-    maxOutputTokens,
+    maxOutputTokens: outputTokenCaps[chosen.effort],
     durationMs: Date.now() - started,
     usage: record(data.usage)
       ? Object.fromEntries(
@@ -218,7 +303,6 @@ export async function runModel(
       version: 1,
       request: body,
       response: data,
-      rawResponse: raw,
       execution,
     }).replaceAll(key, "[redacted]");
     const hash = createHash("sha256").update(receipt).digest("hex");
