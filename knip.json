@@ -5,7 +5,7 @@
   "ignoreUnresolved": [
     "^scripts/with-postgres\\.ts$",
     "^packages/schema/scripts/classify-mutations\\.ts$",
-    "^scripts/verify-web\\.ts$"
+    "^scripts/(verify-web|test-strength)\\.ts$"
   ],
   "ignoreIssues": {
     "apps/web/src/components/ui/**": ["exports", "types"]
