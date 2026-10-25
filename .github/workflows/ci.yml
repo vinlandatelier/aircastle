@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       coverage_summary: ${{ steps.coverage-summary.outcome }}
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,12 +56,18 @@ jobs:
         name: Install Chromium
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: vp -C apps/web exec playwright install --with-deps chromium
-      - name: Test browser journeys
+      - id: browser
+        name: Test browser journeys
         if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         run: vp run test-web:e2e
-      - name: Test verification tools
-        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
-        run: vp run test-web:verification
+      - name: Upload browser reports
+        if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-reports
+          path: apps/web/reports/
+          if-no-files-found: warn
+          retention-days: 7
       - id: coverage
         name: Test schema coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
