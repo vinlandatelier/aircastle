@@ -3,6 +3,7 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { AppErrorBoundary } from '@/features/error-recovery'
 import { createAppRouter } from './router'
+import { themeStorageKey } from '@/theme'
 
 const fault = vi.hoisted(() => ({ loader: false, render: false }))
 const marker = 'Aircastle route failure: private details'
@@ -84,7 +85,7 @@ describe('Route failure escalation', () => {
 
   it('applies the saved theme when the root loader fails before the app renders', async () => {
     preferDarkSystemTheme()
-    localStorage.setItem('aircastle-theme', 'light')
+    localStorage.setItem(themeStorageKey, 'light')
     fault.loader = true
     await renderRoute('/sign-in')
     expect(document.documentElement.classList.contains('light')).toBe(true)

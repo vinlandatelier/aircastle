@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { RecoveryPage } from './recovery-page'
+import { themeStorageKey } from '@/theme'
 
 function applyRecoveryTheme() {
   const root = document.documentElement
@@ -11,7 +12,7 @@ function applyRecoveryTheme() {
   } else {
     let stored: string | null
     try {
-      stored = localStorage.getItem('aircastle-theme')
+      stored = localStorage.getItem(themeStorageKey)
     } catch {
       stored = null
     }

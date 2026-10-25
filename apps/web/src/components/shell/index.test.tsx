@@ -1,10 +1,11 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test'
 import { renderApp } from '@/test-utils'
+import { themeStorageKey } from '@/theme'
 
 describe('Aircastle app shell', () => {
-  beforeEach(() => localStorage.removeItem('aircastle-theme'))
-  afterEach(() => localStorage.removeItem('aircastle-theme'))
+  beforeEach(() => localStorage.removeItem(themeStorageKey))
+  afterEach(() => localStorage.removeItem(themeStorageKey))
 
   it('applies and stores explicit theme choices through the public app', async () => {
     const { user } = await renderApp()
@@ -17,7 +18,7 @@ describe('Aircastle app shell', () => {
       await waitFor(() => {
         expect(document.documentElement.classList.contains(value)).toBe(true)
         expect(document.documentElement.classList.contains(other)).toBe(false)
-        expect(localStorage.getItem('aircastle-theme')).toBe(value)
+        expect(localStorage.getItem(themeStorageKey)).toBe(value)
       })
     }
   })
