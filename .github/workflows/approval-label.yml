@@ -3,6 +3,7 @@ on:
   pull_request_target:
     types: [synchronize]
 permissions: {}
+concurrency: approval-label-${{ github.event.pull_request.number }}
 jobs:
   clear:
     if: contains(github.event.pull_request.labels.*.name, 'ready-for-human-approval')
@@ -16,4 +17,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh api --method DELETE "repos/$REPOSITORY/issues/$PR_NUMBER/labels/ready-for-human-approval"
+        run: |
+          if output=$(gh api --method DELETE "repos/$REPOSITORY/issues/$PR_NUMBER/labels/ready-for-human-approval" 2>&1); then
+            exit 0
+          fi
+          case "$output" in
+            *"HTTP 404"*) echo "The label was already removed." ;;
+            *) echo "$output" >&2; exit 1 ;;
+          esac

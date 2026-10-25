@@ -4,27 +4,57 @@ import { expect, test } from "vite-plus/test";
 
 const workflowDirectory = resolve(import.meta.dirname, "../../.github/workflows");
 const workflows = readdirSync(workflowDirectory)
-  .filter((file) => file.endsWith(".yml"))
+  .filter((file) => /\.ya?ml$/.test(file))
   .map((file) => ({ file, text: readFileSync(join(workflowDirectory, file), "utf8") }));
-const fetchesPullRequestCode =
-  /actions\/checkout|\bgit\s+(clone|fetch|checkout|pull)\b|gh\s+pr\s+checkout/;
 
-const triggerBlock = (text: string) => /^on:\n((?: {2}.*\n)+)/m.exec(text)?.[1];
+const approvalLabelWorkflow = "approval-label.yml";
+const approvedRunScripts = [
+  [
+    "|",
+    'if output=$(gh api --method DELETE "repos/$REPOSITORY/issues/$PR_NUMBER/labels/ready-for-human-approval" 2>&1); then',
+    "exit 0",
+    "fi",
+    'case "$output" in',
+    '*"HTTP 404"*) echo "The label was already removed." ;;',
+    '*) echo "$output" >&2; exit 1 ;;',
+    "esac",
+  ],
+];
 
-test("pull_request_target workflows never check out or fetch pull request code", () => {
-  const offenders = workflows
+const indentation = (line: string) => line.length - line.trimStart().length;
+
+const runScripts = (text: string) => {
+  const lines = text.split("\n");
+  return lines.flatMap((line, index) => {
+    const match = /^(\s*(?:-\s+)?)run:\s*(.*)$/.exec(line);
+    if (!match) return [];
+    const keyIndentation = match[1]?.length ?? 0;
+    const following = lines.slice(index + 1);
+    const end = following.findIndex(
+      (next) => next.trim() !== "" && indentation(next) <= keyIndentation,
+    );
+    const block = end === -1 ? following : following.slice(0, end);
+    return [[match[2] ?? "", ...block].map((part) => part.trim()).filter((part) => part !== "")];
+  });
+};
+
+const approvalLabel = workflows.find(({ file }) => file === approvalLabelWorkflow)?.text ?? "";
+
+test("only the approval label workflow runs on pull_request_target", () => {
+  const privileged = workflows
     .filter(({ text }) => text.includes("pull_request_target"))
-    .filter(({ text }) => fetchesPullRequestCode.test(text))
     .map(({ file }) => file);
 
-  expect(offenders).toEqual([]);
+  expect(privileged).toEqual([approvalLabelWorkflow]);
 });
 
-test("the approval label workflow runs only when a pull request gets new commits", () => {
-  const workflow = workflows.find(({ file }) => file === "approval-label.yml");
+test("the approval label workflow calls no actions or reusable workflows", () => {
+  expect(approvalLabel).not.toMatch(/\buses\s*:/);
+});
 
-  expect(workflow).toBeDefined();
-  expect(triggerBlock(workflow?.text ?? "")).toBe(
-    "  pull_request_target:\n    types: [synchronize]\n",
-  );
+test("the approval label workflow runs only approved scripts without expressions", () => {
+  const scripts = runScripts(approvalLabel);
+
+  expect(scripts.filter((script) => script.join("\n").includes("${{"))).toEqual([]);
+  expect(scripts).toEqual(approvedRunScripts);
 });
