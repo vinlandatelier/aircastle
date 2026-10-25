@@ -47,6 +47,34 @@ test.each([
   expect(inspectCode("value.ts", source)).toEqual([]);
 });
 
+test.each([
+  ["call", "sql.unsafe(query);"],
+  ["typed transaction call", "transaction.unsafe<Row[]>(query, [id]);"],
+  ["optional call", "sql?.unsafe(query);"],
+  ["computed access", 'sql["unsafe"](query);'],
+  ["reference", "const run = sql.unsafe;"],
+  ["template computed access", "sql[`unsafe`](query);"],
+  ["destructuring", "const { unsafe } = sql;"],
+  ["renamed destructuring", "const { unsafe: raw } = sql;"],
+  ["string-keyed destructuring", 'const { "unsafe": raw } = sql;'],
+  ["parameter destructuring", "const run = ({ unsafe }: Sql) => unsafe(query);"],
+])("rejects raw SQL outside the identifier helpers: %s", (_name, source) => {
+  expect(inspectCode("packages/adapter-postgres/src/index.ts", source)).toEqual([
+    expect.objectContaining({ rule: "unsafe-sql" }),
+  ]);
+});
+
+test("accepts raw SQL in the identifier helpers and unsafe-looking literals elsewhere", () => {
+  for (const file of [
+    "packages/adapter-postgres/src/identifier.ts",
+    "tests/support/content-database.ts",
+  ])
+    expect(inspectCode(file, "sql.unsafe(query);")).toEqual([]);
+  expect(
+    inspectCode("value.ts", 'const code = "sql.unsafe(query)"; const unsafe = { unsafe: 1 };'),
+  ).toEqual([]);
+});
+
 test("handles JSX text and expression comments independently", () => {
   expect(inspectCode("value.tsx", "const value = <div>// literal /* text */</div>;")).toEqual([]);
   expect(inspectCode("value.jsx", "const value = <div>{/* explanation */}</div>;")).toHaveLength(1);

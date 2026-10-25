@@ -8,7 +8,7 @@ import type {
   Result,
 } from "@aircastle/contracts";
 import { canonicalContract, parseCollections } from "@aircastle/contracts";
-import { qualified } from "./layout.ts";
+import { identifier } from "./identifier.ts";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -46,13 +46,12 @@ export function projectTransaction(
   namespace: string,
   project: string,
 ): ProjectTransaction {
-  const table = (name: string) => qualified(namespace, name);
+  const table = (name: string) => identifier(sql, namespace, name);
   const collectionKey = (name: string) => hash(name);
   const resolveCollection = async (name: string) => {
-    const rows = await sql.unsafe<{ name: string }[]>(
-      `SELECT name FROM ${table("collections")} WHERE project_id = $1 AND name_key = $2`,
-      [project, collectionKey(name)],
-    );
+    const rows = await sql<
+      { name: string }[]
+    >`SELECT name FROM ${table("collections")} WHERE project_id = ${project} AND name_key = ${collectionKey(name)}`;
     if (rows[0]?.name !== name)
       throw new Error("Unknown collection or collection name hash collision");
   };
@@ -64,17 +63,13 @@ export function projectTransaction(
     id: string,
   ) => {
     const digest = hash(value);
-    const inserted = await transaction.unsafe<{ value: string }[]>(
-      `INSERT INTO ${table("unique_values")} (project_id, collection_name, field, digest, value, document_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (project_id, collection_key, field_key, digest) DO NOTHING RETURNING value`,
-      [project, collection, field, digest, value, id],
-    );
+    const inserted = await transaction<
+      { value: string }[]
+    >`INSERT INTO ${table("unique_values")} (project_id, collection_name, field, digest, value, document_id) VALUES (${project}, ${collection}, ${field}, ${digest}, ${value}, ${id}) ON CONFLICT (project_id, collection_key, field_key, digest) DO NOTHING RETURNING value`;
     if (inserted.length > 0) return;
-    const existing = await transaction.unsafe<
+    const existing = await transaction<
       { collection_name: string; field: string; value: string }[]
-    >(
-      `SELECT collection_name, field, value FROM ${table("unique_values")} WHERE project_id = $1 AND collection_key = $2 AND field_key = $3 AND digest = $4`,
-      [project, collectionKey(collection), hash(field), digest],
-    );
+    >`SELECT collection_name, field, value FROM ${table("unique_values")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} AND field_key = ${hash(field)} AND digest = ${digest}`;
     const prior = existing[0];
     if (
       !prior ||
@@ -87,23 +82,20 @@ export function projectTransaction(
   };
   const documents = async (collection: string) => {
     await resolveCollection(collection);
-    const rows = await sql.unsafe<{ id: string; data: unknown }[]>(
-      `SELECT id, data FROM ${table("documents")} WHERE project_id = $1 AND collection_key = $2 ORDER BY id`,
-      [project, collectionKey(collection)],
-    );
+    const rows = await sql<
+      { id: string; data: unknown }[]
+    >`SELECT id, data FROM ${table("documents")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} ORDER BY id`;
     return rows.map(document);
   };
   return {
     state: async () => {
-      const projects = await sql.unsafe<{ revision: string | null }[]>(
-        `SELECT revision FROM ${table("projects")} WHERE id = $1`,
-        [project],
-      );
+      const projects = await sql<
+        { revision: string | null }[]
+      >`SELECT revision FROM ${table("projects")} WHERE id = ${project}`;
       if (!projects[0]) throw new Error("Unknown project");
-      const rows = await sql.unsafe<{ name: string; definition: string }[]>(
-        `SELECT name, definition FROM ${table("collections")} WHERE project_id = $1 ORDER BY ordinal`,
-        [project],
-      );
+      const rows = await sql<
+        { name: string; definition: string }[]
+      >`SELECT name, definition FROM ${table("collections")} WHERE project_id = ${project} ORDER BY ordinal`;
       return {
         revision: projects[0].revision,
         collections: rows.map((row) => ({
@@ -113,40 +105,31 @@ export function projectTransaction(
       };
     },
     contract: async (id) => {
-      const rows = await sql.unsafe<{ definition: string }[]>(
-        `SELECT definition FROM ${table("contracts")} WHERE project_id = $1 AND hash = $2`,
-        [project, id],
-      );
+      const rows = await sql<
+        { definition: string }[]
+      >`SELECT definition FROM ${table("contracts")} WHERE project_id = ${project} AND hash = ${id}`;
       return rows[0] ? description(rows[0].definition) : undefined;
     },
     documents,
     activate: async (collections, publication) => {
       for (const [ordinal, collection] of collections.entries()) {
-        const existing = await sql.unsafe<{ name: string }[]>(
-          `SELECT name FROM ${table("collections")} WHERE project_id = $1 AND name_key = $2`,
-          [project, collectionKey(collection.name)],
-        );
+        const existing = await sql<
+          { name: string }[]
+        >`SELECT name FROM ${table("collections")} WHERE project_id = ${project} AND name_key = ${collectionKey(collection.name)}`;
         if (existing[0] && existing[0].name !== collection.name)
           throw new Error("Collection name hash collision");
-        await sql.unsafe(
-          `INSERT INTO ${table("collections")} (project_id, name, ordinal, definition) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, name_key) DO UPDATE SET ordinal = excluded.ordinal, definition = excluded.definition`,
-          [project, collection.name, ordinal, JSON.stringify(collection.description)],
-        );
+        await sql`INSERT INTO ${table("collections")} (project_id, name, ordinal, definition) VALUES (${project}, ${collection.name}, ${ordinal}, ${JSON.stringify(collection.description)}) ON CONFLICT (project_id, name_key) DO UPDATE SET ordinal = excluded.ordinal, definition = excluded.definition`;
         const id = publication.contracts[collection.name];
         if (!id) throw new Error("Missing contract identifier");
         const canonical = canonicalContract(collection.description);
-        await sql.unsafe(
-          `INSERT INTO ${table("contracts")} (project_id, hash, definition, canonical) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, hash) DO NOTHING`,
-          [project, id, JSON.stringify(collection.description), canonical],
-        );
-        const stored = await sql.unsafe<{ canonical: string }[]>(
-          `SELECT canonical FROM ${table("contracts")} WHERE project_id = $1 AND hash = $2`,
-          [project, id],
-        );
+        await sql`INSERT INTO ${table("contracts")} (project_id, hash, definition, canonical) VALUES (${project}, ${id}, ${JSON.stringify(collection.description)}, ${canonical}) ON CONFLICT (project_id, hash) DO NOTHING`;
+        const stored = await sql<
+          { canonical: string }[]
+        >`SELECT canonical FROM ${table("contracts")} WHERE project_id = ${project} AND hash = ${id}`;
         if (stored[0]?.canonical !== canonical)
           throw new Error("Collection contract hash collision");
       }
-      await sql.unsafe(`DELETE FROM ${table("unique_values")} WHERE project_id = $1`, [project]);
+      await sql`DELETE FROM ${table("unique_values")} WHERE project_id = ${project}`;
       for (const collection of collections) {
         const unique = Object.entries(collection.description.fields)
           .filter(([, field]) => field.unique)
@@ -160,20 +143,14 @@ export function projectTransaction(
           }
         }
       }
-      await sql.unsafe(`UPDATE ${table("projects")} SET revision = $2 WHERE id = $1`, [
-        project,
-        publication.revision,
-      ]);
+      await sql`UPDATE ${table("projects")} SET revision = ${publication.revision} WHERE id = ${project}`;
     },
     insert: async (collection, data, uniqueFields) => {
       await resolveCollection(collection);
       try {
         return await sql.savepoint(async (transaction): Promise<Result<ContentDocument>> => {
           const id = randomUUID();
-          await transaction.unsafe(
-            `INSERT INTO ${table("documents")} (id, project_id, collection_name, data) VALUES ($1, $2, $3, $4::jsonb)`,
-            [id, project, collection, transaction.json(data)],
-          );
+          await transaction`INSERT INTO ${table("documents")} (id, project_id, collection_name, data) VALUES (${id}, ${project}, ${collection}, ${transaction.json(data)}::jsonb)`;
           for (const field of uniqueFields) {
             const value = data[field];
             if (typeof value === "string") await claim(transaction, collection, field, value, id);
@@ -188,10 +165,9 @@ export function projectTransaction(
     },
     read: async (collection, id) => {
       await resolveCollection(collection);
-      const rows = await sql.unsafe<{ id: string; data: unknown }[]>(
-        `SELECT id, data FROM ${table("documents")} WHERE id = $1 AND project_id = $2 AND collection_key = $3`,
-        [id, project, collectionKey(collection)],
-      );
+      const rows = await sql<
+        { id: string; data: unknown }[]
+      >`SELECT id, data FROM ${table("documents")} WHERE id = ${id} AND project_id = ${project} AND collection_key = ${collectionKey(collection)}`;
       return rows[0] ? document(rows[0]) : undefined;
     },
   };

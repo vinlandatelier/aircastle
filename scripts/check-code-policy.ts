@@ -5,8 +5,29 @@ import { resolve } from "node:path";
 export interface PolicyViolation {
   line: number;
   column: number;
-  rule: "ordinary-comment" | "type-suppression";
+  rule: "ordinary-comment" | "type-suppression" | "unsafe-sql";
 }
+
+const rawSqlFiles = new Set([
+  "packages/adapter-postgres/src/identifier.ts",
+  "tests/support/content-database.ts",
+]);
+
+interface SyntaxKey {
+  type: string;
+  name?: string;
+  value?: unknown;
+  expressions?: unknown[];
+  quasis?: { value: { cooked?: string | null } }[];
+  loc?: { start: { line: number; column: number } };
+}
+
+const namesUnsafe = (key: SyntaxKey, computed: boolean) =>
+  (key.type === "Identifier" && key.name === "unsafe" && !computed) ||
+  (key.type === "StringLiteral" && key.value === "unsafe") ||
+  (key.type === "TemplateLiteral" &&
+    key.expressions?.length === 0 &&
+    key.quasis?.[0]?.value.cooked === "unsafe");
 
 export function inspectCode(file: string, source: string): PolicyViolation[] {
   const plugins: ParserPlugin[] = [];
@@ -14,6 +35,7 @@ export function inspectCode(file: string, source: string): PolicyViolation[] {
   if (/\.[jt]sx$/.test(file)) plugins.push("jsx");
   const ast = parse(source, { sourceType: "unambiguous", plugins });
   const documented = new Set<number>();
+  const violations: PolicyViolation[] = [];
   const declarationParts = new Set([
     "ClassMethod",
     "ClassPrivateMethod",
@@ -36,6 +58,24 @@ export function inspectCode(file: string, source: string): PolicyViolation[] {
     }
     if (value === null || typeof value !== "object") return;
     const node = value as Record<string, unknown>;
+    const keys =
+      node.type === "MemberExpression" || node.type === "OptionalMemberExpression"
+        ? [{ key: node.property, computed: node.computed }]
+        : node.type === "ObjectPattern" && Array.isArray(node.properties)
+          ? (node.properties as Record<string, unknown>[])
+              .filter((entry) => entry.type === "ObjectProperty")
+              .map((entry) => ({ key: entry.key, computed: entry.computed }))
+          : [];
+    for (const { key, computed } of keys) {
+      if (!rawSqlFiles.has(file) && namesUnsafe(key as SyntaxKey, computed === true)) {
+        const start = (key as SyntaxKey).loc?.start;
+        violations.push({
+          line: start?.line ?? 1,
+          column: (start?.column ?? 0) + 1,
+          rule: "unsafe-sql",
+        });
+      }
+    }
     if (
       typeof node.type === "string" &&
       (node.type.endsWith("Declaration") || declarationParts.has(node.type)) &&
@@ -61,7 +101,6 @@ export function inspectCode(file: string, source: string): PolicyViolation[] {
     }
   };
   visit(ast.program);
-  const violations: PolicyViolation[] = [];
   for (const comment of ast.comments ?? []) {
     const rule = /@ts-(?:expect-error|ignore|nocheck)\b/i.test(comment.value)
       ? "type-suppression"
