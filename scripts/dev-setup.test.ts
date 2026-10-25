@@ -23,7 +23,7 @@ test("development setup creates and prints usable local connection settings", as
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
   expect(values.AIRCASTLE_API_KEY).toMatch(/^[A-Za-z0-9_-]{32,}$/);
-}, 30_000);
+});
 
 test("setup reruns reuse the project and reveal no existing secret; new-key is explicit", async () => {
   const namespace = `setup_${randomUUID().replaceAll("-", "")}`;
@@ -44,4 +44,4 @@ test("setup reruns reuse the project and reveal no existing secret; new-key is e
   expect(newer.AIRCASTLE_PROJECT_ID).toBe(original.AIRCASTLE_PROJECT_ID);
   expect(newer.AIRCASTLE_API_KEY).toMatch(/^[A-Za-z0-9_-]{32,}$/);
   expect(newer.AIRCASTLE_API_KEY).not.toBe(original.AIRCASTLE_API_KEY);
-}, 80_000);
+});
