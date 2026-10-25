@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vite-plus/test'
-import { SidebarProvider, SidebarTrigger } from './sidebar'
+import { SidebarMenuButton, SidebarProvider, SidebarTrigger } from './sidebar'
 
 describe('Sidebar state', () => {
   it('toggles uncontrolled state while notifying an observer', async () => {
@@ -58,5 +58,25 @@ describe('Sidebar state', () => {
 
     await user.click(trigger)
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('shows menu tooltips only while the desktop sidebar is collapsed', async () => {
+    const user = userEvent.setup()
+    render(
+      <SidebarProvider>
+        <SidebarTrigger />
+        <SidebarMenuButton tooltip="Tasks label">Tasks</SidebarMenuButton>
+      </SidebarProvider>,
+    )
+    const item = screen.getByRole('button', { name: 'Tasks' })
+
+    await user.hover(item)
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    expect(screen.queryByText('Tasks label')).toBeNull()
+
+    await user.unhover(item)
+    await user.click(screen.getByRole('button', { name: 'Toggle Sidebar' }))
+    await user.hover(screen.getByRole('button', { name: 'Tasks' }))
+    await waitFor(() => expect(screen.getByText('Tasks label')).toBeTruthy(), { timeout: 2000 })
   })
 })
