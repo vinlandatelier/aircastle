@@ -22,8 +22,70 @@ const config = {
     claudeImplementer: anthropic,
   },
 };
-const response = (content: unknown) =>
-  new Response(JSON.stringify(content), { headers: { "content-type": "application/json" } });
+type Event = { type: string } & Record<string, unknown>;
+const stream = (events: Event[], chunkSize = Infinity) => {
+  const bytes = new TextEncoder().encode(
+    events
+      .map((event) => `event: ${event.type}\r\ndata: ${JSON.stringify(event)}\r\n\r\n`)
+      .join(""),
+  );
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (let index = 0; index < bytes.length; index += chunkSize)
+          controller.enqueue(bytes.slice(index, index + chunkSize));
+        controller.close();
+      },
+    }),
+    { headers: { "content-type": "text/event-stream" } },
+  );
+};
+const openaiStream = (response: Record<string, unknown>): Event[] => [
+  { type: "response.created", response: { status: "in_progress" } },
+  { type: `response.${String(response.status)}`, response },
+];
+const anthropicStream = (
+  message: { content: Record<string, unknown>[] } & Record<string, unknown>,
+): Event[] => [
+  { type: "message_start", message: { ...message, content: [], stop_reason: null } },
+  { type: "ping" },
+  ...message.content.flatMap((block, index): Event[] =>
+    block.type === "text"
+      ? [
+          { type: "content_block_start", index, content_block: { type: "text", text: "" } },
+          ...String(block.text)
+            .split(/(?<=,)/)
+            .map((text) => ({
+              type: "content_block_delta",
+              index,
+              delta: { type: "text_delta", text },
+            })),
+          { type: "content_block_stop", index },
+        ]
+      : [
+          { type: "content_block_start", index, content_block: { ...block, thinking: "" } },
+          { type: "content_block_delta", index, delta: { type: "thinking_delta", thinking: "" } },
+          {
+            type: "content_block_delta",
+            index,
+            delta: { type: "signature_delta", signature: "sig" },
+          },
+          { type: "content_block_stop", index },
+        ],
+  ),
+  {
+    type: "message_delta",
+    delta: { stop_reason: message.stop_reason },
+    usage: { output_tokens: 9 },
+  },
+  { type: "message_stop" },
+];
+const response = (body: Record<string, unknown>) =>
+  stream(
+    "status" in body
+      ? openaiStream(body)
+      : anthropicStream(body as { content: Record<string, unknown>[] }),
+  );
 const completed = (text: string) => ({
   status: "completed",
   model: openai.model,
@@ -101,13 +163,13 @@ test.each([openai, anthropic])(
         strict: true,
         schema,
       });
-      expect(body.max_output_tokens).toBeLessThanOrEqual(8192);
+      expect(body.stream).toBe(true);
     } else {
       expect(body.output_config).toEqual({
         effort: "high",
         format: { type: "json_schema", schema },
       });
-      expect(body.max_tokens).toBeLessThanOrEqual(8192);
+      expect(body.stream).toBe(true);
     }
     expect(JSON.stringify(request)).not.toContain(
       selection.provider === "openai" ? "anthropic-secret" : "openai-secret",
@@ -143,6 +205,84 @@ test.each(["max_tokens", "refusal", "tool_use", "pause_turn"])(
     await expect(runModel(anthropic, "review", schema)).rejects.toThrow();
   },
 );
+
+test.each([
+  ["low", 64_000],
+  ["medium", 64_000],
+  ["high", 64_000],
+  ["xhigh", 128_000],
+  ["max", 128_000],
+] as const)(
+  "%s effort leaves both providers room to reason before answering (%i tokens)",
+  async (effort, cap) => {
+    vi.stubEnv("OPENAI_API_KEY", "openai-secret");
+    vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-secret");
+    const fetcher = vi.fn(async (url: string, _request: RequestInit) =>
+      response(
+        url.includes("openai")
+          ? completed('{"ok":true}')
+          : {
+              model: anthropic.model,
+              stop_reason: "end_turn",
+              content: [{ type: "text", text: '{"ok":true}' }],
+            },
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    await runModel({ ...openai, effort }, "review", schema);
+    await runModel({ ...anthropic, effort }, "review", schema);
+    const bodies = fetcher.mock.calls.map(([, request]) => {
+      if (typeof request.body !== "string") throw new Error("missing request");
+      return JSON.parse(request.body);
+    });
+    expect(bodies[0].max_output_tokens).toBe(cap);
+    expect(bodies[1].max_tokens).toBe(cap);
+  },
+);
+
+test("config accepts xhigh effort for Anthropic roles", () => {
+  const roles = { ...config.roles, claudeReviewer: { ...anthropic, effort: "xhigh" } };
+  expect(parseModelConfig({ ...config, roles }).roles.claudeReviewer.effort).toBe("xhigh");
+});
+
+test("Anthropic answer is reassembled from thinking and text deltas split across chunks", async () => {
+  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
+  const answer = { ok: true, note: "first, second, third" };
+  const events = anthropicStream({
+    model: anthropic.model,
+    stop_reason: "end_turn",
+    content: [
+      { type: "thinking", signature: "" },
+      { type: "text", text: JSON.stringify(answer) },
+    ],
+  });
+  vi.stubGlobal("fetch", async () => stream(events, 7));
+  const noted = {
+    ...schema,
+    properties: { ...schema.properties, note: { type: "string" } },
+    required: ["ok", "note"],
+  };
+  await expect(runModel(anthropic, "review", noted)).resolves.toEqual(answer);
+});
+
+test.each<[string, ModelSelection, Event[]]>([
+  ["Anthropic", anthropic, [{ type: "message_start", message: { model: anthropic.model } }]],
+  ["OpenAI", openai, [{ type: "response.created", response: { status: "in_progress" } }]],
+])("%s stream that ends before its final event is incomplete", async (_, selection, events) => {
+  vi.stubEnv("OPENAI_API_KEY", "key-secret");
+  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
+  vi.stubGlobal("fetch", async () => stream(events));
+  await expect(runModel(selection, "review", schema)).rejects.toThrow("provider_incomplete");
+});
+
+test.each([anthropic, openai])("%s error event fails without echoing it", async (selection) => {
+  vi.stubEnv("OPENAI_API_KEY", "key-secret");
+  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
+  vi.stubGlobal("fetch", async () =>
+    stream([{ type: "error", error: { type: "overloaded_error", message: "key-secret" } }]),
+  );
+  await expect(runModel(selection, "review", schema)).rejects.toThrow("provider_failed");
+});
 
 test("rejects unsupported schemas and oversized prompts before spending", async () => {
   vi.stubEnv("OPENAI_API_KEY", "key-secret");
