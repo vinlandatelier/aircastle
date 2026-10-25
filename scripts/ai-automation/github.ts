@@ -3,6 +3,7 @@ import {
   contextComplete,
   digest,
   integer,
+  isReceipt,
   operationId,
   parseCommand,
   requireObject,
@@ -153,14 +154,10 @@ export class Coordinator {
       const stored = comment.body.slice(marker.length);
       const encoded =
         stored.startsWith("<!--\n") && stored.endsWith("\n-->") ? stored.slice(5, -4) : stored;
-      const value = requireObject(JSON.parse(encoded));
-      if (
-        value.version !== 1 ||
-        !/^[a-f0-9]{64}$/.test(String(value.id)) ||
-        !["claimed", "published", "stale", "failed"].includes(String(value.state))
-      )
+      const receipt: unknown = JSON.parse(encoded);
+      if (!isReceipt(receipt) || !/^[a-f0-9]{64}$/.test(receipt.id))
         throw new Error("Invalid bot receipt");
-      return [{ commentId: integer(comment.id), receipt: value as unknown as Receipt }];
+      return [{ commentId: integer(comment.id), receipt }];
     });
   }
   async claim(job: Job, existing: StoredReceipt[]): Promise<StoredReceipt | null> {

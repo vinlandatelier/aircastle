@@ -1,4 +1,4 @@
-import { digest, type Edit, type Job, type Verification } from "./index.ts";
+import { digest, isRecord, type Edit, type Job, type Verification } from "./index.ts";
 
 const uiTests = new Map([
   ["apps/web/src/components/ui/input-group.tsx", "src/components/ui/input-group.test.tsx"],
@@ -49,8 +49,8 @@ export function verificationPlan(edits: Edit[]): string[][] | null {
  * and its result matches the plan: passed for scoped checks, not passed for patch-only scopes.
  */
 export function boundVerification(job: Job, edits: Edit[], value: unknown): Verification | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const receipt = value as Record<string, unknown>;
+  if (!isRecord(value)) return null;
+  const receipt = value;
   const commands = verificationPlan(edits);
   if (
     receipt.id !== job.id ||

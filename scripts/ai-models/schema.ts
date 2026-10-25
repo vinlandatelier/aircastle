@@ -36,7 +36,7 @@ export function anthropicSchema(schema: Record<string, unknown>): Record<string,
     result.properties = Object.fromEntries(
       Object.entries(schema.properties).map(([key, value]) => [
         key,
-        anthropicSchema(value as Record<string, unknown>),
+        isJsonObject(value) ? anthropicSchema(value) : value,
       ]),
     );
   if (isJsonObject(schema.items)) result.items = anthropicSchema(schema.items);
@@ -59,13 +59,14 @@ export function checkSchema(schema: unknown, depth = 0): asserts schema is Recor
   if (acceptedTypes.length === 0 || acceptedTypes.some((type) => !types.includes(String(type))))
     throw new Error("unsupported_schema");
   if (acceptedTypes.includes("object")) {
+    const required: unknown = schema.required;
     if (
       !isJsonObject(schema.properties) ||
       schema.additionalProperties !== false ||
-      !Array.isArray(schema.required) ||
-      schema.required.some((key) => typeof key !== "string") ||
-      Object.keys(schema.properties).some((key) => !(schema.required as unknown[]).includes(key)) ||
-      schema.required.length !== Object.keys(schema.properties).length
+      !Array.isArray(required) ||
+      required.some((key) => typeof key !== "string") ||
+      Object.keys(schema.properties).some((key) => !required.includes(key)) ||
+      required.length !== Object.keys(schema.properties).length
     )
       throw new Error("unsupported_schema");
     for (const property of Object.values(schema.properties)) checkSchema(property, depth + 1);
@@ -80,6 +81,11 @@ export function checkSchema(schema: unknown, depth = 0): asserts schema is Recor
     )
       throw new Error("unsupported_schema");
   }
+}
+
+function subschema(value: unknown): Record<string, unknown> {
+  if (!isJsonObject(value)) throw new Error("unsupported_schema");
+  return value;
 }
 
 export function matches(schema: Record<string, unknown>, value: unknown): boolean {
@@ -100,18 +106,17 @@ export function matches(schema: Record<string, unknown>, value: unknown): boolea
   if (Object.hasOwn(schema, "const") && JSON.stringify(schema.const) !== JSON.stringify(value))
     return false;
   if (isJsonObject(value)) {
-    const properties = schema.properties as Record<string, Record<string, unknown>>;
+    const properties = subschema(schema.properties);
     if (
       Object.keys(value).some((key) => !Object.hasOwn(properties, key)) ||
       Object.keys(properties).some(
-        (key) => !Object.hasOwn(value, key) || !matches(properties[key]!, value[key]),
+        (key) => !Object.hasOwn(value, key) || !matches(subschema(properties[key]), value[key]),
       )
     )
       return false;
   }
   if (Array.isArray(value)) {
-    if (!value.every((item) => matches(schema.items as Record<string, unknown>, item)))
-      return false;
+    if (!value.every((item) => matches(subschema(schema.items), item))) return false;
     if (
       (typeof schema.minItems === "number" && value.length < schema.minItems) ||
       (typeof schema.maxItems === "number" && value.length > schema.maxItems)

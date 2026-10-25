@@ -66,13 +66,22 @@ export function parseModelConfig(value: unknown): ModelConfig {
     Object.keys(value.roles).sort().join() !== [...roles].sort().join()
   )
     throw new Error("invalid_model_config");
-  const result = {} as Record<Role, ModelSelection>;
-  for (const role of roles) {
-    result[role] = selection(value.roles[role]);
-    if (result[role].provider !== (role.startsWith("codex") ? "openai" : "anthropic"))
+  const configured = value.roles;
+  const roleSelection = (role: Role): ModelSelection => {
+    const result = selection(configured[role]);
+    if (result.provider !== (role.startsWith("codex") ? "openai" : "anthropic"))
       throw new Error("invalid_model_config");
-  }
-  return { version: 1, roles: result };
+    return result;
+  };
+  return {
+    version: 1,
+    roles: {
+      codexReviewer: roleSelection("codexReviewer"),
+      codexImplementer: roleSelection("codexImplementer"),
+      claudeReviewer: roleSelection("claudeReviewer"),
+      claudeImplementer: roleSelection("claudeImplementer"),
+    },
+  };
 }
 
 async function* serverEvents(

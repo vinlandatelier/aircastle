@@ -2,7 +2,14 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Coordinator } from "./github.ts";
 import { renderPatch } from "./materialize.ts";
-import { digest, integer, requireObject, sha, text, workflowOutputs, type Job } from "./index.ts";
+import {
+  digest,
+  integer,
+  parseJob,
+  requireObject,
+  sha,
+  workflowOutputs,
+} from "./index.ts";
 import { boundVerification } from "./checks.ts";
 import { verify } from "./verify.ts";
 import { executeOperation, boundModelOutput, type ModelOutput } from "./operations.ts";
@@ -35,38 +42,6 @@ async function json(path: string, max = 2_000_000): Promise<unknown> {
 async function output(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value));
-}
-function inputJob(value: unknown): Job {
-  const job = requireObject(value),
-    snapshot = requireObject(job.snapshot),
-    selection = requireObject(job.selection);
-  if (
-    job.version !== 1 ||
-    !/^[a-f0-9]{64}$/.test(String(job.id)) ||
-    !["review", "fix", "request"].includes(String(job.task)) ||
-    !["codexReviewer", "codexImplementer", "claudeReviewer", "claudeImplementer"].includes(
-      String(job.role),
-    )
-  )
-    throw new Error("Invalid job");
-  sha(job.control);
-  sha(snapshot.head);
-  sha(snapshot.base);
-  integer(snapshot.number);
-  text(selection.model, 200);
-  text(selection.effort, 40);
-  if (job.task === "request") {
-    const implementation = requireObject(job.implementation);
-    text(implementation.model, 200);
-    text(implementation.effort, 40);
-  }
-  if (
-    !Array.isArray(snapshot.files) ||
-    !Array.isArray(snapshot.changedPaths) ||
-    !Array.isArray(snapshot.omitted)
-  )
-    throw new Error("Invalid context bundle");
-  return job as unknown as Job;
 }
 async function main(): Promise<void> {
   const command = process.argv[2];
@@ -133,7 +108,7 @@ async function main(): Promise<void> {
     throw new Error("Usage: node scripts/ai-automation/cli.ts setup|prepare|model|verify|publish");
   const id = required("AI_OPERATION_ID");
   if (!/^[a-f0-9]{64}$/.test(id)) throw new Error("Invalid operation ID");
-  const job = inputJob(await json(`${target}/plan/${id}.json`));
+  const job = parseJob(await json(`${target}/plan/${id}.json`));
   if (job.id !== id || job.control !== required("AI_CONTROL_SHA"))
     throw new Error("Control revision mismatch");
   if (command === "model") {

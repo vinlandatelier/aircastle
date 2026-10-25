@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { requireObject, sha, validateEdits, type Job } from "./index.ts";
+import { parseJob, sha, validateEdits } from "./index.ts";
 import { applyEdits } from "./materialize.ts";
 import { verificationPlan } from "./checks.ts";
 
@@ -14,7 +14,7 @@ function run(command: string, args: string[], cwd: string, timeout = 300000): vo
   if (result.status !== 0)
     throw new Error(`Verification command failed: ${command}; status ${result.status}`);
 }
-const job = requireObject(JSON.parse(await readFile("/input/job.json", "utf8"))) as unknown as Job;
+const job = parseJob(JSON.parse(await readFile("/input/job.json", "utf8")));
 const fix = validateEdits(JSON.parse(await readFile("/input/result.json", "utf8")), job.snapshot);
 const commands = verificationPlan(fix.edits);
 if (commands === null) throw new Error("Scoped verification unavailable");
