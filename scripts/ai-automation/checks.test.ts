@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, vi } from "vite-plus/test";
-import { verificationPlan } from "./checks.ts";
+import { boundVerification, verificationPlan } from "./checks.ts";
 import { digest, type Edit, type Job } from "./index.ts";
 import { snapshot } from "./fixtures.ts";
 import { verify } from "./verify.ts";
@@ -150,4 +150,21 @@ test("the verification image takes its toolchain versions from the repository fi
     ]),
   );
   expect(readFileSync("scripts/ai-automation/Dockerfile", "utf8")).not.toMatch(/\d+\.\d+\.\d+/);
+});
+
+test("each fix publishes from its own bound verification receipt", async () => {
+  const supported = input("apps/web/src/components/shell/app-header.tsx");
+  const edits = [edit("apps/web/src/components/shell/app-header.tsx")];
+  const receipt = await verify(supported.job, supported.output, "vinlandatelier/aircastle");
+  expect(boundVerification(supported.job, edits, receipt)).toEqual(receipt);
+  expect(boundVerification(supported.job, edits, { ...receipt, passed: false })).toBeNull();
+  expect(boundVerification(supported.job, edits, undefined)).toBeNull();
+  const other = { ...supported.job, id: "2".repeat(64) };
+  expect(boundVerification(other, edits, receipt)).toBeNull();
+  expect(boundVerification(supported.job, edits, { ...receipt, recipe: "forged" })).toBeNull();
+  const unsupported = input("packages/core/src/value.ts");
+  const patchOnly = await verify(unsupported.job, unsupported.output, "vinlandatelier/aircastle");
+  expect(
+    boundVerification(unsupported.job, [edit("packages/core/src/value.ts")], patchOnly),
+  ).toEqual(patchOnly);
 });

@@ -8,6 +8,7 @@ import {
   reviewLenses,
   validateEdits,
   validateReview,
+  workflowOutputs,
   type Job,
 } from "./index.ts";
 
@@ -323,3 +324,30 @@ test.each(["codexReviewer", "claudeReviewer"] as const)(
     );
   },
 );
+
+test("only fix jobs enter the verification matrix", () => {
+  const fix = {
+    ...reviewJob,
+    id: "2".repeat(64),
+    role: "codexImplementer" as const,
+    task: "fix" as const,
+  };
+  const outputs = (jobs: Job[]) =>
+    Object.fromEntries(
+      workflowOutputs(jobs)
+        .trim()
+        .split("\n")
+        .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+    );
+  const both = outputs([reviewJob, fix]);
+  expect(JSON.parse(String(both.matrix)).include.map((entry: { id: string }) => entry.id)).toEqual([
+    reviewJob.id,
+    fix.id,
+  ]);
+  expect(JSON.parse(String(both.verify_matrix)).include).toEqual([
+    { id: fix.id, provider: "openai", task: "fix" },
+  ]);
+  expect(both.has_fixes).toBe("true");
+  expect(outputs([reviewJob]).has_fixes).toBe("false");
+  expect(outputs([]).has_jobs).toBe("false");
+});

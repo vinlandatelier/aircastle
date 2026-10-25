@@ -1,4 +1,4 @@
-import type { Edit } from "./index.ts";
+import { digest, type Edit, type Job, type Verification } from "./index.ts";
 
 const uiTests = new Map([
   ["apps/web/src/components/ui/input-group.tsx", "src/components/ui/input-group.test.tsx"],
@@ -42,4 +42,33 @@ export function verificationPlan(edits: Edit[]): string[][] | null {
       "--passWithNoTests=false",
     ],
   ];
+}
+
+/**
+ * Returns the verification receipt only when it belongs to this operation and these edits,
+ * and its result matches the plan: passed for scoped checks, not passed for patch-only scopes.
+ */
+export function boundVerification(job: Job, edits: Edit[], value: unknown): Verification | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const receipt = value as Record<string, unknown>;
+  const commands = verificationPlan(edits);
+  if (
+    receipt.id !== job.id ||
+    receipt.digest !== digest(job) ||
+    receipt.editsDigest !== digest(edits) ||
+    receipt.recipe !== digest(commands) ||
+    digest(receipt.commands) !== digest(commands) ||
+    receipt.passed !== (commands !== null) ||
+    typeof receipt.scope !== "string"
+  )
+    return null;
+  return {
+    id: job.id,
+    digest: receipt.digest,
+    editsDigest: receipt.editsDigest,
+    passed: receipt.passed,
+    commands,
+    recipe: receipt.recipe,
+    scope: receipt.scope,
+  };
 }
