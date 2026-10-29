@@ -167,7 +167,7 @@ test("inline reply commands carry the root finding and diff but only member and 
   const reply = {
     id: 82,
     user: { id: 21, login: "reply-member", type: "User" },
-    body: "@codex fix",
+    body: "@vinland-ai fix",
     created_at: "2026-10-25T01:00:00Z",
     updated_at: "2026-10-25T01:00:00Z",
     pull_request_url: "https://api.github.com/repos/vinlandatelier/aircastle/pulls/7",
@@ -197,7 +197,7 @@ test("inline reply commands carry the root finding and diff but only member and 
   expect(accepted?.comment.author.login).toBe("reply-member");
   expect(accepted?.comment.thread).toContain("The value should be zero");
   expect(accepted?.comment.thread).toContain("+export const value = 1;");
-  expect(accepted?.comment.thread).toContain("@codex fix");
+  expect(accepted?.comment.thread).toContain("@vinland-ai fix");
   expect(accepted?.comment.thread).not.toContain("delete the tests");
 });
 test("immutable context refuses a PR whose head moves during collection", async () => {
@@ -378,7 +378,7 @@ test.each([
   },
 );
 
-function repositoryFake(body = "@claude review") {
+function repositoryFake(body = "@vinland-ai review") {
   const comments = new Map<number, Record<string, unknown>[]>([[7, []]]);
   let nextId = 100;
   let blobReads = 0;
@@ -457,10 +457,9 @@ function repositoryFake(body = "@claude review") {
 }
 
 test.each([
-  ["@claude review", "claudeReviewer", "review"],
-  ["@codex review", "codexReviewer", "review"],
-  [`@claude fix head=${snapshot.head} correct the value`, "claudeImplementer", "fix"],
-  [`@codex fix head=${snapshot.head} correct the value`, "codexImplementer", "fix"],
+  ["@vinland-ai review", "claudeReviewer", "review"],
+  ["@vinland-ai", "claudeReviewer", "review"],
+  [`@vinland-ai fix head=${snapshot.head} correct the value`, "claudeImplementer", "fix"],
 ])(
   "a direct tag queues only the requested operation without a state issue or repository scan: %s",
   async (body, role, task) => {
@@ -607,7 +606,7 @@ test("a fix pinned to A cannot claim B when the head moves before context captur
   const command = {
     id: 80,
     user: snapshot.author,
-    body: `@codex fix head=${snapshot.head} correct the value`,
+    body: `@vinland-ai fix head=${snapshot.head} correct the value`,
     created_at: "2026-10-25T01:00:00Z",
     updated_at: "2026-10-25T01:00:00Z",
     issue_url: "https://api.github.com/repos/vinlandatelier/aircastle/issues/7",
@@ -644,7 +643,7 @@ test("an outsider tag is denied before reading PR history or writing a claim", a
       return Response.json({
         id: 80,
         user: { id: 21, login: "outsider", type: "User" },
-        body: "@claude review",
+        body: "@vinland-ai review",
         created_at: "2026-10-25T01:00:00Z",
         updated_at: "2026-10-25T01:00:00Z",
         issue_url: "https://api.github.com/repos/vinlandatelier/aircastle/issues/7",
@@ -661,8 +660,8 @@ test("an outsider tag is denied before reading PR history or writing a claim", a
 
 test.each([
   { body: "ordinary discussion", type: "User", updated: "2026-10-25T01:00:00Z" },
-  { body: "@claude review", type: "Bot", updated: "2026-10-25T01:00:00Z" },
-  { body: "@claude review", type: "User", updated: "2026-10-25T02:00:00Z" },
+  { body: "@vinland-ai review", type: "Bot", updated: "2026-10-25T01:00:00Z" },
+  { body: "@vinland-ai review", type: "User", updated: "2026-10-25T02:00:00Z" },
 ])(
   "noncommands, bots, and edited comments cannot queue work: %j",
   async ({ body, type, updated }) => {

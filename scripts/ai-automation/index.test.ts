@@ -14,14 +14,16 @@ import {
 
 import { sha, snapshot, invocation } from "./fixtures.ts";
 
-test.each(["@codex", "@codex review", "@codex review check validation", "@codex please review"])(
-  "defaults a standalone mention to review: %s",
-  (body) => {
-    expect(parseCommand(body)?.kind).toBe("review");
-  },
-);
+test.each([
+  "@vinland-ai",
+  "@vinland-ai review",
+  "@vinland-ai review check validation",
+  "@vinland-ai please review",
+])("defaults a standalone mention to review: %s", (body) => {
+  expect(parseCommand(body)).toMatchObject({ provider: "anthropic", kind: "review" });
+});
 test("explicit fix commands preserve task instructions and optional expected SHA", () => {
-  expect(parseCommand(`@claude fix head=${sha} correct the referenced finding`)).toEqual({
+  expect(parseCommand(`@vinland-ai fix head=${sha} correct the referenced finding`)).toEqual({
     provider: "anthropic",
     kind: "fix",
     instructions: "correct the referenced finding",
@@ -29,13 +31,15 @@ test("explicit fix commands preserve task instructions and optional expected SHA
   });
 });
 test.each([
-  "> @codex fix",
-  "`@codex fix`",
-  "```\n@codex fix\n```",
-  "<!--\n@codex fix\n-->",
-  "@codex fix\n@claude review",
-  "text @codex fix",
-  "@codexity fix",
+  "@claude review",
+  "@codex review",
+  "> @vinland-ai fix",
+  "`@vinland-ai fix`",
+  "```\n@vinland-ai fix\n```",
+  "<!--\n@vinland-ai fix\n-->",
+  "@vinland-ai fix\n@vinland-ai review",
+  "text @vinland-ai fix",
+  "@vinland-ai-extra fix",
 ])("ignores quoted, ambiguous, or spoofed commands: %s", (body) => {
   expect(parseCommand(body)).toBeNull();
 });
@@ -62,7 +66,7 @@ test("an inline reply author authorizes the command, not the PR author", async (
   const command = {
     id: 80,
     author: { id: 21, login: "reply-member", type: "User" },
-    body: "@claude fix",
+    body: "@vinland-ai fix",
     createdAt: "2026-10-25T00:00:00Z",
     thread: "Finding: incorrect value",
     source: "inline" as const,
@@ -93,7 +97,7 @@ test("an explicit head in a command cannot authorize a different revision", asyn
   const command = {
     id: 81,
     author: snapshot.author,
-    body: `@codex review head=${"f".repeat(40)}`,
+    body: `@vinland-ai review head=${"f".repeat(40)}`,
     createdAt: "2026-10-25T00:00:00Z",
     thread: "",
     source: "issue" as const,
@@ -101,7 +105,7 @@ test("an explicit head in a command cannot authorize a different revision", asyn
   expect(
     (
       await authorize(
-        { ...invocation, kind: "manual", command },
+        { ...invocation, kind: "manual", role: "claudeReviewer", command },
         { membership: async () => "member" },
       )
     ).kind,
@@ -115,7 +119,7 @@ test("automatic review keys change per revision and provider; manual keys never 
   const command = {
     id: 82,
     author: snapshot.author,
-    body: "@codex",
+    body: "@vinland-ai",
     createdAt: "2026-10-25T00:00:00Z",
     thread: "",
     source: "issue" as const,
@@ -197,20 +201,21 @@ test("edits require original blobs and allow only bounded normal text files", ()
   ).toThrow();
 });
 
-test.each(["    @codex fix", "\t@claude fix", "<!-- unclosed\n@codex fix"])(
+test.each(["    @vinland-ai fix", "\t@vinland-ai fix", "<!-- unclosed\n@vinland-ai fix"])(
   "ignores indented code and unclosed HTML quotes: %s",
   (body) => {
     expect(parseCommand(body)).toBeNull();
   },
 );
 test("a polite explicit fix request selects fix", () => {
-  expect(parseCommand("@codex please fix the referenced finding")?.kind).toBe("fix");
+  expect(parseCommand("@vinland-ai please fix the referenced finding")?.kind).toBe("fix");
 });
 
 test("multiline fix instructions reach the task instead of disappearing", () => {
   expect(
-    parseCommand("@codex fix\nUse the API's validated result.\nKeep the original public behavior.")
-      ?.instructions,
+    parseCommand(
+      "@vinland-ai fix\nUse the API's validated result.\nKeep the original public behavior.",
+    )?.instructions,
   ).toBe("Use the API's validated result.\nKeep the original public behavior.");
 });
 

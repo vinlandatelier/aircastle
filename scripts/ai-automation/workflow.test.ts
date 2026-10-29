@@ -20,8 +20,9 @@ test("comment events start planning only for PR comments that mention a bot from
   const gate = condition("prepare");
   expect(gate).toContain("github.event_name == 'issue_comment'");
   expect(gate).toContain("github.event.issue.pull_request");
-  expect(gate).toContain("contains(github.event.comment.body, '@codex')");
-  expect(gate).toContain("contains(github.event.comment.body, '@claude')");
+  expect(gate).toContain("contains(github.event.comment.body, '@vinland-ai')");
+  expect(gate).not.toContain("@claude");
+  expect(gate).not.toContain("@codex");
   expect(gate).toContain(
     `contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)`,
   );
