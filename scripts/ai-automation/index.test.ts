@@ -470,3 +470,13 @@ test("natural requests enter secretless verification because they may resolve to
   );
   expect(output).toContain("has_verification=true");
 });
+
+test.each([
+  "@vinland-ai\ncan u pls change this to XYZ",
+  "can u pls change this to XYZ\n\n@vinland-ai",
+])("natural prose around the mention still requests interpretation: %s", (body) => {
+  expect(parseCommand(body)).toMatchObject({
+    kind: "request",
+    instructions: expect.stringContaining("can u pls change this to XYZ"),
+  });
+});

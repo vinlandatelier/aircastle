@@ -158,7 +158,8 @@ export function parseCommand(body: string): Command | null {
   if (body.length > 32000) return null;
   const lines = body.replace(/<!--[\s\S]*?(?:-->|$)/g, "").split(/\r?\n/);
   let fence: string | null = null;
-  const commands: Command[] = [];
+  const commands: (Command & { explicit: boolean })[] = [];
+  let surroundingProse = false;
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!;
     const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
@@ -169,7 +170,10 @@ export function parseCommand(body: string): Command | null {
     }
     if (fence || /^\s*>/.test(line) || /^(?: {4}|\t)/.test(line)) continue;
     const match = /^\s*@vinland-ai(?:\s+(.*))?\s*$/i.exec(line);
-    if (!match) continue;
+    if (!match) {
+      if (line.trim()) surroundingProse = true;
+      continue;
+    }
     let instructions = (match[1] ?? "").trim();
     if (/@vinland-ai\b/i.test(instructions)) return null;
     const action = /^(?:(?:please|can you|could you)\s+)?(fix|review)\b\s*/i.exec(instructions);
@@ -184,6 +188,7 @@ export function parseCommand(body: string): Command | null {
         ? "request"
         : "review";
     commands.push({
+      explicit: action !== null,
       provider: "anthropic",
       kind,
       instructions: [...lines.slice(0, index), instructions, ...lines.slice(index + 1)]
@@ -192,7 +197,9 @@ export function parseCommand(body: string): Command | null {
       ...(expected ? { expectedHead: expected[1]! } : {}),
     });
   }
-  return commands.length === 1 ? commands[0]! : null;
+  if (commands.length !== 1) return null;
+  const { explicit, ...command } = commands[0]!;
+  return !explicit && surroundingProse ? { ...command, kind: "request" } : command;
 }
 export function operationId(input: Invocation): string {
   const s = input.snapshot;

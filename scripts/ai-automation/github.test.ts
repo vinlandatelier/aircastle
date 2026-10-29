@@ -766,3 +766,32 @@ test("natural requests are claimed without running a model in the privileged pla
   });
   expect(await coordinator.prepare(config, 80)).toEqual([]);
 });
+
+test("claim metadata stays inside HTML comments and round-trips even with comment delimiters", async () => {
+  const hiddenJob = { ...job, instructions: "Change <!-- the --> value --!> now" };
+  const stored: Record<string, unknown>[] = [];
+  const coordinator = new Coordinator(options, async (_url, init) => {
+    if (init?.body) {
+      const body = JSON.parse(typeof init.body === "string" ? init.body : "null");
+      const comment = { id: 91, user: { id: 99, type: "Bot" }, ...body };
+      if (init.method === "POST") stored.push(comment);
+      else stored[0] = comment;
+      return Response.json(comment);
+    }
+    return Response.json(stored);
+  });
+  const claim = await coordinator.claim(hiddenJob, []);
+  expect(
+    String(stored[0]?.body)
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .trim(),
+  ).toBe("");
+  expect((await coordinator.receipts(7))[0]?.receipt.job.instructions).toBe(hiddenJob.instructions);
+  await coordinator.finish(claim!, "published");
+  expect(
+    String(stored[0]?.body)
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .trim(),
+  ).toBe("");
+  expect((await coordinator.receipts(7))[0]?.receipt.state).toBe("published");
+});

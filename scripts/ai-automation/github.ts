@@ -36,6 +36,12 @@ type Options = {
   botLogin?: string;
 };
 const marker = "<!-- aircastle-ai:v1 -->\n";
+function receiptBody(receipt: Receipt): string {
+  const encoded = JSON.stringify(receipt).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
+  const body = `${marker}<!--\n${encoded}\n-->`;
+  if (Buffer.byteLength(body) > 55000) throw new Error("Receipt exceeds bound");
+  return body;
+}
 function identity(value: unknown): Identity {
   const user = requireObject(value);
   const login = text(user.login, 100);
@@ -143,7 +149,10 @@ export class Coordinator {
         !comment.body.startsWith(marker)
       )
         return [];
-      const value = requireObject(JSON.parse(comment.body.slice(marker.length)));
+      const stored = comment.body.slice(marker.length);
+      const encoded =
+        stored.startsWith("<!--\n") && stored.endsWith("\n-->") ? stored.slice(5, -4) : stored;
+      const value = requireObject(JSON.parse(encoded));
       if (
         value.version !== 1 ||
         !/^[a-f0-9]{64}$/.test(String(value.id)) ||
@@ -181,24 +190,23 @@ export class Coordinator {
       attempt: (prior?.receipt.attempt ?? 0) + 1,
       at: new Date().toISOString(),
     };
-    if (Buffer.byteLength(JSON.stringify(receipt)) > 55000)
-      throw new Error("Receipt exceeds bound");
+    const body = receiptBody(receipt);
     if (prior) {
       await this.api(`${this.root}/issues/comments/${prior.commentId}`, "PATCH", {
-        body: marker + JSON.stringify(receipt),
+        body,
       });
       return { commentId: prior.commentId, receipt };
     }
     const posted = requireObject(
       await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
-        body: marker + JSON.stringify(receipt),
+        body,
       }),
     );
     return { commentId: integer(posted.id), receipt };
   }
   async finish(claim: StoredReceipt, state: Receipt["state"]): Promise<void> {
     await this.api(`${this.root}/issues/comments/${claim.commentId}`, "PATCH", {
-      body: marker + JSON.stringify({ ...claim.receipt, state }),
+      body: receiptBody({ ...claim.receipt, state }),
     });
   }
   async current(job: Job): Promise<boolean> {
