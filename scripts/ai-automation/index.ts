@@ -29,7 +29,7 @@ export type Snapshot = {
 };
 export type Command = {
   provider: "openai" | "anthropic";
-  kind: "review" | "fix";
+  kind: "review" | "fix" | "request";
   instructions: string;
   expectedHead?: string;
 };
@@ -169,15 +169,18 @@ export function parseCommand(body: string): Command | null {
     const match = /^\s*@vinland-ai(?:\s+(.*))?\s*$/i.exec(line);
     if (!match) continue;
     let instructions = (match[1] ?? "").trim();
-    const kind = /^(?:(?:please|can you|could you)\s+)?fix\b/i.test(instructions)
-      ? "fix"
-      : "review";
-    instructions = instructions.replace(
-      /^(?:(?:please|can you|could you)\s+)?(?:fix|review)\b\s*/i,
-      "",
-    );
+    if (/@vinland-ai\b/i.test(instructions)) return null;
+    const action = /^(?:(?:please|can you|could you)\s+)?(fix|review)\b\s*/i.exec(instructions);
+    if (action) instructions = instructions.slice(action[0].length);
     const expected = /^head=([a-f0-9]{40})(?:\s+|$)/.exec(instructions);
     if (expected) instructions = instructions.slice(expected[0].length);
+    const kind = action
+      ? action[1]!.toLowerCase() === "fix"
+        ? "fix"
+        : "review"
+      : instructions
+        ? "request"
+        : "review";
     commands.push({
       provider: "anthropic",
       kind,
@@ -209,7 +212,7 @@ export async function authorize(
   if (
     input.kind === "manual" &&
     (!parsed ||
-      parsed.kind !== task ||
+      (parsed.kind !== "request" && parsed.kind !== task) ||
       (parsed.provider === "openai") !== input.role.startsWith("codex"))
   )
     return { kind: "denied", reason: "invalidCommand" };

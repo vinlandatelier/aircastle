@@ -31,6 +31,117 @@ test("explicit fix commands preserve task instructions and optional expected SHA
   });
 });
 test.each([
+  "can u pls change this to XYZ",
+  "could you explain why the value is wrong?",
+  "please make this faster",
+  "can you help with this?",
+])("keeps natural prose for interpretation: %s", (instructions) => {
+  expect(parseCommand(`@vinland-ai ${instructions}`)).toEqual({
+    provider: "anthropic",
+    kind: "request",
+    instructions,
+  });
+});
+test.each(["review", "fix"] as const)("keeps polite %s commands explicit", (kind) => {
+  for (const prefix of ["", "please ", "can you ", "could you "]) {
+    expect(parseCommand(`@vinland-ai ${prefix}${kind} this`)).toEqual({
+      provider: "anthropic",
+      kind,
+      instructions: "this",
+    });
+  }
+});
+test("natural requests preserve an expected SHA and multiline instructions", () => {
+  expect(
+    parseCommand(`@vinland-ai head=${sha} can u pls change this to XYZ\nKeep the API.`),
+  ).toEqual({
+    provider: "anthropic",
+    kind: "request",
+    instructions: "can u pls change this to XYZ\nKeep the API.",
+    expectedHead: sha,
+  });
+});
+test("a head-bound bare mention still requests a review", () => {
+  expect(parseCommand(`@vinland-ai head=${sha}`)).toEqual({
+    provider: "anthropic",
+    kind: "review",
+    instructions: "",
+    expectedHead: sha,
+  });
+});
+test.each(["> @vinland-ai fix\n@vinland-ai", "```\n@vinland-ai fix\n```\n@vinland-ai"])(
+  "quoted commands do not turn a bare mention into a request: %s",
+  (body) => {
+    expect(parseCommand(body)?.kind).toBe("review");
+  },
+);
+test.each(["claudeReviewer", "claudeImplementer"] as const)(
+  "an authorized natural request can use the resolved %s role",
+  async (role) => {
+    const command = {
+      id: 90,
+      author: { id: 21, login: "reply-member", type: "User" },
+      body: `@vinland-ai head=${sha} can u pls change this to XYZ`,
+      createdAt: "2026-10-25T00:00:00Z",
+      thread: "Referenced finding",
+      source: "inline" as const,
+    };
+    const membership = vi.fn(async () => "member" as const);
+    expect(
+      await authorize({ ...invocation, kind: "manual", role, command }, { membership }),
+    ).toMatchObject({
+      kind: "authorized",
+      requester: command.author,
+      task: role === "claudeImplementer" ? "fix" : "review",
+      instructions: "can u pls change this to XYZ",
+      thread: command.thread,
+    });
+    expect(membership).toHaveBeenCalledExactlyOnceWith("reply-member");
+  },
+);
+test.each([
+  {
+    role: "codexImplementer",
+    type: "User",
+    head: sha,
+    membership: "member",
+    reason: "invalidCommand",
+  },
+  {
+    role: "claudeImplementer",
+    type: "Bot",
+    head: sha,
+    membership: "member",
+    reason: "invalidActor",
+  },
+  {
+    role: "claudeImplementer",
+    type: "User",
+    head: "f".repeat(40),
+    membership: "member",
+    reason: "stale",
+  },
+  { role: "claudeImplementer", type: "User", head: sha, membership: "outside", reason: "outside" },
+  { role: "claudeImplementer", type: "User", head: sha, membership: "unknown", reason: "unknown" },
+] as const)("natural requests preserve the $reason authorization check", async (fixture) => {
+  const command = {
+    id: 91,
+    author: { ...snapshot.author, type: fixture.type },
+    body: `@vinland-ai head=${fixture.head} can u pls change this to XYZ`,
+    createdAt: "2026-10-25T00:00:00Z",
+    thread: "",
+    source: "issue" as const,
+  };
+  expect(
+    await authorize(
+      { ...invocation, kind: "manual", role: fixture.role, command },
+      {
+        membership: async () => fixture.membership,
+      },
+    ),
+  ).toEqual({ kind: "denied", reason: fixture.reason });
+});
+test.each([
   "@claude review",
   "@codex review",
   "> @vinland-ai fix",
@@ -40,6 +151,10 @@ test.each([
   "@vinland-ai fix\n@vinland-ai review",
   "text @vinland-ai fix",
   "@vinland-ai-extra fix",
+  "> @vinland-ai can u pls change this to XYZ",
+  "```\n@vinland-ai can u pls change this to XYZ\n```",
+  "    @vinland-ai can u pls change this to XYZ",
+  "@vinland-ai fix @vinland-ai review",
 ])("ignores quoted, ambiguous, or spoofed commands: %s", (body) => {
   expect(parseCommand(body)).toBeNull();
 });
