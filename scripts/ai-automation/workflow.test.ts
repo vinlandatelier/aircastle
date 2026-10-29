@@ -18,7 +18,7 @@ const condition = (name: string) => {
 
 test("comment events start planning only for PR comments that mention a bot from an associated author", () => {
   const gate = condition("prepare");
-  expect(gate).toContain("github.event_name != 'issue_comment' ||");
+  expect(gate).toContain("github.event_name == 'issue_comment'");
   expect(gate).toContain("github.event.issue.pull_request");
   expect(gate).toContain("contains(github.event.comment.body, '@codex')");
   expect(gate).toContain("contains(github.event.comment.body, '@claude')");
@@ -31,4 +31,12 @@ test("verification runs only for planned fixes and publication reads each operat
   expect(job("verify")).toContain("matrix: ${{ fromJSON(needs.prepare.outputs.verify_matrix) }}");
   expect(condition("verify")).toBe("always() && needs.prepare.outputs.has_fixes == 'true'");
   expect(job("publish")).not.toContain("needs.verify.result");
+});
+
+test("AI automation runs from new PR conversation tags without scheduled recovery state", () => {
+  expect(workflow).toContain("issue_comment:\n    types: [created]");
+  expect(workflow).not.toContain("schedule:");
+  expect(workflow).not.toContain("workflow_dispatch:");
+  expect(workflow).not.toContain("AI_STATE_ISSUE");
+  expect(workflow).not.toContain("AI_ACTIVATED_AT");
 });

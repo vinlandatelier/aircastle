@@ -8,8 +8,6 @@ const options = {
   repository: "vinlandatelier/aircastle",
   token: "installation-token",
   botId: 99,
-  stateIssue: 1,
-  activatedAt: "2026-10-25T00:00:00Z",
   control: "e".repeat(40),
   run: "123",
 };
@@ -380,11 +378,8 @@ test.each([
   },
 );
 
-function repositoryFake() {
-  const comments = new Map<number, Record<string, unknown>[]>([
-    [1, []],
-    [7, []],
-  ]);
+function repositoryFake(body = "@claude review") {
+  const comments = new Map<number, Record<string, unknown>[]>([[7, []]]);
   let nextId = 100;
   let blobReads = 0;
   const fetcher = async (url: string, init?: RequestInit): Promise<Response> => {
@@ -399,10 +394,16 @@ function repositoryFake() {
         head: { sha: snapshot.head, repo: { id: 11 } },
         base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
       });
-    if (path.endsWith("/pulls")) return Response.json([{ number: 7 }]);
-    if (path.endsWith("/issues/comments") || path.endsWith("/pulls/comments"))
-      return Response.json([]);
-    const issue = /\/issues\/(1|7)\/comments$/.exec(path);
+    if (path.endsWith("/issues/comments/80"))
+      return Response.json({
+        id: 80,
+        user: snapshot.author,
+        body,
+        created_at: "2026-10-25T01:00:00Z",
+        updated_at: "2026-10-25T01:00:00Z",
+        issue_url: "https://api.github.com/repos/vinlandatelier/aircastle/issues/7",
+      });
+    const issue = /\/issues\/(7)\/comments$/.exec(path);
     if (issue) {
       const list = comments.get(Number(issue[1]))!;
       if (init?.method === "POST") {
@@ -455,50 +456,29 @@ function repositoryFake() {
   return { fetcher, comments, blobReads: () => blobReads };
 }
 
-test("scheduled reconciliation creates independent provider claims and a repeat spends no work", async () => {
-  const repository = repositoryFake();
-  const { comments } = repository;
-  const coordinator = new Coordinator(options, repository.fetcher);
-  const roles = {
-    codexReviewer: { provider: "openai" as const, model: "review", effort: "high" as const },
-    codexImplementer: { provider: "openai" as const, model: "fix", effort: "high" as const },
-    claudeReviewer: { provider: "anthropic" as const, model: "review", effort: "high" as const },
-    claudeImplementer: { provider: "anthropic" as const, model: "fix", effort: "high" as const },
-  };
-  const jobs = await coordinator.prepare({ version: 1, roles });
-  expect(jobs.map((j) => j.role)).toEqual(["codexReviewer", "claudeReviewer"]);
-  expect(jobs.every((j) => j.task === "review" && j.snapshot.head === snapshot.head)).toBe(true);
-  expect(comments.get(7)).toHaveLength(2);
-  expect(await coordinator.prepare({ version: 1, roles })).toEqual([]);
-  expect(repository.blobReads()).toBe(2);
-});
+test.each([
+  ["@claude review", "claudeReviewer", "review"],
+  ["@codex review", "codexReviewer", "review"],
+  [`@claude fix head=${snapshot.head} correct the value`, "claudeImplementer", "fix"],
+  [`@codex fix head=${snapshot.head} correct the value`, "codexImplementer", "fix"],
+])(
+  "a direct tag queues only the requested operation without a state issue or repository scan: %s",
+  async (body, role, task) => {
+    const repository = repositoryFake(body);
+    const coordinator = new Coordinator(options, repository.fetcher);
+    const jobs = await coordinator.prepare(config, 80);
+    expect(jobs.map((item) => [item.role, item.task, item.snapshot.head])).toEqual([
+      [role, task, snapshot.head],
+    ]);
+    expect(repository.comments.get(7)).toHaveLength(1);
+    expect(await coordinator.prepare(config, 80)).toEqual([]);
+    expect(repository.blobReads()).toBe(1);
+  },
+);
 
-test("a retried claim from an older control revision runs with the current control and models", async () => {
-  const repository = repositoryFake();
-  const first = new Coordinator(options, repository.fetcher);
-  expect(await first.prepare(config)).toHaveLength(2);
-  for (const item of repository.comments.get(7)!) {
-    const receipt = JSON.parse(String(item.body).slice("<!-- aircastle-ai:v1 -->\n".length));
-    item.body = `<!-- aircastle-ai:v1 -->\n${JSON.stringify({ ...receipt, at: "2026-10-25T00:00:00Z" })}`;
-  }
-  const control = "f".repeat(40);
-  const later = new Coordinator({ ...options, control }, repository.fetcher);
-  const roles = {
-    ...config.roles,
-    codexReviewer: { ...config.roles.codexReviewer, model: "review-next" },
-  };
-  const retried = await later.prepare({ version: 1, roles });
-  expect(retried.map((job) => [job.role, job.control, job.selection.model])).toEqual([
-    ["codexReviewer", control, "review-next"],
-    ["claudeReviewer", control, "review"],
-  ]);
-  const stored = repository.comments
-    .get(7)!
-    .map((item) => JSON.parse(String(item.body).slice("<!-- aircastle-ai:v1 -->\n".length)));
-  expect(stored.map((receipt) => [receipt.attempt, receipt.job.control])).toEqual([
-    [2, control],
-    [2, control],
-  ]);
+test("a failed command lookup fails planning so the workflow can be retried", async () => {
+  const coordinator = new Coordinator(options, async () => new Response(null, { status: 503 }));
+  await expect(coordinator.prepare(config, 80)).rejects.toThrow("503");
 });
 
 test("a result marker quoted inside another bot review does not forge publication", async () => {
@@ -549,15 +529,18 @@ test("role names cannot silently route both independent reviewers to one provide
   });
   const wrong = { provider: "openai" as const, model: "same-provider", effort: "high" as const };
   await expect(
-    coordinator.prepare({
-      version: 1,
-      roles: {
-        codexReviewer: wrong,
-        codexImplementer: wrong,
-        claudeReviewer: wrong,
-        claudeImplementer: wrong,
+    coordinator.prepare(
+      {
+        version: 1,
+        roles: {
+          codexReviewer: wrong,
+          codexImplementer: wrong,
+          claudeReviewer: wrong,
+          claudeImplementer: wrong,
+        },
       },
-    }),
+      80,
+    ),
   ).rejects.toThrow("provider");
   expect(reads).toBe(0);
 });
@@ -620,7 +603,6 @@ test("UTF-8 task metadata cannot exceed the reserved provider budget before a cl
 test("a fix pinned to A cannot claim B when the head moves before context capture", async () => {
   let prReads = 0;
   let claimWrites = 0;
-  let cursorWrites = 0;
   const moved = "f".repeat(40);
   const command = {
     id: 80,
@@ -645,51 +627,57 @@ test("a fix pinned to A cannot claim B when the head moves before context captur
     if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
     if (init?.method === "POST") {
       if (path.endsWith("/issues/7/comments")) claimWrites++;
-      if (path.endsWith("/issues/1/comments")) cursorWrites++;
       return Response.json({ id: 100 });
     }
     return Response.json([]);
   });
-  expect(await coordinator.prepare(config, 80)).toEqual([]);
+  await expect(coordinator.prepare(config, 80)).rejects.toThrow("Stale revision");
   expect(claimWrites).toBe(0);
-  expect(cursorWrites).toBe(1);
 });
 
-test("an outsider's incomplete history cannot block later member PRs or shared scan progress", async () => {
-  let cursorWrites = 0;
-  let outsiderPages = 0;
-  const outsider = { id: 21, login: "outsider", type: "User" };
-  const coordinator = new Coordinator(options, async (url, init) => {
+test("an outsider tag is denied before reading PR history or writing a claim", async () => {
+  const calls: string[] = [];
+  const coordinator = new Coordinator(options, async (url) => {
     const path = new URL(url).pathname;
-    if (path.endsWith("/members/outsider")) return new Response(null, { status: 404 });
-    if (path.endsWith("/members/member")) return new Response(null, { status: 204 });
-    if (/\/pulls\/(7|8)$/.test(path))
+    calls.push(path);
+    if (path.endsWith("/issues/comments/80"))
       return Response.json({
-        state: "open",
-        user: path.endsWith("/7") ? outsider : snapshot.author,
-        head: { sha: snapshot.head, repo: { id: 11 } },
-        base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
+        id: 80,
+        user: { id: 21, login: "outsider", type: "User" },
+        body: "@claude review",
+        created_at: "2026-10-25T01:00:00Z",
+        updated_at: "2026-10-25T01:00:00Z",
+        issue_url: "https://api.github.com/repos/vinlandatelier/aircastle/issues/7",
       });
-    if (path.endsWith("/pulls")) return Response.json([{ number: 7 }, { number: 8 }]);
-    if (path.endsWith("/issues/7/comments")) {
-      outsiderPages++;
-      return Response.json(
-        Array.from({ length: 100 }, (_, id) => ({ id, user: outsider, body: "ordinary comment" })),
-      );
-    }
-    if (path.includes("/compare/")) return Response.json({ files: [] });
-    if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
-    if (init?.method === "POST") {
-      if (path.endsWith("/issues/1/comments")) cursorWrites++;
-      return Response.json({ id: 100 });
-    }
-    return Response.json([]);
+    if (path.endsWith("/members/outsider")) return new Response(null, { status: 404 });
+    throw new Error(`Unexpected request ${path}`);
   });
-  const jobs = await coordinator.prepare(config);
-  expect(jobs.map((item) => [item.snapshot.number, item.role])).toEqual([
-    [8, "codexReviewer"],
-    [8, "claudeReviewer"],
+  expect(await coordinator.prepare(config, 80)).toEqual([]);
+  expect(calls).toEqual([
+    "/repos/vinlandatelier/aircastle/issues/comments/80",
+    "/orgs/vinlandatelier/members/outsider",
   ]);
-  expect(outsiderPages).toBe(3);
-  expect(cursorWrites).toBe(1);
 });
+
+test.each([
+  { body: "ordinary discussion", type: "User", updated: "2026-10-25T01:00:00Z" },
+  { body: "@claude review", type: "Bot", updated: "2026-10-25T01:00:00Z" },
+  { body: "@claude review", type: "User", updated: "2026-10-25T02:00:00Z" },
+])(
+  "noncommands, bots, and edited comments cannot queue work: %j",
+  async ({ body, type, updated }) => {
+    const coordinator = new Coordinator(options, async (url) => {
+      if (new URL(url).pathname.endsWith("/issues/comments/80"))
+        return Response.json({
+          id: 80,
+          user: { ...snapshot.author, type },
+          body,
+          created_at: "2026-10-25T01:00:00Z",
+          updated_at: updated,
+          issue_url: "https://api.github.com/repos/vinlandatelier/aircastle/issues/7",
+        });
+      throw new Error(`Unexpected request ${url}`);
+    });
+    expect(await coordinator.prepare(config, 80)).toEqual([]);
+  },
+);

@@ -36,8 +36,6 @@ function coordinator(): Coordinator {
     token: required("AI_GITHUB_TOKEN"),
     botId: integer(Number(required("AI_BOT_USER_ID"))),
     botLogin: `${required("AI_APP_SLUG")}[bot]`,
-    stateIssue: integer(Number(required("AI_STATE_ISSUE"))),
-    activatedAt: required("AI_ACTIVATED_AT"),
     control: sha(required("AI_CONTROL_SHA")),
     run: required("GITHUB_RUN_ID"),
   });
@@ -125,13 +123,14 @@ async function main(): Promise<void> {
     await api.setup();
     const { parseModelConfig } = await import("../ai-models/index.ts");
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
-    let immediate: number | undefined;
-    if (process.env.GITHUB_EVENT_NAME === "issue_comment") {
-      const event = requireObject(await json(required("GITHUB_EVENT_PATH")));
-      if (event.action === "created" && requireObject(event.issue).pull_request)
-        immediate = integer(requireObject(event.comment).id);
-    }
-    const jobs = await api.prepare(config, immediate);
+    const event = requireObject(await json(required("GITHUB_EVENT_PATH")));
+    if (
+      process.env.GITHUB_EVENT_NAME !== "issue_comment" ||
+      event.action !== "created" ||
+      !requireObject(event.issue).pull_request
+    )
+      throw new Error("New PR conversation comment required");
+    const jobs = await api.prepare(config, integer(requireObject(event.comment).id));
     await mkdir(`${target}/plan`, { recursive: true });
     for (const job of jobs) await output(`${target}/plan/${job.id}.json`, job);
     await appendFile(required("GITHUB_OUTPUT"), workflowOutputs(jobs));
