@@ -85,7 +85,7 @@ test("unsupported scoped verification rejects mixed supported and unknown edits"
 });
 function input(path: string): {
   job: Job;
-  output: { id: string; digest: string; result: unknown; selection: Job["selection"] };
+  output: { task: "fix"; id: string; digest: string; result: unknown; selection: Job["selection"] };
 } {
   const job: Job = {
     version: 1,
@@ -103,6 +103,7 @@ function input(path: string): {
   return {
     job,
     output: {
+      task: "fix" as const,
       id: job.id,
       digest: digest(job),
       selection: job.selection,
@@ -167,4 +168,32 @@ test("each fix publishes from its own bound verification receipt", async () => {
   expect(
     boundVerification(unsupported.job, [edit("packages/core/src/value.ts")], patchOnly),
   ).toEqual(patchOnly);
+});
+
+test("a natural fix must pass the same scoped verifier and bind to the original request", async () => {
+  docker.calls.length = 0;
+  const supported = input("apps/web/src/components/shell/app-header.tsx");
+  const request: Job = {
+    ...supported.job,
+    task: "request",
+    role: "claudeReviewer",
+    instructions: "can u change this value",
+    selection: { provider: "anthropic", model: "review", effort: "high" },
+    implementation: supported.job.selection,
+  };
+  const output = { ...supported.output, digest: digest(request) };
+  const receipt = await verify(request, output, "vinlandatelier/aircastle");
+  expect(receipt.digest).toBe(digest(request));
+  expect(receipt.passed).toBe(true);
+  expect(docker.calls.map((args) => args[0])).toEqual(["build", "run", "rm"]);
+  expect(
+    boundVerification(request, [edit("apps/web/src/components/shell/app-header.tsx")], receipt),
+  ).toEqual(receipt);
+  expect(
+    boundVerification(
+      { ...request, instructions: "Different request" },
+      [edit("apps/web/src/components/shell/app-header.tsx")],
+      receipt,
+    ),
+  ).toBeNull();
 });

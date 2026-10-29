@@ -4,7 +4,6 @@ import {
   operationId,
   parseCommand,
   prompt,
-  renderReview,
   reviewLenses,
   validateEdits,
   validateReview,
@@ -436,15 +435,6 @@ test.each(["codexImplementer", "claudeImplementer"] as const)(
   },
 );
 
-test.each(["codexReviewer", "claudeReviewer"] as const)(
-  "%s published review names its lens",
-  (role) => {
-    expect(renderReview({ ...reviewJob, role }, { summary: "Fine", findings: [] })).toMatch(
-      new RegExp(`^${role}: advisory ${reviewLenses[role].title} review\n`),
-    );
-  },
-);
-
 test("only fix jobs enter the verification matrix", () => {
   const fix = {
     ...reviewJob,
@@ -467,7 +457,16 @@ test("only fix jobs enter the verification matrix", () => {
   expect(JSON.parse(String(both.verify_matrix)).include).toEqual([
     { id: fix.id, provider: "openai", task: "fix" },
   ]);
-  expect(both.has_fixes).toBe("true");
-  expect(outputs([reviewJob]).has_fixes).toBe("false");
+  expect(both.has_verification).toBe("true");
+  expect(outputs([reviewJob]).has_verification).toBe("false");
   expect(outputs([]).has_jobs).toBe("false");
+});
+
+test("natural requests enter secretless verification because they may resolve to fixes", () => {
+  const request: Job = { ...reviewJob, task: "request", implementation: reviewJob.selection };
+  const output = workflowOutputs([request]);
+  expect(output).toContain(
+    'verify_matrix={"include":[{"id":"' + request.id + '","provider":"openai","task":"request"}]}',
+  );
+  expect(output).toContain("has_verification=true");
 });

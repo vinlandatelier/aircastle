@@ -173,56 +173,79 @@ test.each(["create", "delete"] as const)(
   },
 );
 
-test("unsupported scoped verification CLI exits successfully with an unavailable receipt", async () => {
-  const { spawnSync } = await import("node:child_process");
-  const { snapshot } = await import("./fixtures.ts");
-  const root = await mkdtemp(join(tmpdir(), "aircastle-ai-unavailable-"));
-  try {
-    const path = "src/value.ts";
-    const job: Job = {
-      version: 1,
-      id: "1".repeat(64),
-      task: "fix",
-      role: "codexImplementer",
-      requester: snapshot.author,
-      snapshot,
-      instructions: "Fix value",
-      thread: "",
-      control: "e".repeat(40),
-      selection: { provider: "openai", model: "fixture", effort: "high" },
-      previous: "",
-    };
-    await mkdir(join(root, "plan"));
-    await mkdir(join(root, "model"));
-    await writeFile(join(root, "plan", `${job.id}.json`), JSON.stringify(job));
-    await writeFile(
-      join(root, "model", `${job.id}.json`),
-      JSON.stringify({
-        id: job.id,
-        digest: digest(job),
-        selection: job.selection,
-        result: {
-          summary: "Fix",
-          edits: [{ path, expectedBlob: "c".repeat(40), content: "fixed\n" }],
+test.each([
+  { task: "fix", resolved: "fix" },
+  { task: "request", resolved: "fix" },
+  { task: "request", resolved: "review" },
+] as const)(
+  "verification CLI handles $task resolved to $resolved without unrelated tools",
+  async ({ task, resolved }) => {
+    const { spawnSync } = await import("node:child_process");
+    const { snapshot } = await import("./fixtures.ts");
+    const root = await mkdtemp(join(tmpdir(), "aircastle-ai-unavailable-"));
+    try {
+      const path = "src/value.ts";
+      const job: Job = {
+        version: 1,
+        id: "1".repeat(64),
+        ...(task === "request"
+          ? ({
+              task,
+              implementation: { provider: "openai", model: "fixture", effort: "high" },
+            } as const)
+          : { task }),
+        role: "codexImplementer",
+        requester: snapshot.author,
+        snapshot,
+        instructions: "Fix value",
+        thread: "",
+        control: "e".repeat(40),
+        selection: { provider: "openai", model: "fixture", effort: "high" },
+        previous: "",
+      };
+      await mkdir(join(root, "plan"));
+      await mkdir(join(root, "model"));
+      await writeFile(join(root, "plan", `${job.id}.json`), JSON.stringify(job));
+      await writeFile(
+        join(root, "model", `${job.id}.json`),
+        JSON.stringify({
+          task: resolved,
+          id: job.id,
+          digest: digest(job),
+          selection: job.selection,
+          result:
+            resolved === "fix"
+              ? {
+                  summary: "Fix",
+                  edits: [{ path, expectedBlob: "c".repeat(40), content: "fixed\n" }],
+                }
+              : {
+                  correctness: { summary: "No findings", findings: [] },
+                  quality: { summary: "No findings", findings: [] },
+                },
+        }),
+      );
+      const result = spawnSync(process.execPath, ["scripts/ai-automation/cli.ts", "verify"], {
+        cwd: process.cwd(),
+        env: {
+          PATH: "/no-docker-executable",
+          AI_DATA_DIR: root,
+          AI_OPERATION_ID: job.id,
+          AI_CONTROL_SHA: job.control,
+          GITHUB_REPOSITORY: "vinlandatelier/aircastle",
         },
-      }),
-    );
-    const result = spawnSync(process.execPath, ["scripts/ai-automation/cli.ts", "verify"], {
-      cwd: process.cwd(),
-      env: {
-        PATH: "/no-docker-executable",
-        AI_DATA_DIR: root,
-        AI_OPERATION_ID: job.id,
-        AI_CONTROL_SHA: job.control,
-        GITHUB_REPOSITORY: "vinlandatelier/aircastle",
-      },
-      encoding: "utf8",
-    });
-    expect(result.status, result.stderr).toBe(0);
-    expect(
-      JSON.parse(await readFile(join(root, "verification", `${job.id}.json`), "utf8")),
-    ).toMatchObject({ passed: false, commands: null, recipe: digest(null) });
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        JSON.parse(await readFile(join(root, "verification", `${job.id}.json`), "utf8")),
+      ).toMatchObject(
+        resolved === "fix"
+          ? { passed: false, commands: null, recipe: digest(null) }
+          : { skipped: "review-only" },
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);

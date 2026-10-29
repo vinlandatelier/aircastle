@@ -5,12 +5,10 @@ import {
   operationId,
   parseCommand,
   requireObject,
-  renderReview,
   safePath,
   sha,
   text,
   validateEdits,
-  validateReview,
   type Authorization,
   type Comment,
   type Fix,
@@ -25,6 +23,7 @@ import {
 } from "./index.ts";
 import type { ModelConfig, Role } from "../ai-models/index.ts";
 import { boundVerification, verificationPlan } from "./checks.ts";
+import { reviewPayload, validateReviewPasses } from "./reviews.ts";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type StoredReceipt = { commentId: number; receipt: Receipt };
@@ -218,7 +217,7 @@ export class Coordinator {
     value: unknown,
     claim: StoredReceipt,
   ): Promise<"published" | "stale"> {
-    const review = validateReview(value, job.snapshot);
+    const passes = validateReviewPasses(value, job.snapshot);
     if (!(await this.current(job))) {
       await this.finish(claim, "stale");
       return "stale";
@@ -233,10 +232,10 @@ export class Coordinator {
         );
       })
     ) {
+      const payload = await reviewPayload(job, passes);
       await this.api(`${this.root}/pulls/${job.snapshot.number}/reviews`, "POST", {
-        event: "COMMENT",
-        commit_id: job.snapshot.head,
-        body: `${renderReview(job, review)}\n\n${receiptMarker}`,
+        ...payload,
+        body: `${payload.body}\n\n${receiptMarker}`,
       });
     }
     await this.finish(claim, "published");
@@ -515,7 +514,9 @@ export class Coordinator {
     const job: Job = {
       version: 1,
       id,
-      task: authorization.task,
+      ...(cmd.kind === "request"
+        ? ({ task: "request", implementation: config.roles.claudeImplementer } as const)
+        : { task: authorization.task }),
       role,
       requester,
       snapshot,
@@ -537,6 +538,7 @@ export class Coordinator {
     claim: StoredReceipt,
   ): Promise<string> {
     const fix: Fix = validateEdits(raw, job.snapshot);
+    const selection = job.task === "request" ? job.implementation : job.selection;
     const commands = verificationPlan(fix.edits);
     if (!boundVerification(job, fix.edits, verification)) {
       await this.finish(claim, "failed");
@@ -637,7 +639,7 @@ export class Coordinator {
         title: `AI fix for #${job.snapshot.number}: ${fix.summary.slice(0, 100)}`,
         head: branch,
         base: job.snapshot.baseRef,
-        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${job.selection.model}; effort sent: ${job.selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}.\n\nSelected commands:\n\n\`\`\`text\n${commands.map((args) => args.join(" ")).join("\n")}\n\`\`\`\n\nOrdinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
+        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${selection.model}; effort sent: ${selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}.\n\nSelected commands:\n\n\`\`\`text\n${commands.map((args) => args.join(" ")).join("\n")}\n\`\`\`\n\nOrdinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
       }),
     );
     await this.finish(claim, "published");

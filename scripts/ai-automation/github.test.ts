@@ -98,7 +98,10 @@ test("stale publication never emits a review", async () => {
   };
   const result = await coordinator.publishReview(
     job,
-    { summary: "No findings", findings: [] },
+    {
+      correctness: { summary: "No findings", findings: [] },
+      quality: { summary: "No findings", findings: [] },
+    },
     { commentId: 91, receipt },
   );
   expect(result).toBe("stale");
@@ -136,13 +139,17 @@ test("COMMENT publication binds commit_id and displays incomplete coverage", asy
   };
   await coordinator.publishReview(
     { ...job, snapshot: { ...snapshot, complete: false, omitted: ["huge.ts"] } },
-    { summary: "No findings", findings: [] },
+    {
+      correctness: { summary: "No findings", findings: [] },
+      quality: { summary: "No findings", findings: [] },
+    },
     { commentId: 91, receipt },
   );
   expect(writes[0]).toMatchObject({ event: "COMMENT", commit_id: snapshot.head });
   expect(writes[0]?.body).toContain("INCOMPLETE");
   expect(writes[0]?.body).toContain(snapshot.head);
-  expect(writes[0]?.body).toMatch(/^codexReviewer: advisory adversarial correctness review\n/);
+  expect(writes[0]?.body).toContain("Correctness + quality");
+  expect(writes[0]?.comments).toEqual([]);
 });
 test("pagination is bounded and explicitly fails incomplete state reads", async () => {
   let calls = 0;
@@ -514,7 +521,10 @@ test("a result marker quoted inside another bot review does not forge publicatio
   };
   await coordinator.publishReview(
     job,
-    { summary: "Review complete", findings: [] },
+    {
+      correctness: { summary: "Review complete", findings: [] },
+      quality: { summary: "Review complete", findings: [] },
+    },
     { commentId: 91, receipt },
   );
   expect(reviewWrites).toBe(1);
@@ -680,3 +690,79 @@ test.each([
     expect(await coordinator.prepare(config, 80)).toEqual([]);
   },
 );
+
+test("publication sends one combined review with inline comments and does not duplicate it on replay", async () => {
+  const posted: Record<string, unknown>[] = [];
+  const stored: Record<string, unknown>[] = [];
+  const coordinator = new Coordinator(options, async (url, init) => {
+    const path = new URL(url).pathname;
+    if (path.includes("/members/")) return new Response(null, { status: 204 });
+    if (path.endsWith("/users/member")) return Response.json(snapshot.author);
+    if (path.endsWith("/pulls/7"))
+      return Response.json({
+        state: "open",
+        head: { sha: snapshot.head },
+        base: { sha: snapshot.base },
+      });
+    if (path.endsWith("/reviews")) {
+      if (init?.method === "POST") {
+        const payload = JSON.parse(typeof init.body === "string" ? init.body : "null");
+        posted.push(payload);
+        stored.push({ user: { id: 99 }, body: payload.body });
+        return Response.json({ id: 200 });
+      }
+      return Response.json(stored);
+    }
+    if (init?.method === "PATCH") return Response.json({});
+    throw new Error(`Unexpected request ${url}`);
+  });
+  const finding = {
+    severity: "high",
+    path: "src/value.ts",
+    startLine: 1,
+    endLine: 1,
+    quote: "value = 1",
+    consequence: "The API returns the wrong value.",
+    correction: "Use zero.",
+  };
+  const value = {
+    correctness: { summary: "Wrong value.", findings: [finding] },
+    quality: { summary: "No findings.", findings: [] },
+  };
+  const claim = {
+    commentId: 91,
+    receipt: {
+      version: 1 as const,
+      id: job.id,
+      job,
+      digest: digest(job),
+      attempt: 1,
+      state: "claimed" as const,
+      run: options.run,
+      at: new Date().toISOString(),
+    },
+  };
+  expect(await coordinator.publishReview(job, value, claim)).toBe("published");
+  expect(await coordinator.publishReview(job, value, claim)).toBe("published");
+  expect(posted).toHaveLength(1);
+  expect(posted[0]).toMatchObject({
+    event: "COMMENT",
+    commit_id: snapshot.head,
+    comments: [{ path: "src/value.ts", line: 1, side: "RIGHT" }],
+  });
+  expect(String(posted[0]?.body)).toContain("Correctness + quality");
+});
+
+test("natural requests are claimed without running a model in the privileged planner", async () => {
+  const repository = repositoryFake("@vinland-ai can u pls change this to XYZ");
+  const coordinator = new Coordinator(options, repository.fetcher);
+  const jobs = await coordinator.prepare(config, 80);
+  expect(jobs).toHaveLength(1);
+  expect(jobs[0]).toMatchObject({
+    task: "request",
+    role: "claudeReviewer",
+    instructions: "can u pls change this to XYZ",
+    implementation: config.roles.claudeImplementer,
+  });
+  expect(await coordinator.prepare(config, 80)).toEqual([]);
+});

@@ -68,10 +68,9 @@ export type Finding = {
 export type Review = { summary: string; findings: Finding[] };
 export type Edit = { path: string; expectedBlob: string | null; content: string | null };
 export type Fix = { summary: string; edits: Edit[] };
-export type Job = {
+type JobBase = {
   version: 1;
   id: string;
-  task: "review" | "fix";
   role: Role;
   requester: Identity;
   snapshot: Snapshot;
@@ -81,10 +80,12 @@ export type Job = {
   selection: ModelSelection;
   previous: string;
 };
+type JobTask = { task: "review" | "fix" } | { task: "request"; implementation: ModelSelection };
+export type Job = JobBase & JobTask;
 export type Receipt = {
   version: 1;
   id: string;
-  job: Omit<Job, "snapshot"> & { snapshot: Omit<Snapshot, "files"> };
+  job: Omit<JobBase, "snapshot"> & JobTask & { snapshot: Omit<Snapshot, "files"> };
   digest: string;
   attempt: number;
   state: "claimed" | "published" | "stale" | "failed";
@@ -92,6 +93,7 @@ export type Receipt = {
   at: string;
 };
 export type ModelOutput = {
+  task: "review" | "fix";
   id: string;
   digest: string;
   result: unknown;
@@ -313,7 +315,7 @@ export const reviewSchema: Record<string, unknown> = {
   additionalProperties: false,
   required: ["summary", "findings"],
   properties: {
-    summary: stringSchema,
+    summary: { type: "string", maxLength: 240 },
     findings: {
       type: "array",
       items: {
@@ -334,8 +336,8 @@ export const reviewSchema: Record<string, unknown> = {
           startLine: { type: "integer" },
           endLine: { type: "integer" },
           quote: stringSchema,
-          consequence: stringSchema,
-          correction: stringSchema,
+          consequence: { type: "string", maxLength: 360 },
+          correction: { type: "string", maxLength: 360 },
         },
       },
     },
@@ -402,20 +404,16 @@ export function prompt(job: Job, repositoryInstructions: string): string {
 }
 /**
  * GitHub Actions step outputs for the planned jobs. Every job gets a model and publish entry.
- * Only fix jobs get a verification entry.
+ * Fixes and natural requests get a verification entry.
  */
 export function workflowOutputs(jobs: Job[]): string {
   const entry = (job: Job) => ({ id: job.id, provider: job.selection.provider, task: job.task });
-  const fixes = jobs.filter((job) => job.task === "fix");
+  const verification = jobs.filter((job) => job.task !== "review");
   return [
     `matrix=${JSON.stringify({ include: jobs.map(entry) })}`,
     `has_jobs=${jobs.length > 0}`,
-    `verify_matrix=${JSON.stringify({ include: fixes.map(entry) })}`,
-    `has_fixes=${fixes.length > 0}`,
+    `verify_matrix=${JSON.stringify({ include: verification.map(entry) })}`,
+    `has_verification=${verification.length > 0}`,
     "",
   ].join("\n");
-}
-export function renderReview(job: Job, review: Review): string {
-  if (!reviewer(job.role)) throw new Error("Only reviewer roles publish reviews");
-  return `${job.role}: advisory ${reviewLenses[job.role].title} review\n\nReviewed SHA: \`${job.snapshot.head}\`\nBase SHA: \`${job.snapshot.base}\`\nModel: \`${job.selection.model}\`; effort sent: \`${job.selection.effort}\`\nContext: ${job.snapshot.complete && job.thread.length < 24000 ? "bounded changed-file context complete" : "INCOMPLETE"}. Unchanged repository files were not reviewed.\nOmitted: ${[...job.snapshot.omitted, ...(job.thread.length >= 24000 ? ["inline thread truncated"] : [])].join(", ") || "none"}\n\n${review.summary}\n\n${review.findings.map((f) => `- ${f.severity}: ${f.path}:${f.startLine}-${f.endLine}\n  Evidence: ${JSON.stringify(f.quote)}\n  Consequence: ${f.consequence}\n  Correction: ${f.correction}`).join("\n") || "No findings in the supplied context."}\n\nThis COMMENT review is advisory. It does not approve, block, or merge this PR.`;
 }

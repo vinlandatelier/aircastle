@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { digest, validateEdits, type Job, type ModelOutput, type Verification } from "./index.ts";
 
 import { verificationPlan } from "./checks.ts";
+import { boundModelOutput } from "./operations.ts";
 
 async function toolchainVersions(): Promise<Record<string, string>> {
   const root = new URL("../../", import.meta.url);
@@ -21,9 +22,9 @@ export async function verify(
   output: ModelOutput,
   repository: string,
 ): Promise<Verification> {
-  const fix = validateEdits(output.result, job.snapshot);
-  if (output.digest !== digest(job) || output.id !== job.id)
-    throw new Error("Verification input digest mismatch");
+  const model = boundModelOutput(job, output);
+  if (model.task !== "fix") throw new Error("Verification requires a fix result");
+  const fix = validateEdits(model.result, job.snapshot);
   const commands = verificationPlan(fix.edits);
   const receipt: Verification = {
     id: job.id,
