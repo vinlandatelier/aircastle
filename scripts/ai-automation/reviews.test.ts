@@ -7,13 +7,13 @@ const job: Job = {
   version: 1,
   id: "1".repeat(64),
   task: "review",
-  role: "claudeReviewer",
+  role: "reviewer",
   requester: snapshot.author,
   snapshot,
   instructions: "Check the changed value",
   thread: "",
   control: "e".repeat(40),
-  selection: { provider: "anthropic", model: "fixture", effort: "high" },
+  selection: { model: "fixture", effort: "high" },
   previous: "",
 };
 const finding: Finding = {

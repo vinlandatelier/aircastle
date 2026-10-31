@@ -1,19 +1,19 @@
 import {
   contextComplete,
-  prompt,
   requireObject,
+  reviewPrompt,
   reviewSchema,
   validateReview,
   type Finding,
   type Job,
   type Review,
+  type ReviewPass,
   type Snapshot,
   threadLimit,
 } from "./index.ts";
 import { runModel } from "../ai-models/index.ts";
 
-export type ReviewPasses = { correctness: Review; quality: Review };
-type Pass = keyof ReviewPasses;
+export type ReviewPasses = Record<ReviewPass, Review>;
 type InlineComment = {
   path: string;
   body: string;
@@ -48,11 +48,11 @@ export async function runReviewPasses(
   const concise =
     "Write for rapid reading. Use one short sentence for the consequence and the correction. Omit praise, repeated evidence, and general advice.";
   const [correctness, quality] = await Promise.all(
-    (["codexReviewer", "claudeReviewer"] as const).map(async (role) =>
+    (["correctness", "quality"] as const).map(async (pass) =>
       validateReview(
         await runner(
           job.selection,
-          `${prompt({ ...job, task: "review", role }, guidance)}\n${concise}`,
+          `${reviewPrompt({ ...job, task: "review" }, guidance, pass)}\n${concise}`,
           reviewSchema,
         ),
         job.snapshot,
@@ -62,7 +62,7 @@ export async function runReviewPasses(
   return { correctness: correctness!, quality: quality! };
 }
 
-function findings(reviews: ReviewPasses): { finding: Finding; pass: Pass }[] {
+function findings(reviews: ReviewPasses): { finding: Finding; pass: ReviewPass }[] {
   return (["correctness", "quality"] as const)
     .flatMap((pass) => reviews[pass].findings.map((finding) => ({ finding, pass })))
     .sort((a, b) => rank[a.finding.severity] - rank[b.finding.severity]);

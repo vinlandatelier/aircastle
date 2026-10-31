@@ -88,13 +88,13 @@ function input(path: string): { job: Job; fix: Fix } {
     version: 1,
     id: "1".repeat(64),
     task: "fix",
-    role: "codexImplementer",
+    role: "implementer",
     requester: snapshot.author,
     snapshot: { ...snapshot, files: [{ ...snapshot.files[0]!, path }], changedPaths: [path] },
     instructions: "Fix the value",
     thread: "",
     control: "e".repeat(40),
-    selection: { provider: "openai", model: "fixture", effort: "high" },
+    selection: { model: "fixture", effort: "high" },
     previous: "",
   };
   return { job, fix: { summary: "Fix value", edits: [edit(path)] } };
@@ -163,9 +163,9 @@ test("a natural fix must pass the same scoped verifier and bind to the original 
   const request: Job = {
     ...supported.job,
     task: "request",
-    role: "claudeReviewer",
+    role: "reviewer",
     instructions: "can u change this value",
-    selection: { provider: "anthropic", model: "review", effort: "high" },
+    selection: { model: "review", effort: "high" },
     implementation: supported.job.selection,
   };
   const receipt = await verify(request, supported.fix, "vinlandatelier/aircastle");

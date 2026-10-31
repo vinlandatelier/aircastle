@@ -25,6 +25,10 @@ function coordinator(): Coordinator {
     botLogin: `${required("AI_APP_SLUG")}[bot]`,
     control: sha(required("AI_CONTROL_SHA")),
     run: required("GITHUB_RUN_ID"),
+    trigger: {
+      login: required("AI_TRIGGER_LOGIN"),
+      id: Number(required("AI_TRIGGER_USER_ID")),
+    },
   });
 }
 async function json(path: string, max = 2_000_000): Promise<unknown> {
@@ -42,18 +46,12 @@ async function main(): Promise<void> {
   const target = process.env.AI_DATA_DIR ?? "ai-data";
   if (command === "setup") {
     required("AI_GITHUB_TOKEN");
-    required("OPENAI_API_KEY");
-    required("ANTHROPIC_API_KEY");
+    required("CLAUDE_CODE_OAUTH_TOKEN");
     const api = coordinator();
     await api.setup();
     const { parseModelConfig, runModel } = await import("../ai-models/index.ts");
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
-    for (const role of [
-      "codexReviewer",
-      "codexImplementer",
-      "claudeReviewer",
-      "claudeImplementer",
-    ] as const) {
+    for (const role of ["reviewer", "implementer"] as const) {
       const result = requireObject(
         await runModel(config.roles[role], 'Return {"ready":true} using the requested schema.', {
           type: "object",
@@ -68,7 +66,7 @@ async function main(): Promise<void> {
         JSON.stringify({
           role,
           selection: config.roles[role],
-          compatibility: "live API/schema accepted",
+          compatibility: "live Claude Code CLI/schema accepted",
           evaluation: "not evaluated",
         }),
       );
@@ -109,11 +107,9 @@ async function main(): Promise<void> {
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
     if (
       digest(config.roles[job.role]) !== digest(job.selection) ||
-      (job.task === "request" &&
-        digest(job.implementation) !== digest(config.roles.claudeImplementer))
+      (job.task === "request" && digest(job.implementation) !== digest(config.roles.implementer))
     )
       throw new Error("Trusted model configuration mismatch");
-    required(job.selection.provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY");
     console.log(
       JSON.stringify({ operation: id, head: job.snapshot.head, selection: job.selection }),
     );

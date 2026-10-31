@@ -7,15 +7,15 @@ const request: Job = {
   version: 1,
   id: "1".repeat(64),
   task: "request",
-  role: "claudeReviewer",
+  role: "reviewer",
   requester: snapshot.author,
   snapshot,
   instructions: "can u pls change this to XYZ",
   thread: "",
   control: "e".repeat(40),
   previous: "",
-  selection: { provider: "anthropic", model: "review", effort: "high" },
-  implementation: { provider: "anthropic", model: "implement", effort: "high" },
+  selection: { model: "review", effort: "high" },
+  implementation: { model: "implement", effort: "high" },
 };
 const fix = {
   summary: "Correct value.",
