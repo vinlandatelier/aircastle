@@ -2,7 +2,7 @@ import { validateField } from "./composites.ts";
 import type { IssuePath, SchemaIssue, TextEditorDescription } from "./contract.ts";
 import { parseDate, parseDatetime } from "./dates.ts";
 import { fieldDefinition, type FieldDefinition, type Modifier } from "./declarations.ts";
-import { equalEditor, normalizeEditor } from "./editors.ts";
+import { equalEditor, normalizeBooleanEditor, normalizeEditor } from "./editors.ts";
 import { schemaIssue } from "./errors.ts";
 import { withoutNegativeZero } from "./numbers.ts";
 import type { CompiledField, FieldEntries, Rules, TextRules } from "./fields.ts";
@@ -24,24 +24,24 @@ type MutableTextRules = { -readonly [Key in keyof TextRules]: TextRules[Key] };
 
 const issueOrder: Record<SchemaIssue["code"], number> = {
   invalid_definition: 0,
-  invalid_item: 0.1,
-  invalid_blocks: 0.2,
-  unknown_collection: 0.3,
-  invalid_references: 0.4,
-  unsupported_unique: 0.5,
-  conflicting_defaults: 1,
-  conflicting_formats: 2,
-  conflicting_choices: 3,
-  conflicting_editors: 4,
-  invalid_bound: 5,
-  conflicting_bounds: 6,
-  invalid_editor: 7,
-  unknown_editor: 8,
-  invalid_editor_options: 9,
-  incompatible_editor: 10,
-  invalid_choices: 11,
-  duplicate_choice: 12,
-  invalid_default: 13,
+  invalid_item: 1,
+  invalid_blocks: 2,
+  unknown_collection: 3,
+  invalid_references: 4,
+  unsupported_unique: 5,
+  conflicting_defaults: 6,
+  conflicting_formats: 7,
+  conflicting_choices: 8,
+  conflicting_editors: 9,
+  invalid_bound: 10,
+  conflicting_bounds: 11,
+  invalid_editor: 12,
+  unknown_editor: 13,
+  invalid_editor_options: 14,
+  incompatible_editor: 15,
+  invalid_choices: 16,
+  duplicate_choice: 17,
+  invalid_default: 18,
 };
 
 const placeholder: CompiledField = {
@@ -101,6 +101,14 @@ function has(modifiers: readonly Modifier[], kind: Modifier["kind"]): boolean {
   return modifiers.some((modifier) => modifier.kind === kind);
 }
 
+function tighterBound<Bound extends number | string>(
+  constraint: "min" | "max",
+  current: Bound,
+  limit: Bound,
+): Bound {
+  return (constraint === "min") === limit > current ? limit : current;
+}
+
 function compileBounds<Bound extends number | string>(
   modifiers: readonly Modifier[],
   path: IssuePath,
@@ -117,9 +125,7 @@ function compileBounds<Bound extends number | string>(
       continue;
     }
     const valid = parsed as Bound[];
-    bounds[constraint] = valid.reduce((current, limit) =>
-      (constraint === "min") === limit > current ? limit : current,
-    );
+    bounds[constraint] = valid.reduce((current, limit) => tighterBound(constraint, current, limit));
   }
   if (bounds.min !== undefined && bounds.max !== undefined && bounds.min > bounds.max) {
     own.push(
@@ -233,17 +239,9 @@ function compileBoolean(
   const selections = new Set<"checkbox" | "switch">();
   for (const modifier of modifiers) {
     if (modifier.kind !== "editor") continue;
-    const name = modifier.name;
-    if (typeof name !== "string")
-      own.push(
-        schemaIssue(path, {
-          code: "invalid_editor",
-          expected: "string",
-          received: receivedType(name),
-        }),
-      );
-    else if (name === "checkbox" || name === "switch") selections.add(name);
-    else own.push(schemaIssue(path, { code: "unknown_editor", editor: name }));
+    const normalized = normalizeBooleanEditor(modifier, path);
+    if (normalized.ok) selections.add(normalized.editor);
+    else own.push(normalized.issue);
   }
   if (selections.size > 1) own.push(schemaIssue(path, { code: "conflicting_editors" }));
   return selections.has("switch") && selections.size === 1
@@ -252,12 +250,11 @@ function compileBoolean(
 }
 
 function compileEntries(
-  snapshot: unknown,
+  record: RecordSnapshot,
   path: IssuePath,
   context: CompileContext,
   children: SchemaIssue[],
 ): FieldEntries {
-  const record = snapshot as RecordSnapshot;
   if (!record.ok) {
     children.push(
       schemaIssue(path, {
@@ -289,7 +286,7 @@ function compileEntries(
 }
 
 function compileList(
-  definition: FieldDefinition,
+  definition: FieldDefinition<"list">,
   path: IssuePath,
   context: CompileContext,
   own: SchemaIssue[],
@@ -314,7 +311,7 @@ function compileList(
   if (has(modifiers, "unique") && context.unique === "allowed")
     own.push(schemaIssue(path, { code: "invalid_item", modifier: "unique" }));
   if (itemDefinition.kind === "object") {
-    const shape = itemDefinition.argument as RecordSnapshot;
+    const shape = itemDefinition.argument;
     if (shape.ok && shape.entries.some(([name]) => name === "id"))
       own.push(schemaIssue(path, { code: "invalid_item", field: "id" }));
   }
@@ -326,14 +323,16 @@ function compileList(
   return compiled.field;
 }
 
+type BlockVariants = readonly (readonly [string, FieldEntries])[];
+
 function compileBlocks(
-  definition: FieldDefinition,
+  definition: FieldDefinition<"blocks">,
   path: IssuePath,
   context: CompileContext,
   own: SchemaIssue[],
   children: SchemaIssue[],
-): Rules["kind"] extends never ? never : readonly (readonly [string, FieldEntries])[] {
-  const record = definition.argument as RecordSnapshot;
+): BlockVariants {
+  const record = definition.argument;
   if (!record.ok) {
     own.push(
       schemaIssue(path, {
@@ -359,7 +358,7 @@ function compileBlocks(
       has(variantDefinition.modifiers, "default")
     )
       own.push(schemaIssue(path, { code: "invalid_blocks", reason: "modifier", variant }));
-    const shape = variantDefinition.argument as RecordSnapshot;
+    const shape = variantDefinition.argument;
     if (shape.ok)
       for (const [name] of shape.entries) {
         if (name === "type" || name === "id")
@@ -381,7 +380,7 @@ function compileBlocks(
 }
 
 function compileReference(
-  definition: FieldDefinition,
+  definition: FieldDefinition<"reference">,
   path: IssuePath,
   context: CompileContext,
   own: SchemaIssue[],
@@ -426,7 +425,6 @@ export function compileField(
   const optional = has(modifiers, "optional");
   const nullable = has(modifiers, "nullable");
   let rules: Rules;
-  let listItem: CompiledField | undefined;
   switch (definition.kind) {
     case "text":
       rules = compileText(modifiers, path, own, context);
@@ -450,8 +448,11 @@ export function compileField(
       rules = { kind: "datetime", ...compileBounds(modifiers, path, own, parseDatetime) };
       break;
     case "list":
-      listItem = compileList(definition, path, context, own, children);
-      rules = { kind: "list", item: listItem, ...compileBounds(modifiers, path, own, countBound) };
+      rules = {
+        kind: "list",
+        item: compileList(definition, path, context, own, children),
+        ...compileBounds(modifiers, path, own, countBound),
+      };
       break;
     case "object":
       rules = {
@@ -490,15 +491,18 @@ export function compileField(
       issue.code === "unknown_collection",
   );
   const declared = values(modifiers, "default");
-  const normalized = declared.map((value) => {
-    const result = structural ? undefined : validateField(base, value, path, false);
+  const results = declared.map((value) =>
+    structural ? undefined : validateField(base, value, path, false),
+  );
+  const normalized = declared.map((value, index) => {
+    const result = results[index];
     return result?.ok ? result.value : value;
   });
   const defaults = distinct(normalized, deepEqual);
   let field = base;
   if (defaults.length > 1) own.push(schemaIssue(path, { code: "conflicting_defaults" }));
   else if (defaults.length === 1 && !structural && !children.length) {
-    const result = validateField(base, declared[0], path, false);
+    const result = results[0]!;
     if (result.ok) field = { ...base, hasDefault: true, default: result.value };
     else
       own.push(
