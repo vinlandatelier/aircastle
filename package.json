@@ -22,6 +22,7 @@
     "lint-schema": "vp lint packages/schema",
     "test": "vp run build && vp run test:prepared",
     "test-web": "vp -C apps/web run test",
+    "test-web:record": "WEB_E2E_VIDEO=1 vp run test-web:e2e",
     "test-api": "vp -C apps/api run test",
     "test-schema": "vp -C packages/schema run test",
     "check:policy": "bun scripts/check-code-policy.ts",
@@ -52,10 +53,7 @@
     "test:prepared": "vp run db:test -- vp run test:all",
     "ai:setup": "node scripts/ai-automation/cli.ts setup",
     "test-web:e2e": "vp -C apps/web run test:e2e",
-    "test-web:coverage": "vp -C apps/web run test:coverage",
-    "verify-web": "vp -C apps/web run verify",
-    "test-web:strength": "vp -C apps/web run test:strength",
-    "test-web:verification": "vp -C apps/web run test:verification"
+    "test-web:coverage": "vp -C apps/web run test:coverage"
   },
   "devDependencies": {
     "@aircastle/adapter-postgres": "workspace:*",

@@ -16,9 +16,9 @@
 
 <!-- Each check you ran with its exit code. For a new guardrail, the planted violation and its failing result. -->
 
-## Screenshots (optional)
+## Screenshots
 
-<!-- UI changes only. -->
+<!-- UI changes need recorded evidence here. See "Complete the feature" in apps/web/VERIFICATION.md. -->
 
 ## Anything else (optional)
 

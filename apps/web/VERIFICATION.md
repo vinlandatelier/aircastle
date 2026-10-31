@@ -20,37 +20,23 @@ Start here before implementing frontend behavior. [AGENTS.md](AGENTS.md) lists c
 | Data extremes, scrolling and explicit geometry | [Stress journeys](e2e/stress.spec.ts) |
 | A workflow crossing feature boundaries | [Integrated journeys](e2e/integration.spec.ts) |
 | Fixtures excluded from production builds | [Build-isolation check](e2e/isolation.spec.ts) |
-| Rejecting false success in verification tools | [Runner](e2e/runner.test.ts), [report](e2e/evidence.test.ts), and [strength](e2e/strength.test.ts) checks |
 
 Import `test` and `expect` from `e2e/support.ts` in browser specs. Its automatic fixture fails local console/runtime errors and required resource failures and attaches browser metadata. Use roles and accessible names to operate the UI.
 
 The existing `visit` and `assertLayout` helpers target the dashboard shell. For a public page, use `page.goto` with the configured normal-build base URL and assert that page's identity. Keep page-specific helpers close to their tests. Do not copy shell assumptions into unrelated features.
 
-Supply deterministic data before rendering through a module-owned seam. Extend the verification build only when necessary; keep fixture data and overrides out of normal production output. Do not change rendered text or private React state to simulate feature data. API-backed workflows need their real repository-owned service setup and failure contract when implemented.
+Supply deterministic data before rendering through a module-owned seam. Extend the fixture build only when necessary; keep fixture data and overrides out of normal production output. Do not change rendered text or private React state to simulate feature data. API-backed workflows need their real repository-owned service setup and failure contract when implemented.
 
 ## Prove test strength
 
-A red test must fail because the promised behavior is absent or broken. Use a focused fault check when needed to resolve a specific concern about test sensitivity: temporarily break that behavior in an isolated copy, confirm the relevant assertion fails, restore it, and confirm the control passes again. A screenshot or a failed build is insufficient evidence of test sensitivity.
-
-The committed examples run through:
-
-```sh
-vp run test-web:strength
-vp run test-web:strength --case theme
-```
-
-[e2e/strength-cases.ts](e2e/strength-cases.ts) declares four bounded faults: ignored theme selection, broken entry, a no-op sidebar toggle, and removed popup containment. Each has baseline, fault and restored controls. The command works in disposable copies and retains logs and structured outcomes under `apps/web/reports/`.
-
-For new behavior, add a justified case when it fits this mechanism, or use an isolated feature-specific experiment. Choose the fault from the requirement, not from whichever line is easiest to change. Keep the case focused on the intended failing assertion. Do not add redundant campaigns merely to increase a count.
-
-A surviving fault is a test gap or an equivalent change requiring explanation. Invalid anchors, setup failures and timeouts are separate outcomes and never count as kills. These selected cases establish sensitivity; they are not a full mutation score or a percentage quality gate.
+A red test must fail because the promised behavior is absent or broken. Use a focused fault check when needed to resolve a specific concern about test sensitivity: temporarily break that behavior, confirm the relevant assertion fails, restore it, and confirm the test passes again. Choose the fault from the requirement, not from whichever line is easiest to change. A screenshot or a failed build is insufficient evidence of test sensitivity. Do not commit the fault.
 
 ## Complete the feature
 
 - Follow the root [verification rules](../../AGENTS.md#changes-and-verification). Run only the component tests, browser journeys, and package checks needed to verify the change and affected callers. Select files and cases rather than running the whole frontend suite by default.
-- Neither `vp run verify-web` nor `vp run check` is a required completion gate. Reserve full-suite runs for explicit user requests. A focused UI change does not require backend, database, mutation, or verification-tool suites.
-- When changing verification scripts, reporters, fixtures or configuration, select the affected files or cases through `vp run test-web:verification <file>`. Do not run its unrelated fault campaigns.
+- `vp run check` is not a required completion gate. Reserve full-suite runs for explicit user requests. A focused UI change does not require backend, database, or mutation suites.
 - Run `vp run test-web:coverage` when assessing coverage. Inspect raw covered/total counts and uncovered modules. The component-suite V8 report includes unimported source, excludes CSS, and includes compiler-generated branch effects. Browser journey results are separate evidence.
-- Preserve the command, revision/source fingerprint, executed/failed/skipped counts, intended red witness and final passing result. Use one focused independent review to challenge missing outcomes and assertions that could pass with broken behavior.
+- Preserve the command, revision, executed and failed counts, intended red witness and final passing result. Use one focused independent review to challenge missing outcomes and assertions that could pass with broken behavior.
+- If the change alters what a user sees or does, run `vp run test-web:record <specs>` for each changed journey and its edge cases. Upload the videos and screenshots from `reports/test-results/` into the PR body under `## Screenshots`; GitHub plays `.webm` inline. Never commit media. If UI source changed but nothing visible did, write `No visible UI change: <reason>` in the PR body.
 
-The receipt lists the cases selected for that run, including each test's file and title hierarchy, status, attempts, errors and browser metadata. Report only the coverage established by those selected cases. Do not weaken assertions, silently skip failures, or accept retries to obtain green evidence.
+The Playwright HTML and JSON reports list the cases selected for that run, with each test's file and title, status, errors and attachments. Report only the coverage established by those selected cases. Do not weaken assertions, skip failures, or accept retries to obtain green evidence.
