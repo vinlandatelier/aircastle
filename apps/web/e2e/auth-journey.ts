@@ -47,11 +47,23 @@ export async function expectInbox(page: Page) {
   ).toBeVisible()
 }
 
+const messageBodies = {
+  'Create your Aircastle account': 'Confirm your email to create your account.',
+  'Sign in to Aircastle': 'Use this link to sign in.',
+} as const
+
+const sessionCookie = 'better-auth.session_token'
+
 export function message(page: Page, email: string, subject: string) {
   return page.getByRole('button').filter({ hasText: email }).filter({ hasText: subject })
 }
 
-export async function capturedLink(page: Page, email: string, subject: string, name?: string) {
+export async function capturedLink(
+  page: Page,
+  email: string,
+  subject: keyof typeof messageBodies,
+  name?: string,
+) {
   await message(page, email, subject).first().click()
   const readingPane = page.getByRole('region', { name: 'Reading pane', exact: true })
   await expect(readingPane.getByText('From', { exact: true })).toBeVisible()
@@ -64,14 +76,7 @@ export async function capturedLink(page: Page, email: string, subject: string, n
   await expect(
     readingPane.getByText('This link expires in 5 minutes.', { exact: true }),
   ).toBeVisible()
-  await expect(
-    readingPane.getByText(
-      subject === 'Create your Aircastle account'
-        ? 'Confirm your email to create your account.'
-        : 'Use this link to sign in.',
-      { exact: true },
-    ),
-  ).toBeVisible()
+  await expect(readingPane.getByText(messageBodies[subject], { exact: true })).toBeVisible()
   if (name) await expect(readingPane.getByText(name, { exact: false }).last()).toBeVisible()
   const link = readingPane.getByRole('link', { name: 'Continue', exact: true })
   await expect(link).toHaveCount(1)
@@ -92,8 +97,9 @@ export async function signOut(page: Page, name: string, email: string) {
 }
 
 export async function expectBearerOutsideWebStorage(page: Page) {
-  const cookies = (await page.context().cookies()).filter((cookie) => cookie.httpOnly)
-  expect(cookies.length, 'Claim must issue an actual HttpOnly session cookie').toBeGreaterThan(0)
+  const session = (await page.context().cookies()).find((cookie) => cookie.name === sessionCookie)
+  if (!session) throw new Error(`Claim must issue the ${sessionCookie} cookie`)
+  expect(session.httpOnly, 'Session cookie must be HttpOnly').toBe(true)
   const storage = await page.evaluate(() =>
     JSON.stringify({
       local: Object.entries(localStorage),
@@ -101,13 +107,11 @@ export async function expectBearerOutsideWebStorage(page: Page) {
       cookie: document.cookie,
     }),
   )
-  for (const cookie of cookies) {
-    const decoded = decodeURIComponent(cookie.value)
-    for (const bearer of new Set([cookie.value, decoded, decoded.split('.')[0]!])) {
-      expect(bearer, 'Issued bearer must be nonempty').not.toBe('')
-      expect(storage, 'Issued session bearer must stay outside JavaScript storage').not.toContain(
-        bearer,
-      )
-    }
+  const decoded = decodeURIComponent(session.value)
+  for (const bearer of new Set([session.value, decoded, decoded.split('.')[0]!])) {
+    expect(bearer, 'Issued bearer must be nonempty').not.toBe('')
+    expect(storage, 'Issued session bearer must stay outside JavaScript storage').not.toContain(
+      bearer,
+    )
   }
 }

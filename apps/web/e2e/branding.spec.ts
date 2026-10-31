@@ -1,17 +1,6 @@
 import { Buffer } from 'node:buffer'
-import { test, expect } from './support'
+import { fixtureTest as test, expect } from './support'
 import { themeStorageKey } from '../src/theme'
-import { origins } from './origins'
-
-test.use({ baseURL: origins.fixture.url })
-
-test.beforeEach(async ({ baseURL }, info) => {
-  expect(baseURL).toBe(origins.fixture.url)
-  info.annotations.push({
-    type: 'scenario',
-    description: 'display-only auth transport for public routing, metadata, and recovery',
-  })
-})
 
 test('favicons embed small light and dark brand icons', async ({ request }) => {
   const icons: Buffer[] = []
