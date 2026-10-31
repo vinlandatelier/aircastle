@@ -1,12 +1,10 @@
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { parseModelConfig, runModel, type ModelSelection } from "./index.ts";
 
-const openai: ModelSelection = { provider: "openai", model: "gpt-6-astra", effort: "high" };
-const anthropic: ModelSelection = {
-  provider: "anthropic",
-  model: "claude-opus-5-5",
-  effort: "high",
-};
+const selection: ModelSelection = { model: "claude-opus-5-5", effort: "high" };
 const schema = {
   type: "object",
   properties: { ok: { type: "boolean" } },
@@ -15,413 +13,287 @@ const schema = {
 };
 const config = {
   version: 1,
-  roles: {
-    codexReviewer: openai,
-    codexImplementer: openai,
-    claudeReviewer: anthropic,
-    claudeImplementer: anthropic,
-  },
+  roles: { reviewer: selection, implementer: selection },
 };
-type Event = { type: string } & Record<string, unknown>;
-const stream = (events: Event[], chunkSize = Infinity) => {
-  const bytes = new TextEncoder().encode(
-    events
-      .map((event) => `event: ${event.type}\r\ndata: ${JSON.stringify(event)}\r\n\r\n`)
-      .join(""),
-  );
-  return new Response(
-    new ReadableStream({
-      start(controller) {
-        for (let index = 0; index < bytes.length; index += chunkSize)
-          controller.enqueue(bytes.slice(index, index + chunkSize));
-        controller.close();
-      },
-    }),
-    { headers: { "content-type": "text/event-stream" } },
-  );
-};
-const openaiStream = (response: Record<string, unknown>): Event[] => [
-  { type: "response.created", response: { status: "in_progress" } },
-  { type: `response.${String(response.status)}`, response },
-];
-const anthropicStream = (
-  message: { content: Record<string, unknown>[] } & Record<string, unknown>,
-): Event[] => [
-  { type: "message_start", message: { ...message, content: [], stop_reason: null } },
-  { type: "ping" },
-  ...message.content.flatMap((block, index): Event[] =>
-    block.type === "text"
-      ? [
-          { type: "content_block_start", index, content_block: { type: "text", text: "" } },
-          ...String(block.text)
-            .split(/(?<=,)/)
-            .map((text) => ({
-              type: "content_block_delta",
-              index,
-              delta: { type: "text_delta", text },
-            })),
-          { type: "content_block_stop", index },
-        ]
-      : [
-          { type: "content_block_start", index, content_block: { ...block, thinking: "" } },
-          { type: "content_block_delta", index, delta: { type: "thinking_delta", thinking: "" } },
-          {
-            type: "content_block_delta",
-            index,
-            delta: { type: "signature_delta", signature: "sig" },
-          },
-          { type: "content_block_stop", index },
-        ],
-  ),
-  {
-    type: "message_delta",
-    delta: { stop_reason: message.stop_reason },
-    usage: { output_tokens: 9 },
-  },
-  { type: "message_stop" },
-];
-const response = (body: Record<string, unknown>) =>
-  stream(
-    "status" in body
-      ? openaiStream(body)
-      : anthropicStream(body as { content: Record<string, unknown>[] }),
-  );
-const completed = (text: string) => ({
-  status: "completed",
-  model: openai.model,
-  output: [{ type: "message", content: [{ type: "output_text", text }] }],
+const success = (structured: unknown, models: string[] = [selection.model]) => ({
+  type: "result",
+  subtype: "success",
+  is_error: false,
+  num_turns: 2,
+  session_id: "session-1",
+  result: JSON.stringify(structured),
+  structured_output: structured,
+  usage: { input_tokens: 3, output_tokens: 9 },
+  modelUsage: Object.fromEntries(models.map((model) => [model, { outputTokens: 9 }])),
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
+const directories: string[] = [];
+afterEach(async () => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true })));
 });
 
-test("config requires exactly four correctly paired roles and explicit effort", () => {
+async function directory(): Promise<string> {
+  const path = await mkdtemp(join(tmpdir(), "ai-models-test-"));
+  directories.push(path);
+  return path;
+}
+
+/**
+ * Puts a `claude` on PATH that records its invocation, prints `output` and `stderr`, then exits
+ * with `exitCode` or, when `exitCode` is a signal name, kills itself with that signal.
+ */
+async function fakeClaude(output: unknown, exitCode: number | "TERM" = 0, stderr = "") {
+  const bin = await directory();
+  await writeFile(
+    join(bin, "output"),
+    typeof output === "string" ? output : JSON.stringify(output),
+  );
+  await writeFile(join(bin, "stderr"), stderr);
+  await writeFile(
+    join(bin, "claude"),
+    [
+      "#!/bin/sh",
+      `cat > "${bin}/stdin"`,
+      `printf '%s\\n' "$@" > "${bin}/args"`,
+      `env > "${bin}/env"`,
+      `pwd -P > "${bin}/cwd"`,
+      `(cd "$HOME" && pwd -P) > "${bin}/home"`,
+      `ls -A > "${bin}/files"`,
+      `cat "${bin}/output"`,
+      `cat "${bin}/stderr" >&2`,
+      typeof exitCode === "number" ? `exit ${exitCode}` : `kill -${exitCode} $$`,
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  vi.stubEnv("PATH", `${bin}:${process.env.PATH ?? ""}`);
+  vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-secret");
+  vi.stubEnv("AI_MODEL_RECEIPTS_DIR", "");
+  const read = (name: string) => readFile(join(bin, name), "utf8");
+  return {
+    bin,
+    read,
+    ran: () =>
+      stat(join(bin, "args")).then(
+        () => true,
+        () => false,
+      ),
+  };
+}
+
+test("config requires exactly the reviewer and implementer roles with a model and explicit effort", () => {
   expect(parseModelConfig(config)).toEqual(config);
+  expect(() => parseModelConfig({ ...config, roles: { reviewer: selection } })).toThrow();
   expect(() =>
-    parseModelConfig({ ...config, roles: { ...config.roles, claudeReviewer: openai } }),
+    parseModelConfig({ ...config, roles: { ...config.roles, secondReviewer: selection } }),
   ).toThrow();
-  expect(() => parseModelConfig({ ...config, roles: { codexReviewer: openai } })).toThrow();
+  expect(() =>
+    parseModelConfig({
+      ...config,
+      roles: { ...config.roles, implementer: { ...selection, endpoint: "https://evil.invalid" } },
+    }),
+  ).toThrow();
   expect(() => parseModelConfig({ ...config, url: "https://evil.invalid" })).toThrow();
   expect(() =>
     parseModelConfig({
       ...config,
-      roles: { ...config.roles, codexReviewer: { ...openai, effort: "super" } },
+      roles: { ...config.roles, reviewer: { ...selection, effort: "super" } },
     }),
   ).toThrow();
 });
 
-test("missing matching key reports setup_required before any network call", async () => {
-  vi.stubEnv("OPENAI_API_KEY", "");
-  vi.stubEnv("ANTHROPIC_API_KEY", "other-secret");
-  const fetcher = vi.fn();
-  vi.stubGlobal("fetch", fetcher);
-  await expect(runModel(openai, "review", schema)).rejects.toThrow("setup_required");
-  expect(fetcher).not.toHaveBeenCalled();
+test("a missing subscription token reports setup_required before running the CLI", async () => {
+  const claude = await fakeClaude(success({ ok: true }));
+  vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", "");
+  await expect(runModel(selection, "review", schema)).rejects.toThrow("setup_required");
+  expect(await claude.ran()).toBe(false);
 });
 
-test.each([openai, anthropic])(
-  "%s sends strict schema and exact settings only to fixed official endpoints",
-  async (selection) => {
-    vi.stubEnv("OPENAI_API_KEY", "openai-secret");
-    vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-secret");
-    vi.stubEnv("OPENAI_BASE_URL", "https://evil.invalid");
-    const fetcher = vi.fn(async () =>
-      response(
-        selection.provider === "openai"
-          ? completed('{"ok":true}')
-          : {
-              model: selection.model,
-              stop_reason: "end_turn",
-              content: [{ type: "text", text: '{"ok":true}' }],
-            },
-      ),
-    );
-    vi.stubGlobal("fetch", fetcher);
-    await expect(runModel(selection, "review untrusted text", schema)).resolves.toEqual({
-      ok: true,
-    });
-    const [url, request] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(
-      selection.provider === "openai"
-        ? "https://api.openai.com/v1/responses"
-        : "https://api.anthropic.com/v1/messages",
-    );
-    if (typeof request.body !== "string") throw new Error("missing request");
-    const body = JSON.parse(request.body);
-    expect(body.model).toBe(selection.model);
-    expect(body.tools).toBeUndefined();
-    expect(request.redirect).toBe("error");
-    expect(request.signal).toBeInstanceOf(AbortSignal);
-    if (selection.provider === "openai") {
-      expect(body.reasoning).toEqual({ effort: "high" });
-      expect(body.text.format).toEqual({
-        type: "json_schema",
-        name: "result",
-        strict: true,
-        schema,
-      });
-      expect(body.stream).toBe(true);
-    } else {
-      expect(body.output_config).toEqual({
-        effort: "high",
-        format: { type: "json_schema", schema },
-      });
-      expect(body.stream).toBe(true);
-    }
-    expect(JSON.stringify(request)).not.toContain(
-      selection.provider === "openai" ? "anthropic-secret" : "openai-secret",
-    );
-  },
-);
-
-test.each([
-  { status: "incomplete", output: [] },
-  {
-    status: "completed",
-    output: [{ type: "message", content: [{ type: "refusal", refusal: "key-secret" }] }],
-  },
-  completed('{"ok":"true"}'),
-  completed('{"ok":true,"extra":1}'),
-  completed("invalid key-secret"),
-])(
-  "rejects incomplete, refused and schema-invalid OpenAI output without echoing it",
-  async (body) => {
-    vi.stubEnv("OPENAI_API_KEY", "key-secret");
-    vi.stubGlobal("fetch", async () => response(body));
-    await expect(runModel(openai, "review", schema)).rejects.toThrow(/^(?!.*key-secret)/);
-  },
-);
-
-test.each(["max_tokens", "refusal", "tool_use", "pause_turn"])(
-  "rejects Anthropic %s stop",
-  async (stop_reason) => {
-    vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
-    vi.stubGlobal("fetch", async () =>
-      response({ stop_reason, content: [{ type: "text", text: '{"ok":true}' }] }),
-    );
-    await expect(runModel(anthropic, "review", schema)).rejects.toThrow();
-  },
-);
-
-test.each([
-  ["low", 64_000],
-  ["medium", 64_000],
-  ["high", 64_000],
-  ["xhigh", 128_000],
-  ["max", 128_000],
-] as const)(
-  "%s effort leaves both providers room to reason before answering (%i tokens)",
-  async (effort, cap) => {
-    vi.stubEnv("OPENAI_API_KEY", "openai-secret");
-    vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-secret");
-    const fetcher = vi.fn(async (url: string, _request: RequestInit) =>
-      response(
-        url.includes("openai")
-          ? completed('{"ok":true}')
-          : {
-              model: anthropic.model,
-              stop_reason: "end_turn",
-              content: [{ type: "text", text: '{"ok":true}' }],
-            },
-      ),
-    );
-    vi.stubGlobal("fetch", fetcher);
-    await runModel({ ...openai, effort }, "review", schema);
-    await runModel({ ...anthropic, effort }, "review", schema);
-    const bodies = fetcher.mock.calls.map(([, request]) => {
-      if (typeof request.body !== "string") throw new Error("missing request");
-      return JSON.parse(request.body);
-    });
-    expect(bodies[0].max_output_tokens).toBe(cap);
-    expect(bodies[1].max_tokens).toBe(cap);
-  },
-);
-
-test("config accepts xhigh effort for Anthropic roles", () => {
-  const roles = { ...config.roles, claudeReviewer: { ...anthropic, effort: "xhigh" } };
-  expect(parseModelConfig({ ...config, roles }).roles.claudeReviewer.effort).toBe("xhigh");
+test("the CLI gets the prompt on stdin, the schema and settings as flags, and no tools", async () => {
+  const claude = await fakeClaude(success({ ok: true }));
+  await expect(runModel(selection, "review untrusted text", schema)).resolves.toEqual({ ok: true });
+  expect((await claude.read("args")).split("\n").slice(0, -1)).toEqual([
+    "-p",
+    "--output-format",
+    "json",
+    "--json-schema",
+    JSON.stringify(schema),
+    "--model",
+    "claude-opus-5-5",
+    "--effort",
+    "high",
+    "--tools",
+    "",
+    "--strict-mcp-config",
+    "--no-session-persistence",
+    "--max-turns",
+    "4",
+  ]);
+  expect(await claude.read("stdin")).toBe("review untrusted text");
 });
 
-test("Anthropic answer is reassembled from thinking and text deltas split across chunks", async () => {
-  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
-  const answer = { ok: true, note: "first, second, third" };
-  const events = anthropicStream({
-    model: anthropic.model,
-    stop_reason: "end_turn",
-    content: [
-      { type: "thinking", signature: "" },
-      { type: "text", text: JSON.stringify(answer) },
-    ],
-  });
-  vi.stubGlobal("fetch", async () => stream(events, 7));
-  const noted = {
-    ...schema,
-    properties: { ...schema.properties, note: { type: "string" } },
-    required: ["ok", "note"],
-  };
-  await expect(runModel(anthropic, "review", noted)).resolves.toEqual(answer);
-});
-
-test.each<[string, ModelSelection, Event[]]>([
-  ["Anthropic", anthropic, [{ type: "message_start", message: { model: anthropic.model } }]],
-  ["OpenAI", openai, [{ type: "response.created", response: { status: "in_progress" } }]],
-])("%s stream that ends before its final event is incomplete", async (_, selection, events) => {
-  vi.stubEnv("OPENAI_API_KEY", "key-secret");
-  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
-  vi.stubGlobal("fetch", async () => stream(events));
-  await expect(runModel(selection, "review", schema)).rejects.toThrow("provider_incomplete");
-});
-
-test.each([anthropic, openai])("%s error event fails without echoing it", async (selection) => {
-  vi.stubEnv("OPENAI_API_KEY", "key-secret");
-  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
-  vi.stubGlobal("fetch", async () =>
-    stream([{ type: "error", error: { type: "overloaded_error", message: "key-secret" } }]),
+test("the CLI runs in a fresh empty directory with its own config and only the subscription credential", async () => {
+  const claude = await fakeClaude(success({ ok: true }));
+  vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "gateway-secret");
+  vi.stubEnv("ANTHROPIC_BASE_URL", "https://evil.invalid");
+  vi.stubEnv("GITHUB_TOKEN", "github-secret");
+  await runModel(selection, "review", schema);
+  const cwd = (await claude.read("cwd")).trim();
+  const env = Object.fromEntries(
+    (await claude.read("env"))
+      .trim()
+      .split("\n")
+      .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
   );
-  await expect(runModel(selection, "review", schema)).rejects.toThrow("provider_failed");
+  expect(await claude.read("files")).toBe("");
+  expect((await claude.read("home")).trim()).toBe(cwd);
+  expect(env.CLAUDE_CONFIG_DIR).toBe(join(env.HOME ?? "", ".claude"));
+  expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("oauth-secret");
+  expect(Object.keys(env).filter((key) => key.startsWith("ANTHROPIC_"))).toEqual([]);
+  expect(env.GITHUB_TOKEN).toBeUndefined();
+  await expect(stat(cwd)).rejects.toThrow();
 });
 
-test("rejects unsupported schemas and oversized prompts before spending", async () => {
-  vi.stubEnv("OPENAI_API_KEY", "key-secret");
-  const fetcher = vi.fn();
-  vi.stubGlobal("fetch", fetcher);
-  await expect(runModel(openai, "review", { ...schema, magicKeyword: true })).rejects.toThrow();
-  await expect(runModel(openai, "x".repeat(200_001), schema)).rejects.toThrow();
-  expect(fetcher).not.toHaveBeenCalled();
+test.each<[string, unknown, number, string]>([
+  [
+    "a failed run",
+    { ...success({ ok: true }), is_error: true, subtype: "error_during_execution" },
+    1,
+    "provider_failed",
+  ],
+  ["a non-zero exit", success({ ok: true }), 1, "provider_failed"],
+  [
+    "a run out of turns",
+    { ...success({ ok: true }), is_error: true, subtype: "error_max_turns" },
+    1,
+    "provider_incomplete",
+  ],
+  [
+    "a run without structured output",
+    { ...success({ ok: true }), structured_output: undefined },
+    0,
+    "provider_no_structured_output",
+  ],
+  ["output that breaks the schema", success({ ok: "true" }), 0, "provider_schema_mismatch"],
+  ["output with an extra property", success({ ok: true, extra: 1 }), 0, "provider_schema_mismatch"],
+  [
+    "a different model than configured",
+    success({ ok: true }, ["claude-haiku-5-5"]),
+    0,
+    "provider_model_mismatch",
+  ],
+  ["text that is not JSON", "Not logged in oauth-secret", 1, "provider_invalid_json"],
+  ["JSON that is not a result", { type: "system" }, 0, "provider_invalid_response"],
+])("%s fails with its own error code", async (_, output, exitCode, error) => {
+  await fakeClaude(output, exitCode, "stderr oauth-secret");
+  const failure = runModel(selection, "review", schema);
+  await expect(failure).rejects.toThrow(new RegExp(`^${error}(: |$)`));
+  await expect(failure).rejects.not.toThrow("oauth-secret");
 });
 
-test("network errors and non-OK bodies never disclose secrets", async () => {
-  vi.stubEnv("OPENAI_API_KEY", "key-secret");
-  vi.stubGlobal("fetch", async () => {
-    throw new Error("key-secret https://private");
-  });
-  await expect(runModel(openai, "review", schema)).rejects.toThrow("provider_unavailable");
-  vi.stubGlobal("fetch", async () => new Response("key-secret", { status: 401 }));
-  await expect(runModel(openai, "review", schema)).rejects.toThrow("provider_http_401");
+const unauthenticated = {
+  type: "result",
+  subtype: "success",
+  is_error: true,
+  terminal_reason: "api_error",
+  result:
+    'Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"Invalid bearer token oauth-secret"}}',
+  session_id: "session-1",
+};
+
+test("an authentication failure names the CLI's reason and stderr tail without the token", async () => {
+  await fakeClaude(unauthenticated, 1, `${"x".repeat(5_000)}\nlast line\twith oauth-secret\n`);
+  const failure = runModel(selection, "review", schema);
+  await expect(failure).rejects.toThrow(/^provider_failed: /);
+  await expect(failure).rejects.toThrow("exit=1");
+  await expect(failure).rejects.toThrow("Failed to authenticate. API Error: 401");
+  await expect(failure).rejects.toThrow('terminal_reason="api_error"');
+  await expect(failure).rejects.toThrow("last line with [redacted]");
+  await expect(failure).rejects.not.toThrow("oauth-secret");
+  await expect(failure).rejects.not.toThrow("x".repeat(400));
 });
 
-test("a failed provider response is distinguished from incomplete output without echoing its error", async () => {
-  vi.stubEnv("OPENAI_API_KEY", "key-secret");
-  vi.stubGlobal("fetch", async () =>
-    response({ status: "failed", error: { message: "key-secret" }, output: [] }),
+test("a failed run still writes a receipt with the failure and no token", async () => {
+  await fakeClaude(unauthenticated, 1, "rate limited oauth-secret");
+  const receipts = await directory();
+  vi.stubEnv("AI_MODEL_RECEIPTS_DIR", receipts);
+  const message = await runModel(selection, "review", schema).then(
+    () => "",
+    (error: unknown) => (error instanceof Error ? error.message : ""),
   );
-  await expect(runModel(openai, "review", schema)).rejects.toThrow("provider_failed");
+  const [name] = await readdir(receipts);
+  const receipt = await readFile(join(receipts, name ?? ""), "utf8");
+  expect(JSON.parse(receipt)).toMatchObject({
+    request: { prompt: "review" },
+    response: { is_error: true, terminal_reason: "api_error" },
+    stderr: "rate limited [redacted]",
+    failure: message,
+  });
+  expect(message).toMatch(/^provider_failed: /);
+  expect(receipt).not.toContain("oauth-secret");
 });
 
-test("Anthropic transport describes unsupported bounds while local validation still enforces them", async () => {
-  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
-  const bounded = {
-    type: "object",
-    properties: {
-      findings: {
-        type: "array",
-        minItems: 2,
-        maxItems: 8,
-        items: {
-          type: "object",
-          properties: {
-            line: { type: "integer", minimum: 1, maximum: 100 },
-            quote: { type: "string", minLength: 12, maxLength: 12000, description: "Exact quote." },
-          },
-          required: ["line", "quote"],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ["findings"],
-    additionalProperties: false,
-  };
-  const original = structuredClone(bounded);
-  const fetcher = vi.fn(async () =>
-    response({
-      model: anthropic.model,
-      stop_reason: "end_turn",
-      content: [
-        { type: "text", text: JSON.stringify({ findings: [{ line: 0, quote: "short" }] }) },
-      ],
-    }),
+test("a token cut by the stderr tail boundary leaves no fragment in the error", async () => {
+  const token = `sk-ant-oat01-${"Q7f".repeat(16)}`;
+  await fakeClaude(unauthenticated, 1, `${"a ".repeat(200)}${token}${" b".repeat(146)}`);
+  vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", token);
+  const message = await runModel(selection, "review", schema).then(
+    () => "",
+    (error: unknown) => (error instanceof Error ? error.message : ""),
   );
-  vi.stubGlobal("fetch", fetcher);
-  await expect(runModel(anthropic, "review", bounded)).rejects.toThrow("provider_schema_mismatch");
-  const request = fetcher.mock.calls[0] as unknown as [string, RequestInit];
-  if (typeof request[1].body !== "string") throw new Error("missing request");
-  const transport = JSON.parse(request[1].body).output_config.format.schema;
-  expect(transport.properties.findings.minItems).toBeUndefined();
-  expect(transport.properties.findings.maxItems).toBeUndefined();
-  expect(transport.properties.findings.description).toContain("maxItems: 8");
-  expect(transport.properties.findings.items.properties.line).toEqual({
-    type: "integer",
-    description: "{minimum: 1} {maximum: 100}",
+  expect(message).toContain("stderr=");
+  expect(message).not.toContain("Q7f");
+});
+
+test("a receipt that cannot be written still rejects with the provider error", async () => {
+  await fakeClaude(unauthenticated, 1, "rate limited");
+  const blocker = join(await directory(), "file");
+  await writeFile(blocker, "");
+  vi.stubEnv("AI_MODEL_RECEIPTS_DIR", join(blocker, "receipts"));
+  const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  await expect(runModel(selection, "review", schema)).rejects.toThrow(/^provider_failed: /);
+  expect(logged).toHaveBeenCalledWith(expect.stringContaining("provider_receipt_unavailable"));
+});
+
+test("a run the timeout killed reports provider_timeout", async () => {
+  await fakeClaude("", "TERM");
+  await expect(runModel(selection, "review", schema)).rejects.toThrow(
+    /^provider_timeout: signal=SIGTERM/,
+  );
+});
+
+test("an auxiliary model next to the configured one is accepted", async () => {
+  await fakeClaude(success({ ok: true }, ["claude-haiku-5-5", selection.model]));
+  await expect(runModel(selection, "review", schema)).resolves.toEqual({ ok: true });
+});
+
+test("a missing CLI is unavailable", async () => {
+  vi.stubEnv("PATH", await directory());
+  vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-secret");
+  await expect(runModel(selection, "review", schema)).rejects.toThrow("provider_unavailable");
+});
+
+test("rejects unsupported schemas and oversized prompts before running the CLI", async () => {
+  const claude = await fakeClaude(success({ ok: true }));
+  await expect(runModel(selection, "review", { ...schema, magicKeyword: true })).rejects.toThrow();
+  await expect(runModel(selection, "x".repeat(200_001), schema)).rejects.toThrow();
+  expect(await claude.ran()).toBe(false);
+});
+
+test("a receipt records the request and response with the token redacted", async () => {
+  await fakeClaude({ ...success({ ok: true }), result: "echo oauth-secret" });
+  const receipts = await directory();
+  vi.stubEnv("AI_MODEL_RECEIPTS_DIR", receipts);
+  vi.spyOn(console, "log").mockImplementation(() => undefined);
+  await runModel(selection, "review", schema);
+  const [name] = await readdir(receipts);
+  const receipt = await readFile(join(receipts, name ?? ""), "utf8");
+  expect(JSON.parse(receipt)).toMatchObject({
+    request: { prompt: "review" },
+    response: { result: "echo [redacted]", structured_output: { ok: true } },
+    execution: { selection, models: [selection.model], effort: "sent", turns: 2 },
   });
-  expect(transport.properties.findings.items.properties.quote).toEqual({
-    type: "string",
-    description: "Exact quote. {minLength: 12} {maxLength: 12000}",
-  });
-  expect(bounded).toEqual(original);
-});
-
-const okResponse = () =>
-  response({
-    model: anthropic.model,
-    stop_reason: "end_turn",
-    content: [{ type: "text", text: '{"ok":true}' }],
-  });
-
-test("rate limits and overloads before the stream starts are retried after the server's delay", async () => {
-  vi.useFakeTimers();
-  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
-  const fetcher = vi
-    .fn()
-    .mockResolvedValueOnce(new Response("busy", { status: 529 }))
-    .mockResolvedValueOnce(
-      new Response("slow down", { status: 429, headers: { "retry-after": "5" } }),
-    )
-    .mockResolvedValueOnce(okResponse());
-  vi.stubGlobal("fetch", fetcher);
-  const result = runModel(anthropic, "review", schema);
-  await vi.advanceTimersByTimeAsync(2_000);
-  expect(fetcher).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(4_999);
-  expect(fetcher).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(1);
-  await expect(result).resolves.toEqual({ ok: true });
-  expect(fetcher).toHaveBeenCalledTimes(3);
-});
-
-test("retries stop after three attempts and report the last status", async () => {
-  vi.useFakeTimers();
-  vi.stubEnv("OPENAI_API_KEY", "key-secret");
-  const fetcher = vi.fn(async () => new Response("down", { status: 503 }));
-  vi.stubGlobal("fetch", fetcher);
-  const result = runModel(openai, "review", schema);
-  const settled = expect(result).rejects.toThrow("provider_http_503");
-  await vi.runAllTimersAsync();
-  await settled;
-  expect(fetcher).toHaveBeenCalledTimes(3);
-});
-
-test.each([400, 401, 404])("status %i is not retried", async (status) => {
-  vi.stubEnv("OPENAI_API_KEY", "key-secret");
-  const fetcher = vi.fn(async () => new Response("no", { status }));
-  vi.stubGlobal("fetch", fetcher);
-  await expect(runModel(openai, "review", schema)).rejects.toThrow(`provider_http_${status}`);
-  expect(fetcher).toHaveBeenCalledTimes(1);
-});
-
-test("a retry-after delay is capped at one minute", async () => {
-  vi.useFakeTimers();
-  vi.stubEnv("ANTHROPIC_API_KEY", "key-secret");
-  const fetcher = vi
-    .fn()
-    .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "3600" } }))
-    .mockResolvedValueOnce(okResponse());
-  vi.stubGlobal("fetch", fetcher);
-  const result = runModel(anthropic, "review", schema);
-  await vi.advanceTimersByTimeAsync(60_000);
-  await expect(result).resolves.toEqual({ ok: true });
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(receipt).not.toContain("oauth-secret");
 });

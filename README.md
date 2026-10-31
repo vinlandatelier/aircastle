@@ -54,11 +54,8 @@ Run common commands from the repository root:
 | `vp run test:db` | Disposable Postgres runner lifecycle checks |
 | `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases |
 | `vp run test-web` | Fast web component tests |
-| `vp run test-web:e2e` | Fresh web builds and Chromium journeys |
+| `vp run test-web:e2e` | Normal and fixture web builds, then Chromium journeys |
 | `vp run test-web:coverage` | Web V8 coverage with HTML and JSON reports |
-| `vp run verify-web` | Frontend policy, types, lint, boundaries, component tests, builds, and browser journeys |
-| `vp run test-web:strength` | Selected UI faults with passing baseline and restored controls |
-| `vp run test-web:verification` | Verification command, reporter, and strength-runner tests |
 | `vp run test-api` | API tests |
 | `vp run test-schema` | Schema runtime tests |
 | `vp run test-mutation` | Slower schema mutation tests, run separately |
@@ -71,10 +68,12 @@ Install the browser before running web browser verification:
 
 ```sh
 vp -C apps/web exec playwright install chromium
-vp run verify-web
+vp run test-web:e2e
 ```
 
-Browser verification runs its preview controller on Node.js and starts and cleans up its own servers on allocated ports. It does not require the API or Postgres for the current shell. Each run prints an isolated directory under `apps/web/reports/` containing its receipt, logs, test reports, and failure artifacts. Run a focused scenario with `vp run test-web:e2e stress.spec.ts --grep long-text`.
+Playwright builds the web app twice, once with its real data and once with fixture data, and serves each build until the run ends. The normal build listens on `WEB_E2E_PORT`, which defaults to 43124, and the fixture build listens on the next port. An occupied port stops the run. To run browser journeys in two worktrees at once, give each run its own port, for example `WEB_E2E_PORT=43224 vp run test-web:e2e`. The journeys do not require the API or Postgres for the current shell.
+
+Each run overwrites its reports in `apps/web/reports/`. `html/` holds the HTML report, `results.json` holds the JSON results, `test-results/` holds traces and screenshots of failed tests, and `build/normal/` and `build/fixture/` hold the two builds. Open the HTML report with `vp -C apps/web exec playwright show-report reports/html`. Run a focused scenario with `vp run test-web:e2e stress.spec.ts --grep long-text`.
 
 ## Local Postgres
 
