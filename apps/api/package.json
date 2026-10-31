@@ -19,8 +19,10 @@
     "@aircastle/contracts": "workspace:*",
     "@aircastle/core": "workspace:*",
     "@arkenv/core": "1.0.0-rc.4",
+    "@better-auth/core": "1.7.12",
     "@scalar/hono-api-reference": "0.12.14",
     "arktype": "2.2.9",
+    "better-auth": "1.7.12",
     "hono": "4.13.13",
     "hono-openapi": "1.5.0",
     "hono-pino": "0.10.3",
@@ -29,6 +31,7 @@
   "devDependencies": {
     "@hono/cli": "1.0.0-rc.8",
     "@types/bun": "catalog:",
+    "postgres": "3.4.9",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }
