@@ -47,7 +47,12 @@ export async function postgresWire(url: string, observe?: (frame: Buffer, type: 
   let release: (() => void) | undefined;
   let serverCommitted = false;
   const server = net.createServer((front) => {
-    const back = net.connect({ host: target.hostname, port: Number(target.port) || 5432 });
+    const back = net.connect({
+      host: target.hostname,
+      port: Number(target.port) || 5432,
+      noDelay: true,
+    });
+    front.setNoDelay(true);
     sockets.add(front);
     sockets.add(back);
     const statements = new Map<string, string>();
