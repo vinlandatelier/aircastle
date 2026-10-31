@@ -86,8 +86,8 @@ export function defineConfig<const Collections extends CollectionDefinitions>(co
 }
 
 function responseResult<Output extends object>(
-  collection: CompiledCollection<Output>,
   response: unknown,
+  stored: (fields: Record<string, unknown>) => Output | undefined,
 ): Result<{ id: string } & Output> | undefined {
   if (!isPlainRecord(response)) return undefined;
   if (response.ok === false) {
@@ -104,7 +104,7 @@ function responseResult<Output extends object>(
   const document = response.data;
   if (typeof document.id !== "string" || !uuid.test(document.id)) return undefined;
   const fields = Object.fromEntries(Object.entries(document).filter(([key]) => key !== "id"));
-  const data = storedDocument(collection, fields);
+  const data = stored(fields);
   return data === undefined ? undefined : { ok: true, data: { id: document.id, ...data } };
 }
 
@@ -113,7 +113,7 @@ type ClientOptions<Collections extends CollectionDefinitions> = AircastleConfig<
   fetch?: Fetch;
 };
 
-/** The returned object is built key by key from `config.collections`, so the declarations carry its collection names and output types. */
+/** This overload is the only unchecked type claim in `createClient`. The returned object is built key by key from `config.collections`, so the declarations carry its collection names and output types. */
 export function createClient<const Collections extends CollectionDefinitions>(
   options: ClientOptions<Collections>,
 ): AircastleClient<Collections>;
@@ -137,7 +137,6 @@ export function createClient<const Collections extends CollectionDefinitions>(
     method: "GET" | "POST",
     endpoint: string,
     collection: CompiledCollection<Output>,
-    description: CollectionDescription,
     data?: object,
     expectedId?: string,
   ): Promise<Result<{ id: string } & Output>> {
@@ -147,7 +146,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
     };
     const headers: Record<string, string> = {
       authorization,
-      "aircastle-schema": await contractId(description),
+      "aircastle-schema": await contractId(collection.describe()),
     };
     const init: RequestInit = { method, headers, keepalive: false };
     if (data !== undefined) {
@@ -162,7 +161,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
     } catch {
       return failed;
     }
-    const parsed = responseResult(collection, body);
+    const parsed = responseResult(body, (fields) => storedDocument(collection, fields));
     if (!parsed || response.ok !== parsed.ok) return failed;
     if (
       parsed.ok &&
@@ -175,14 +174,13 @@ export function createClient<const Collections extends CollectionDefinitions>(
 
   for (const name of Object.keys(config.collections) as (keyof Collections & string)[]) {
     const definition = compiled[name]!;
-    const description = definition.describe();
     const endpoint = `${config.url}/api/projects/${encodeURIComponent(config.project)}/collections/${encodeURIComponent(name)}/documents`;
     client[name] = {
       async create(input) {
         const validated = definition.validate(input);
         if (!validated.ok)
           return { ok: false, error: { code: "validation_failed", issues: validated.issues } };
-        return send("POST", endpoint, definition, description, validated.data);
+        return send("POST", endpoint, definition, validated.data);
       },
       async findById(id) {
         if (typeof id !== "string" || !uuid.test(id))
@@ -192,7 +190,6 @@ export function createClient<const Collections extends CollectionDefinitions>(
           "GET",
           `${endpoint}/${encodeURIComponent(normalized)}`,
           definition,
-          description,
           undefined,
           normalized,
         );
@@ -203,5 +200,9 @@ export function createClient<const Collections extends CollectionDefinitions>(
 }
 
 export function validateResponse(description: CollectionDescription, response: unknown): boolean {
-  return responseResult(compileDescription(description), response) !== undefined;
+  return (
+    responseResult(response, (fields) =>
+      storedDocument(compileDescription(description), fields),
+    ) !== undefined
+  );
 }
