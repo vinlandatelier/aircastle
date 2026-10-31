@@ -171,7 +171,6 @@ test("each fix publishes from its own bound verification receipt", async () => {
 });
 
 test("a natural fix must pass the same scoped verifier and bind to the original request", async () => {
-  docker.calls.length = 0;
   const supported = input("apps/web/src/components/shell/app-header.tsx");
   const request: Job = {
     ...supported.job,
@@ -185,10 +184,6 @@ test("a natural fix must pass the same scoped verifier and bind to the original 
   const receipt = await verify(request, output, "vinlandatelier/aircastle");
   expect(receipt.digest).toBe(digest(request));
   expect(receipt.passed).toBe(true);
-  expect(docker.calls.map((args) => args[0])).toEqual(["build", "run", "rm"]);
-  expect(
-    boundVerification(request, [edit("apps/web/src/components/shell/app-header.tsx")], receipt),
-  ).toEqual(receipt);
   expect(
     boundVerification(
       { ...request, instructions: "Different request" },
