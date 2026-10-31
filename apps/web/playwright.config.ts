@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { defineConfig } from '@playwright/test'
 import { authInstances, origins } from './e2e/origins'
 
@@ -41,5 +42,9 @@ export default defineConfig({
     reducedMotion: 'reduce',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    video:
+      process.env.WEB_E2E_VIDEO === '1'
+        ? { mode: 'on', size: { width: 1440, height: 900 } }
+        : 'off',
   },
 })
