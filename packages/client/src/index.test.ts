@@ -1,7 +1,7 @@
 import type { Fetch } from "@aircastle/contracts";
 import { collection, text } from "@aircastle/schema";
 import { describe, expect, test, vi } from "vite-plus/test";
-import { createClient } from "./index.ts";
+import { createClient, validateResponse } from "./index.ts";
 
 const project = "11111111-1111-4111-8111-111111111111";
 const id = "33333333-3333-4333-8333-333333333333";
@@ -375,4 +375,17 @@ describe("SDK failures and uncertain writes", () => {
       expect(transport).toHaveBeenCalledTimes(1);
     },
   );
+});
+
+describe("validateResponse", () => {
+  const invalidBounds = {
+    fields: {
+      title: { type: "text", required: true, nullable: false, unique: false, min: 5, max: 1 },
+    },
+  } as const;
+
+  test("checks error and malformed envelopes without compiling the description", () => {
+    expect(validateResponse(invalidBounds, { ok: false, error: { code: "not_found" } })).toBe(true);
+    expect(validateResponse(invalidBounds, null)).toBe(false);
+  });
 });

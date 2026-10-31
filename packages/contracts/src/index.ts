@@ -208,17 +208,23 @@ export function uniqueFields(description: CollectionDescription): string[] {
     .map(([name]) => name);
 }
 
-export function validateStored(description: CollectionDescription, data: unknown): boolean {
-  const result = compileDescription(description).validate(data);
-  if (!result.ok) return false;
-  /** `validate` succeeded, so `data` is a plain record of data properties. */
-  const stored = data as Readonly<Record<string, unknown>>;
-  return (
-    Object.keys(stored).length === Object.keys(result.data).length &&
+/** Returns the validated output only when `data` is already exactly that output, with no defaults to fill in. */
+export function storedDocument<Output extends object>(
+  collection: CompiledCollection<Output>,
+  data: unknown,
+): Output | undefined {
+  const result = collection.validate(data);
+  if (!result.ok || !isPlainRecord(data)) return undefined;
+  return Object.keys(data).length === Object.keys(result.data).length &&
     Object.entries(result.data).every(
-      ([key, value]) => Object.hasOwn(stored, key) && stored[key] === value,
+      ([key, value]) => Object.hasOwn(data, key) && data[key] === value,
     )
-  );
+    ? result.data
+    : undefined;
+}
+
+export function validateStored(description: CollectionDescription, data: unknown): boolean {
+  return storedDocument(compileDescription(description), data) !== undefined;
 }
 
 export function projectDocument(

@@ -59,8 +59,16 @@ export type ValidationResult<Output extends object> =
   | { readonly ok: true; readonly data: Output }
   | { readonly ok: false; readonly issues: NonemptyIssues<ValidationIssue> };
 
+export type DecodeResult<Output extends object> =
+  | { readonly ok: true; readonly data: Output }
+  | { readonly ok: false; readonly issues: NonemptyIssues<SchemaIssue> };
+
 export type SchemaIssue = IssueDetails &
   (
+    | {
+        /** A description decoded from untrusted input has the wrong shape. The path locates the rejected value. */
+        readonly code: "invalid_description";
+      }
     | {
         readonly code: "invalid_definition";
         readonly expected: "record" | "collection" | "field";
