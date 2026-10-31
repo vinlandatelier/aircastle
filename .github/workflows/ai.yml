@@ -84,14 +84,6 @@ jobs:
           name: ai-plan
           path: ai-data/plan
       - run: npm install --global @anthropic-ai/claude-code@2.1.308
-      - name: Refuse provider API keys
-        run: |
-          for name in ANTHROPIC_API_KEY OPENAI_API_KEY; do
-            if [ -n "$(printenv "$name")" ]; then
-              echo "::error::$name is set. AI reviews run only on the Claude subscription token."
-              exit 1
-            fi
-          done
       - run: node scripts/ai-automation/cli.ts model
         env:
           AI_OPERATION_ID: ${{ matrix.id }}

@@ -115,7 +115,7 @@ function claude(args: string[], prompt: string, directory: string, token: string
 
 /**
  * Makes CLI text safe for logs: no token, no control characters, bounded length. Redaction runs on
- * the whole text before truncation, and a truncated tail drops its cut first word.
+ * the whole text before truncation.
  */
 function sanitize(text: string, token: string, keep: "head" | "tail"): string {
   const clean = text
@@ -125,9 +125,7 @@ function sanitize(text: string, token: string, keep: "head" | "tail"): string {
     .replace(/ {2,}/g, " ")
     .trim();
   if (clean.length <= detailChars) return clean;
-  return keep === "head"
-    ? clean.slice(0, detailChars)
-    : clean.slice(-detailChars).replace(/^\S*\s*/, "");
+  return keep === "head" ? clean.slice(0, detailChars) : clean.slice(-detailChars);
 }
 
 /**
