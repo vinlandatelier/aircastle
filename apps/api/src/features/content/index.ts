@@ -27,8 +27,8 @@ function documentTarget(c: Context): Result<CollectionTarget & { id: string }> {
   return { ok: true, data: { ...target.data, id: id.toLowerCase() } };
 }
 
-export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: number }) {
-  const { cms, maxRequestBytes = 1_048_576 } = options;
+export function contentRoutes(options: { cms: ContentService; maxRequestBytes: number }) {
+  const { cms, maxRequestBytes } = options;
 
   if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes < 1)
     throw new Error("maxRequestBytes must be a positive safe integer");
