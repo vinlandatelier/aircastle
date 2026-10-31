@@ -33,8 +33,6 @@ A red test must fail because the promised behavior is absent or broken. Use a fo
 
 ## Complete the feature
 
-- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). Run only the component tests, browser journeys, and package checks needed to verify the change and affected callers. Select files and cases rather than running the whole frontend suite by default.
-- `vp run check` is not a required completion gate. Reserve full-suite runs for explicit user requests. A focused UI change does not require backend, database, or mutation suites.
 - Run `vp run test-web:coverage` when assessing coverage. Inspect raw covered/total counts and uncovered modules. The component-suite V8 report includes unimported source, excludes CSS, and includes compiler-generated branch effects. Browser journey results are separate evidence.
 - Preserve the command, revision, executed and failed counts, intended red witness and final passing result. Use one focused independent review to challenge missing outcomes and assertions that could pass with broken behavior.
 - If the change alters what a user sees or does, run `vp run test-web:record <specs>` for each changed journey and its edge cases. Upload the videos and screenshots from `reports/test-results/` into the PR body under `## Screenshots`; GitHub plays `.webm` inline. Never commit media. If UI source changed but nothing visible did, write `No visible UI change: <reason>` in the PR body.

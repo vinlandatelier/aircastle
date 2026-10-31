@@ -13,7 +13,6 @@ Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defin
 - `playwright.config.ts` builds and serves the normal and fixture apps through `webServer` on `WEB_E2E_PORT` (default 43124) and the next port. Set a distinct `WEB_E2E_PORT` when another worktree may run journeys at the same time.
 - Browser runs write `apps/web/reports/html/`, `reports/results.json`, and traces and screenshots of failed tests under `reports/test-results/`. Open the report with `vp -C apps/web exec playwright show-report reports/html`.
 - `vp run test-web:record <specs>` runs the same journeys and saves a `video.webm` and a final screenshot for every test under `reports/test-results/`. Normal runs record no video.
-- A PR that changes what a user sees or does needs recorded evidence in its body. Follow [Complete the feature](VERIFICATION.md#complete-the-feature).
 - Read `coverage/index.html` and `coverage/coverage-summary.json` together. Raw coverage includes shared UI wrappers and compiler-generated branches, excludes CSS, and has no percentage gate.
 - Lint rejects child processes, server launchers, and `test.skip` or `test.fixme` in browser tooling. Add servers to `webServer` and checks to package scripts instead of writing a runner.
 
