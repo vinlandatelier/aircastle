@@ -3,7 +3,10 @@ import { describe, expect, test } from "vite-plus/test";
 import { parseContentError, type ContentError } from "./index.ts";
 import { freezeDeep } from "./support/fixtures.ts";
 
-type BareCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
+type BareCode = Exclude<
+  ContentError["code"],
+  "validation_failed" | "unique_conflict" | "referenced"
+>;
 const bareCodes: Record<BareCode, true> = {
   invalid_request: true,
   unauthorized: true,
@@ -146,6 +149,43 @@ describe("accepted structured content errors", () => {
       "invalid_choice",
       "too_long",
     ]);
+  });
+});
+
+describe("R11 R13 referenced error", () => {
+  test.each([
+    ["articles", "author"],
+    ["__proto__", "constructor"],
+    ["", ""],
+  ])("accepts referenced from collection %j field %j", (collection, field) => {
+    expect(parseContentError({ code: "referenced", collection, field })).toEqual({
+      code: "referenced",
+      collection,
+      field,
+    });
+  });
+
+  test("round-trips a referenced error through JSON", () => {
+    const error: ContentError = { code: "referenced", collection: "articles", field: "author" };
+    expect(parseContentError(JSON.parse(JSON.stringify(error)))).toEqual({
+      code: "referenced",
+      collection: "articles",
+      field: "author",
+    });
+  });
+
+  test.each([
+    ["missing collection and field", { code: "referenced" }],
+    ["missing collection", { code: "referenced", field: "author" }],
+    ["missing field", { code: "referenced", collection: "articles" }],
+    ["null collection", { code: "referenced", collection: null, field: "author" }],
+    ["numeric collection", { code: "referenced", collection: 1, field: "author" }],
+    ["array collection", { code: "referenced", collection: ["articles"], field: "author" }],
+    ["null field", { code: "referenced", collection: "articles", field: null }],
+    ["numeric field", { code: "referenced", collection: "articles", field: 1 }],
+    ["object field", { code: "referenced", collection: "articles", field: {} }],
+  ])("rejects referenced with %s", (_name, input) => {
+    expect(parseContentError(input)).toBeUndefined();
   });
 });
 
