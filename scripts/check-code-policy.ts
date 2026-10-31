@@ -229,6 +229,21 @@ export function workspaceCycles(workspaces: readonly Workspace[]): string[][] {
   return cycles;
 }
 
+function commentRule(
+  comment: { type: string; value: string; start?: number | null },
+  documented: ReadonlySet<number>,
+): PolicyViolation["rule"] | undefined {
+  if (/@ts-(?:expect-error|ignore|nocheck)\b/i.test(comment.value)) return "type-suppression";
+  if (/\b(?:v8|c8|istanbul|node:coverage)\s+(?:ignore|disable)\b/i.test(comment.value))
+    return "coverage-suppression";
+  const isDocstring =
+    comment.type === "CommentBlock" &&
+    comment.value.startsWith("*") &&
+    !comment.value.startsWith("**") &&
+    documented.has(comment.start!);
+  return isDocstring ? undefined : "ordinary-comment";
+}
+
 export function inspectCode(
   file: string,
   source: string,
@@ -314,16 +329,7 @@ export function inspectCode(
         : [{ line: 1, column: 1, rule: "stale-catch-allowance" as const }]),
     );
   for (const comment of ast.comments ?? []) {
-    const rule = /@ts-(?:expect-error|ignore|nocheck)\b/i.test(comment.value)
-      ? "type-suppression"
-      : /\b(?:v8|c8|istanbul|node:coverage)\s+(?:ignore|disable)\b/i.test(comment.value)
-        ? "coverage-suppression"
-        : comment.type === "CommentBlock" &&
-            comment.value.startsWith("*") &&
-            !comment.value.startsWith("**") &&
-            documented.has(comment.start!)
-          ? undefined
-          : "ordinary-comment";
+    const rule = commentRule(comment, documented);
     if (rule)
       violations.push({
         line: comment.loc?.start.line ?? 1,
