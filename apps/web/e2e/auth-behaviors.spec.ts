@@ -164,6 +164,18 @@ test('B10 concurrent confirmation of two setup links creates exactly one account
     const loser = browsers[outcomes.indexOf('lost')]!.page
     await loser.goto('/dash')
     await expectSignIn(loser)
+    const winnerEmail = emails[outcomes.indexOf('won')]!
+    const loserEmail = emails[outcomes.indexOf('lost')]!
+    await requestSignInLink(page, winnerEmail)
+    await page.goto('/sign-in')
+    await expectSignIn(page)
+    await page.getByRole('textbox', { name: 'Email' }).fill(loserEmail)
+    await page.getByRole('button', { name: 'Send sign-in link', exact: true }).click()
+    await expect(page.getByText(signInConfirmation, { exact: true })).toBeVisible()
+    await page.goto('/development-inbox')
+    await expectInbox(page)
+    await expect(message(page, winnerEmail, signInSubject)).toHaveCount(1)
+    await expect(message(page, loserEmail, signInSubject)).toHaveCount(0)
   } finally {
     for (const { context } of browsers) await context.close()
   }
@@ -268,7 +280,7 @@ test('B16 unknown and known email sign-in get the same response and only the kno
   const unknown = uniqueEmail('unknown')
   await completeSetupAndSkip(page, email)
   await signOut(page, 'Alex', email)
-  const responses: { status: number; body: string }[] = []
+  const responses: { status: number; body: string; headers: Record<string, string> }[] = []
   for (const address of [unknown, email]) {
     await page.goto('/sign-in')
     await expectSignIn(page)
@@ -280,7 +292,10 @@ test('B16 unknown and known email sign-in get the same response and only the kno
     await page.getByRole('textbox', { name: 'Email' }).fill(address)
     await page.getByRole('button', { name: 'Send sign-in link', exact: true }).click()
     const received = await response
-    responses.push({ status: received.status(), body: await received.text() })
+    const headers = Object.fromEntries(
+      Object.entries(await received.allHeaders()).filter(([name]) => name !== 'date'),
+    )
+    responses.push({ status: received.status(), body: await received.text(), headers })
     await expect(page.getByText(signInConfirmation, { exact: true })).toBeVisible()
   }
   expect(responses[0]).toEqual(responses[1])
@@ -409,13 +424,25 @@ test('B31 hostile return targets never leave the configured origin', async ({ pa
   const email = uniqueEmail('hostile-return')
   await completeSetupAndSkip(page, email)
   await signOut(page, 'Alex', email)
+  const home = origin(page)
   const foreign: string[] = []
   page.on('request', (request) => {
-    if (new URL(request.url()).hostname.includes('evil')) foreign.push(request.url())
+    if (new URL(request.url()).origin !== home) foreign.push(request.url())
   })
-  await page.goto(
-    '/sign-in?callbackURL=https%3A%2F%2Fevil.test&redirect=%2F%2Fevil.test&returnTo=https%3A%2F%2Fevil.test',
-  )
+  const hostileTargets = [
+    'https://evil.test',
+    '//evil.test',
+    '/\\evil.test',
+    '/%2F%2Fevil.test',
+    'https:evil.test',
+    'javascript:alert(1)',
+  ]
+  const hostileQuery = new URLSearchParams(
+    hostileTargets.flatMap((target) =>
+      ['callbackURL', 'redirect', 'returnTo'].map((name) => [name, target]),
+    ),
+  ).toString()
+  await page.goto(`/sign-in?${hostileQuery}`)
   await expectSignIn(page)
   const sent = page.waitForRequest(
     (request) =>
@@ -425,25 +452,17 @@ test('B31 hostile return targets never leave the configured origin', async ({ pa
   await page.getByRole('button', { name: 'Send sign-in link', exact: true }).click()
   expect((await sent).postDataJSON()).toEqual({ email })
   await expect(page.getByText(signInConfirmation, { exact: true })).toBeVisible()
-  for (const returnTo of [
-    'https://evil.test',
-    '//evil.test',
-    { kind: 'url', url: 'https://evil.test' },
-  ]) {
+  for (const returnTo of [...hostileTargets, { kind: 'url', url: 'https://evil.test' }]) {
     const response = await rawRequest(page, '/api/auth/sign-in', { email, returnTo })
-    expect(response.status()).toBe(400)
+    expect(response.status(), JSON.stringify(returnTo)).toBe(400)
     expect((await response.json()).kind).toBe('invalid-input')
   }
   await page.goto('/development-inbox')
   await expectInbox(page)
   await expect(message(page, email, signInSubject)).toHaveCount(1)
   const link = await capturedLink(page, email, signInSubject)
-  await confirmLink(
-    page,
-    `${link}&callbackURL=https%3A%2F%2Fevil.test&redirect=%2F%2Fevil.test`,
-    email,
-  )
-  await expect(page).toHaveURL(`${origin(page)}/dash/workspaces`)
+  await confirmLink(page, `${link}&${hostileQuery}`, email)
+  await expect(page).toHaveURL(`${home}/dash/workspaces`)
   await expect(heading(page, 'Workspaces')).toBeVisible()
   expect(foreign).toEqual([])
 })
