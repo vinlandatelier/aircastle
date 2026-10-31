@@ -109,3 +109,4 @@ describe('Route failure escalation', () => {
     expect(favicon()).toBe('/brand/favicon-dark.svg')
   })
 })
+

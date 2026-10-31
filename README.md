@@ -104,3 +104,4 @@ Run `vp run dev:setup` to provision local development connection settings. Rerun
 `AIRCASTLE_MAX_REQUEST_BYTES` sets the positive integer JSON request-byte limit and defaults to 1,048,576 bytes.
 
 `vp run test:db` verifies the infrastructure with real Postgres, including persistence, reset and concurrent isolation. It requires Docker and runs separately from the regular test suite. Future CI database checks should use `db:test` so the image pin stays in one place.
+
