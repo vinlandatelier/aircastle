@@ -224,6 +224,30 @@ export default defineConfig({
         },
       },
       {
+        files: ["packages/core/src/**"],
+        excludeFiles: ["**/*.test.{ts,tsx}", "**/test-support/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: ["node:process", "process"].map((name) => ({
+                name,
+                importNames: ["env"],
+                message: "Read environment variables in the entry point's config module.",
+              })),
+              patterns: [
+                {
+                  regex:
+                    "^(better-auth|@better-auth|hono|postgres|@aircastle/adapter-postgres)(/|$)",
+                  message:
+                    "Core defines operations and storage contracts; it cannot import HTTP, auth libraries or database drivers.",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
         files: [
           "apps/web/src/**",
           "packages/contracts/src/**",
@@ -239,8 +263,9 @@ export default defineConfig({
             {
               patterns: [
                 {
-                  regex: "^(bun|postgres|pino)(:|/|$)",
-                  message: "Browser-safe code cannot import server runtimes or drivers.",
+                  regex: "^(bun|postgres|pino|better-auth|@better-auth|hono)(:|/|$)",
+                  message:
+                    "Browser-safe code cannot import server runtimes, drivers or server libraries.",
                 },
                 {
                   group: [

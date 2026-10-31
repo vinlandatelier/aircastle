@@ -128,6 +128,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@aircastle/schema": "workspace:*",
+        "arktype": "2.2.9",
       },
       "devDependencies": {
         "@stryker-mutator/core": "10.0.0",
@@ -165,6 +166,9 @@
         "vitest": "5.0.5",
       },
     },
+  },
+  "patchedDependencies": {
+    "@ark/util@0.56.8": "patches/@ark%2Futil@0.56.8.patch",
   },
   "overrides": {
     "@types/node": "24.19.2",
