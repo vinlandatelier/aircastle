@@ -239,6 +239,12 @@ const vectors: readonly {
   },
 ];
 
+function vector(name: string) {
+  const found = vectors.find((candidate) => candidate.name === name);
+  if (!found) throw new Error(`Unknown hash vector: ${name}`);
+  return found;
+}
+
 describe("contract identifiers for every field kind", () => {
   test.each(vectors)(
     "independent bytes for $name produce the pinned digest",
@@ -256,7 +262,9 @@ describe("contract identifiers for every field kind", () => {
   });
 
   test("canonicalization leaves frozen nested input unchanged", async () => {
-    const input = freezeDeep(structuredClone(vectors[4]!.input));
+    const input = freezeDeep(
+      structuredClone(vector("blocks whose variant fields and list items carry editors").input),
+    );
     const before = structuredClone(input);
     await contractId(input);
     canonicalContract(input);
@@ -265,7 +273,7 @@ describe("contract identifiers for every field kind", () => {
 });
 
 describe("editors at depth", () => {
-  const plainBoolean = "v1:ad96825cb5f870aba8e1b04a8c10c420102ac7f0159a95ff376b924fe105d092";
+  const plainBoolean = `v1:${vector("boolean with the switch editor").digest}`;
 
   test("the switch editor declared with builders keeps the plain boolean contract id", async () => {
     const [switched] = describeCollections({
@@ -277,8 +285,8 @@ describe("editors at depth", () => {
   });
 
   test("a nested field named editor changes the id of an otherwise empty object", async () => {
-    const empty = vectors[9]!;
-    const named = vectors[5]!;
+    const empty = vector("empty object");
+    const named = vector("nested field named editor");
     expect(await contractId(named.input)).not.toBe(await contractId(empty.input));
   });
 
@@ -322,7 +330,7 @@ describe("editors at depth", () => {
           },
         },
       },
-      vectors[2]!,
+      vector("object whose nested fields carry editors"),
     ],
     [
       "list item nullability",
@@ -344,7 +352,7 @@ describe("editors at depth", () => {
           },
         },
       },
-      vectors[3]!,
+      vector("list whose item carries an editor"),
     ],
     [
       "variant field presence",
@@ -374,7 +382,7 @@ describe("editors at depth", () => {
           },
         },
       },
-      vectors[4]!,
+      vector("blocks whose variant fields and list items carry editors"),
     ],
   ] as const)(
     "a data rule change at depth (%s) changes the id",

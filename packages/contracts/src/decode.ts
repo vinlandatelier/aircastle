@@ -15,7 +15,9 @@ import {
   SchemaError,
   text,
   type CollectionDescription,
+  type CollectionDefinitions,
   type CompiledCollection,
+  type FieldDescription,
   type IssuePath,
   type JsonValue,
 } from "@aircastle/schema";
@@ -47,20 +49,28 @@ const reservedCollections = new Set([
   "__proto__",
   "toJSON",
 ]);
-const commonKeys = ["type", "required", "nullable"];
-const kindKeys: Readonly<Record<string, readonly string[]>> = {
-  text: ["unique", "min", "max", "choices", "default", "format", "editor"],
-  number: ["integer", "min", "max", "default"],
-  boolean: ["default", "editor"],
-  date: ["min", "max", "default"],
-  datetime: ["min", "max", "default"],
-  list: ["item", "min", "max", "default"],
-  object: ["fields", "default"],
-  blocks: ["variants", "min", "max", "default"],
-  json: ["default"],
-  point: ["default"],
-  reference: ["collection", "collections"],
-};
+type Kind = FieldDescription["type"];
+const keys = (...extra: string[]): ReadonlySet<string> =>
+  new Set(["type", "required", "nullable", ...extra]);
+const kindKeys = {
+  text: keys("unique", "min", "max", "choices", "default", "format", "editor"),
+  number: keys("integer", "min", "max", "default"),
+  boolean: keys("default", "editor"),
+  date: keys("min", "max", "default"),
+  datetime: keys("min", "max", "default"),
+  list: keys("item", "min", "max", "default"),
+  object: keys("fields", "default"),
+  blocks: keys("variants", "min", "max", "default"),
+  json: keys("default"),
+  point: keys("default"),
+  reference: keys("collection", "collections"),
+} satisfies Record<Kind, ReadonlySet<string>>;
+function isKind(value: unknown): value is Kind {
+  return typeof value === "string" && Object.hasOwn(kindKeys, value);
+}
+function unreachable(kind: never): never {
+  throw new TypeError(`Unhandled field kind ${String(kind)}`);
+}
 function knownKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
   return Object.keys(value).every((key) => allowed.has(key));
 }
@@ -217,16 +227,16 @@ function decodeField(
 ): Decoded<WireBuilder> {
   if (
     !isPlainRecord(value) ||
-    typeof value.type !== "string" ||
-    !Object.hasOwn(kindKeys, value.type) ||
-    !knownKeys(value, new Set([...commonKeys, ...kindKeys[value.type]!])) ||
+    !isKind(value.type) ||
+    !knownKeys(value, kindKeys[value.type]) ||
     typeof value.required !== "boolean" ||
     typeof value.nullable !== "boolean" ||
     (position !== "field" && !value.required) ||
     (position === "variant" && (value.nullable || value.type !== "object"))
   )
     return invalidField(path);
-  switch (value.type) {
+  const kind: Kind = value.type;
+  switch (kind) {
     case "text":
       return decodeText(value, path);
     case "boolean":
@@ -238,7 +248,7 @@ function decodeField(
     }
     case "date":
     case "datetime": {
-      const base = wire(value.type === "date" ? date() : datetime());
+      const base = wire(kind === "date" ? date() : datetime());
       return withDefault(bounded(presence(base, value), value), value, path);
     }
     case "json":
@@ -257,13 +267,15 @@ function decodeField(
       if (!fields.ok) return fields;
       return withDefault(presence(wire(object(fields.data)), value), value, path);
     }
-    default: {
+    case "blocks": {
       const variants = decodeMap(value.variants, [...path, "variants"], "variant", targets);
       if (!variants.ok) return variants;
       if (Object.keys(variants.data).length === 0) return invalidField(path, "variants");
-      const base = wire(blocks(variants.data as never));
+      const base = wire(blocks(variants.data as unknown as Parameters<typeof blocks>[0]));
       return withDefault(bounded(presence(base, value), value), value, path);
     }
+    default:
+      return unreachable(kind);
   }
 }
 
@@ -290,13 +302,13 @@ function decodeEntry(value: unknown, path: IssuePath): Decoded<DecodedEntry> {
     if (!decoded.ok) return decoded;
     fields[name] = decoded.data;
   }
-  const definitions: Record<string, unknown> = Object.create(null);
+  const definitions: Record<string, CollectionDefinitions[string]> = Object.create(null);
   definitions[entryName] = collection(fields);
   for (const { name } of targets) {
     if (name !== entryName && collectionName(name)) definitions[name] = collection({});
   }
   try {
-    const compiled = compileSchema(definitions as never)[entryName] as CompiledCollection<
+    const compiled = compileSchema(definitions)[entryName] as CompiledCollection<
       Record<string, JsonValue>
     >;
     return { ok: true, data: { compiled, targets } };
