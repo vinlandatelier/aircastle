@@ -52,7 +52,8 @@
     "test:content:mutation": "vp -C packages/contracts run test:mutation",
     "test:prepared": "vp run db:test -- vp run test:all",
     "ai:setup": "node scripts/ai-automation/cli.ts setup",
-    "test-web:e2e": "vp -C apps/web run test:e2e",
+    "test-auth:web": "vp run db:test -- vp -C apps/web run test:e2e auth.spec.ts auth-errors.spec.ts auth-entry.spec.ts",
+    "test-web:e2e": "vp run db:test -- vp -C apps/web run test:e2e",
     "test-web:coverage": "vp -C apps/web run test:coverage"
   },
   "devDependencies": {

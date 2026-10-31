@@ -67,6 +67,10 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Routine README.md development-setup updates that reflect agreed tooling or workflow changes are authorized. Keep installation and development commands current as part of those changes.
 - Obtain explicit user approval for other public documentation changes. A direct request for a specific documentation change authorizes that change; feature work alone does not.
 
+## Product copy
+
+- Keep UI copy focused on the user's current task. Add explanations, caveats, or disclaimers only when they help the user complete that task or make a meaningful decision, or when explicitly requested. Omit implementation details and explanations that do not change what the user needs to know or do.
+
 ## Public writing
 
 Apply these rules to README.md, guides, reference docs, and other public copy.

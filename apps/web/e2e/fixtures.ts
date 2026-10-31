@@ -1,5 +1,5 @@
 const scenarios = [
-  'normal',
+  'default',
   'long-text',
   'unicode',
   'many-projects',

@@ -12,3 +12,6 @@ export const origins = {
   normal: { port, url: `http://127.0.0.1:${port}` },
   fixture: { port: port + 1, url: `http://127.0.0.1:${port + 1}` },
 } as const
+
+/** Origin of the auth instance server, which owns a real API and preview per auth journey. */
+export const authInstances = { port: port + 2, url: `http://127.0.0.1:${port + 2}` } as const

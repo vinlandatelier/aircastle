@@ -21,10 +21,12 @@ apps/
         │   ├── shell/        Persistent header, sidebar, page frame, and supporting controls
         │   └── ui/           Local shadcn UI components built on Base UI
         ├── features/         Product behavior by feature
+        │   ├── auth/         Browser auth state, setup and sign-in forms, confirmation, and development inbox
         │   ├── error-recovery/ App-wide fatal error boundary and standalone recovery
         │   ├── navigation/   Shared page catalog, sidebar navigation, and page search
         │   ├── not-found/    Public recovery page for unmatched destinations
-        │   └── sign-in/      Standalone email sign-in interface and decorative background
+        │   ├── sign-in/      Standalone setup and sign-in page layout and decorative background
+        │   └── theme/        Client theme preference, persistence, and favicon
         ├── hooks/            Browser state subscriptions
         └── lib/              Browser-safe UI utilities
 
@@ -53,7 +55,7 @@ Vite forwards `/api` requests unchanged during development and preview. The buil
 
 Paths in this section are relative to `apps/web`.
 
-- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `App` provides light, dark, and system themes with `next-themes` and renders route-owned document metadata. A shared CMS layout under `/dash/workspaces/$workspaceId/projects/$projectId` keeps the shell mounted as dashboard destinations change; `/` and `/sign-in` render outside that layout.
+- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `src/features/theme` owns client-only light, dark, and system preferences, persistence, OS changes, and the favicon. `App` renders route-owned document metadata. A shared CMS layout under `/dash/workspaces/$workspaceId/projects/$projectId` keeps the shell mounted as dashboard destinations change; authentication pages render outside that layout.
 - `src/components/shell/` owns the persistent header, sidebar, page frame, and private supporting controls. The sidebar collapses independently beneath the full-width header. Import the shell through its `index.tsx` entry point.
 - `src/components/ui/` holds shared UI primitives built on Base UI.
 - `src/features/<feature>/` owns a product feature's behavior, types, data fetching, and tests. Import features through their `index.ts` or `index.tsx` entry point; keep supporting files private.
@@ -72,9 +74,9 @@ Public routes render without resolving authentication, including when local auth
 
 `src/index.css` owns the `marketing` and `dashboard` colour palettes in light and dark mode. Marketing uses Efferd's auth preview tokens and is the default for public pages. Sign-in declares `data-theme-scope="marketing"`; the shell declares `data-theme-scope="dashboard"`. The dashboard marker selects its palette at the document root, including overlays rendered outside the shell. Shared UI components consume the active semantic tokens without separate component variants or theme providers.
 
-Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys and extreme-input fixtures. Fixture builds set `WEB_FIXTURES=1`, and a Vite plugin then swaps `src/components/shell/data.ts` and `src/features/navigation/pages.ts` for the modules in `e2e/fixture-modules/` by resolved path, so every import spelling gets the fixture. Normal production builds retain their real data and expose no fixture controls. `tsconfig.e2e.json` type-checks the Playwright config, journeys and fixture modules.
+Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys and extreme-input fixtures. Fixture builds set `WEB_FIXTURES=1`, and a Vite plugin then swaps `src/components/shell/data.ts` and `src/features/navigation/pages.ts` for the modules in `e2e/fixture-modules/` by resolved path, so every import spelling gets the fixture. It also swaps `src/main.tsx` for `e2e/fixture-entry.tsx`, which mounts the real router with a display-only auth transport. Normal production builds retain their real data and expose no fixture controls. `tsconfig.e2e.json` type-checks the Playwright config, journeys and fixture modules.
 
-`playwright.config.ts` owns browser execution. Its `webServer` entries build the normal and fixture apps and preview them on `WEB_E2E_PORT` and the next port, which `e2e/origins.ts` derives for both the config and the `visit` helper. Playwright starts and stops those servers, rejects `.only`, retries and flaky passes, and writes HTML and JSON reports, traces, and screenshots to the ignored `reports/` directory. Lint keeps process spawning, server launchers and skipped journeys out of `apps/web`, so new verification goes into Playwright or Vitest configuration rather than a custom runner. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names without a central registry.
+`playwright.config.ts` owns browser execution. Its `webServer` entries build the normal and fixture apps and preview them on `WEB_E2E_PORT` and the next port, which `e2e/origins.ts` derives for both the config and the `visit` helper. Playwright starts and stops those servers, rejects `.only`, retries and flaky passes, and writes HTML and JSON reports, traces, and screenshots to the ignored `reports/` directory. A third `webServer` entry runs `tests/web/auth-instances.ts`, which gives each auth journey its own Bun API process, Postgres namespace and same-origin preview of the normal build; the test API child controls time over IPC. Root browser recipes allocate disposable Postgres for those journeys. Lint keeps process spawning, server launchers and skipped journeys out of `apps/web`, so new verification goes into Playwright or Vitest configuration rather than a custom runner. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names without a central registry.
 
 ## Repository automation
 
