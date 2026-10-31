@@ -61,9 +61,8 @@ test.each(testedWorkspaces)("%s runs its tests behind coverage thresholds", asyn
   ]);
   for (const threshold of Object.values(coverage?.thresholds ?? {}))
     expect(threshold).toBeGreaterThan(0);
-  const allowedEntryFiles = Object.keys(untestableEntryFiles[directory] ?? {});
-  for (const pattern of coverage?.exclude ?? [])
-    expect(testSupportExcludes.has(pattern) || allowedEntryFiles.includes(pattern), pattern).toBe(
-      true,
-    );
+  const entryFileReasons = untestableEntryFiles[directory] ?? {};
+  const allowedExcludes = [...testSupportExcludes, ...Object.keys(entryFileReasons)];
+  for (const pattern of coverage?.exclude ?? []) expect(allowedExcludes).toContain(pattern);
+  for (const reason of Object.values(entryFileReasons)) expect(reason).not.toBe("");
 });
