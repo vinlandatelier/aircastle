@@ -82,6 +82,21 @@ export const test = base.extend<{
 
 export { expect }
 
+/** Test bound to the fixture preview, whose display-only auth transport serves public routing, metadata, and recovery journeys. */
+export const fixtureTest = test.extend<{ fixtureScenario: void }>({
+  baseURL: origins.fixture.url,
+  fixtureScenario: [
+    async ({ baseURL }, provide, info) => {
+      info.annotations.push({
+        type: 'scenario',
+        description: `display-only auth transport at ${baseURL} for public routing, metadata, and recovery`,
+      })
+      await provide()
+    },
+    { auto: true },
+  ],
+})
+
 export async function visit(
   page: Page,
   scenario: Scenario = 'default',
