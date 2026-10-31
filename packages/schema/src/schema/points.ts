@@ -1,6 +1,7 @@
 import type { IssuePath, ValidationIssue } from "./contract.ts";
 import { validationIssue } from "./errors.ts";
 import type { Outcome } from "./fields.ts";
+import { withoutNegativeZero } from "./numbers.ts";
 import { receivedType, snapshotRecord } from "./records.ts";
 
 const limits = { lat: 90, lng: 180 } as const;
@@ -47,5 +48,5 @@ export function validatePoint(value: unknown, path: IssuePath): Outcome {
   }
   return issues.length
     ? { ok: false, issues }
-    : { ok: true, value: { lat: lat === 0 ? 0 : lat, lng: lng === 0 ? 0 : lng } };
+    : { ok: true, value: { lat: withoutNegativeZero(lat), lng: withoutNegativeZero(lng) } };
 }
