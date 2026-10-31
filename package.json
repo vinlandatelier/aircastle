@@ -22,6 +22,7 @@
     "lint-schema": "vp lint packages/schema",
     "test": "vp run build && vp run test:prepared",
     "test-web": "vp -C apps/web run test",
+    "test-web:record": "WEB_E2E_VIDEO=1 vp run test-web:e2e",
     "test-api": "vp -C apps/api run test",
     "test-schema": "vp -C packages/schema run test",
     "check:policy": "bun scripts/check-code-policy.ts",
