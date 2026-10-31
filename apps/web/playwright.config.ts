@@ -22,7 +22,7 @@ export default defineConfig({
     url,
     env: { WEB_FIXTURES: name === 'fixture' ? '1' : '0' },
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 300_000,
   })),
   use: {
     browserName: 'chromium',

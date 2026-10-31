@@ -12,7 +12,7 @@ apps/
 │           ├── health/       Process liveness and its response schema
 │           └── content/      Project schema publication and content HTTP routes
 └── web/                      React admin
-    ├── scripts/              Brand icon generation and Node.js verification commands
+    ├── scripts/              Brand icon generation
     └── src/
         ├── components/       Shared presentation modules
         │   ├── shell/        Persistent header, sidebar, page frame, and supporting controls
