@@ -27,6 +27,9 @@
         "config": ["vite.config.ts"]
       }
     },
+    "packages/contracts": {
+      "entry": ["tests/types/**/*.ts"]
+    },
     "packages/client": {
       "entry": ["tests/types/**/*.ts"],
       "paths": {

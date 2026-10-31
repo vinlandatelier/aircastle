@@ -1,0 +1,26 @@
+diff --git a/out/objectKinds.d.ts b/out/objectKinds.d.ts
+index 38d99c169d595ffd607771316ba4d0b567d50714..f88be48fceddab50e045c87ee5b8a428d129a9ea 100644
+--- a/out/objectKinds.d.ts
++++ b/out/objectKinds.d.ts
+@@ -34,7 +34,7 @@ export type EcmascriptObjects = satisfy<instantiateConstructors<keyof ecmascript
+     Promise: Promise<unknown>;
+ }>;
+ /** Node18 */
+-export declare const FileConstructor: typeof import("buffer").File;
++export declare const FileConstructor: typeof globalThis.File;
+ export type platformConstructors = {
+     ArrayBuffer: ArrayBufferConstructor;
+     Blob: typeof Blob;
+diff --git a/out/registry.d.ts b/out/registry.d.ts
+index dd2e098ee08f53e270c9c2fb178e00f09e740750..c5c762f680d09501562e164a9e275b1a6112802f 100644
+--- a/out/registry.d.ts
++++ b/out/registry.d.ts
+@@ -2,7 +2,7 @@ export declare const arkUtilVersion = "0.56.8";
+ export declare const initialRegistryContents: {
+     version: string;
+     filename: string;
+-    FileConstructor: typeof import("buffer").File;
++    FileConstructor: typeof globalThis.File;
+ };
+ export type InitialRegistryContents = typeof initialRegistryContents;
+ export interface ArkRegistry extends InitialRegistryContents {
