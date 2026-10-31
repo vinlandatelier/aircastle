@@ -54,6 +54,31 @@ export interface DocumentListQuery {
   limit?: number;
   cursor?: string;
 }
+/** The page size a list query uses when it does not name one. */
+export const defaultListLimit = 20;
+/** The largest page size a list query may request. */
+export const maximumListLimit = 100;
+const listQueryKeys = new Set<string>([
+  "where",
+  "sort",
+  "limit",
+  "cursor",
+] satisfies (keyof DocumentListQuery)[]);
+const listSortPattern = /^-?[A-Za-z_][A-Za-z0-9_]*$/;
+/** Whether `key` names a {@link DocumentListQuery} property. */
+export function isListQueryKey(key: string): key is keyof DocumentListQuery {
+  return listQueryKeys.has(key);
+}
+/** Whether `value` is an integer page size from 1 to {@link maximumListLimit}. */
+export function isListLimit(value: unknown): value is number {
+  return (
+    typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= maximumListLimit
+  );
+}
+/** Whether `value` is a field name, optionally prefixed with `-` for descending order. */
+export function isListSort(value: unknown): value is string {
+  return typeof value === "string" && listSortPattern.test(value);
+}
 /** One page of a list. `next` is null exactly when no further matching documents existed. */
 export interface DocumentPage<Document = ContentDocument> {
   documents: Document[];
