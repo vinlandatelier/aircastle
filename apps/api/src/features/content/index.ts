@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import type { ContentService } from "@aircastle/core";
-import { access, jsonBody, uuid } from "./request.ts";
+import { access, jsonBody, listQuery, searchQuery, updateRequest, uuid } from "./request.ts";
 import { failure, reply, unexpectedError } from "./responses.ts";
 
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -94,6 +94,86 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
           return reply(c, failure("invalid_request"));
 
         return reply(c, await cms.findById(credentials.data, name, fingerprint, id));
+      },
+    )
+    .patch(
+      "/projects/:project/collections/:collection/documents/:id",
+      describeRoute({ summary: "Update document", tags: ["Content"] }),
+      async (c) => {
+        const body = await jsonBody(c, maxRequestBytes);
+        if (!body.ok) return reply(c, body);
+
+        const update = updateRequest(body.data);
+        if (!update.ok) return reply(c, update);
+
+        const credentials = access(c);
+        if (!credentials.ok) return reply(c, credentials);
+
+        const name = c.req.param("collection");
+        const id = c.req.param("id");
+        const fingerprint = c.req.header("aircastle-schema") ?? "";
+        if (!identifier.test(name) || !uuid.test(id) || !contract.test(fingerprint))
+          return reply(c, failure("invalid_request"));
+
+        return reply(
+          c,
+          await cms.update(credentials.data, name, fingerprint, id.toLowerCase(), update.data),
+        );
+      },
+    )
+    .delete(
+      "/projects/:project/collections/:collection/documents/:id",
+      describeRoute({ summary: "Delete document", tags: ["Content"] }),
+      async (c) => {
+        const credentials = access(c);
+        if (!credentials.ok) return reply(c, credentials);
+
+        const name = c.req.param("collection");
+        const id = c.req.param("id");
+        const fingerprint = c.req.header("aircastle-schema") ?? "";
+        if (!identifier.test(name) || !uuid.test(id) || !contract.test(fingerprint))
+          return reply(c, failure("invalid_request"));
+
+        return reply(c, await cms.delete(credentials.data, name, fingerprint, id.toLowerCase()));
+      },
+    )
+    .get(
+      "/projects/:project/collections/:collection/documents",
+      describeRoute({ summary: "List documents", tags: ["Content"] }),
+      async (c) => {
+        const query = searchQuery(c);
+        if (!query.ok) return reply(c, query);
+
+        const credentials = access(c);
+        if (!credentials.ok) return reply(c, credentials);
+
+        const name = c.req.param("collection");
+        const fingerprint = c.req.header("aircastle-schema") ?? "";
+        if (!identifier.test(name) || !contract.test(fingerprint))
+          return reply(c, failure("invalid_request"));
+
+        return reply(c, await cms.list(credentials.data, name, fingerprint, query.data));
+      },
+    )
+    .post(
+      "/projects/:project/collections/:collection/documents/query",
+      describeRoute({ summary: "Query documents", tags: ["Content"] }),
+      async (c) => {
+        const body = await jsonBody(c, maxRequestBytes);
+        if (!body.ok) return reply(c, body);
+
+        const query = listQuery(body.data);
+        if (!query.ok) return reply(c, query);
+
+        const credentials = access(c);
+        if (!credentials.ok) return reply(c, credentials);
+
+        const name = c.req.param("collection");
+        const fingerprint = c.req.header("aircastle-schema") ?? "";
+        if (!identifier.test(name) || !contract.test(fingerprint))
+          return reply(c, failure("invalid_request"));
+
+        return reply(c, await cms.list(credentials.data, name, fingerprint, query.data));
       },
     );
 }

@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 import pino from "pino";
 import type { ContentError, Permission, Result } from "@aircastle/contracts";
 import {
@@ -48,9 +48,14 @@ function fixture(error?: ContentError) {
     findById: async (access, collection, contract, id) =>
       outcome("read", access, document, [collection, contract, id]),
     update: async (access, collection, contract, id, request) =>
-      outcome("update", access, document, [collection, contract, id, request]),
+      outcome("update", access, { ...document, id: id.toLowerCase() }, [
+        collection,
+        contract,
+        id,
+        request,
+      ]),
     delete: async (access, collection, contract, id) =>
-      outcome("delete", access, { id }, [collection, contract, id]),
+      outcome("delete", access, { id: id.toLowerCase() }, [collection, contract, id]),
     list: async (access, collection, contract, query) =>
       outcome("list", access, { documents: [document], next: null }, [collection, contract, query]),
   };
@@ -149,6 +154,16 @@ test("preserves the database-detected uniqueness field", async () => {
   expect(await response.json()).toEqual({
     ok: false,
     error: { code: "unique_conflict", field: "slug" },
+  });
+});
+
+test("R11 maps referenced to HTTP 409 with its collection and field", async () => {
+  const { app, headers } = fixture({ code: "referenced", collection: "articles", field: "author" });
+  const response = await app.request(documents, { method: "POST", headers, body: "{}" });
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({
+    ok: false,
+    error: { code: "referenced", collection: "articles", field: "author" },
   });
 });
 
@@ -469,3 +484,664 @@ test.each(["invalid UTF-8", "malformed JSON", "read failure"] as const)(
     expect(calls).toEqual([]);
   },
 );
+
+const upperDocumentId = "ABCDEF12-2222-4222-8222-ABCDEFABCDEF";
+const lowerDocumentId = "abcdef12-2222-4222-8222-abcdefabcdef";
+const documentPath = `${documents}/${documentId}`;
+const queryPath = `${documents}/query`;
+const invalidRequest = { ok: false, error: { code: "invalid_request" } };
+const unauthorized = { ok: false, error: { code: "unauthorized" } };
+
+async function expectReply(response: Response, status: number, body: unknown) {
+  const json = response.headers.get("content-type")?.startsWith("application/json") ?? false;
+  const received: unknown = json ? await response.json() : await response.text();
+  expect({ status: response.status, body: received }).toEqual({ status, body });
+}
+
+function lifecycleCalls<Call extends { operation: string }>(calls: Call[]) {
+  return calls.filter((call) => ["update", "delete", "list"].includes(call.operation));
+}
+
+function forwardedId(calls: { operation: string; args: unknown[] }[], operation: string) {
+  const id = calls.find((call) => call.operation === operation)?.args[2];
+  return typeof id === "string" ? id.toLowerCase() : id;
+}
+
+function withoutEmptyWhere(calls: { operation: string; args: unknown[] }[]) {
+  return lifecycleCalls(calls).map((call) => {
+    const [collection, contract, query] = call.args;
+    if (typeof query !== "object" || query === null || !("where" in query)) return call;
+    const { where, ...rest } = query as { where: unknown };
+    const empty = typeof where === "object" && where !== null && Object.keys(where).length === 0;
+    return empty ? { ...call, args: [collection, contract, rest] } : call;
+  });
+}
+
+function without(headers: Record<string, string>, ...names: string[]) {
+  return Object.fromEntries(Object.entries(headers).filter(([name]) => !names.includes(name)));
+}
+
+describe("R11 R13 PATCH update route", () => {
+  const patch = (
+    app: ReturnType<typeof fixture>["app"],
+    body: string,
+    headers: Headers | Record<string, string>,
+  ) => app.request(documentPath, { method: "PATCH", headers, body });
+
+  test.each([
+    [
+      "changes only",
+      { changes: { title: "Hello again" } },
+      { changes: { title: "Hello again" }, unset: [] },
+    ],
+    [
+      "changes and unset",
+      { changes: { title: "X" }, unset: ["summary"] },
+      { changes: { title: "X" }, unset: ["summary"] },
+    ],
+    ["empty unset same as omitted", { changes: {}, unset: [] }, { changes: {}, unset: [] }],
+    ["no changes", { changes: {} }, { changes: {}, unset: [] }],
+    [
+      "undeclared names and values left to the service",
+      { changes: { id: "x", body: 42, title: null }, unset: ["missing", "slug"] },
+      { changes: { id: "x", body: 42, title: null }, unset: ["missing", "slug"] },
+    ],
+  ])("returns 200 and forwards exactly the parsed update: %s", async (_name, body, forwarded) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await patch(app, JSON.stringify(body), headers), 200, {
+      ok: true,
+      data: document,
+    });
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "update",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, documentId, forwarded],
+      },
+    ]);
+  });
+
+  test.each([
+    ["array body", "[]"],
+    ["null body", "null"],
+    ["string body", '"changes"'],
+    ["missing changes", '{"unset":[]}'],
+    ["empty object", "{}"],
+    ["unknown top-level key", '{"changes":{},"extra":1}'],
+    ["unknown key beside unset", '{"changes":{},"unset":[],"set":{}}'],
+    ["null changes", '{"changes":null}'],
+    ["array changes", '{"changes":[]}'],
+    ["string changes", '{"changes":"title"}'],
+    ["unset null", '{"changes":{},"unset":null}'],
+    ["unset string", '{"changes":{},"unset":"summary"}'],
+    ["unset object", '{"changes":{},"unset":{}}'],
+    ["unset with a number", '{"changes":{},"unset":[1]}'],
+    ["unset with null", '{"changes":{},"unset":[null]}'],
+    ["duplicate unset names", '{"changes":{},"unset":["summary","summary"]}'],
+    ["name in both lists", '{"changes":{"summary":"x"},"unset":["summary"]}'],
+    ["name in both lists with null", '{"changes":{"summary":null},"unset":["title","summary"]}'],
+    ["malformed JSON", "{"],
+  ])("rejects %s with 400 before the service", async (_name, body) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await patch(app, body, headers), 400, invalidRequest);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["malformed JSON", "{"],
+    ["missing changes", '{"unset":[]}'],
+    ["unset null", '{"changes":{},"unset":null}'],
+    ["name in both lists", '{"changes":{"summary":"x"},"unset":["summary"]}'],
+  ])("checks body syntax before the bearer: %s", async (_name, body) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(
+      await patch(app, body, without(headers, "authorization")),
+      400,
+      invalidRequest,
+    );
+    expect(calls).toEqual([]);
+  });
+
+  test("checks the request size before the bearer", async () => {
+    const { cms, calls, headers } = fixture();
+    const app = createApp({ logger: pino({ level: "silent" }), cms, maxRequestBytes: 16 });
+    const body = JSON.stringify({ changes: { title: "longer than sixteen bytes" } });
+    await expectReply(await patch(app, body, without(headers, "authorization")), 413, {
+      ok: false,
+      error: { code: "payload_too_large" },
+    });
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["text/plain", { "content-type": "text/plain" }],
+    ["gzip encoding", { "content-encoding": "gzip" }],
+  ])("rejects unsupported representation %s", async (_name, extra) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(
+      await patch(app, '{"changes":{}}', { ...headers, ...extra }),
+      400,
+      invalidRequest,
+    );
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["malformed id", `${documents}/not-a-uuid`],
+    ["malformed project", `/api/projects/not-a-uuid/collections/articles/documents/${documentId}`],
+    ["malformed collection", `${base}/collections/bad-name/documents/${documentId}`],
+  ])("checks the bearer before a %s", async (_name, path) => {
+    const { app, calls, headers } = fixture();
+    const response = await app.request(path, {
+      method: "PATCH",
+      headers: without(headers, "authorization", "aircastle-schema"),
+      body: '{"changes":{}}',
+    });
+    await expectReply(response, 401, unauthorized);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["malformed id", `${documents}/not-a-uuid`, {}],
+    ["id with braces", `${documents}/{${documentId}}`, {}],
+    [
+      "malformed project",
+      `/api/projects/not-a-uuid/collections/articles/documents/${documentId}`,
+      {},
+    ],
+    ["malformed collection", `${base}/collections/bad-name/documents/${documentId}`, {}],
+    ["missing contract header", documentPath, { "aircastle-schema": undefined }],
+    ["malformed contract header", documentPath, { "aircastle-schema": `v1:${"g".repeat(64)}` }],
+    ["short contract header", documentPath, { "aircastle-schema": `v1:${"a".repeat(63)}` }],
+  ])(
+    "returns 400 for a %s before checking the key",
+    async (_name, path, overrides: Record<string, string | undefined>) => {
+      const { app, calls, headers } = fixture();
+      const requestHeaders = new Headers({ ...headers, authorization: "Bearer wrong-key" });
+      for (const [name, value] of Object.entries(overrides)) {
+        if (value === undefined) requestHeaders.delete(name);
+        else requestHeaders.set(name, value);
+      }
+      const response = await app.request(path, {
+        method: "PATCH",
+        headers: requestHeaders,
+        body: '{"changes":{}}',
+      });
+      await expectReply(response, 400, invalidRequest);
+      expect(calls).toEqual([]);
+    },
+  );
+
+  test("R13 forwards a case-insensitive path id and returns the lowercase id", async () => {
+    const { app, calls, headers } = fixture();
+    const response = await app.request(`${documents}/${upperDocumentId}`, {
+      method: "PATCH",
+      headers,
+      body: '{"changes":{"title":"X"}}',
+    });
+    await expectReply(response, 200, { ok: true, data: { ...document, id: lowerDocumentId } });
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "update",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, expect.any(String), { changes: { title: "X" }, unset: [] }],
+      },
+    ]);
+    expect(forwardedId(calls, "update")).toBe(lowerDocumentId);
+  });
+
+  test.each([
+    [{ code: "unauthorized" }, 401],
+    [{ code: "forbidden" }, 403],
+    [{ code: "not_found" }, 404],
+    [{ code: "schema_mismatch" }, 409],
+    [{ code: "unique_conflict", field: "slug" }, 409],
+    [
+      {
+        code: "validation_failed",
+        issues: [
+          {
+            code: "unknown_field",
+            path: ["body"],
+            message: "This field is not declared in the collection.",
+          },
+        ],
+      },
+      422,
+    ],
+    [{ code: "internal_error" }, 500],
+  ] as const)("returns the service error %o with its status", async (error, status) => {
+    const { app, headers } = fixture(error);
+    await expectReply(await patch(app, '{"changes":{}}', headers), status, { ok: false, error });
+  });
+});
+
+describe("R11 R13 DELETE route", () => {
+  test("returns 200 with the deleted id and forwards collection, contract and id", async () => {
+    const { app, calls, headers } = fixture();
+    const response = await app.request(documentPath, {
+      method: "DELETE",
+      headers: without(headers, "content-type"),
+    });
+    await expectReply(response, 200, { ok: true, data: { id: documentId } });
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "delete",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, documentId],
+      },
+    ]);
+  });
+
+  test.each([
+    ["malformed JSON", { "content-type": "application/json" }, "{"],
+    ["plain text", { "content-type": "text/plain" }, "anything"],
+    ["gzip encoding", { "content-type": "application/json", "content-encoding": "gzip" }, "{}"],
+  ])("ignores a %s body", async (_name, extra, body) => {
+    const { app, calls, headers } = fixture();
+    const response = await app.request(documentPath, {
+      method: "DELETE",
+      headers: { ...without(headers, "content-type"), ...extra },
+      body,
+    });
+    await expectReply(response, 200, { ok: true, data: { id: documentId } });
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "delete",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, documentId],
+      },
+    ]);
+  });
+
+  test("R13 forwards a case-insensitive path id and returns the lowercase id", async () => {
+    const { app, calls, headers } = fixture();
+    const response = await app.request(`${documents}/${upperDocumentId}`, {
+      method: "DELETE",
+      headers,
+    });
+    await expectReply(response, 200, { ok: true, data: { id: lowerDocumentId } });
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "delete",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, expect.any(String)],
+      },
+    ]);
+    expect(forwardedId(calls, "delete")).toBe(lowerDocumentId);
+  });
+
+  test.each([
+    ["missing bearer", documentPath],
+    ["missing bearer and malformed id", `${documents}/not-a-uuid`],
+    [
+      "missing bearer and malformed project",
+      `/api/projects/x/collections/articles/documents/${documentId}`,
+    ],
+    [
+      "missing bearer and malformed collection",
+      `${base}/collections/bad-name/documents/${documentId}`,
+    ],
+  ])("returns 401 for a %s", async (_name, path) => {
+    const { app, calls, headers } = fixture();
+    const response = await app.request(path, {
+      method: "DELETE",
+      headers: without(headers, "authorization", "aircastle-schema"),
+    });
+    await expectReply(response, 401, unauthorized);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["malformed id", `${documents}/not-a-uuid`, {}],
+    ["malformed project", `/api/projects/x/collections/articles/documents/${documentId}`, {}],
+    ["malformed collection", `${base}/collections/bad-name/documents/${documentId}`, {}],
+    ["missing contract header", documentPath, { "aircastle-schema": undefined }],
+    ["malformed contract header", documentPath, { "aircastle-schema": "wrong" }],
+  ])(
+    "returns 400 for a %s before checking the key",
+    async (_name, path, overrides: Record<string, string | undefined>) => {
+      const { app, calls, headers } = fixture();
+      const requestHeaders = new Headers({ ...headers, authorization: "Bearer wrong-key" });
+      for (const [name, value] of Object.entries(overrides)) {
+        if (value === undefined) requestHeaders.delete(name);
+        else requestHeaders.set(name, value);
+      }
+      await expectReply(
+        await app.request(path, { method: "DELETE", headers: requestHeaders }),
+        400,
+        invalidRequest,
+      );
+      expect(calls).toEqual([]);
+    },
+  );
+
+  test.each([
+    [{ code: "referenced", collection: "articles", field: "author" }, 409],
+    [{ code: "not_found" }, 404],
+    [{ code: "schema_mismatch" }, 409],
+    [{ code: "forbidden" }, 403],
+    [{ code: "unauthorized" }, 401],
+  ] as const)("returns the service error %o with its status", async (error, status) => {
+    const { app, headers } = fixture(error);
+    await expectReply(await app.request(documentPath, { method: "DELETE", headers }), status, {
+      ok: false,
+      error,
+    });
+  });
+});
+
+describe("R11 R13 GET list route", () => {
+  const list = (
+    app: ReturnType<typeof fixture>["app"],
+    search: string,
+    headers: Record<string, string>,
+  ) => app.request(`${documents}${search}`, { headers: without(headers, "content-type") });
+  const page = { ok: true, data: { documents: [document], next: null } };
+
+  test("returns 200 with the page and forwards every parsed parameter", async () => {
+    const { app, calls, headers } = fixture();
+    const where = encodeURIComponent(
+      JSON.stringify({ status: "published", title: { contains: "a" } }),
+    );
+    await expectReply(await list(app, `?where=${where}&sort=-title&limit=2`, headers), 200, page);
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "list",
+        access: { project, apiKey: "test-secret" },
+        args: [
+          "articles",
+          fingerprint,
+          { where: { status: "published", title: { contains: "a" } }, sort: "-title", limit: 2 },
+        ],
+      },
+    ]);
+  });
+
+  test("forwards an empty query when no parameter is given", async () => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await list(app, "", headers), 200, page);
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "list",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, {}],
+      },
+    ]);
+  });
+
+  test("treats where {} the same as no where", async () => {
+    const empty = fixture();
+    await expectReply(await list(empty.app, "?where=%7B%7D&limit=5", empty.headers), 200, page);
+    const none = fixture();
+    await expectReply(await list(none.app, "?limit=5", none.headers), 200, page);
+    expect(withoutEmptyWhere(empty.calls)).toEqual(lifecycleCalls(none.calls));
+    expect(lifecycleCalls(none.calls)).toHaveLength(1);
+  });
+
+  test.each([
+    ["1", 1],
+    ["9", 9],
+    ["20", 20],
+    ["99", 99],
+    ["100", 100],
+  ])("accepts limit %s", async (limit, parsed) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await list(app, `?limit=${limit}`, headers), 200, page);
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "list",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, { limit: parsed }],
+      },
+    ]);
+  });
+
+  test.each(["title", "-title", "_private", "-A_1"])("accepts sort %s", async (sort) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await list(app, `?sort=${encodeURIComponent(sort)}`, headers), 200, page);
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "list",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, { sort }],
+      },
+    ]);
+  });
+
+  test.each([
+    ["limit 0", "?limit=0"],
+    ["limit 101", "?limit=101"],
+    ["limit 999", "?limit=999"],
+    ["limit 1000", "?limit=1000"],
+    ["limit with a leading zero", "?limit=020"],
+    ["negative limit", "?limit=-1"],
+    ["signed limit", "?limit=%2B1"],
+    ["fractional limit", "?limit=1.5"],
+    ["exponent limit", "?limit=1e2"],
+    ["spaced limit", "?limit=%201"],
+    ["word limit", "?limit=ten"],
+    ["empty limit", "?limit="],
+    ["bare limit", "?limit"],
+    ["double dash sort", "?sort=--title"],
+    ["plus sort", "?sort=%2Btitle"],
+    ["dotted sort", "?sort=seo.title"],
+    ["digit-led sort", "?sort=1title"],
+    ["bare dash sort", "?sort=-"],
+    ["spaced sort", "?sort=ti%20tle"],
+    ["empty sort", "?sort="],
+    ["where array", `?where=${encodeURIComponent("[]")}`],
+    ["where null", "?where=null"],
+    ["where number", "?where=1"],
+    ["where string", `?where=${encodeURIComponent('"title"')}`],
+    ["where malformed JSON", `?where=${encodeURIComponent("{")}`],
+    ["where unquoted", "?where=status"],
+    ["empty where", "?where="],
+    ["empty cursor", "?cursor="],
+    ["repeated limit", "?limit=1&limit=2"],
+    ["repeated identical sort", "?sort=title&sort=title"],
+    ["repeated where", "?where=%7B%7D&where=%7B%7D"],
+    ["repeated cursor", "?cursor=a&cursor=b"],
+    ["unknown parameter", "?page=2"],
+    ["unknown parameter beside valid ones", "?limit=2&offset=4"],
+    ["empty unknown parameter", "?filter="],
+  ])("rejects %s with 400 before the service", async (_name, search) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await list(app, search, headers), 400, invalidRequest);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["limit 0", "?limit=0"],
+    ["unknown parameter", "?page=2"],
+    ["where array", `?where=${encodeURIComponent("[]")}`],
+    ["sort syntax", "?sort=--title"],
+  ])("checks query syntax before the bearer: %s", async (_name, search) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(
+      await list(app, search, without(headers, "authorization", "aircastle-schema")),
+      400,
+      invalidRequest,
+    );
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["missing header", documents],
+    ["malformed project", "/api/projects/x/collections/articles/documents"],
+    ["malformed collection", `${base}/collections/bad-name/documents`],
+  ])("checks the bearer before a %s", async (_name, path) => {
+    const { app, calls, headers } = fixture();
+    const response = await app.request(path, {
+      headers: without(headers, "authorization", "aircastle-schema", "content-type"),
+    });
+    await expectReply(response, 401, unauthorized);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["missing contract header", documents, { "aircastle-schema": undefined }],
+    ["malformed contract header", documents, { "aircastle-schema": "wrong" }],
+    ["malformed project", "/api/projects/x/collections/articles/documents", {}],
+    ["malformed collection", `${base}/collections/bad-name/documents`, {}],
+  ])(
+    "returns 400 for a %s before checking the key",
+    async (_name, path, overrides: Record<string, string | undefined>) => {
+      const { app, calls, headers } = fixture();
+      const requestHeaders = new Headers({
+        ...without(headers, "content-type"),
+        authorization: "Bearer wrong-key",
+      });
+      for (const [name, value] of Object.entries(overrides)) {
+        if (value === undefined) requestHeaders.delete(name);
+        else requestHeaders.set(name, value);
+      }
+      await expectReply(await app.request(path, { headers: requestHeaders }), 400, invalidRequest);
+      expect(calls).toEqual([]);
+    },
+  );
+
+  test.each([
+    [{ code: "invalid_request" }, 400],
+    [{ code: "not_found" }, 404],
+    [{ code: "schema_mismatch" }, 409],
+    [{ code: "forbidden" }, 403],
+    [{ code: "internal_error" }, 500],
+  ] as const)("returns the service error %o with its status", async (error, status) => {
+    const { app, headers } = fixture(error);
+    await expectReply(await list(app, "", headers), status, { ok: false, error });
+  });
+});
+
+describe("R11 R13 POST documents/query route", () => {
+  const query = (
+    app: ReturnType<typeof fixture>["app"],
+    body: string,
+    headers: Headers | Record<string, string>,
+  ) => app.request(queryPath, { method: "POST", headers, body });
+  const page = { ok: true, data: { documents: [document], next: null } };
+
+  test("returns 200 and forwards the JSON query exactly", async () => {
+    const { app, calls, headers } = fixture();
+    const body = { where: { status: "published" }, sort: "-title", limit: 2 };
+    await expectReply(await query(app, JSON.stringify(body), headers), 200, page);
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "list",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, body],
+      },
+    ]);
+  });
+
+  test("forwards the same arguments as the equivalent GET", async () => {
+    const posted = fixture();
+    const body = { where: { title: { in: ["a", "b"] } }, sort: "title", limit: 100 };
+    await expectReply(await query(posted.app, JSON.stringify(body), posted.headers), 200, page);
+    const fetched = fixture();
+    const search = `?where=${encodeURIComponent(JSON.stringify(body.where))}&sort=title&limit=100`;
+    await expectReply(
+      await fetched.app.request(`${documents}${search}`, { headers: fetched.headers }),
+      200,
+      page,
+    );
+    expect(lifecycleCalls(posted.calls)).toEqual(lifecycleCalls(fetched.calls));
+    expect(lifecycleCalls(posted.calls)).toHaveLength(1);
+  });
+
+  test("an empty query object forwards an empty query", async () => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await query(app, "{}", headers), 200, page);
+    expect(lifecycleCalls(calls)).toEqual([
+      {
+        operation: "list",
+        access: { project, apiKey: "test-secret" },
+        args: ["articles", fingerprint, {}],
+      },
+    ]);
+  });
+
+  test("treats where {} the same as no where", async () => {
+    const empty = fixture();
+    await expectReply(await query(empty.app, '{"where":{},"limit":3}', empty.headers), 200, page);
+    const none = fixture();
+    await expectReply(await query(none.app, '{"limit":3}', none.headers), 200, page);
+    expect(withoutEmptyWhere(empty.calls)).toEqual(lifecycleCalls(none.calls));
+    expect(lifecycleCalls(none.calls)).toHaveLength(1);
+  });
+
+  test.each([
+    ["array body", "[]"],
+    ["null body", "null"],
+    ["unknown key", '{"page":2}'],
+    ["limit 0", '{"limit":0}'],
+    ["limit 101", '{"limit":101}'],
+    ["fractional limit", '{"limit":1.5}'],
+    ["negative limit", '{"limit":-1}'],
+    ["null limit", '{"limit":null}'],
+    ["double dash sort", '{"sort":"--title"}'],
+    ["dotted sort", '{"sort":"seo.title"}'],
+    ["empty sort", '{"sort":""}'],
+    ["numeric sort", '{"sort":1}'],
+    ["where array", '{"where":[]}'],
+    ["where null", '{"where":null}'],
+    ["where string", '{"where":"{}"}'],
+    ["empty cursor", '{"cursor":""}'],
+    ["numeric cursor", '{"cursor":1}'],
+    ["malformed JSON", "{"],
+  ])("rejects %s with 400 before the service", async (_name, body) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(await query(app, body, headers), 400, invalidRequest);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["malformed JSON", "{"],
+    ["limit 0", '{"limit":0}'],
+    ["unknown key", '{"page":2}'],
+  ])("checks body syntax before the bearer: %s", async (_name, body) => {
+    const { app, calls, headers } = fixture();
+    await expectReply(
+      await query(app, body, without(headers, "authorization", "aircastle-schema")),
+      400,
+      invalidRequest,
+    );
+    expect(calls).toEqual([]);
+  });
+
+  test("checks the bearer before the contract header", async () => {
+    const { app, calls, headers } = fixture();
+    await expectReply(
+      await query(app, "{}", without(headers, "authorization", "aircastle-schema")),
+      401,
+      unauthorized,
+    );
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    ["missing contract header", { "aircastle-schema": undefined }],
+    ["malformed contract header", { "aircastle-schema": "wrong" }],
+    ["text/plain", { "content-type": "text/plain" }],
+  ])("returns 400 for a %s", async (_name, overrides: Record<string, string | undefined>) => {
+    const { app, calls, headers } = fixture();
+    const requestHeaders = new Headers({ ...headers, authorization: "Bearer wrong-key" });
+    for (const [name, value] of Object.entries(overrides)) {
+      if (value === undefined) requestHeaders.delete(name);
+      else requestHeaders.set(name, value);
+    }
+    await expectReply(await query(app, "{}", requestHeaders), 400, invalidRequest);
+    expect(calls).toEqual([]);
+  });
+
+  test("keeps the 1 MiB request limit", async () => {
+    const { app, calls, headers } = fixture();
+    const body = JSON.stringify({ cursor: "x".repeat(1_048_576 - 13) });
+    expect(new TextEncoder().encode(body).length).toBe(1_048_576);
+    await expectReply(await query(app, `${body} `, headers), 413, {
+      ok: false,
+      error: { code: "payload_too_large" },
+    });
+    expect(calls).toEqual([]);
+  });
+});
