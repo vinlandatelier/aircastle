@@ -19,12 +19,41 @@ export function expectOwnKeys(value: object, expected: readonly string[]): void 
   expect(new Set(Reflect.ownKeys(value))).toEqual(new Set(expected));
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function expectSameOwnKeysDeep(
+  actual: unknown,
+  expected: unknown,
+  path: readonly PropertyKey[],
+): void {
+  const where = `own keys at ${JSON.stringify(path.map(String))}`;
+  if (Array.isArray(expected)) {
+    expect(Array.isArray(actual), where).toBe(true);
+    const items = actual as unknown[];
+    expect(items, where).toHaveLength(expected.length);
+    expected.forEach((item, index) => expectSameOwnKeysDeep(items[index], item, [...path, index]));
+    return;
+  }
+  if (!isPlainRecord(expected)) return;
+  expect(actual !== null && typeof actual === "object" && !Array.isArray(actual), where).toBe(true);
+  const record = actual as Record<string, unknown>;
+  expect(new Set(Reflect.ownKeys(record)), where).toEqual(new Set(Object.keys(expected)));
+  for (const key of Object.keys(expected)) {
+    expectSameOwnKeysDeep(record[key], expected[key], [...path, key]);
+  }
+}
+
 export function expectData(actual: unknown, expected: Record<string, unknown>): void {
   const data = expectObject(actual);
   expectOwnKeys(data, Object.keys(expected));
   for (const key of Object.keys(expected)) {
     expect(Object.hasOwn(data, key)).toBe(true);
     expect(data[key]).toEqual(expected[key]);
+    expectSameOwnKeysDeep(data[key], expected[key], [key]);
   }
 }
 

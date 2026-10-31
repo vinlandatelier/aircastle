@@ -17,7 +17,11 @@ import {
 import { postgresAdapter } from "./index.ts";
 
 const permissions: readonly Permission[] = ["content:read", "content:write", "schema:publish"];
-const articles: CollectionDescription = {
+const articles: {
+  readonly fields: Readonly<
+    Record<string, Extract<CollectionDescription["fields"][string], { type: "text" }>>
+  >;
+} = {
   fields: {
     title: { type: "text", required: true, nullable: false, unique: false, min: 1 },
     slug: { type: "text", required: true, nullable: false, unique: true },
@@ -443,8 +447,7 @@ test("tightening publication and a concurrent old-client write leave a valid com
       expect(active.collections).toEqual([{ name: "articles", description: strict }]);
       expect(
         documents.every(
-          (document) =>
-            document.title !== undefined && document.title !== null && document.title.length >= 5,
+          (document) => typeof document.title === "string" && document.title.length >= 5,
         ),
       ).toBe(true);
       expect(created).toMatchObject({

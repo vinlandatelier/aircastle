@@ -5,6 +5,7 @@ import type {
   DocumentUpdate,
   Permission,
 } from "@aircastle/contracts";
+import type { TextFieldDescription } from "@aircastle/schema";
 import { createService, type ErrorSummary, type ReportError } from "./index.ts";
 import { access, contract, controlledStore, failOnReport } from "./test-support/fixtures.ts";
 
@@ -13,9 +14,16 @@ const idB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const missingId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const message = expect.any(String);
 
+const title: TextFieldDescription = {
+  type: "text",
+  required: true,
+  nullable: false,
+  unique: false,
+  min: 1,
+};
 const posts: CollectionDescription = {
   fields: {
-    title: { type: "text", required: true, nullable: false, unique: false, min: 1 },
+    title,
     slug: { type: "text", required: true, nullable: false, unique: true },
     subtitle: { type: "text", required: true, nullable: true, unique: false },
     summary: { type: "text", required: false, nullable: true, unique: false },
@@ -31,7 +39,7 @@ const posts: CollectionDescription = {
   },
 };
 const withTitleMin = (min: number): CollectionDescription => ({
-  fields: { ...posts.fields, title: { ...posts.fields.title!, min } },
+  fields: { ...posts.fields, title: { ...title, min } },
 });
 const withoutSummary: CollectionDescription = {
   fields: Object.fromEntries(Object.entries(posts.fields).filter(([name]) => name !== "summary")),
