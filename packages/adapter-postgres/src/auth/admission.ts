@@ -6,25 +6,51 @@ import type {
   AuthLimits,
   AuthLimitScope,
 } from "@aircastle/core";
-import type { PostgresOptions } from "./index.ts";
-import { identifier } from "./identifier.ts";
-import { validatedNamespace } from "./layout.ts";
-import { initializeAuthLayout } from "./auth/layout.ts";
+import type { PostgresOptions } from "../index.ts";
+import { identifier } from "../identifier.ts";
+import { connectionTarget } from "../layout.ts";
+import { initializeAuthLayout } from "./layout.ts";
 
 const windows = [
   ["fiveMinutes", 300_000],
   ["oneHour", 3_600_000],
 ] as const;
+const retention = Math.max(...windows.map(([, duration]) => duration));
 const scopes = ["email", "ip", "global"] as const;
+
+type AdmissionEvent = { scope: AuthLimitScope; admitted_at: string };
+type Throttled = Extract<AuthAdmission, { kind: "throttled" }>;
+
+function exhausted(
+  events: AdmissionEvent[],
+  limits: AuthLimits,
+  now: number,
+  checked: AuthLimitScope[],
+): Throttled | undefined {
+  const blocked: AuthLimitScope[] = [];
+  let retryAt = now;
+  for (const scope of checked) {
+    const times = events
+      .filter((event) => event.scope === scope)
+      .map((event) => Number(event.admitted_at));
+    let denied = false;
+    for (const [window, duration] of windows) {
+      const retained = times.filter((time) => time > now - duration);
+      const ceiling = limits[scope][window];
+      if (retained.length >= ceiling) {
+        denied = true;
+        retryAt = Math.max(retryAt, retained[retained.length - ceiling]! + duration);
+      }
+    }
+    if (denied) blocked.push(scope);
+  }
+  if (blocked.length) return { kind: "throttled", retryAt, scopes: blocked };
+}
 
 export async function postgresAuthAdmission(
   options: PostgresOptions & { limits: AuthLimits; clock?: () => number },
 ): Promise<AuthAdmissionStore> {
-  const namespace = validatedNamespace(
-    options.namespace === undefined ? "aircastle" : options.namespace,
-  );
-  if (typeof options.url !== "string" || options.url.length === 0)
-    throw new Error("Postgres URL is required");
+  const { url, namespace } = connectionTarget(options);
   const limits: AuthLimits = {
     email: { ...options.limits.email },
     ip: { ...options.limits.ip },
@@ -39,7 +65,7 @@ export async function postgresAuthAdmission(
   );
   const operationKey = JSON.stringify([namespace, "auth-admission"]);
   const policyKey = JSON.stringify([namespace, "auth-admission-policy"]);
-  const sql = postgres(options.url, {
+  const sql = postgres(url, {
     max: 1,
     prepare: false,
     idle_timeout: 0,
@@ -84,35 +110,14 @@ export async function postgresAuthAdmission(
           await transaction`SELECT pg_advisory_xact_lock_shared(hashtextextended(${policyKey}, 0))`;
           if (!(await matchesPolicy(transaction))) throw new AuthStorageError("unavailable");
           const now = clock();
-          await transaction`DELETE FROM ${table("auth_admission_events")} WHERE admitted_at <= ${now - 3_600_000}`;
+          await transaction`DELETE FROM ${table("auth_admission_events")} WHERE admitted_at <= ${now - retention}`;
           const events = await transaction<
-            { scope: AuthLimitScope; admitted_at: string }[]
+            AdmissionEvent[]
           >`SELECT scope, admitted_at FROM ${table("auth_admission_events")} WHERE (scope = 'global' AND identity = '') OR (scope = 'ip' AND identity = ${source}) OR (scope = 'email' AND identity = ${email ?? null}) ORDER BY admitted_at`;
-          function exhausted(
-            checked: AuthLimitScope[],
-          ): Extract<AuthAdmission, { kind: "throttled" }> | undefined {
-            const blocked: AuthLimitScope[] = [];
-            let retryAt = now;
-            for (const scope of checked) {
-              const times = events
-                .filter((event) => event.scope === scope)
-                .map((event) => Number(event.admitted_at));
-              let denied = false;
-              for (const [window, duration] of windows) {
-                const retained = times.filter((time) => time > now - duration);
-                const ceiling = limits[scope][window];
-                if (retained.length >= ceiling) {
-                  denied = true;
-                  retryAt = Math.max(retryAt, retained[retained.length - ceiling]! + duration);
-                }
-              }
-              if (denied) blocked.push(scope);
-            }
-            if (blocked.length) return { kind: "throttled", retryAt, scopes: blocked };
-          }
-          const outer = exhausted(["ip", "global"]);
+          const throttled = (checked: AuthLimitScope[]) => exhausted(events, limits, now, checked);
+          const outer = throttled(["ip", "global"]);
           if (outer) {
-            const recipient = email === undefined ? undefined : exhausted(["email"]);
+            const recipient = email === undefined ? undefined : throttled(["email"]);
             if (recipient) outer.retryAt = Math.max(outer.retryAt, recipient.retryAt);
             return outer;
           }
@@ -122,9 +127,9 @@ export async function postgresAuthAdmission(
             { scope: "global", admitted_at: String(now) },
           );
           if (email !== undefined) {
-            const recipient = exhausted(["email"]);
+            const recipient = throttled(["email"]);
             if (recipient) {
-              const chargedOuter = exhausted(["ip", "global"]);
+              const chargedOuter = throttled(["ip", "global"]);
               if (chargedOuter)
                 recipient.retryAt = Math.max(recipient.retryAt, chargedOuter.retryAt);
               return recipient;
