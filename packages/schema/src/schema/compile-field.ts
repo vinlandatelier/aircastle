@@ -308,7 +308,8 @@ function compileList(
     own.push(schemaIssue(path, { code: "invalid_item", modifier: "optional" }));
   if (has(modifiers, "default"))
     own.push(schemaIssue(path, { code: "invalid_item", modifier: "default" }));
-  if (has(modifiers, "unique") && context.unique === "allowed")
+  const directItem = context.unique !== "item";
+  if (has(modifiers, "unique") && directItem)
     own.push(schemaIssue(path, { code: "invalid_item", modifier: "unique" }));
   if (itemDefinition.kind === "object") {
     const shape = itemDefinition.argument;
@@ -317,7 +318,7 @@ function compileList(
   }
   const compiled = compileField(itemDefinition, path, {
     ...context,
-    unique: context.unique === "allowed" ? "item" : "unsupported",
+    unique: directItem ? "item" : "unsupported",
   });
   children.push(...compiled.issues);
   return compiled.field;

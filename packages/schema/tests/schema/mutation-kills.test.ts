@@ -187,10 +187,10 @@ describe("editor and uniqueness declarations", () => {
     );
   });
 
-  test(".unique() on the item of a list inside an object is unsupported_unique", () => {
+  test(".unique() on the direct item of a list inside an object is invalid_item", () => {
     expectSchemaError(
       () => compileCollection({ seo: object({ tags: list(text().unique()) }) }),
-      [{ code: "unsupported_unique", path: ["articles", "seo", "tags"] }],
+      [{ code: "invalid_item", path: ["articles", "seo", "tags"], modifier: "unique" }],
     );
   });
 });
