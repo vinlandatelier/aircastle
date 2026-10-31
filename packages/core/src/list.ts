@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
-import type {
-  CollectionDescription,
-  ContentDocument,
-  DocumentListQuery,
-  Result,
+import {
+  defaultListLimit,
+  isListLimit,
+  isListSort,
+  type CollectionDescription,
+  type ContentDocument,
+  type DocumentListQuery,
+  type Result,
 } from "@aircastle/contracts";
 
 /**
@@ -84,9 +87,7 @@ interface DecodedCursor {
 
 type Condition = readonly [operator: FieldFilter["operator"], value: unknown];
 
-const defaultLimit = 20;
-const maximumValues = 100;
-const sortSyntax = /^-?[A-Za-z_][A-Za-z0-9_]*$/;
+const maximumInValues = 100;
 const cursorText = /^[A-Za-z0-9_-]+$/;
 const jsonString = String.raw`"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"`;
 const cursorJson = new RegExp(
@@ -134,10 +135,10 @@ export function encodeCursor(digest: string, position: ListPosition): string {
 
 /** Checks the shape of `limit`, `sort`, `where` and `cursor`, without consulting a schema. */
 export function listSyntax(query: DocumentListQuery): ListSyntax | undefined {
-  const { where = {}, sort, limit = defaultLimit, cursor } = query;
+  const { where = {}, sort, limit = defaultListLimit, cursor } = query;
   if (!isRecord(where)) return undefined;
-  if (!Number.isInteger(limit) || limit < 1 || limit > maximumValues) return undefined;
-  if (sort !== undefined && !sortSyntax.test(sort)) return undefined;
+  if (!isListLimit(limit)) return undefined;
+  if (sort !== undefined && !isListSort(sort)) return undefined;
   const decoded = cursor === undefined ? undefined : decodeCursor(cursor);
   if (cursor !== undefined && decoded === undefined) return undefined;
   return { where, sort, limit, cursor: decoded };
@@ -164,7 +165,7 @@ function filterFor(field: string, [operator, value]: Condition): FieldFilter | u
     case "empty":
       return typeof value === "boolean" ? { field, operator, empty: value } : undefined;
     case "in": {
-      if (!Array.isArray(value) || value.length > maximumValues) return undefined;
+      if (!Array.isArray(value) || value.length > maximumInValues) return undefined;
       const [first, ...rest] = value;
       if (!isText(first) || !rest.every(isText)) return undefined;
       return { field, operator, values: [first, ...rest] };
