@@ -2,6 +2,8 @@ import process from 'node:process'
 import { defineConfig } from '@playwright/test'
 import { origins } from './e2e/origins'
 
+const recording = process.env.WEB_E2E_VIDEO === '1'
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.spec.ts',
@@ -9,8 +11,8 @@ export default defineConfig({
   retries: 0,
   failOnFlakyTests: true,
   workers: 2,
-  timeout: 30_000,
-  globalTimeout: 600_000,
+  timeout: recording ? 120_000 : 30_000,
+  globalTimeout: recording ? 1_800_000 : 600_000,
   expect: { timeout: 5_000 },
   outputDir: 'reports/test-results',
   reporter: [
@@ -32,10 +34,17 @@ export default defineConfig({
     colorScheme: 'light',
     reducedMotion: 'reduce',
     trace: 'retain-on-failure',
-    screenshot: process.env.WEB_E2E_VIDEO === '1' ? 'on' : 'only-on-failure',
-    video:
-      process.env.WEB_E2E_VIDEO === '1'
-        ? { mode: 'on', size: { width: 1440, height: 900 } }
-        : 'off',
+    launchOptions: recording ? { slowMo: 500 } : {},
+    screenshot: recording ? 'on' : 'only-on-failure',
+    video: recording
+      ? {
+          mode: 'on',
+          size: { width: 1440, height: 900 },
+          show: {
+            actions: { duration: 1_000, position: 'top', cursor: 'pointer' },
+            test: { level: 'step', position: 'bottom' },
+          },
+        }
+      : 'off',
   },
 })
