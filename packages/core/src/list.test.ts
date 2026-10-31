@@ -278,19 +278,23 @@ describe("R7 R13 cursor binding", () => {
     JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
   const encoded = (value: Record<string, unknown>) =>
     Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
   for (const order of [{}, { sort: "title" }] satisfies DocumentListQuery[])
-    test(`a non-canonical spelling of an issued ${order.sort ?? "created"} cursor returns invalid_request`, async () => {
+    test(`an issued ${order.sort ?? "created"} cursor re-encoded unchanged still continues`, async () => {
       const { cms } = service(documents);
       const cursor = await nextCursor(cms, { ...order, limit: 1 });
-      const last = alphabet.indexOf(cursor.at(-1)!);
-      const bent =
-        cursor.length % 4 === 0 ? `${cursor}A` : `${cursor.slice(0, -1)}${alphabet[last ^ 1]}`;
-      expect(bent).not.toBe(cursor);
-      expect(Buffer.from(bent, "base64url")).toEqual(Buffer.from(cursor, "base64url"));
-      expect(await list(cms, { ...order, limit: 1, cursor: bent })).toEqual(invalid);
+      const original = await list(cms, { ...order, limit: 1, cursor });
+      expect(original).toEqual(page(expect.any(Array), "more"));
+      expect(await list(cms, { ...order, limit: 1, cursor: encoded(decoded(cursor)) })).toEqual(
+        original,
+      );
     });
+
+  test("a cursor whose bytes are not UTF-8 returns invalid_request", async () => {
+    const { cms } = service(documents);
+    const cursor = Buffer.from([0x7b, 0xff, 0xfe, 0x7d]).toString("base64url");
+    expect(await list(cms, { limit: 1, cursor })).toEqual(invalid);
+  });
 
   test("a created-order cursor given a sort value returns invalid_request", async () => {
     const { cms } = service(documents);
