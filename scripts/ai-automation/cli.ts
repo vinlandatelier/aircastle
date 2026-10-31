@@ -1,5 +1,6 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { parseModelConfig, runModel } from "../ai-models/index.ts";
 import { Coordinator } from "./github.ts";
 import { renderPatch } from "./materialize.ts";
 import { digest, integer, parseJob, requireObject, sha, workflowOutputs } from "./index.ts";
@@ -36,6 +37,9 @@ async function json(path: string, max = 2_000_000): Promise<unknown> {
   if (raw.length > max) throw new Error("Input artifact exceeds bound");
   return JSON.parse(raw.toString("utf8"));
 }
+async function modelConfig(root: string) {
+  return parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
+}
 async function output(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value));
@@ -49,8 +53,7 @@ async function main(): Promise<void> {
     required("CLAUDE_CODE_OAUTH_TOKEN");
     const api = coordinator();
     await api.setup();
-    const { parseModelConfig, runModel } = await import("../ai-models/index.ts");
-    const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
+    const config = await modelConfig(root);
     for (const role of ["reviewer", "implementer"] as const) {
       const result = requireObject(
         await runModel(config.roles[role], 'Return {"ready":true} using the requested schema.', {
@@ -79,8 +82,7 @@ async function main(): Promise<void> {
   if (command === "prepare") {
     const api = coordinator();
     await api.setup();
-    const { parseModelConfig } = await import("../ai-models/index.ts");
-    const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
+    const config = await modelConfig(root);
     const event = requireObject(await json(required("GITHUB_EVENT_PATH")));
     if (
       process.env.GITHUB_EVENT_NAME !== "issue_comment" ||
@@ -103,8 +105,7 @@ async function main(): Promise<void> {
   if (job.id !== id || job.control !== required("AI_CONTROL_SHA"))
     throw new Error("Control revision mismatch");
   if (command === "model") {
-    const { parseModelConfig } = await import("../ai-models/index.ts");
-    const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
+    const config = await modelConfig(root);
     if (
       digest(config.roles[job.role]) !== digest(job.selection) ||
       (job.task === "request" && digest(job.implementation) !== digest(config.roles.implementer))
