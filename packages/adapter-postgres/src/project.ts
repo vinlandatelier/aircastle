@@ -11,6 +11,7 @@ import { canonicalContract, compileDescription, uniqueFields } from "@aircastle/
 import { identifier } from "./identifier.ts";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+const documentId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 class UniqueConflict extends Error {
   constructor(readonly field: string) {
@@ -170,11 +171,12 @@ export function projectTransaction(
       return rows[0] ? document(rows[0]) : undefined;
     },
     existing: async (collection, ids) => {
-      if (ids.length === 0) return new Set<string>();
+      const candidates = ids.filter((id) => documentId.test(id));
+      if (candidates.length === 0) return new Set<string>();
       await resolveCollection(collection);
       const rows = await sql<
         { id: string }[]
-      >`SELECT id FROM ${table("documents")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} AND id = ANY(${ids as string[]}::uuid[]) FOR SHARE`;
+      >`SELECT id FROM ${table("documents")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} AND id = ANY(${candidates}::uuid[]) FOR SHARE`;
       return new Set(rows.map((row) => row.id));
     },
   };
