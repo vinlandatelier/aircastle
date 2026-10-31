@@ -1,0 +1,50 @@
+name: PR evidence
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  merge_group:
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    shell: bash
+jobs:
+  ui-evidence:
+    name: UI evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require recorded evidence for UI changes
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          ui_files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate \
+            --jq '.[] | .filename, (.previous_filename // empty)' \
+            | grep -E '^apps/web/(src/|public/|index\.html$)' \
+            | grep -vE '\.test\.tsx?$|^apps/web/src/test-(setup\.ts|utils\.tsx)$' \
+            || true)
+          if [ -z "$ui_files" ]; then
+            echo "No UI source changed."
+            exit 0
+          fi
+          printf 'UI source changed:\n%s\n' "$ui_files"
+          body=$(printf '%s\n' "$BODY" | tr -d '\r')
+          if printf '%s\n' "$body" | grep -qE '^[[:space:]]*No visible UI change: *[^[:space:]]'; then
+            echo "The body declares no visible UI change."
+            exit 0
+          fi
+          screenshots=$(printf '%s\n' "$body" | awk '/^##? /{inside = ($0 ~ /^## Screenshots[[:space:]]*$/); next} inside')
+          if printf '%s\n' "$screenshots" | grep -qF 'https://github.com/user-attachments/assets/'; then
+            echo "The Screenshots section has uploaded media."
+            exit 0
+          fi
+          echo "::error::This PR changes UI source but its body has no evidence. Upload videos and screenshots from 'vp run test-web:record <specs>' under '## Screenshots', or add a line 'No visible UI change: <reason>'."
+          exit 1
