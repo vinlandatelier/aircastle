@@ -37,14 +37,24 @@ describe("R5 delete", () => {
   });
 
   test("R13 an uppercase id deletes the document and the result id is lowercase", async () => {
-    const { cms } = seeded();
-    expect(await cms.delete(access, "articles", contract, documentId.toUpperCase())).toEqual({
-      ok: true,
-      data: { id: documentId },
+    const lettered = "abcdef12-abcd-4abc-8abc-abcdef123456";
+    const { store } = controlledStore({
+      documents: { articles: [{ ...stored, id: lettered }, neighbour] },
     });
-    expect(await cms.findById(access, "articles", contract, documentId)).toEqual({
+    const cms = createService(store, failOnReport);
+    expect(
+      await cms.delete(access, "articles", contract, "ABCDEF12-ABCD-4ABC-8ABC-ABCDEF123456"),
+    ).toEqual({
+      ok: true,
+      data: { id: lettered },
+    });
+    expect(await cms.findById(access, "articles", contract, lettered)).toEqual({
       ok: false,
       error: { code: "not_found" },
+    });
+    expect(await cms.findById(access, "articles", contract, other)).toEqual({
+      ok: true,
+      data: neighbour,
     });
   });
 
