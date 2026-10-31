@@ -142,6 +142,16 @@ function withDefault(
   return { ok: true, data: builder.default(value.default) };
 }
 
+function applyModifiers(
+  builder: WireBuilder,
+  value: Record<string, unknown>,
+  path: IssuePath,
+  supportsBounds: boolean,
+): Decoded<WireBuilder> {
+  const present = presence(builder, value);
+  return withDefault(supportsBounds ? bounded(present, value) : present, value, path);
+}
+
 function decodeText(value: Record<string, unknown>, path: IssuePath): Decoded<WireBuilder> {
   if (typeof value.unique !== "boolean") return invalidField(path);
   let builder = presence(wire(text()), value);
@@ -243,36 +253,35 @@ function decodeField(
       return decodeBoolean(value, path);
     case "number": {
       if (typeof value.integer !== "boolean") return invalidField(path);
-      const base = presence(wire(number()), value);
-      return withDefault(bounded(value.integer ? base.int() : base, value), value, path);
+      const base = wire(number());
+      return applyModifiers(value.integer ? base.int() : base, value, path, true);
     }
     case "date":
     case "datetime": {
-      const base = wire(kind === "date" ? date() : datetime());
-      return withDefault(bounded(presence(base, value), value), value, path);
+      return applyModifiers(wire(kind === "date" ? date() : datetime()), value, path, true);
     }
     case "json":
-      return withDefault(presence(wire(json()), value), value, path);
+      return applyModifiers(wire(json()), value, path, false);
     case "point":
-      return withDefault(presence(wire(point()), value), value, path);
+      return applyModifiers(wire(point()), value, path, false);
     case "reference":
       return decodeReference(value, path, targets);
     case "list": {
       const item = decodeField(value.item, [...path, "item"], "item", targets);
       if (!item.ok) return item;
-      return withDefault(bounded(presence(wire(list(item.data)), value), value), value, path);
+      return applyModifiers(wire(list(item.data)), value, path, true);
     }
     case "object": {
       const fields = decodeMap(value.fields, [...path, "fields"], "field", targets);
       if (!fields.ok) return fields;
-      return withDefault(presence(wire(object(fields.data)), value), value, path);
+      return applyModifiers(wire(object(fields.data)), value, path, false);
     }
     case "blocks": {
       const variants = decodeMap(value.variants, [...path, "variants"], "variant", targets);
       if (!variants.ok) return variants;
       if (Object.keys(variants.data).length === 0) return invalidField(path, "variants");
       const base = wire(blocks(variants.data as unknown as Parameters<typeof blocks>[0]));
-      return withDefault(bounded(presence(base, value), value), value, path);
+      return applyModifiers(base, value, path, true);
     }
     default:
       return unreachable(kind);
@@ -302,6 +311,18 @@ function decodeEntry(value: unknown, path: IssuePath): Decoded<DecodedEntry> {
     if (!decoded.ok) return decoded;
     fields[name] = decoded.data;
   }
+  return compileAgainstTargets(fields, targets);
+}
+
+/**
+ * Compiles one stored contract on its own. Reference targets are data here (FT-WIRE-REFS), so each
+ * valid target name becomes an empty stand-in collection. A target named like the entry keeps the
+ * entry.
+ */
+function compileAgainstTargets(
+  fields: Record<string, WireBuilder>,
+  targets: readonly ReferenceTarget[],
+): Decoded<DecodedEntry> {
   const definitions: Record<string, CollectionDefinitions[string]> = Object.create(null);
   definitions[entryName] = collection(fields);
   for (const { name } of targets) {
