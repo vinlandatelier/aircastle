@@ -274,6 +274,40 @@ describe("R7 R13 cursor binding", () => {
     ).toEqual(page(rest, null));
   });
 
+  const decoded = (cursor: string): Record<string, unknown> =>
+    JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  const encoded = (value: Record<string, unknown>) =>
+    Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+  for (const order of [{}, { sort: "title" }] satisfies DocumentListQuery[])
+    test(`a non-canonical spelling of an issued ${order.sort ?? "created"} cursor returns invalid_request`, async () => {
+      const { cms } = service(documents);
+      const cursor = await nextCursor(cms, { ...order, limit: 1 });
+      const last = alphabet.indexOf(cursor.at(-1)!);
+      const bent =
+        cursor.length % 4 === 0 ? `${cursor}A` : `${cursor.slice(0, -1)}${alphabet[last ^ 1]}`;
+      expect(bent).not.toBe(cursor);
+      expect(Buffer.from(bent, "base64url")).toEqual(Buffer.from(cursor, "base64url"));
+      expect(await list(cms, { ...order, limit: 1, cursor: bent })).toEqual(invalid);
+    });
+
+  test("a created-order cursor given a sort value returns invalid_request", async () => {
+    const { cms } = service(documents);
+    const cursor = await nextCursor(cms, { limit: 1 });
+    const tampered = encoded({ ...decoded(cursor), s: "x" });
+    expect(await list(cms, { limit: 1, cursor: tampered })).toEqual(invalid);
+  });
+
+  test("a field-sort cursor without its sort value returns invalid_request", async () => {
+    const { cms } = service(documents);
+    const cursor = await nextCursor(cms, { sort: "title", limit: 1 });
+    const { s, ...withoutSort } = decoded(cursor);
+    expect(s).toEqual(expect.any(String));
+    const tampered = encoded(withoutSort);
+    expect(await list(cms, { sort: "title", limit: 1, cursor: tampered })).toEqual(invalid);
+  });
+
   for (const cursor of ["", "not-a-cursor", "e30", "!!!!", "eyJ2IjoxfQ"])
     test(`a malformed cursor ${JSON.stringify(cursor)} returns invalid_request`, async () => {
       const { cms } = service(documents);
@@ -395,6 +429,9 @@ describe("R8 R13 filter errors", () => {
     ["an unpaired high surrogate", { summary: { is: "a\ud800" } }],
     ["an unpaired low surrogate in in", { summary: { in: ["\udc00"] } }],
     ["an unpaired surrogate in not", { summary: { not: "\ud800b" } }],
+    ["a lone low surrogate after text", { summary: { is: "a\udc00" } }],
+    ["a number where", 5],
+    ["a boolean where", true],
     ["an unknown field", { unknown: "x" }],
     ["the id field", { id: "00000000-0000-4000-8000-000000000001" }],
     ["a dotted path", { "title.text": "x" }],
@@ -404,6 +441,12 @@ describe("R8 R13 filter errors", () => {
       const { cms } = service([article(1, { summary: "news" })]);
       expect(await list(cms, { where })).toEqual(invalid);
     });
+
+  test("a surrogate pair is a valid filter value", async () => {
+    const emoji = article(1, { summary: "😀" });
+    const { cms } = service([emoji, article(2, { summary: "news" })]);
+    expect(await list(cms, { where: { summary: "😀" } })).toEqual(page([emoji], null));
+  });
 
   test("a field outside the client contract returns invalid_request", async () => {
     const old: CollectionDescription = {
@@ -594,6 +637,12 @@ describe("R10 R13 access, collection and contract", () => {
       error: { code: "not_found" },
     });
   });
+
+  for (const sort of ["x.title", "title.x"])
+    test(`R13 sort syntax ${JSON.stringify(sort)} returns invalid_request before an unknown collection`, async () => {
+      const { cms } = service([article(1)]);
+      expect(await cms.list(access, "missing", contract, { sort })).toEqual(invalid);
+    });
 
   test("an unknown contract returns schema_mismatch before query meaning", async () => {
     const { cms } = service([article(1)], { contracts: {} });
