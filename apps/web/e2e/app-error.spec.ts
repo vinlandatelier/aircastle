@@ -1,21 +1,10 @@
 import type { Page } from '@playwright/test'
-import { test, expect } from './support'
+import { fixtureTest as test, expect } from './support'
 import { themeStorageKey } from '../src/theme'
-import { origins } from './origins'
 
 type Fault = 'runtime' | 'rejection'
 
 const faultMarker = (fault: Fault) => `Aircastle verification ${fault} failure: private details`
-
-test.use({ baseURL: origins.fixture.url })
-
-test.beforeEach(async ({ baseURL }, info) => {
-  expect(baseURL).toBe(origins.fixture.url)
-  info.annotations.push({
-    type: 'scenario',
-    description: 'display-only auth transport for public routing, metadata, and recovery',
-  })
-})
 
 async function failAfterStartup(page: Page, fault: Fault) {
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()

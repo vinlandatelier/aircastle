@@ -1,9 +1,9 @@
 import process from 'node:process'
 
 const port = Number(process.env.WEB_E2E_PORT ?? 43124)
-if (!Number.isInteger(port) || port < 1024 || port > 65534) {
+if (!Number.isInteger(port) || port < 1024 || port > 65533) {
   throw new Error(
-    `WEB_E2E_PORT must be an integer from 1024 to 65534, got ${process.env.WEB_E2E_PORT}`,
+    `WEB_E2E_PORT must be an integer from 1024 to 65533, got ${process.env.WEB_E2E_PORT}`,
   )
 }
 

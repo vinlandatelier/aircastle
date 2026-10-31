@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { Route } from '@playwright/test'
 import { test, expect } from './auth-service'
 import {
   capturedLink,
@@ -9,16 +10,27 @@ import {
   submitSetup,
 } from './auth-journey'
 
+function temporaryFailure(route: Route) {
+  return route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({ kind: 'temporary-failure' }),
+  })
+}
+
 test('[auth:R5] malformed completion removes the token and sets no-referrer', async ({ page }) => {
   const token = 'invalid-token-should-disappear'
+  const referrers: string[] = []
+  page.on('request', (request) => referrers.push(request.headers()['referer'] ?? ''))
   const response = await page.goto(`/setup?token=${token}`)
   expect(response?.headers()['referrer-policy']).toBe('no-referrer')
   await expect(page.getByText(invalidLink, { exact: true })).toBeVisible()
   await expect(page).toHaveURL(/\/setup$/)
-  expect(await page.evaluate(() => document.referrer)).not.toContain(token)
   await expectPublicPage(page)
   await page.getByRole('link', { name: /setup|create.*account/i }).click()
   await expectSetup(page)
+  expect(referrers.length, 'The token page must load subresources').toBeGreaterThan(0)
+  expect(referrers.filter((referrer) => referrer.includes(token))).toEqual([])
 })
 
 test('[auth:R7] initial session check never flashes the protected shell', async ({ page }) => {
@@ -67,13 +79,7 @@ test('[auth:R7] initial session check never flashes the protected shell', async 
 test('[auth:R8] failed inbox load offers Retry and recovers against the real API', async ({
   page,
 }) => {
-  await page.route('**/api/development-inbox/messages', (route) =>
-    route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({ kind: 'temporary-failure' }),
-    }),
-  )
+  await page.route('**/api/development-inbox/messages', temporaryFailure)
   await page.goto('/development-inbox')
   await expect(page.getByText('Could not load messages. Try again.', { exact: true })).toBeVisible()
   await page.unroute('**/api/development-inbox/messages')
@@ -86,13 +92,7 @@ test('[auth:R3] failed setup request reports retryable failure without claiming 
 }) => {
   await page.goto('/setup')
   await expectSetup(page)
-  await page.route('**/api/auth/setup', (route) =>
-    route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({ kind: 'temporary-failure' }),
-    }),
-  )
+  await page.route('**/api/auth/setup', temporaryFailure)
   await submitSetup(page, 'Alex', 'alex@example.test')
   await expect(
     page.getByText('Could not create your sign-in email. Try again.', { exact: true }),
