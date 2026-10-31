@@ -69,7 +69,8 @@ export type Finding = {
   consequence: string;
   correction: string;
 };
-export type Review = { findings: Finding[] };
+/** `unverified` counts findings dropped because their quoted evidence is not at the reviewed SHA. */
+export type Review = { findings: Finding[]; unverified: number };
 export type Edit = { path: string; expectedBlob: string | null; content: string | null };
 export type Fix = { summary: string; edits: Edit[] };
 type JobBase = {
@@ -346,6 +347,11 @@ export function authorize(input: Invocation, trigger: Trigger): Authorization {
 export function contextComplete(job: Job): boolean {
   return job.snapshot.complete && job.thread.length < threadLimit;
 }
+/**
+ * Validates one model review pass. Malformed findings fail the pass. A well-formed finding whose
+ * quoted evidence is not in its cited lines at the reviewed SHA is dropped and counted, never
+ * published.
+ */
 export function validateReview(value: unknown, snapshot: Snapshot): Review {
   const result = requireObject(value);
   if (JSON.stringify(value).length > 40000) throw new Error("Review exceeds publication bound");
@@ -355,33 +361,30 @@ export function validateReview(value: unknown, snapshot: Snapshot): Review {
     const f = requireObject(raw);
     const severity = text(f.severity);
     if (!isSeverity(severity)) throw new Error("Invalid severity");
-    const path = safePath(f.path);
-    const file = snapshot.files.find((candidate) => candidate.path === path);
-    const startLine = integer(f.startLine),
-      endLine = integer(f.endLine);
-    const quote = text(f.quote, 2000);
-    if (
-      !file?.text ||
-      endLine < startLine ||
-      endLine > file.text.split("\n").length ||
-      !file.text
-        .split("\n")
-        .slice(startLine - 1, endLine)
-        .join("\n")
-        .includes(quote)
-    )
-      throw new Error("Finding evidence does not exist at reviewed SHA");
     return {
       severity,
-      path,
-      startLine,
-      endLine,
-      quote,
+      path: safePath(f.path),
+      startLine: integer(f.startLine),
+      endLine: integer(f.endLine),
+      quote: text(f.quote, 2000),
       consequence: text(f.consequence, 2000),
       correction: text(f.correction, 2000),
     };
   });
-  return { findings };
+  const verified = findings.filter((finding) => evidenceExists(finding, snapshot));
+  return { findings: verified, unverified: findings.length - verified.length };
+}
+function evidenceExists(finding: Finding, snapshot: Snapshot): boolean {
+  const lines = snapshot.files.find((file) => file.path === finding.path)?.text?.split("\n");
+  return (
+    lines !== undefined &&
+    finding.endLine >= finding.startLine &&
+    finding.endLine <= lines.length &&
+    lines
+      .slice(finding.startLine - 1, finding.endLine)
+      .join("\n")
+      .includes(finding.quote)
+  );
 }
 export function validateEdits(value: unknown, snapshot: Snapshot): Fix {
   const result = requireObject(value);

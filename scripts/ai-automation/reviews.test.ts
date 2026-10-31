@@ -25,7 +25,7 @@ const finding: Finding = {
   consequence: "The API returns the wrong value.",
   correction: "Use zero.",
 };
-const empty = { findings: [] };
+const empty = { findings: [], unverified: 0 };
 
 test("one request runs separate correctness and quality prompts on the same revision", async () => {
   const calls: string[] = [];
@@ -55,7 +55,7 @@ test("a failed pass cannot produce a complete review", async () => {
 
 test("one compact review combines both passes, orders severity, and attaches inline findings", async () => {
   const payload = await reviewPayload(job, {
-    correctness: { findings: [finding] },
+    correctness: { findings: [finding], unverified: 0 },
     quality: {
       findings: [
         {
@@ -66,6 +66,7 @@ test("one compact review combines both passes, orders severity, and attaches inl
         },
         { ...finding, severity: "medium" },
       ],
+      unverified: 0,
     },
   });
   expect(payload.event).toBe("COMMENT");
@@ -90,7 +91,7 @@ test("findings outside the diff stay in the top-level body with their correction
   const payload = await reviewPayload(
     { ...job, snapshot: { ...snapshot, files: [{ ...snapshot.files[0]!, patch: "" }] } },
     {
-      correctness: { findings: [finding] },
+      correctness: { findings: [finding], unverified: 0 },
       quality: empty,
     },
   );
@@ -115,7 +116,7 @@ test("context gaps and truncated patches cannot invent an inline location", asyn
   const payload = await reviewPayload(
     { ...job, snapshot: changed },
     {
-      correctness: { findings: [span] },
+      correctness: { findings: [span], unverified: 0 },
       quality: empty,
     },
   );
@@ -130,7 +131,7 @@ test("context gaps and truncated patches cannot invent an inline location", asyn
       },
     },
     {
-      correctness: { findings: [finding] },
+      correctness: { findings: [finding], unverified: 0 },
       quality: empty,
     },
   );
@@ -153,6 +154,7 @@ test("a multiline finding attaches only when its entire range is in one diff hun
     {
       correctness: {
         findings: [{ ...finding, startLine: 1, endLine: 3, quote: "one" }],
+        unverified: 0,
       },
       quality: empty,
     },
@@ -187,7 +189,67 @@ test("an oversized combined review fails visibly instead of dropping findings", 
       consequence: `${prefix}${index}`.padEnd(360, "x"),
       correction: "y".repeat(360),
     })),
+    unverified: 0,
   });
   const reviews = validateReviewPasses({ correctness: pass("C"), quality: pass("Q") }, source);
   await expect(reviewPayload({ ...job, snapshot: source }, reviews)).rejects.toThrow("body limit");
+});
+
+test("an unverifiable finding is dropped and counted while the verified findings still publish", async () => {
+  const invented = {
+    ...finding,
+    quote: "export const value = 2;",
+    consequence: "The invented quote claims a crash.",
+  };
+  const passes = await runReviewPasses(job, "Rules", async (_selection, message) =>
+    message.includes("adversarial correctness") ? { findings: [finding, invented] } : empty,
+  );
+  const published = await reviewPayload(
+    job,
+    validateReviewPasses(JSON.parse(JSON.stringify(passes)), snapshot),
+  );
+  expect(published.body).toContain("The API returns the wrong value.");
+  expect(published.body).not.toContain("The invented quote claims a crash.");
+  expect(published.comments).toHaveLength(1);
+  expect(published.comments[0]?.body).not.toContain("invented");
+  expect(published.body).toContain(
+    "Dropped 1 finding whose quoted evidence is not in the reviewed file.",
+  );
+});
+
+test("a pass whose every finding is unverifiable still completes with only the dropped count", async () => {
+  const unverifiable = [
+    { ...finding, quote: "missing" },
+    { ...finding, path: "src/absent.ts" },
+    { ...finding, startLine: 2, endLine: 2 },
+    { ...finding, startLine: 1, endLine: 9 },
+  ];
+  const passes = await runReviewPasses(job, "Rules", async (_selection, message) =>
+    message.includes("quality and conformance") ? { findings: unverifiable } : empty,
+  );
+  const published = await reviewPayload(job, passes);
+  expect(published.comments).toEqual([]);
+  expect(published.body).toContain("No findings");
+  expect(published.body).toContain(
+    "Dropped 4 findings whose quoted evidence is not in the reviewed file.",
+  );
+});
+
+test("trust-boundary checks on a finding still fail the whole pass", async () => {
+  const invalid = [
+    { ...finding, path: "../secret.ts" },
+    { ...finding, severity: "urgent" },
+    { ...finding, consequence: "" },
+    { ...finding, quote: "missing", correction: "" },
+  ];
+  for (const bad of invalid)
+    await expect(
+      runReviewPasses(job, "Rules", async () => ({ findings: [finding, bad] })),
+    ).rejects.toThrow();
+  expect(() =>
+    validateReviewPasses(
+      { correctness: { ...empty, unverified: -1 }, quality: { ...empty, unverified: 0 } },
+      snapshot,
+    ),
+  ).toThrow();
 });

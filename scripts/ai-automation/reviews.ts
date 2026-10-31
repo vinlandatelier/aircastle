@@ -32,12 +32,17 @@ const rank: Record<Finding["severity"], number> = {
 const compact = (value: string) => value.replace(/\s+/g, " ").trim();
 const label = (severity: Finding["severity"]) => severity[0]!.toUpperCase() + severity.slice(1);
 
+/** Re-reads review passes from the model job's artifact, keeping each pass's dropped count. */
 export function validateReviewPasses(value: unknown, snapshot: Snapshot): ReviewPasses {
   const result = requireObject(value);
-  return {
-    correctness: validateReview(result.correctness, snapshot),
-    quality: validateReview(result.quality, snapshot),
+  const pass = (raw: unknown): Review => {
+    const carried = requireObject(raw).unverified;
+    if (!Number.isSafeInteger(carried) || Number(carried) < 0 || Number(carried) > 30)
+      throw new Error("Invalid unverified count");
+    const review = validateReview(raw, snapshot);
+    return { ...review, unverified: review.unverified + Number(carried) };
   };
+  return { correctness: pass(result.correctness), quality: pass(result.quality) };
 }
 
 export async function runReviewPasses(
@@ -115,9 +120,14 @@ export async function reviewPayload(
   const coverage = contextComplete(job)
     ? ""
     : `\nINCOMPLETE: ${[...job.snapshot.omitted, ...(job.thread.length >= threadLimit ? ["thread truncated"] : [])].join(", ") || "changed-file context unavailable"}.`;
+  const unverified = reviews.correctness.unverified + reviews.quality.unverified;
+  const dropped =
+    unverified === 0
+      ? ""
+      : `\nDropped ${unverified} finding${unverified === 1 ? "" : "s"} whose quoted evidence is not in the reviewed file.`;
   const body = `Correctness + quality · \`${job.snapshot.head}\`
 
-${rows.join("\n") || "No findings in the supplied changed-file context."}${coverage}`;
+${rows.join("\n") || "No findings in the supplied changed-file context."}${dropped}${coverage}`;
   if (body.length > 60000) throw new Error("Combined review exceeds GitHub body limit");
   return {
     event: "COMMENT",

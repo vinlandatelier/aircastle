@@ -202,12 +202,20 @@ test("review findings must cite actual immutable source and a consequence", () =
     consequence: "The API returns the wrong value",
     correction: "Use zero",
   };
+  expect(validateReview({ findings: [finding] }, snapshot)).toMatchObject({ unverified: 0 });
   expect(validateReview({ findings: [finding] }, snapshot).findings).toHaveLength(1);
-  expect(() =>
-    validateReview({ findings: [{ ...finding, quote: "invented" }] }, snapshot),
-  ).toThrow();
-  expect(() => validateReview({ findings: [{ ...finding, startLine: 2 }] }, snapshot)).toThrow();
+  expect(validateReview({ findings: [{ ...finding, quote: "invented" }] }, snapshot)).toEqual({
+    findings: [],
+    unverified: 1,
+  });
+  expect(validateReview({ findings: [{ ...finding, startLine: 2 }] }, snapshot)).toEqual({
+    findings: [],
+    unverified: 1,
+  });
   expect(() => validateReview({ findings: [{ ...finding, consequence: "" }] }, snapshot)).toThrow();
+  expect(() =>
+    validateReview({ findings: [{ ...finding, path: "/etc/passwd" }] }, snapshot),
+  ).toThrow();
 });
 test("edits require original blobs and allow only bounded normal text files", () => {
   const edit = {
