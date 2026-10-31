@@ -1,0 +1,177 @@
+{
+  "version": "1.7.12",
+  "routes": [
+    {
+      "name": "accountInfo",
+      "path": "/account-info",
+      "methods": ["GET"]
+    },
+    {
+      "name": "callbackOAuth",
+      "path": "/callback/:id",
+      "methods": ["GET", "POST"]
+    },
+    {
+      "name": "changeEmail",
+      "path": "/change-email",
+      "methods": ["POST"]
+    },
+    {
+      "name": "changePassword",
+      "path": "/change-password",
+      "methods": ["POST"]
+    },
+    {
+      "name": "deleteUser",
+      "path": "/delete-user",
+      "methods": ["POST"]
+    },
+    {
+      "name": "deleteUserCallback",
+      "path": "/delete-user/callback",
+      "methods": ["GET"]
+    },
+    {
+      "name": "error",
+      "path": "/error",
+      "methods": ["GET"]
+    },
+    {
+      "name": "getAccessToken",
+      "path": "/get-access-token",
+      "methods": ["POST"]
+    },
+    {
+      "name": "getSession",
+      "path": "/get-session",
+      "methods": ["GET", "POST"]
+    },
+    {
+      "name": "linkSocialAccount",
+      "path": "/link-social",
+      "methods": ["POST"]
+    },
+    {
+      "name": "listSessions",
+      "path": "/list-sessions",
+      "methods": ["GET"]
+    },
+    {
+      "name": "listUserAccounts",
+      "path": "/list-accounts",
+      "methods": ["GET"]
+    },
+    {
+      "name": "ok",
+      "path": "/ok",
+      "methods": ["GET"]
+    },
+    {
+      "name": "refreshToken",
+      "path": "/refresh-token",
+      "methods": ["POST"]
+    },
+    {
+      "name": "requestPasswordReset",
+      "path": "/request-password-reset",
+      "methods": ["POST"]
+    },
+    {
+      "name": "requestPasswordResetCallback",
+      "path": "/reset-password/:token",
+      "methods": ["GET"]
+    },
+    {
+      "name": "resetPassword",
+      "path": "/reset-password",
+      "methods": ["POST"]
+    },
+    {
+      "name": "revokeOtherSessions",
+      "path": "/revoke-other-sessions",
+      "methods": ["POST"]
+    },
+    {
+      "name": "revokeSession",
+      "path": "/revoke-session",
+      "methods": ["POST"]
+    },
+    {
+      "name": "revokeSessions",
+      "path": "/revoke-sessions",
+      "methods": ["POST"]
+    },
+    {
+      "name": "sendVerificationEmail",
+      "path": "/send-verification-email",
+      "methods": ["POST"]
+    },
+    {
+      "name": "setPassword",
+      "path": null,
+      "methods": ["POST"]
+    },
+    {
+      "name": "signInEmail",
+      "path": "/sign-in/email",
+      "methods": ["POST"]
+    },
+    {
+      "name": "signInSocial",
+      "path": "/sign-in/social",
+      "methods": ["POST"]
+    },
+    {
+      "name": "signOut",
+      "path": "/sign-out",
+      "methods": ["POST"]
+    },
+    {
+      "name": "signUpEmail",
+      "path": "/sign-up/email",
+      "methods": ["POST"]
+    },
+    {
+      "name": "unlinkAccount",
+      "path": "/unlink-account",
+      "methods": ["POST"]
+    },
+    {
+      "name": "updateSession",
+      "path": "/update-session",
+      "methods": ["POST"]
+    },
+    {
+      "name": "updateUser",
+      "path": "/update-user",
+      "methods": ["POST"]
+    },
+    {
+      "name": "verifyEmail",
+      "path": "/verify-email",
+      "methods": ["GET"]
+    },
+    {
+      "name": "verifyPassword",
+      "path": "/verify-password",
+      "methods": ["POST"]
+    }
+  ],
+  "pluginRoutes": [
+    {
+      "name": "aircastleConfirm",
+      "path": "/aircastle/confirm",
+      "methods": ["POST"]
+    },
+    {
+      "name": "aircastleSession",
+      "path": "/aircastle/session",
+      "methods": ["GET"]
+    },
+    {
+      "name": "aircastleSignOut",
+      "path": "/aircastle/sign-out",
+      "methods": ["POST"]
+    }
+  ]
+}
