@@ -51,7 +51,8 @@
     "test:content:mutation": "vp -C packages/contracts run test:mutation",
     "test:prepared": "vp run db:test -- vp run test:all",
     "ai:setup": "node scripts/ai-automation/cli.ts setup",
-    "test-auth:web": "vp run db:test -- vp -C apps/web run test:e2e auth.spec.ts auth-errors.spec.ts auth-entry.spec.ts",
+    "test-auth:web": "vp run db:test -- vp -C apps/web run test:e2e auth.spec.ts auth-errors.spec.ts auth-entry.spec.ts auth-behaviors.spec.ts",
+    "test-auth:record": "WEB_E2E_VIDEO=1 vp run test-auth:web",
     "test-web:e2e": "vp run db:test -- vp -C apps/web run test:e2e",
     "test-web:coverage": "vp -C apps/web run test:coverage"
   },
