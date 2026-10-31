@@ -12,7 +12,14 @@ function wrapped(code: string, interrupt = false) {
       ["scripts/with-postgres.ts", "bun", "-e", code],
       {
         cwd: root,
-        env: { ...process.env, DATABASE_URL: "postgres://must-not-use", AIRCASTLE_DB_PORT: "1" },
+        env: {
+          ...process.env,
+          AIRCASTLE_DATABASE_URL: "postgres://must-not-use",
+          AIRCASTLE_DB_PORT: "1",
+          AIRCASTLE_DB_NAME: "must_not_use",
+          AIRCASTLE_DB_USER: "must_not_use",
+          AIRCASTLE_DB_PASSWORD: "must_not_use",
+        },
         timeout: 110_000,
       },
       (error, stdout, stderr) => {
@@ -53,13 +60,13 @@ test("runs the requested command and preserves its failure status", async () => 
 test("parallel commands receive separate working databases and leave no storage", async () => {
   const code = `
     import { SQL } from "bun";
-    const sql = new SQL(process.env.DATABASE_URL);
+    const sql = new SQL(process.env.AIRCASTLE_DATABASE_URL);
     await sql.unsafe("CREATE TABLE isolated (value text)");
     await sql.unsafe("INSERT INTO isolated VALUES ('saved')");
     const rows = await sql.unsafe("SELECT value FROM isolated");
     if (rows[0].value !== "saved") throw new Error("write failed");
     console.log("DB_PROJECT=" + process.env.COMPOSE_PROJECT_NAME);
-    console.log("DB_URL=" + process.env.DATABASE_URL);
+    console.log("DB_URL=" + process.env.AIRCASTLE_DATABASE_URL);
     await sql.close();
   `;
   const results = await Promise.all([wrapped(code), wrapped(code)]);

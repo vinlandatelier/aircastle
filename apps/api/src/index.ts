@@ -2,20 +2,15 @@ import pino from "pino";
 import { postgresAdapter } from "@aircastle/adapter-postgres";
 import { createAircastle } from "@aircastle/core";
 import { cmsErrorReporter, createApp } from "./app.ts";
-import { readConfig } from "./config.ts";
+import { readConfig, readDatabaseConfig } from "./config.ts";
 
 const config = readConfig();
-const logger = pino({ level: config.LOG_LEVEL });
-const database = postgresAdapter({
-  url: config.DATABASE_URL,
-  ...(config.AIRCASTLE_DATABASE_NAMESPACE === undefined
-    ? {}
-    : { namespace: config.AIRCASTLE_DATABASE_NAMESPACE }),
-});
+const logger = pino({ level: config.AIRCASTLE_LOG_LEVEL });
+const database = postgresAdapter(readDatabaseConfig());
 const cms = await createAircastle({ database, report: cmsErrorReporter(logger) });
 try {
   const app = createApp({ logger, cms, maxRequestBytes: config.AIRCASTLE_MAX_REQUEST_BYTES });
-  const server = Bun.serve({ port: config.PORT, fetch: app.fetch });
+  const server = Bun.serve({ port: config.AIRCASTLE_PORT, fetch: app.fetch });
   let closing: Promise<void> | undefined;
   const close = () => {
     closing ??= (async () => {

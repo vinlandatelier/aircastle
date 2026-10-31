@@ -3,6 +3,17 @@ import { identifier } from "./identifier.ts";
 
 type Transaction = postgres.TransactionSql;
 
+export function validatedNamespace(value: string) {
+  if (typeof value !== "string" || !value || value.includes("\0") || Buffer.byteLength(value) > 63)
+    throw new Error("Invalid Postgres namespace");
+  for (const point of value) {
+    const code = point.charCodeAt(0);
+    if (point.length === 1 && code >= 0xd800 && code <= 0xdfff)
+      throw new Error("Invalid Postgres namespace Unicode");
+  }
+  return value;
+}
+
 export async function initializeLayout(sql: Transaction, namespace: string) {
   await sql`SELECT pg_advisory_xact_lock(hashtextextended(${namespace}, 0))`;
   const existing = await sql<
