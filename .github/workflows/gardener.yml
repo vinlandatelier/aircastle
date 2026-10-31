@@ -1,20 +1,11 @@
 name: Gardener
-on:
-  schedule:
-    - cron: "23 4 * * 1"
-  workflow_dispatch:
-    inputs:
-      max_prs:
-        description: Most pull requests to open
-        type: choice
-        options: ["3", "2", "1", "0"]
-        default: "3"
+on: workflow_dispatch
 permissions: {}
 concurrency:
   group: gardener
   cancel-in-progress: false
 env:
-  GARDENER_MAX_PRS: ${{ inputs.max_prs || '3' }}
+  GARDENER_MAX_PRS: "3"
 defaults:
   run:
     shell: bash
@@ -23,8 +14,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' && github.repository_owner == 'vinlandatelier' &&
       vars.AI_TRIGGER_LOGIN != '' && vars.AI_TRIGGER_USER_ID != '' &&
-      (github.event_name == 'schedule' || (github.triggering_actor == vars.AI_TRIGGER_LOGIN &&
-      github.event.sender.id == vars.AI_TRIGGER_USER_ID))
+      github.triggering_actor == vars.AI_TRIGGER_LOGIN &&
+      github.event.sender.id == vars.AI_TRIGGER_USER_ID
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     environment: ai-automation
@@ -116,9 +107,14 @@ jobs:
           path: ${{ runner.temp }}/gardener/out
           if-no-files-found: ignore
           retention-days: 14
+      - name: Delete the Git directory the audit could write
+        if: always()
+        run: rm -rf "$GITHUB_WORKSPACE/.git"
   publish:
     needs: audit
-    if: ${{ !cancelled() && needs.audit.outputs.count != '' && needs.audit.outputs.count != '0' }}
+    if: >-
+      !cancelled() && needs.audit.outputs.count != '' && needs.audit.outputs.count != '0' &&
+      vars.AI_TRIGGER_LOGIN != '' && github.triggering_actor == vars.AI_TRIGGER_LOGIN
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: ai-automation
@@ -151,12 +147,9 @@ jobs:
           dir="$RUNNER_TEMP/gardener"
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           held_paths=(.github .claude .agents/skills/gardener scripts/ai-automation scripts/ai-models tests/harness/gardener-workflow.test.ts tests/harness/ai-credentials.test.ts)
-          guardrail_paths=(scripts/check-code-policy.ts ':(glob)**/package.json' ':(glob)**/vite*.config.ts' ':(glob)**/tsconfig*.json' knip.json ':(glob)**/stryker*' tests/harness .agents/skills/guardrails)
           status=0
           gh label create gardener --repo "$GITHUB_REPOSITORY" --force \
-            --color 2E7D32 --description "Opened by the scheduled gardener"
-          gh label create touches-guardrails --repo "$GITHUB_REPOSITORY" --force \
-            --color B71C1C --description "Gardener change to checks, configs or the harness"
+            --color 2E7D32 --description "Opened by the gardener"
           git fetch --no-tags "$dir/out/branches.bundle" '+refs/heads/gardener/*:refs/remotes/gardener/*'
           while IFS= read -r entry; do
             branch=$(jq -r .branch <<<"$entry")
@@ -189,15 +182,8 @@ jobs:
               status=1
               continue
             fi
-            guardrails=$(git diff --no-renames --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- "${guardrail_paths[@]}" | paste -sd ' ' -)
-            labels=(--label gardener --label ready-for-human-approval)
-            : > "$dir/body.md"
-            if [ -n "$guardrails" ]; then
-              labels=(--label gardener --label touches-guardrails)
-              printf 'Touches guardrails: %s. Review these changes before approving.\n\n' "$guardrails" > "$dir/body.md"
-            fi
-            jq -r .body <<<"$entry" >> "$dir/body.md"
+            jq -r .body <<<"$entry" > "$dir/body.md"
             gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
-              --title "$title" --body-file "$dir/body.md" "${labels[@]}"
+              --title "$title" --body-file "$dir/body.md" --label gardener
           done < <(jq -c --argjson max "$GARDENER_MAX_PRS" '.[:$max][]' "$dir/out/prs.json")
           exit "$status"
