@@ -356,6 +356,18 @@ describe("R11 R13 lost and malformed responses", () => {
     },
   );
 
+  test.each(["update", "delete"] as const)(
+    "a %s success for a different document id is unknown_write_outcome",
+    async (operation) => {
+      const data = { update: { ...article, id: otherId }, delete: { id: otherId } };
+      const { client } = recording({ ok: true, data: data[operation] });
+      expect(await writes[operation](client)).toEqual({
+        ok: false,
+        error: { code: "unknown_write_outcome" },
+      });
+    },
+  );
+
   test.each([201, 203])("list success with status %i is transport_error", async (status) => {
     const { client } = recording({ ok: true, data: { documents: [], next: null } }, status);
     expect(await client.articles.list()).toEqual({ ok: false, error: { code: "transport_error" } });
