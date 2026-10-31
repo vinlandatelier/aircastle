@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test'
-import { origins } from './e2e/origins'
+import { authInstances, origins } from './e2e/origins'
 
 export default defineConfig({
   testDir: './e2e',
@@ -17,13 +17,22 @@ export default defineConfig({
     ['html', { outputFolder: 'reports/html', open: 'never' }],
     ['json', { outputFile: 'reports/results.json' }],
   ],
-  webServer: Object.entries(origins).map(([name, { port, url }]) => ({
-    command: `vp build --outDir reports/build/${name} && vp preview --outDir reports/build/${name} --host 127.0.0.1 --port ${port} --strictPort`,
-    url,
-    env: { WEB_FIXTURES: name === 'fixture' ? '1' : '0' },
-    reuseExistingServer: false,
-    timeout: 300_000,
-  })),
+  webServer: [
+    ...Object.entries(origins).map(([name, { port, url }]) => ({
+      command: `vp build --outDir reports/build/${name} && vp preview --outDir reports/build/${name} --host 127.0.0.1 --port ${port} --strictPort`,
+      url,
+      env: { WEB_FIXTURES: name === 'fixture' ? '1' : '0' },
+      reuseExistingServer: false,
+      timeout: 300_000,
+    })),
+    {
+      command: 'node ../../tests/web/auth-instances.ts',
+      url: `${authInstances.url}/health`,
+      env: { AUTH_INSTANCES_PORT: String(authInstances.port) },
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+  ],
   use: {
     browserName: 'chromium',
     baseURL: origins.normal.url,
