@@ -97,7 +97,7 @@ for (const access of ['retained', 'revoked before confirmation'] as const) {
     page,
     authService,
   }) => {
-    test.setTimeout(60_000)
+    test.setTimeout(test.info().timeout * 2)
     const project = await authService.provisionProject()
     const email = `return-${randomUUID()}@example.test`
     await confirmSetup(page, email)
