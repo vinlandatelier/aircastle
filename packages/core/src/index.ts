@@ -315,7 +315,7 @@ export function createService(store: ContentStore, report: ReportError): Content
           if (!collection) return failure("not_found");
           const client = await transaction.contract(requestedContract);
           if (!client) return failure("schema_mismatch");
-          const document = await transaction.read(collectionName, id);
+          const document = await transaction.read(collectionName, id.toLowerCase());
           if (!document) return failure("not_found");
           if (!validateStored(collection.description, storedData(document))) {
             report(ErrorSummary.of(new CorruptDocument()));
