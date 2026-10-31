@@ -8,7 +8,7 @@ export function NotFoundPage() {
       data-theme-scope="marketing"
       className="relative flex min-h-svh items-center overflow-hidden bg-[radial-gradient(ellipse_at_100%_0%,--theme(--color-foreground/.06),transparent_60%)]"
     >
-      <title>Aircastle - Page not found</title>
+      <title>Aircastle - Page not found (plant)</title>
       <meta name="robots" content="noindex" />
       <Link to="/" aria-label="Aircastle home" className="absolute top-8 left-6 rounded sm:left-10">
         <span aria-hidden="true" className="brand-logo block size-7" />
