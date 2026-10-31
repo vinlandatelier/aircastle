@@ -166,9 +166,9 @@ export function parseCommand(body: string): Command | null {
       continue;
     }
     if (fence || /^\s*>/.test(line) || /^(?: {4}|\t)/.test(line)) continue;
-    const match = /^\s*@(codex|claude)(?:\s+(.*))?\s*$/i.exec(line);
+    const match = /^\s*@vinland-ai(?:\s+(.*))?\s*$/i.exec(line);
     if (!match) continue;
-    let instructions = (match[2] ?? "").trim();
+    let instructions = (match[1] ?? "").trim();
     const kind = /^(?:(?:please|can you|could you)\s+)?fix\b/i.test(instructions)
       ? "fix"
       : "review";
@@ -179,7 +179,7 @@ export function parseCommand(body: string): Command | null {
     const expected = /^head=([a-f0-9]{40})(?:\s+|$)/.exec(instructions);
     if (expected) instructions = instructions.slice(expected[0].length);
     commands.push({
-      provider: match[1]!.toLowerCase() === "codex" ? "openai" : "anthropic",
+      provider: "anthropic",
       kind,
       instructions: [...lines.slice(0, index), instructions, ...lines.slice(index + 1)]
         .join("\n")
