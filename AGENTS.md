@@ -30,6 +30,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Do not add ordinary code comments, including inline, line, or block comments. Use clear names and structure to explain the code.
 - Declaration documentation such as JSDoc is allowed. Do not reformat ordinary comments as docstrings to bypass this rule.
 - Never use compiler suppression directives, including `@ts-expect-error`, `@ts-ignore`, or `@ts-nocheck`, even inside docstrings.
+- Never use coverage ignore hints, such as `v8 ignore`, `c8 ignore`, `istanbul ignore`, or `node:coverage disable`, even inside docstrings. Test the code or leave it uncovered.
 - Verify expected type errors with isolated negative fixtures and explicit compiler diagnostics, without suppressions.
 - Run `vp run check:policy` for JavaScript and TypeScript changes. The configured type-check command also enforces this policy.
 

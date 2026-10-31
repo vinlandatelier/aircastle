@@ -14,7 +14,8 @@
   "scripts": {
     "build": "vp pack --tsconfig tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vp test"
+    "test": "vp test",
+    "test:coverage": "vp test --coverage"
   },
   "dependencies": {
     "@aircastle/contracts": "workspace:*",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }

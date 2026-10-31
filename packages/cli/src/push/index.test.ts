@@ -2,9 +2,10 @@ import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
+import { push, type PushOptions } from "../index.ts";
 
 const repository = fileURLToPath(new URL("../../../../", import.meta.url));
 const cliEntry = join(repository, "packages/cli/src/cli.ts");
@@ -22,12 +23,13 @@ type CapturedRequest = {
 };
 
 async function fixture(
-  run: (context: {
+  scenario: (context: {
     cwd: string;
     url: string;
     state: State;
     requests: CapturedRequest[];
-    command: (args?: string[], custom?: string) => Promise<{ code: number; output: string }>;
+    command: (args?: string[]) => Promise<{ code: number; output: string }>;
+    run: (options?: PushOptions) => Promise<{ code: number; output: string }>;
     lock: (revision: string, target?: { url: string; project: string }) => Promise<void>;
     afterPublish: (effect: (response: ServerResponse) => Promise<void>) => void;
     config: (source: string) => Promise<void>;
@@ -87,19 +89,29 @@ async function fixture(
     prelude +
       "export default defineConfig({ url: process.env.AIRCASTLE_URL, project: process.env.AIRCASTLE_PROJECT_ID, collections: { articles: collection({ title: text() }) } });\n",
   );
-  const command = (args: string[] = [], custom?: string) =>
+  const environment = {
+    AIRCASTLE_URL: url,
+    AIRCASTLE_PROJECT_ID: project,
+    AIRCASTLE_API_KEY: "project-secret",
+  };
+  const run = async (options: PushOptions = {}) => {
+    const lines: string[] = [];
+    for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
+    try {
+      const code = await push({ cwd, output: (line) => lines.push(line), ...options });
+      return { code, output: lines.join("\n") };
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  };
+  const command = (args: string[] = []) =>
     new Promise<{ code: number; output: string }>((resolveCommand) => {
       execFile(
         "bun",
-        ["--conditions=development", ...(custom ? ["-e", custom] : [cliEntry, "push", ...args])],
+        ["--conditions=development", cliEntry, "push", ...args],
         {
           cwd,
-          env: {
-            ...process.env,
-            AIRCASTLE_URL: url,
-            AIRCASTLE_PROJECT_ID: project,
-            AIRCASTLE_API_KEY: "project-secret",
-          },
+          env: { ...process.env, ...environment },
           timeout: 15_000,
         },
         (error, stdout, stderr) =>
@@ -110,12 +122,13 @@ async function fixture(
       );
     });
   try {
-    await run({
+    await scenario({
       cwd,
       url,
       state,
       requests,
       command,
+      run,
       lock: async (revision, target = { url, project }) =>
         writeFile(join(cwd, "aircastle.lock"), JSON.stringify({ format: 1, target, revision })),
       afterPublish: (effect) => {
@@ -158,20 +171,20 @@ test("first push publishes an unpublished project's definitions and creates a se
   }));
 
 test("a config default export that reads the URL through a getter is accepted", async () =>
-  fixture(async ({ config, command, requests }) => {
+  fixture(async ({ config, run, requests }) => {
     await config(
       "export default { get url() { return process.env.AIRCASTLE_URL; }, project: process.env.AIRCASTLE_PROJECT_ID, collections: { articles: collection({ title: text() }) } };",
     );
-    const result = await command();
+    const result = await run();
     expect(result.code, result.output).toBe(0);
     expect(posts(requests)).toHaveLength(1);
   }));
 
 test("missing lockfile is recovered without publication when remote definitions match", async () =>
-  fixture(async ({ cwd, state, command, requests }) => {
+  fixture(async ({ cwd, state, run, requests }) => {
     state.revision = "already-published";
     state.collections = localCollections;
-    const result = await command();
+    const result = await run();
     expect(result.code, result.output).toBe(0);
     expect(posts(requests)).toHaveLength(0);
     expect(JSON.parse(await readFile(join(cwd, "aircastle.lock"), "utf8")).revision).toBe(
@@ -180,10 +193,10 @@ test("missing lockfile is recovered without publication when remote definitions 
   }));
 
 test("missing lockfile cannot overwrite a differing published schema", async () =>
-  fixture(async ({ cwd, state, command, requests }) => {
+  fixture(async ({ cwd, state, run, requests }) => {
     state.revision = "existing";
     state.collections = [{ name: "other", description: { fields: {} } }];
-    const result = await command();
+    const result = await run();
     expect(result.code).not.toBe(0);
     expect(posts(requests)).toHaveLength(0);
     await expect(readFile(join(cwd, "aircastle.lock"), "utf8")).rejects.toMatchObject({
@@ -192,12 +205,12 @@ test("missing lockfile cannot overwrite a differing published schema", async () 
   }));
 
 test("an outdated baseline is not replaced by a fresh GET before publishing", async () =>
-  fixture(async ({ cwd, state, lock, command, requests }) => {
+  fixture(async ({ cwd, state, lock, run, requests }) => {
     await lock("old");
     const before = await readFile(join(cwd, "aircastle.lock"), "utf8");
     state.revision = "newer";
     state.collections = [{ name: "other", description: { fields: {} } }];
-    const result = await command();
+    const result = await run();
     expect(result.code).not.toBe(0);
     expect(
       posts(requests).every(
@@ -209,11 +222,11 @@ test("an outdated baseline is not replaced by a fresh GET before publishing", as
   }));
 
 test("matching remote state heals a stale lock after a lost successful reply", async () =>
-  fixture(async ({ cwd, state, lock, command, requests }) => {
+  fixture(async ({ cwd, state, lock, run, requests }) => {
     await lock("old");
     state.revision = "committed-without-reply";
     state.collections = localCollections;
-    const result = await command();
+    const result = await run();
     expect(result.code, result.output).toBe(0);
     expect(posts(requests)).toHaveLength(0);
     expect(JSON.parse(await readFile(join(cwd, "aircastle.lock"), "utf8")).revision).toBe(
@@ -223,19 +236,19 @@ test("matching remote state heals a stale lock after a lost successful reply", a
 
 for (const broken of ["{broken", '{"format":99,"target":{},"revision":"x"}', "null"]) {
   test(`malformed lockfile fails locally and is preserved: ${broken}`, async () =>
-    fixture(async ({ cwd, command, requests }) => {
+    fixture(async ({ cwd, run, requests }) => {
       await writeFile(join(cwd, "aircastle.lock"), broken);
-      expect((await command()).code).not.toBe(0);
+      expect((await run()).code).not.toBe(0);
       expect(requests).toHaveLength(0);
       expect(await readFile(join(cwd, "aircastle.lock"), "utf8")).toBe(broken);
     }));
 }
 
 test("a different target cannot reuse or rewrite the lockfile", async () =>
-  fixture(async ({ cwd, command, requests, lock }) => {
+  fixture(async ({ cwd, run, requests, lock }) => {
     await lock("old", { url: "https://elsewhere.example", project });
     const before = await readFile(join(cwd, "aircastle.lock"), "utf8");
-    expect((await command()).code).not.toBe(0);
+    expect((await run()).code).not.toBe(0);
     expect(requests).toHaveLength(0);
     expect(await readFile(join(cwd, "aircastle.lock"), "utf8")).toBe(before);
   }));
@@ -251,15 +264,21 @@ test("noninteractive reconciliation fails without publishing or advancing the lo
   }));
 
 test("explicit reconciliation previews and confirms the exact baseline", async () =>
-  fixture(async ({ cwd, state, lock, command, requests }) => {
+  fixture(async ({ cwd, state, lock, run, requests }) => {
     await lock("old");
     state.revision = "reviewed-revision";
-    const entry = pathToFileURL(resolve(repository, "packages/cli/src/index.ts")).href;
-    const script = `import { push } from ${JSON.stringify(entry)}; process.exitCode = await push({ cwd: ${JSON.stringify(cwd)}, reconcile: true, interactive: true, confirm: async diff => { console.log('REVIEW=' + diff); return true; } });`;
-    const result = await command([], script);
+    const reviews: string[] = [];
+    const result = await run({
+      reconcile: true,
+      interactive: true,
+      confirm: async (diff) => {
+        reviews.push(diff);
+        return true;
+      },
+    });
     expect(result.code, result.output).toBe(0);
-    expect(result.output).toContain("REVIEW=");
-    expect(result.output).toContain("articles");
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0]).toContain("articles");
     expect(posts(requests)).toHaveLength(1);
     expect(posts(requests)[0]?.body).toMatchObject({ baseline: "reviewed-revision" });
     expect(JSON.parse(await readFile(join(cwd, "aircastle.lock"), "utf8")).revision).toBe(
@@ -268,23 +287,23 @@ test("explicit reconciliation previews and confirms the exact baseline", async (
   }));
 
 test("declining a reconciliation preview makes no change", async () =>
-  fixture(async ({ cwd, state, lock, command, requests }) => {
+  fixture(async ({ cwd, state, lock, run, requests }) => {
     await lock("old");
     state.revision = "newer";
     const before = await readFile(join(cwd, "aircastle.lock"), "utf8");
-    const entry = pathToFileURL(resolve(repository, "packages/cli/src/index.ts")).href;
-    const script = `import { push } from ${JSON.stringify(entry)}; process.exitCode = await push({ cwd: ${JSON.stringify(cwd)}, reconcile: true, interactive: true, confirm: async () => false });`;
-    expect((await command([], script)).code).not.toBe(0);
+    expect(
+      (await run({ reconcile: true, interactive: true, confirm: async () => false })).code,
+    ).not.toBe(0);
     expect(posts(requests)).toHaveLength(0);
     expect(await readFile(join(cwd, "aircastle.lock"), "utf8")).toBe(before);
   }));
 
 test("publication success followed by local write failure is reported as failure without rolling back the server", async () =>
-  fixture(async ({ cwd, state, command, afterPublish }) => {
+  fixture(async ({ cwd, state, run, afterPublish }) => {
     afterPublish(async () => {
       await mkdir(join(cwd, "aircastle.lock"));
     });
-    const result = await command();
+    const result = await run();
     expect(result.code).not.toBe(0);
     expect(state.revision).toBe("revision-published");
     expect(jsonLines(result.output)).toContainEqual(
@@ -297,24 +316,30 @@ test("publication success followed by local write failure is reported as failure
   }));
 
 test("invalid field declarations fail before network publication", async () =>
-  fixture(async ({ config, command, requests }) => {
+  fixture(async ({ config, run, requests }) => {
     await config(
       "export default defineConfig({ url: process.env.AIRCASTLE_URL, project: process.env.AIRCASTLE_PROJECT_ID, collections: { articles: collection({ title: text().min(-1) }) } });",
     );
-    const result = await command();
+    const result = await run();
     expect(result.code).not.toBe(0);
     expect(requests).toHaveLength(0);
     expect(result.output).toContain("invalid_bound");
   }));
 
 test("a publication during reconciliation review invalidates the confirmed baseline", async () =>
-  fixture(async ({ cwd, url, state, lock, command }) => {
+  fixture(async ({ cwd, url, state, lock, run }) => {
     await lock("old");
     state.revision = "reviewed-revision";
     const before = await readFile(join(cwd, "aircastle.lock"), "utf8");
-    const entry = pathToFileURL(resolve(repository, "packages/cli/src/index.ts")).href;
-    const script = `import { push } from ${JSON.stringify(entry)}; process.exitCode = await push({ cwd: ${JSON.stringify(cwd)}, reconcile: true, interactive: true, confirm: async () => { await fetch(${JSON.stringify(url + "/_advance")}); return true; } });`;
-    expect((await command([], script)).code).not.toBe(0);
+    const result = await run({
+      reconcile: true,
+      interactive: true,
+      confirm: async () => {
+        await fetch(`${url}/_advance`);
+        return true;
+      },
+    });
+    expect(result.code).not.toBe(0);
     expect(state.revision).toBe("published-during-review");
     expect(await readFile(join(cwd, "aircastle.lock"), "utf8")).toBe(before);
   }));
@@ -331,14 +356,14 @@ function jsonLines(output: string): unknown[] {
 }
 
 test("ordinary current-baseline push publishes a changed schema without rewriting config", async () =>
-  fixture(async ({ cwd, state, command, requests, lock }) => {
+  fixture(async ({ cwd, state, run, requests, lock }) => {
     state.revision = "current";
     state.collections = [
       { name: "articles", description: { fields: { title: { ...fields.title, min: 1 } } } },
     ];
     await lock("current");
     const original = await readFile(join(cwd, "aircastle.config.ts"), "utf8");
-    const result = await command();
+    const result = await run();
     expect(result.code, result.output).toBe(0);
     expect(posts(requests)).toHaveLength(1);
     expect(posts(requests)[0]?.body).toEqual({
@@ -353,11 +378,11 @@ test("ordinary current-baseline push publishes a changed schema without rewritin
   }));
 
 test("lost publication confirmation is unknown, never retried, and healed by a matching rerun", async () =>
-  fixture(async ({ cwd, state, command, requests, afterPublish }) => {
+  fixture(async ({ cwd, state, run, requests, afterPublish }) => {
     afterPublish(async (response) => {
       response.destroy();
     });
-    const result = await command();
+    const result = await run();
     expect(result.code).not.toBe(0);
     expect(state.revision).toBe("revision-published");
     expect(posts(requests)).toHaveLength(1);
@@ -371,7 +396,7 @@ test("lost publication confirmation is unknown, never retried, and healed by a m
       code: "ENOENT",
     });
     afterPublish(async () => {});
-    const recovery = await command();
+    const recovery = await run();
     expect(recovery.code, recovery.output).toBe(0);
     expect(posts(requests)).toHaveLength(1);
     expect(JSON.parse(await readFile(join(cwd, "aircastle.lock"), "utf8")).revision).toBe(
@@ -380,11 +405,11 @@ test("lost publication confirmation is unknown, never retried, and healed by a m
   }));
 
 test("a malformed publication success cannot confirm the write or advance the lockfile", async () =>
-  fixture(async ({ cwd, state, command, requests, afterPublish }) => {
+  fixture(async ({ cwd, state, run, requests, afterPublish }) => {
     afterPublish(async (response) => {
       response.end(JSON.stringify({ ok: true, data: { revision: "revision-published" } }));
     });
-    const result = await command();
+    const result = await run();
     expect(result.code).not.toBe(0);
     expect(state.revision).toBe("revision-published");
     expect(posts(requests)).toHaveLength(1);

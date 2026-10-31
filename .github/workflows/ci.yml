@@ -47,7 +47,8 @@ jobs:
       - name: Find unused code
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: vp run knip
-      - name: Test packages, contracts, CLI, SDK and Postgres
+      - id: tests
+        name: Test packages with coverage, contracts, CLI, SDK and Postgres
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: vp run test:prepared
       - name: Test database runner
@@ -69,28 +70,37 @@ jobs:
           path: apps/web/reports/
           if-no-files-found: warn
           retention-days: 7
-      - id: coverage
-        name: Test schema coverage
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: vp run test:coverage
       - id: coverage-summary
-        name: Summarize schema coverage
-        if: ${{ !cancelled() && steps.coverage.outcome != 'skipped' }}
+        name: Summarize package coverage
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         env:
-          RESULT: ${{ steps.coverage.outcome == 'success' && 'passed' || 'is below thresholds' }}
+          RESULT: ${{ steps.tests.outcome == 'success' && 'passed' || 'after a failed test step' }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          shopt -s nullglob
           {
             echo '<!-- aircastle-coverage -->'
-            echo "### Schema coverage ${RESULT} on ${SHA:0:7}"
+            echo "### Package coverage ${RESULT} on ${SHA:0:7}"
             echo
-            echo '| Statements | Branches | Functions | Lines |'
-            echo '|---|---|---|---|'
-            jq -r '.total | [.statements, .branches, .functions, .lines] | map("\(.pct)% (\(.covered)/\(.total))") | "| " + join(" | ") + " |"' \
-              packages/schema/coverage/coverage-summary.json
+            summaries=(packages/*/coverage/coverage-summary.json apps/*/coverage/coverage-summary.json)
+            if [ "${#summaries[@]}" -eq 0 ]; then
+              echo 'No package recorded coverage. A stage before the coverage gates failed.'
+            else
+              echo '| Package | Statements | Branches | Functions | Lines |'
+              echo '|---|---|---|---|---|'
+              for summary in "${summaries[@]}"; do
+                jq -r --arg package "${summary%/coverage/coverage-summary.json}" \
+                  '.total | [.statements, .branches, .functions, .lines] | map("\(.pct)% (\(.covered)/\(.total))") | "| `\($package)` | " + join(" | ") + " |"' \
+                  "$summary"
+              done
+              if [ "$RESULT" != passed ]; then
+                echo
+                echo 'A package below its threshold, a failing package test, or a later stage of test:all can fail the step. Check the run log for the failing stage.'
+              fi
+            fi
             echo
-            echo "Thresholds are set in \`packages/schema/vite.config.ts\`. [Run details](${RUN_URL})"
+            echo "Thresholds are set in each package's \`vite.config.ts\`. [Run details](${RUN_URL})"
           } > "$RUNNER_TEMP/coverage.md"
           cat "$RUNNER_TEMP/coverage.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage summary
@@ -101,7 +111,7 @@ jobs:
           path: ${{ runner.temp }}/coverage.md
           retention-days: 1
   coverage-comment:
-    name: Comment schema coverage
+    name: Comment coverage
     needs: checks
     if: ${{ !cancelled() && needs.checks.outputs.coverage_summary == 'success' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04

@@ -10,6 +10,7 @@
     "start": "bun --env-file=../../.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vp test",
+    "test:coverage": "vp test --coverage",
     "lint": "vp lint",
     "check": "vp check",
     "hono": "hono"
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@hono/cli": "1.0.0-rc.8",
     "@types/bun": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }
