@@ -1,11 +1,31 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { describeRoute } from "hono-openapi";
+import type { Result } from "@aircastle/contracts";
 import type { ContentService } from "@aircastle/core";
 import { access, jsonBody, listQuery, searchQuery, updateRequest, uuid } from "./request.ts";
 import { failure, reply, unexpectedError } from "./responses.ts";
 
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const contract = /^v1:[0-9a-f]{64}$/;
+
+interface CollectionTarget {
+  name: string;
+  fingerprint: string;
+}
+
+function collectionTarget(c: Context): Result<CollectionTarget> {
+  const name = c.req.param("collection") ?? "";
+  const fingerprint = c.req.header("aircastle-schema") ?? "";
+  if (!identifier.test(name) || !contract.test(fingerprint)) return failure("invalid_request");
+  return { ok: true, data: { name, fingerprint } };
+}
+
+function documentTarget(c: Context): Result<CollectionTarget & { id: string }> {
+  const target = collectionTarget(c);
+  const id = c.req.param("id") ?? "";
+  if (!target.ok || !uuid.test(id)) return failure("invalid_request");
+  return { ok: true, data: { ...target.data, id: id.toLowerCase() } };
+}
 
 export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: number }) {
   const { cms, maxRequestBytes = 1_048_576 } = options;
@@ -72,10 +92,9 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
         const credentials = access(c);
         if (!credentials.ok) return reply(c, credentials);
 
-        const name = c.req.param("collection");
-        const fingerprint = c.req.header("aircastle-schema") ?? "";
-        if (!identifier.test(name) || !contract.test(fingerprint))
-          return reply(c, failure("invalid_request"));
+        const target = collectionTarget(c);
+        if (!target.ok) return reply(c, target);
+        const { name, fingerprint } = target.data;
 
         return reply(c, await cms.create(credentials.data, name, fingerprint, body.data), 201);
       },
@@ -87,11 +106,9 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
         const credentials = access(c);
         if (!credentials.ok) return reply(c, credentials);
 
-        const name = c.req.param("collection");
-        const id = c.req.param("id");
-        const fingerprint = c.req.header("aircastle-schema") ?? "";
-        if (!identifier.test(name) || !uuid.test(id) || !contract.test(fingerprint))
-          return reply(c, failure("invalid_request"));
+        const target = documentTarget(c);
+        if (!target.ok) return reply(c, target);
+        const { name, fingerprint, id } = target.data;
 
         return reply(c, await cms.findById(credentials.data, name, fingerprint, id));
       },
@@ -109,16 +126,11 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
         const credentials = access(c);
         if (!credentials.ok) return reply(c, credentials);
 
-        const name = c.req.param("collection");
-        const id = c.req.param("id");
-        const fingerprint = c.req.header("aircastle-schema") ?? "";
-        if (!identifier.test(name) || !uuid.test(id) || !contract.test(fingerprint))
-          return reply(c, failure("invalid_request"));
+        const target = documentTarget(c);
+        if (!target.ok) return reply(c, target);
+        const { name, fingerprint, id } = target.data;
 
-        return reply(
-          c,
-          await cms.update(credentials.data, name, fingerprint, id.toLowerCase(), update.data),
-        );
+        return reply(c, await cms.update(credentials.data, name, fingerprint, id, update.data));
       },
     )
     .delete(
@@ -128,13 +140,11 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
         const credentials = access(c);
         if (!credentials.ok) return reply(c, credentials);
 
-        const name = c.req.param("collection");
-        const id = c.req.param("id");
-        const fingerprint = c.req.header("aircastle-schema") ?? "";
-        if (!identifier.test(name) || !uuid.test(id) || !contract.test(fingerprint))
-          return reply(c, failure("invalid_request"));
+        const target = documentTarget(c);
+        if (!target.ok) return reply(c, target);
+        const { name, fingerprint, id } = target.data;
 
-        return reply(c, await cms.delete(credentials.data, name, fingerprint, id.toLowerCase()));
+        return reply(c, await cms.delete(credentials.data, name, fingerprint, id));
       },
     )
     .get(
@@ -147,10 +157,9 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
         const credentials = access(c);
         if (!credentials.ok) return reply(c, credentials);
 
-        const name = c.req.param("collection");
-        const fingerprint = c.req.header("aircastle-schema") ?? "";
-        if (!identifier.test(name) || !contract.test(fingerprint))
-          return reply(c, failure("invalid_request"));
+        const target = collectionTarget(c);
+        if (!target.ok) return reply(c, target);
+        const { name, fingerprint } = target.data;
 
         return reply(c, await cms.list(credentials.data, name, fingerprint, query.data));
       },
@@ -168,10 +177,9 @@ export function contentRoutes(options: { cms: ContentService; maxRequestBytes?: 
         const credentials = access(c);
         if (!credentials.ok) return reply(c, credentials);
 
-        const name = c.req.param("collection");
-        const fingerprint = c.req.header("aircastle-schema") ?? "";
-        if (!identifier.test(name) || !contract.test(fingerprint))
-          return reply(c, failure("invalid_request"));
+        const target = collectionTarget(c);
+        if (!target.ok) return reply(c, target);
+        const { name, fingerprint } = target.data;
 
         return reply(c, await cms.list(credentials.data, name, fingerprint, query.data));
       },
