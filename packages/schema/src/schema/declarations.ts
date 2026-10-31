@@ -1,5 +1,6 @@
 import type { CodeLanguage, JsonValue, PointValue } from "./contract.ts";
 import {
+  snapshotArray,
   snapshotChoices,
   snapshotDefault,
   snapshotRecord,
@@ -32,16 +33,32 @@ export type FieldKind =
   | "point"
   | "reference";
 
+interface Arguments {
+  text: undefined;
+  number: undefined;
+  boolean: undefined;
+  date: undefined;
+  datetime: undefined;
+  list: unknown;
+  object: RecordSnapshot;
+  blocks: RecordSnapshot;
+  json: undefined;
+  point: undefined;
+  reference: string | readonly unknown[];
+}
+
 /**
  * A declared field as captured by its builder. `argument` holds the kind's constructor input:
  * the item builder for lists, a field snapshot for objects, a variant snapshot for blocks, and the
  * target name or names for references.
  */
-export interface FieldDefinition {
-  readonly kind: FieldKind;
-  readonly argument: unknown;
-  readonly modifiers: readonly Modifier[];
-}
+export type FieldDefinition<Kind extends FieldKind = FieldKind> = {
+  [Name in Kind]: {
+    readonly kind: Name;
+    readonly argument: Arguments[Name];
+    readonly modifiers: readonly Modifier[];
+  };
+}[Kind];
 
 const fields = new WeakMap<object, FieldDefinition>();
 const collections = new WeakMap<object, RecordSnapshot>();
@@ -66,13 +83,11 @@ interface CollectionIdentity {
 
 type Fields = Readonly<Record<string, FieldIdentity>>;
 
-function register(
-  target: object,
-  kind: FieldKind,
-  argument: unknown,
-  modifiers: readonly Modifier[],
-) {
-  fields.set(target, Object.freeze({ kind, argument, modifiers: Object.freeze([...modifiers]) }));
+function register(target: object, definition: FieldDefinition) {
+  fields.set(
+    target,
+    Object.freeze({ ...definition, modifiers: Object.freeze([...definition.modifiers]) }),
+  );
   Object.freeze(target);
 }
 
@@ -102,7 +117,7 @@ class TextField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "text", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -183,7 +198,7 @@ class NumberField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "number", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -233,7 +248,7 @@ class BooleanField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "boolean", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -278,7 +293,7 @@ class DateField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, definition.kind, definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -343,7 +358,7 @@ class ListField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "list", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -393,7 +408,7 @@ class ObjectField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "object", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -449,7 +464,7 @@ class BlocksField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "blocks", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -498,7 +513,7 @@ class JsonField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "json", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -543,7 +558,7 @@ class PointField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "point", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<
@@ -584,7 +599,7 @@ class ReferenceField<
   };
 
   constructor(definition: FieldDefinition) {
-    register(this, "reference", definition.argument, definition.modifiers);
+    register(this, definition);
   }
 
   #append<NextOptional extends boolean = Optional, NextNullable extends boolean = Nullable>(
@@ -609,50 +624,48 @@ class Collection<Shape extends Fields> implements CollectionIdentity {
   }
 }
 
-const blank = (kind: FieldKind, argument?: unknown): FieldDefinition => ({
-  kind,
-  argument,
-  modifiers: [],
-});
-
 export function text(): TextField {
-  return new TextField(blank("text"));
+  return new TextField({ kind: "text", argument: undefined, modifiers: [] });
 }
 
 export function number(): NumberField {
-  return new NumberField(blank("number"));
+  return new NumberField({ kind: "number", argument: undefined, modifiers: [] });
 }
 
 export function boolean(): BooleanField {
-  return new BooleanField(blank("boolean"));
+  return new BooleanField({ kind: "boolean", argument: undefined, modifiers: [] });
 }
 
 export function date(): DateField<"date"> {
-  return new DateField<"date">(blank("date"));
+  return new DateField<"date">({ kind: "date", argument: undefined, modifiers: [] });
 }
 
 export function datetime(): DateField<"datetime"> {
-  return new DateField<"datetime">(blank("datetime"));
+  return new DateField<"datetime">({ kind: "datetime", argument: undefined, modifiers: [] });
 }
 
 export function list<Item extends FieldIdentity>(item: Item): ListField<Item> {
-  return new ListField<Item>(blank("list", item));
+  return new ListField<Item>({ kind: "list", argument: item, modifiers: [] });
 }
 
 export function object<const Shape extends Fields>(shape: Shape): ObjectField<Shape> {
-  return new ObjectField<Shape>(blank("object", snapshotRecord(shape)));
+  return new ObjectField<Shape>({ kind: "object", argument: snapshotRecord(shape), modifiers: [] });
 }
 
 export function blocks<const Shape extends Variants>(variants: Shape): BlocksField<Shape> {
-  return new BlocksField<Shape>(blank("blocks", snapshotRecord(variants)));
+  return new BlocksField<Shape>({
+    kind: "blocks",
+    argument: snapshotRecord(variants),
+    modifiers: [],
+  });
 }
 
 export function json(): JsonField {
-  return new JsonField(blank("json"));
+  return new JsonField({ kind: "json", argument: undefined, modifiers: [] });
 }
 
 export function point(): PointField {
-  return new PointField(blank("point"));
+  return new PointField({ kind: "point", argument: undefined, modifiers: [] });
 }
 
 export function reference<const Name extends string>(collection: Name): ReferenceField<string>;
@@ -660,9 +673,15 @@ export function reference<const Names extends readonly [string, ...string[]]>(
   collections: Names,
 ): ReferenceField<{ collection: Names[number]; id: string }>;
 export function reference(target: unknown): ReferenceField<unknown> {
-  return new ReferenceField(
-    blank("reference", Array.isArray(target) ? snapshotChoices(target) : target),
-  );
+  return new ReferenceField({
+    kind: "reference",
+    argument: Array.isArray(target)
+      ? snapshotArray(target)
+      : typeof target === "string"
+        ? target
+        : "",
+    modifiers: [],
+  });
 }
 
 export function collection<const Shape extends Fields>(definition: Shape): Collection<Shape> {

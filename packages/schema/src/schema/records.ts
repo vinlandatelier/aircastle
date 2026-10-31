@@ -41,14 +41,17 @@ export function isMember<Key extends string>(
   return names.includes(value);
 }
 
-export function snapshotChoices(value: unknown): unknown {
-  if (!Array.isArray(value)) return value;
+export function snapshotArray(value: readonly unknown[]): readonly unknown[] {
   const values: unknown[] = [];
   for (let index = 0; index < value.length; index++) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     values.push(descriptor && Object.hasOwn(descriptor, "value") ? descriptor.value : undefined);
   }
   return Object.freeze(values);
+}
+
+export function snapshotChoices(value: unknown): unknown {
+  return Array.isArray(value) ? snapshotArray(value) : value;
 }
 
 /** Marks a default's accessor property: declaration never invokes getters, so validation sees a value that fits no field. */

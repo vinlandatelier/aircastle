@@ -89,3 +89,21 @@ export function normalizeEditor(modifier: EditorModifier, path: IssuePath): Edit
   }
   return issues.length ? { ok: false, issues } : { ok: true, editor: { type: "radio" } };
 }
+
+export function normalizeBooleanEditor(
+  modifier: EditorModifier,
+  path: IssuePath,
+): { ok: true; editor: "checkbox" | "switch" } | { ok: false; issue: SchemaIssue } {
+  const name = modifier.name;
+  if (typeof name !== "string")
+    return {
+      ok: false,
+      issue: schemaIssue(path, {
+        code: "invalid_editor",
+        expected: "string",
+        received: receivedType(name),
+      }),
+    };
+  if (name === "checkbox" || name === "switch") return { ok: true, editor: name };
+  return { ok: false, issue: schemaIssue(path, { code: "unknown_editor", editor: name }) };
+}
