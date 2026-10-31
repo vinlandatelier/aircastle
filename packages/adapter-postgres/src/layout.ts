@@ -5,10 +5,22 @@ type Transaction = postgres.TransactionSql;
 
 export async function initializeLayout(sql: Transaction, namespace: string) {
   await sql`SELECT pg_advisory_xact_lock(hashtextextended(${namespace}, 0))`;
+  const rootCollation = await sql<
+    { exists: boolean }[]
+  >`SELECT EXISTS (SELECT FROM pg_catalog.pg_collation WHERE collname = 'und-x-icu' AND collnamespace = 'pg_catalog'::regnamespace) AS exists`;
+  if (!rootCollation[0]?.exists)
+    throw new Error(
+      'Aircastle requires a Postgres server built with ICU: the root ICU collation pg_catalog."und-x-icu" is missing',
+    );
   const existing = await sql<
     { exists: boolean }[]
   >`SELECT EXISTS (SELECT FROM pg_namespace WHERE nspname = ${namespace}) AS exists`;
   const table = (name: string) => identifier(sql, namespace, name);
+  const addCreationOrder = async () => {
+    await sql`ALTER TABLE ${table("documents")} ADD COLUMN creation_order bigint GENERATED ALWAYS AS IDENTITY`;
+    await sql`CREATE INDEX ON ${table("documents")} (project_id, collection_key, creation_order)`;
+    await sql`INSERT INTO ${table("migrations")} (version) VALUES (2)`;
+  };
   if (existing[0]?.exists) {
     const marker = await sql<
       { product: string; version: number }[]
@@ -18,8 +30,9 @@ export async function initializeLayout(sql: Transaction, namespace: string) {
     const migrations = await sql<
       { version: number }[]
     >`SELECT version FROM ${table("migrations")} ORDER BY version`;
-    if (migrations.length !== 1 || migrations[0]?.version !== 1)
-      throw new Error("Unsupported Aircastle migration version");
+    const ledger = migrations.map((row) => row.version).join(",");
+    if (ledger === "1") await addCreationOrder();
+    else if (ledger !== "1,2") throw new Error("Unsupported Aircastle migration version");
     return;
   }
   const encoding = await sql<
@@ -40,4 +53,5 @@ export async function initializeLayout(sql: Transaction, namespace: string) {
   await sql`CREATE TABLE ${table("unique_values")} (project_id uuid NOT NULL, collection_name text NOT NULL, collection_key text GENERATED ALWAYS AS (${nameKey}(collection_name)) STORED, field text NOT NULL, field_key text GENERATED ALWAYS AS (${nameKey}(field)) STORED, digest text NOT NULL, value text COLLATE "C" NOT NULL, document_id uuid NOT NULL, PRIMARY KEY(project_id, collection_key, field_key, digest), FOREIGN KEY(document_id, project_id, collection_key) REFERENCES ${table("documents")}(id, project_id, collection_key))`;
   await sql`INSERT INTO ${table("ownership")} VALUES (1, 'aircastle', 1)`;
   await sql`INSERT INTO ${table("migrations")} (version) VALUES (1)`;
+  await addCreationOrder();
 }
