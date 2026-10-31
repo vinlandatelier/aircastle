@@ -199,7 +199,3 @@ export function createClient<const Collections extends CollectionDefinitions>(
   }
   return client as AircastleClient<Collections>;
 }
-
-export function validateResponse(description: CollectionDescription, response: unknown): boolean {
-  return responseResult(description, response) !== undefined;
-}
