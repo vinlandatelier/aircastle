@@ -10,10 +10,11 @@ const schema = {
   packageDir: "packages/schema",
   mutate: ["src/schema/**/*.ts", "!src/schema/contract.ts"],
   tests: { include: ["tests/**/*.test.ts"], filters: ["tests/schema"] },
-  lines: [
-    { path: "packages/schema/src/schema/compile.ts", lines: [[83, 83] as const] },
-    { path: "packages/schema/src/schema/formats.ts", lines: [[3, 4] as const, [23, 23] as const] },
-  ],
+  addedLines: (path: string) =>
+    ({
+      "packages/schema/src/schema/compile.ts": [[83, 83] as const],
+      "packages/schema/src/schema/formats.ts": [[3, 4] as const, [23, 23] as const],
+    })[path] ?? [],
   exists: () => true,
 };
 
@@ -99,33 +100,24 @@ test("deleting a mutated source file mutates the whole package", () => {
   ).toEqual({ kind: "all" });
 });
 
-test("changed lines come from the new side of each zero-context hunk", () => {
+test("changed lines come from the new side of each zero-context hunk of one file", () => {
   const diff = [
     "diff --git a/src/a.ts b/src/a.ts",
     "--- a/src/a.ts",
     "+++ b/src/a.ts",
     "@@ -3 +3 @@ export function a() {",
+    "-++ old",
+    "+++ new",
     "@@ -10,0 +11,2 @@",
+    "+@@ -1 +1 @@",
+    "+",
     "@@ -20,4 +22,0 @@",
-    "diff --git a/src/gone.ts b/src/gone.ts",
-    "--- a/src/gone.ts",
-    "+++ /dev/null",
-    "@@ -1,5 +0,0 @@",
-    "diff --git a/src/new.ts b/src/new.ts",
-    "--- /dev/null",
-    "+++ b/src/new.ts",
-    "@@ -0,0 +1,4 @@",
   ].join("\n");
   expect(changedLines(diff)).toEqual([
-    {
-      path: "src/a.ts",
-      lines: [
-        [3, 3],
-        [11, 12],
-      ],
-    },
-    { path: "src/new.ts", lines: [[1, 4]] },
+    [3, 3],
+    [11, 12],
   ]);
+  expect(changedLines("")).toEqual([]);
 });
 
 test("test filters are the paths before the first flag of a vp test command", () => {

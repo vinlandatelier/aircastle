@@ -5,14 +5,11 @@ import { dirname, join, matchesGlob, resolve } from "node:path";
 /** An inclusive, 1-based range of lines that a pull request added or changed. */
 export type LineRange = readonly [start: number, end: number];
 
-/** One file changed by a pull request, with the line ranges it has after the change. */
-export type ChangedFile = { path: string; lines: readonly LineRange[] };
-
 /** The test files a package's Stryker command runs: Vitest include globs and CLI path filters. */
 export type TestRun = { include: readonly string[]; filters: readonly string[] };
 
 /**
- * What a pull request needs mutation tested in one Stryker package. `lines` lists Stryker
+ * What a pull request needs mutation tested in one Stryker package. `targets` lists Stryker
  * `--mutate` targets such as `src/schema/formats.ts:21-23`.
  */
 export type MutationScope =
@@ -24,25 +21,17 @@ const setupFiles = ["stryker.config.json", "vite.config.ts", "package.json"];
 const undetectedStatuses = new Set(["Survived", "NoCoverage"]);
 
 /**
- * Reads the added and changed line ranges per file from `git diff --unified=0` output. Files
- * that only lost lines map to no ranges.
+ * Reads the added and changed line ranges from the `git diff --unified=0` output of one file.
+ * A file that only lost lines has no ranges.
  */
-export function changedLines(diff: string): ChangedFile[] {
-  const files: ChangedFile[] = [];
-  let current: { path: string; lines: LineRange[] } | undefined;
-  for (const line of diff.split("\n")) {
-    if (line.startsWith("+++ ")) {
-      current = line === "+++ /dev/null" ? undefined : { path: line.slice(6), lines: [] };
-      if (current) files.push(current);
-      continue;
-    }
+export function changedLines(diff: string): LineRange[] {
+  return diff.split("\n").flatMap((line): LineRange[] => {
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
-    if (!hunk || !current) continue;
+    if (!hunk) return [];
     const start = Number(hunk[1]);
     const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
-    if (count > 0) current.lines.push([start, start + count - 1]);
-  }
-  return files;
+    return count > 0 ? [[start, start + count - 1]] : [];
+  });
 }
 
 /** Reads the path filters from a Stryker command of the form `vp test <filters> <flags>`. */
@@ -65,16 +54,18 @@ export function mutationScope(input: {
   mutate: readonly string[];
   tests: TestRun;
   changed: readonly string[];
-  lines: readonly ChangedFile[];
+  addedLines: (path: string) => readonly LineRange[];
   exists: (path: string) => boolean;
 }): MutationScope {
   const prefix = `${input.packageDir}/`;
   const runsTest = (path: string) =>
     input.tests.filters.length === 0 || input.tests.filters.some((filter) => path.includes(filter));
+  const isPackageCode = (path: string) =>
+    ["src/**", "tests/**"].some((pattern) => matchesGlob(path, pattern));
+  const isTestFile = (path: string) =>
+    input.tests.include.some((pattern) => matchesGlob(path, pattern));
   const isTestInput = (path: string) =>
-    setupFiles.includes(path) ||
-    (["src/**", "tests/**"].some((pattern) => matchesGlob(path, pattern)) &&
-      (!input.tests.include.some((pattern) => matchesGlob(path, pattern)) || runsTest(path)));
+    setupFiles.includes(path) || (isPackageCode(path) && (!isTestFile(path) || runsTest(path)));
   const relevant = input.changed
     .filter((path) => path.startsWith(prefix))
     .map((path) => path.slice(prefix.length))
@@ -90,9 +81,7 @@ export function mutationScope(input: {
     input.exists(prefix + path);
   if (!relevant.every(mutated)) return { kind: "all" };
   const targets = relevant.flatMap((path) =>
-    (input.lines.find((file) => file.path === prefix + path)?.lines ?? []).map(
-      ([start, end]) => `${path}:${start}-${end}`,
-    ),
+    input.addedLines(prefix + path).map(([start, end]) => `${path}:${start}-${end}`),
   );
   return targets.length === 0 ? { kind: "skip" } : { kind: "lines", targets };
 }
@@ -133,7 +122,7 @@ export function undetectedMutants(report: unknown): string[] {
 }
 
 function git(...args: string[]): string {
-  const result = spawnSync("git", args, { encoding: "utf8" });
+  const result = spawnSync("git", args, { encoding: "utf8", maxBuffer: Infinity });
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed\n${result.stderr}`);
   return result.stdout;
 }
@@ -153,10 +142,23 @@ if (import.meta.main) {
     throw new Error("Usage: vp run test:mutation:changed -- <base-revision>");
   const baseCommit = git("rev-parse", "--verify", "--end-of-options", `${base}^{commit}`).trim();
   const range = `${baseCommit}...HEAD`;
-  const changed = git("diff", "--name-only", "--no-renames", range).split("\n").filter(Boolean);
-  const lines = changedLines(
-    git("diff", "--unified=0", "--no-renames", "--no-color", "--no-ext-diff", range),
-  );
+  const changed = git("diff", "--name-only", "-z", "--no-renames", range)
+    .split("\0")
+    .filter(Boolean);
+  const addedLines = (path: string) =>
+    changedLines(
+      git(
+        "--literal-pathspecs",
+        "diff",
+        "--unified=0",
+        "--no-renames",
+        "--no-color",
+        "--no-ext-diff",
+        range,
+        "--",
+        path,
+      ),
+    );
   const failed: string[] = [];
   for (const configPath of git("ls-files", "packages/*/stryker.config.json")
     .split("\n")
@@ -171,7 +173,7 @@ if (import.meta.main) {
         text(record(config.commandRunner, "commandRunner").command, "commandRunner.command"),
       ),
       changed,
-      lines,
+      addedLines,
       exists: existsSync,
     });
     console.log(`${packageDir}: ${scope.kind === "lines" ? scope.targets.join(", ") : scope.kind}`);
