@@ -1,6 +1,9 @@
 import {
   contractId,
   describeCollections,
+  isListLimit,
+  isListQueryKey,
+  isListSort,
   parseContentError,
   validateStored,
 } from "@aircastle/contracts";
@@ -210,20 +213,16 @@ function updateRequest(
   return { changes: supplied, unset };
 }
 
-const listKeys = new Set(["where", "sort", "limit", "cursor"]);
-
 function listRequest(query: unknown): Record<string, unknown> | undefined {
   if (query === undefined) return {};
   if (!isPlainRecord(query)) return undefined;
   const request = definedEntries(query);
   const { where, sort, limit, cursor } = request;
   if (
-    Object.keys(request).some((key) => !listKeys.has(key)) ||
+    !Object.keys(request).every(isListQueryKey) ||
     (where !== undefined && !isPlainRecord(where)) ||
-    (sort !== undefined &&
-      (typeof sort !== "string" || !/^-?[A-Za-z_][A-Za-z0-9_]*$/.test(sort))) ||
-    (limit !== undefined &&
-      (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 100)) ||
+    (sort !== undefined && !isListSort(sort)) ||
+    (limit !== undefined && !isListLimit(limit)) ||
     (cursor !== undefined && (typeof cursor !== "string" || cursor.length === 0))
   )
     return undefined;
