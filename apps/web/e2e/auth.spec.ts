@@ -43,7 +43,7 @@ test('[auth:R2] [auth:R3] [auth:R4] [auth:R5] [auth:R6] [auth:R7] [auth:R8] real
   page,
   browser,
 }) => {
-  test.setTimeout(90_000)
+  test.slow()
   const email = `auth-${randomUUID()}@example.test`
   const name = 'Alex  <img src=x onerror="document.title=\'unsafe-auth-mail\'">'
   const subject = 'Create your Aircastle account'
