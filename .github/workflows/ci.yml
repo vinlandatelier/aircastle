@@ -74,7 +74,7 @@ jobs:
         name: Summarize package coverage
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         env:
-          RESULT: ${{ steps.tests.outcome == 'success' && 'passed' || 'failed tests or thresholds' }}
+          RESULT: ${{ steps.tests.outcome == 'success' && 'passed' || 'after a failed test step' }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -83,13 +83,22 @@ jobs:
             echo '<!-- aircastle-coverage -->'
             echo "### Package coverage ${RESULT} on ${SHA:0:7}"
             echo
-            echo '| Package | Statements | Branches | Functions | Lines |'
-            echo '|---|---|---|---|---|'
-            for summary in packages/*/coverage/coverage-summary.json apps/*/coverage/coverage-summary.json; do
-              jq -r --arg package "${summary%/coverage/coverage-summary.json}" \
-                '.total | [.statements, .branches, .functions, .lines] | map("\(.pct)% (\(.covered)/\(.total))") | "| `\($package)` | " + join(" | ") + " |"' \
-                "$summary"
-            done
+            summaries=(packages/*/coverage/coverage-summary.json apps/*/coverage/coverage-summary.json)
+            if [ "${#summaries[@]}" -eq 0 ]; then
+              echo 'No package recorded coverage. A stage before the coverage gates failed.'
+            else
+              echo '| Package | Statements | Branches | Functions | Lines |'
+              echo '|---|---|---|---|---|'
+              for summary in "${summaries[@]}"; do
+                jq -r --arg package "${summary%/coverage/coverage-summary.json}" \
+                  '.total | [.statements, .branches, .functions, .lines] | map("\(.pct)% (\(.covered)/\(.total))") | "| `\($package)` | " + join(" | ") + " |"' \
+                  "$summary"
+              done
+              if [ "$RESULT" != passed ]; then
+                echo
+                echo 'A package below its threshold, a failing package test, or a later stage of test:all can fail the step. Check the run log for the failing stage.'
+              fi
+            fi
             echo
             echo "Thresholds are set in each package's \`vite.config.ts\`. [Run details](${RUN_URL})"
           } > "$RUNNER_TEMP/coverage.md"
