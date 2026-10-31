@@ -12,7 +12,7 @@ apps/
 │           ├── health/       Process liveness and its response schema
 │           └── content/      Project schema publication and content HTTP routes
 └── web/                      React admin
-    ├── scripts/              Brand icon generation and Node.js verification commands
+    ├── scripts/              Brand icon generation
     └── src/
         ├── components/       Shared presentation modules
         │   ├── shell/        Persistent header, sidebar, page frame, and supporting controls
@@ -67,9 +67,9 @@ Paths in this section are relative to `apps/web`.
 
 `src/index.css` owns the `marketing` and `dashboard` colour palettes in light and dark mode. Marketing uses Efferd's auth preview tokens and is the default for public pages. Sign-in declares `data-theme-scope="marketing"`; the shell declares `data-theme-scope="dashboard"`. The dashboard marker selects its palette at the document root, including overlays rendered outside the shell. Shared UI components consume the active semantic tokens without separate component variants or theme providers.
 
-Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys, extreme-input fixtures, and command/report conformance tests. `playwright.config.ts` owns browser execution settings. Fixture builds set `WEB_FIXTURES=1`, and a Vite plugin then swaps `src/components/shell/data.ts` and `src/features/navigation/pages.ts` for the modules in `e2e/fixture-modules/` by resolved path, so every import spelling gets the fixture. Normal production builds retain their real data and expose no fixture controls. `tsconfig.e2e.json` type-checks the journeys, fixture modules and verification scripts.
+Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys and extreme-input fixtures. Fixture builds set `WEB_FIXTURES=1`, and a Vite plugin then swaps `src/components/shell/data.ts` and `src/features/navigation/pages.ts` for the modules in `e2e/fixture-modules/` by resolved path, so every import spelling gets the fixture. Normal production builds retain their real data and expose no fixture controls. `tsconfig.e2e.json` type-checks the Playwright config, journeys and fixture modules.
 
-`scripts/verify-web.ts` runs on Node.js and owns verification commands and evidence. Browser runs build and serve isolated normal and fixture outputs on allocated ports, use fresh browser contexts, and clean up their own servers. Reports, coverage, traces, and screenshots stay in ignored per-run output directories. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names; the receipt records the selected cases without a central registry. The strength command runs the bounded fault cases in disposable verification sandboxes; source copies and reports belong to verification tooling.
+`playwright.config.ts` owns browser execution. Its `webServer` entries build the normal and fixture apps and preview them on `WEB_E2E_PORT` and the next port, which `e2e/origins.ts` derives for both the config and the `visit` helper. Playwright starts and stops those servers, rejects `.only`, retries and flaky passes, and writes HTML and JSON reports, traces, and screenshots to the ignored `reports/` directory. Lint keeps process spawning, server launchers and skipped journeys out of `apps/web`, so new verification goes into Playwright or Vitest configuration rather than a custom runner. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names without a central registry.
 
 ## Repository automation
 
@@ -80,6 +80,8 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
 
 `.github/workflows/gardener.yml` runs the `.agents/skills/gardener` audit of `main` on the subscription token without GitHub credentials, and a separate job opens the resulting PRs with the AI App token. `tests/harness/gardener-workflow.test.ts` guards its secrets, token scope, held paths and merge calls.
+
+`.github/workflows/pr-evidence.yml` checks PR bodies for evidence of web UI changes, as [automation instructions](.github/AGENTS.md) define.
 
 `.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. On pull requests, the required check runs `scripts/mutate-changed.ts`. It skips a package unless the change touches its sources, the tests its Stryker command runs, or its test setup. For source-only changes it mutates the changed lines and fails on any surviving mutant there. When tests or setup changed it mutates the whole package against the package's Stryker break threshold. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
 

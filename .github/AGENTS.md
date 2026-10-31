@@ -2,7 +2,8 @@
 
 Follow [the architecture map](../ARCHITECTURE.md) for tooling ownership.
 
-- `ci.yml` owns deterministic pull-request verification. Its `Lint, typecheck and test` job is the only required status check.
+- `ci.yml` owns deterministic pull-request verification. The only required status checks are its `Lint, typecheck and test` job and the `UI evidence` job in `pr-evidence.yml`.
+- `pr-evidence.yml` fails a PR that changes shipped web UI unless its body has uploaded media (a `https://github.com/user-attachments/assets/<id>` link) under `## Screenshots` or a line `No visible UI change: <reason>` with a real reason. HTML comments in the body don't count. Shipped UI means `apps/web/index.html`, `apps/web/public/`, and `apps/web/src/` except tests, `test-setup.ts` and `test-utils.tsx`. The job reads the body from the event payload through an environment variable and runs no PR code. In the merge queue it passes without checking.
 - AI reviews are advisory. Keep them outside the required status check, required approvals, and required conversation resolution. Never enable automatic merging.
 - Run privileged AI operations from trusted default-branch code with the `ai-automation` environment. Keep that environment restricted to the `main` branch, with no tag policies.
 - AI runs spend the repository owner's personal Claude subscription. Only the account matching both `AI_TRIGGER_LOGIN` and `AI_TRIGGER_USER_ID` may trigger them, because Anthropic's consumer terms forbid making the account available to anyone else. Organization membership, collaborator permissions, and comment text grant nothing.

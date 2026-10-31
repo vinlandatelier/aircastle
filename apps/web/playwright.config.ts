@@ -1,34 +1,41 @@
 import process from 'node:process'
 import { defineConfig } from '@playwright/test'
-import path from 'node:path'
-
-const output = process.env.WEB_RUN_DIR
-if (!output || !process.env.WEB_ORIGIN || !process.env.WEB_FIXTURE_ORIGIN) {
-  throw new Error('Use vp run test-web:e2e to build and own the browser servers')
-}
+import { origins } from './e2e/origins'
 
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.spec.ts',
   forbidOnly: true,
   retries: 0,
+  failOnFlakyTests: true,
   workers: 2,
   timeout: 30_000,
-  globalTimeout: 300_000,
+  globalTimeout: 600_000,
   expect: { timeout: 5_000 },
-  outputDir: path.join(output, 'browser'),
+  outputDir: 'reports/test-results',
   reporter: [
     ['list'],
-    ['junit', { outputFile: path.join(output, 'browser.xml') }],
-    ['json', { outputFile: path.join(output, 'browser.json') }],
+    ['html', { outputFolder: 'reports/html', open: 'never' }],
+    ['json', { outputFile: 'reports/results.json' }],
   ],
+  webServer: Object.entries(origins).map(([name, { port, url }]) => ({
+    command: `vp build --outDir reports/build/${name} && vp preview --outDir reports/build/${name} --host 127.0.0.1 --port ${port} --strictPort`,
+    url,
+    env: { WEB_FIXTURES: name === 'fixture' ? '1' : '0' },
+    reuseExistingServer: false,
+    timeout: 300_000,
+  })),
   use: {
     browserName: 'chromium',
-    baseURL: process.env.WEB_ORIGIN,
+    baseURL: origins.normal.url,
     viewport: { width: 1440, height: 900 },
     colorScheme: 'light',
     reducedMotion: 'reduce',
     trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
+    screenshot: process.env.WEB_E2E_VIDEO === '1' ? 'on' : 'only-on-failure',
+    video:
+      process.env.WEB_E2E_VIDEO === '1'
+        ? { mode: 'on', size: { width: 1440, height: 900 } }
+        : 'off',
   },
 })
