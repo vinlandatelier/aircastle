@@ -1,23 +1,23 @@
-import {
-  contractId,
-  describeCollections,
-  isListLimit,
-  isListQueryKey,
-  isListSort,
-  parseContentError,
-  validateStored,
-} from "@aircastle/contracts";
-import { compileSchema, isPlainRecord } from "@aircastle/schema";
+import { contractId, describeCollections } from "@aircastle/contracts";
+import { compileSchema } from "@aircastle/schema";
 import type {
   CollectionDefinitions,
   CollectionDescription,
-  ContentDocument,
-  DocumentData,
   DocumentPage,
   Fetch,
   Result,
 } from "@aircastle/contracts";
 import type { InferInput, InferOutput } from "@aircastle/schema";
+import {
+  deletedDocument,
+  documentId,
+  documentPage,
+  envelope,
+  listRequest,
+  storedDocument,
+  updateRequest,
+  uuid,
+} from "./wire.ts";
 
 export interface AircastleConfig<Collections extends CollectionDefinitions> {
   url: string;
@@ -94,7 +94,7 @@ export class ConfigurationError extends Error {
     this.name = "ConfigurationError";
   }
 }
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const invalidRequest = { ok: false, error: { code: "invalid_request" } } as const;
 
 function parsedUrl(value: string | undefined): URL | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
@@ -141,92 +141,6 @@ export function defineConfig<const Collections extends CollectionDefinitions>(co
     project: config.project.toLowerCase(),
     collections: { ...config.collections },
   };
-}
-
-function storedDocument(
-  description: CollectionDescription,
-  value: unknown,
-): ContentDocument | undefined {
-  if (!isPlainRecord(value) || typeof value.id !== "string" || !uuid.test(value.id))
-    return undefined;
-  const fields = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "id"));
-  if (!validateStored(description, fields)) return undefined;
-  return { id: value.id, ...(fields as DocumentData) };
-}
-
-function deletedDocument(value: unknown): { id: string } | undefined {
-  if (!isPlainRecord(value) || Object.keys(value).length !== 1) return undefined;
-  return typeof value.id === "string" && uuid.test(value.id) ? { id: value.id } : undefined;
-}
-
-function documentPage(
-  description: CollectionDescription,
-  value: unknown,
-): DocumentPage | undefined {
-  if (
-    !isPlainRecord(value) ||
-    Object.keys(value).some((key) => key !== "documents" && key !== "next") ||
-    !Array.isArray(value.documents) ||
-    !(value.next === null || (typeof value.next === "string" && value.next.length > 0))
-  )
-    return undefined;
-  const documents: ContentDocument[] = [];
-  for (const entry of value.documents) {
-    const document = storedDocument(description, entry);
-    if (!document) return undefined;
-    documents.push(document);
-  }
-  return { documents, next: value.next };
-}
-
-function envelope<Data>(
-  response: unknown,
-  parse: (data: unknown) => Data | undefined,
-): Result<Data> | undefined {
-  if (!isPlainRecord(response)) return undefined;
-  if (response.ok === false) {
-    if (Object.keys(response).some((key) => key !== "ok" && key !== "error")) return undefined;
-    const error = parseContentError(response.error);
-    return error ? { ok: false, error } : undefined;
-  }
-  if (response.ok !== true || Object.keys(response).some((key) => key !== "ok" && key !== "data"))
-    return undefined;
-  const data = parse(response.data);
-  return data === undefined ? undefined : { ok: true, data };
-}
-
-function definedEntries(value: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
-}
-
-function updateRequest(
-  changes: unknown,
-  options: unknown,
-): { changes: Record<string, unknown>; unset: string[] } | undefined {
-  if (!isPlainRecord(changes) || (options !== undefined && !isPlainRecord(options)))
-    return undefined;
-  const unset = options?.unset ?? [];
-  if (!Array.isArray(unset) || !unset.every((name) => typeof name === "string")) return undefined;
-  const supplied = definedEntries(changes);
-  if (new Set(unset).size !== unset.length || unset.some((name) => Object.hasOwn(supplied, name)))
-    return undefined;
-  return { changes: supplied, unset };
-}
-
-function listRequest(query: unknown): Record<string, unknown> | undefined {
-  if (query === undefined) return {};
-  if (!isPlainRecord(query)) return undefined;
-  const request = definedEntries(query);
-  const { where, sort, limit, cursor } = request;
-  if (
-    !Object.keys(request).every(isListQueryKey) ||
-    (where !== undefined && !isPlainRecord(where)) ||
-    (sort !== undefined && !isListSort(sort)) ||
-    (limit !== undefined && !isListLimit(limit)) ||
-    (cursor !== undefined && (typeof cursor !== "string" || cursor.length === 0))
-  )
-    return undefined;
-  return request;
 }
 
 export function createClient<const Collections extends CollectionDefinitions>(
@@ -292,7 +206,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
     const description = definition.describe();
     const endpoint = `${config.url}/api/projects/${encodeURIComponent(config.project)}/collections/${encodeURIComponent(name)}/documents`;
     const documentUrl = (id: string) => `${endpoint}/${encodeURIComponent(id)}`;
-    const document = (expectedId?: string) => (data: unknown) => {
+    const parseStored = (expectedId?: string) => (data: unknown) => {
       const parsed = storedDocument(description, data);
       if (!parsed || (expectedId !== undefined && parsed.id.toLowerCase() !== expectedId))
         return undefined;
@@ -306,23 +220,22 @@ export function createClient<const Collections extends CollectionDefinitions>(
         return send(
           description,
           { method: "POST", url: endpoint, write: true, status: 201, body: validated.data },
-          document(),
+          parseStored(),
         );
       },
       async findById(id) {
-        if (typeof id !== "string" || !uuid.test(id))
-          return { ok: false, error: { code: "invalid_request" } };
-        const normalized = id.toLowerCase();
+        const normalized = documentId(id);
+        if (normalized === undefined) return invalidRequest;
         return send(
           description,
           { method: "GET", url: documentUrl(normalized), write: false, status: 200 },
-          document(normalized),
+          parseStored(normalized),
         );
       },
       async update(id, changes, options) {
+        const normalized = documentId(id);
         const body = updateRequest(changes, options);
-        if (typeof id !== "string" || !uuid.test(id) || !body)
-          return { ok: false, error: { code: "invalid_request" } };
+        if (normalized === undefined || !body) return invalidRequest;
         const validated = definition.validate(body.changes);
         const issues = validated.ok
           ? []
@@ -334,17 +247,15 @@ export function createClient<const Collections extends CollectionDefinitions>(
             ok: false,
             error: { code: "validation_failed", issues: [issues[0], ...issues.slice(1)] },
           };
-        const normalized = id.toLowerCase();
         return send(
           description,
           { method: "PATCH", url: documentUrl(normalized), write: true, status: 200, body },
-          document(normalized),
+          parseStored(normalized),
         );
       },
       async delete(id) {
-        if (typeof id !== "string" || !uuid.test(id))
-          return { ok: false, error: { code: "invalid_request" } };
-        const normalized = id.toLowerCase();
+        const normalized = documentId(id);
+        if (normalized === undefined) return invalidRequest;
         return send(
           description,
           { method: "DELETE", url: documentUrl(normalized), write: true, status: 200 },
@@ -356,7 +267,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
       },
       async list(query) {
         const body = listRequest(query);
-        if (!body) return { ok: false, error: { code: "invalid_request" } };
+        if (!body) return invalidRequest;
         return send(
           description,
           { method: "POST", url: `${endpoint}/query`, write: false, status: 200, body },
