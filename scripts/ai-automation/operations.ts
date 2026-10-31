@@ -2,8 +2,8 @@ import { runModel, type ModelSelection } from "../ai-models/index.ts";
 import {
   contextComplete,
   digest,
+  fixPrompt,
   fixSchema,
-  prompt,
   requireObject,
   text,
   validateEdits,
@@ -102,15 +102,7 @@ export async function executeOperation(
   if (!contextComplete(job)) throw new Error("Fix requires complete bounded changed-file context");
   const result = await runner(
     selection,
-    prompt(
-      {
-        ...job,
-        task: "fix",
-        role: job.task === "request" ? "claudeImplementer" : job.role,
-        selection,
-      },
-      guidance,
-    ),
+    fixPrompt({ ...job, task: "fix", role: "implementer", selection }),
     fixSchema,
   );
   return { ...bound, task: "fix", selection, result: validateEdits(result, job.snapshot) };

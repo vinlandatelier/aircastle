@@ -4,6 +4,7 @@ import {
   digest,
   integer,
   isReceipt,
+  isTrigger,
   operationId,
   parseCommand,
   requireObject,
@@ -15,9 +16,9 @@ import {
   type Comment,
   type Fix,
   type Identity,
+  type Trigger,
   type Invocation,
   type Job,
-  type Membership,
   type Receipt,
   type Snapshot,
   type SourceFile,
@@ -35,6 +36,7 @@ type Options = {
   botId: number;
   control: string;
   run: string;
+  trigger: Trigger;
   botLogin?: string;
 };
 const marker = "<!-- aircastle-ai:v1 -->\n";
@@ -59,8 +61,14 @@ export class Coordinator {
   readonly fetcher: Fetch;
   readonly root: string;
   constructor(options: Options, fetcher: Fetch = fetch) {
-    if (!/^vinlandatelier\/[\w.-]+$/.test(options.repository) || !options.token)
-      throw new Error("setup_required: repository and App token required");
+    if (
+      !/^vinlandatelier\/[\w.-]+$/.test(options.repository) ||
+      !options.token ||
+      !/^[a-zA-Z0-9-]{1,39}$/.test(options.trigger.login) ||
+      !Number.isSafeInteger(options.trigger.id) ||
+      options.trigger.id < 1
+    )
+      throw new Error("setup_required: repository, App token, trigger login and user ID required");
     integer(options.botId);
     sha(options.control);
     this.options = options;
@@ -126,18 +134,11 @@ export class Coordinator {
     }
     throw new Error("Bounded pagination incomplete; refusing authority from partial state");
   }
-  async membership(login: string): Promise<Membership> {
-    try {
-      const result = await this.request(
-        `/orgs/vinlandatelier/members/${encodeURIComponent(login)}`,
-      );
-      return result.status === 204 ? "member" : result.status === 404 ? "outside" : "unknown";
-    } catch {
-      return "unknown";
-    }
+  trusted(user: Pick<Identity, "id" | "login">): boolean {
+    return isTrigger(user, this.options.trigger);
   }
-  authorize(input: Invocation): Promise<Authorization> {
-    return authorize(input, this);
+  authorize(input: Invocation): Authorization {
+    return authorize(input, this.options.trigger);
   }
   async receipts(number: number): Promise<StoredReceipt[]> {
     const comments = await this.list(`${this.root}/issues/${integer(number)}/comments`);
@@ -208,7 +209,7 @@ export class Coordinator {
     });
   }
   async current(job: Job): Promise<boolean> {
-    if ((await this.membership(job.requester.login)) !== "member") return false;
+    if (!this.trusted(job.requester)) return false;
     const user = requireObject(await this.api(`/users/${encodeURIComponent(job.requester.login)}`));
     if (user.id !== job.requester.id || user.type !== "User") return false;
     const pr = requireObject(await this.api(`${this.root}/pulls/${job.snapshot.number}`));
@@ -425,10 +426,7 @@ export class Coordinator {
       for (const r of relevant) {
         const user = identity(r.user);
         if (!trusted.has(user.login))
-          trusted.set(
-            user.login,
-            user.id === this.options.botId || (await this.membership(user.login)) === "member",
-          );
+          trusted.set(user.login, user.id === this.options.botId || this.trusted(user));
       }
       thread = JSON.stringify(
         relevant.map((r) => ({
@@ -436,7 +434,7 @@ export class Coordinator {
           author: identity(r.user).login,
           body: trusted.get(identity(r.user).login)
             ? r.body
-            : "[omitted: not written by an organization member]",
+            : "[omitted: not written by the trigger user]",
           path: r.path,
           diff_hunk: r.diff_hunk,
           commit_id: r.commit_id,
@@ -457,15 +455,6 @@ export class Coordinator {
     };
   }
   async prepare(config: ModelConfig, commentId: number): Promise<Job[]> {
-    for (const role of [
-      "codexReviewer",
-      "codexImplementer",
-      "claudeReviewer",
-      "claudeImplementer",
-    ] as const) {
-      if (config.roles[role].provider !== (role.startsWith("codex") ? "openai" : "anthropic"))
-        throw new Error("setup_required: role provider does not match command provider");
-    }
     const accepted = await this.command(
       await this.api(`${this.root}/issues/comments/${integer(commentId)}`),
       "issue",
@@ -473,9 +462,9 @@ export class Coordinator {
     if (!accepted) return [];
     const { number, comment: command } = accepted;
     const requester = command.author;
-    if ((await this.membership(requester.login)) !== "member") return [];
+    if (!this.trusted(requester)) return [];
     const cmd = parseCommand(command.body)!;
-    const role: Role = `${cmd.provider === "openai" ? "codex" : "claude"}${cmd.kind === "fix" ? "Implementer" : "Reviewer"}`;
+    const role: Role = cmd.kind === "fix" ? "implementer" : "reviewer";
     const response = await this.request(`${this.root}/pulls/${number}`);
     if (response.status === 404) return [];
     if (response.status !== 200) throw new Error("PR lookup unavailable");
@@ -524,14 +513,14 @@ export class Coordinator {
       await this.finish(prior, "stale");
       return [];
     }
-    const authorization = await this.authorize(invocation);
+    const authorization = this.authorize(invocation);
     if (authorization.kind !== "authorized") return [];
     const snapshot = await this.snapshot(number, prior?.receipt.job.snapshot ?? bare);
     const job: Job = {
       version: 1,
       id,
       ...(cmd.kind === "request"
-        ? ({ task: "request", implementation: config.roles.claudeImplementer } as const)
+        ? ({ task: "request", implementation: config.roles.implementer } as const)
         : { task: authorization.task }),
       role,
       requester,
@@ -677,7 +666,5 @@ export class Coordinator {
     const bot = requireObject(await this.api(`/user/${this.options.botId}`));
     if (bot.type !== "Bot" || (this.options.botLogin && bot.login !== this.options.botLogin))
       throw new Error("setup_required: configured bot identity must be a bot");
-    const members = await this.request("/orgs/vinlandatelier/members?per_page=1");
-    if (members.status !== 200) throw new Error("setup_required: App Members read unavailable");
   }
 }

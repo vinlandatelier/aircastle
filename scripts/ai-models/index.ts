@@ -1,60 +1,43 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { anthropicSchema, checkSchema, matches, isJsonObject } from "./schema.ts";
+import { checkSchema, matches, isJsonObject } from "./schema.ts";
 
 export { isJsonObject };
 
-export type Role = "codexReviewer" | "codexImplementer" | "claudeReviewer" | "claudeImplementer";
-export type Provider = "openai" | "anthropic";
+export type Role = "reviewer" | "implementer";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
-export type ModelSelection = { provider: Provider; model: string; effort: Effort };
+export type ModelSelection = { model: string; effort: Effort };
 export type ModelConfig = { version: 1; roles: Record<Role, ModelSelection> };
 
-const roles: Role[] = ["codexReviewer", "codexImplementer", "claudeReviewer", "claudeImplementer"];
+const roles: Role[] = ["reviewer", "implementer"];
 
 export function isRole(value: unknown): value is Role {
   return roles.some((role) => role === value);
 }
-/**
- * Output cap per request, counting reasoning or thinking tokens as well as the visible answer.
- * OpenAI counts reasoning tokens against `max_output_tokens` and advises reserving at least
- * 25,000. Anthropic counts thinking against `max_tokens` and advises at least 64,000 at `xhigh`
- * and `max`. Every configured model accepts up to 128,000 output tokens. Both providers need a
- * streamed response at these sizes.
- */
-const outputTokenCaps: Record<Effort, number> = {
-  low: 64_000,
-  medium: 64_000,
-  high: 64_000,
-  xhigh: 128_000,
-  max: 128_000,
+const efforts: Record<Effort, true> = {
+  low: true,
+  medium: true,
+  high: true,
+  xhigh: true,
+  max: true,
 };
-const maxStreamBytes = 64 * 1_048_576;
-const requestTimeoutMs = 25 * 60_000;
-/** Waits before the second and third attempt when the provider sends no `retry-after`. */
-const retryDelaysMs = [2_000, 8_000];
-const maxRetryDelayMs = 60_000;
+const maxOutputBytes = 64 * 1_048_576;
+const runTimeoutMs = 25 * 60_000;
+const detailChars = 300;
+/** Structured output takes two turns, the answer and its acceptance. The rest allow schema retries. */
+const maxTurns = 4;
 
 function effort(value: unknown): value is Effort {
-  return typeof value === "string" && Object.hasOwn(outputTokenCaps, value);
-}
-
-function retryDelay(response: Response, attempt: number): number | null {
-  if ((response.status !== 429 && response.status < 500) || attempt >= retryDelaysMs.length)
-    return null;
-  const requested = Number(response.headers.get("retry-after")) * 1000;
-  return Math.min(
-    Number.isFinite(requested) && requested > 0 ? requested : (retryDelaysMs[attempt] ?? 0),
-    maxRetryDelayMs,
-  );
+  return typeof value === "string" && Object.hasOwn(efforts, value);
 }
 
 export function isModelSelection(value: unknown): value is ModelSelection {
   return (
     isJsonObject(value) &&
-    Object.keys(value).sort().join() === "effort,model,provider" &&
-    (value.provider === "openai" || value.provider === "anthropic") &&
+    Object.keys(value).sort().join() === "effort,model" &&
     typeof value.model === "string" &&
     /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value.model) &&
     effort(value.effort)
@@ -63,7 +46,7 @@ export function isModelSelection(value: unknown): value is ModelSelection {
 
 function selection(value: unknown): ModelSelection {
   if (!isModelSelection(value)) throw new Error("invalid_model_config");
-  return { provider: value.provider, model: value.model, effort: value.effort };
+  return { model: value.model, effort: value.effort };
 }
 
 export function parseModelConfig(value: unknown): ModelConfig {
@@ -75,110 +58,144 @@ export function parseModelConfig(value: unknown): ModelConfig {
     Object.keys(value.roles).sort().join() !== [...roles].sort().join()
   )
     throw new Error("invalid_model_config");
-  const configured = value.roles;
-  const roleSelection = (role: Role): ModelSelection => {
-    const result = selection(configured[role]);
-    if (result.provider !== (role.startsWith("codex") ? "openai" : "anthropic"))
-      throw new Error("invalid_model_config");
-    return result;
-  };
   return {
     version: 1,
     roles: {
-      codexReviewer: roleSelection("codexReviewer"),
-      codexImplementer: roleSelection("codexImplementer"),
-      claudeReviewer: roleSelection("claudeReviewer"),
-      claudeImplementer: roleSelection("claudeImplementer"),
+      reviewer: selection(value.roles.reviewer),
+      implementer: selection(value.roles.implementer),
     },
   };
 }
 
-async function* serverEvents(
-  body: ReadableStream<Uint8Array>,
-): AsyncGenerator<Record<string, unknown>> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let size = 0;
+type Run = { code: number | null; signal: string | null; stdout: string; stderr: string };
+
+function claude(args: string[], prompt: string, directory: string, token: string): Promise<Run> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("claude", args, {
+      cwd: directory,
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: directory,
+        CLAUDE_CONFIG_DIR: join(directory, ".claude"),
+        CLAUDE_CODE_OAUTH_TOKEN: token,
+      },
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: runTimeoutMs,
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let size = 0;
+    let failure: Error | null = null;
+    const collect = (chunks: Buffer[]) => (chunk: Buffer) => {
+      size += chunk.byteLength;
+      if (size > maxOutputBytes) {
+        failure = new Error("provider_output_limit");
+        child.kill();
+      } else chunks.push(chunk);
+    };
+    child.stdout.on("data", collect(stdout));
+    child.stderr.on("data", collect(stderr));
+    child.on("error", (error) => {
+      failure ??= new Error("provider_unavailable", { cause: error });
+    });
+    child.on("close", (code, signal) => {
+      if (failure) reject(failure);
+      else
+        resolve({
+          code,
+          signal,
+          stdout: Buffer.concat(stdout).toString("utf8"),
+          stderr: Buffer.concat(stderr).toString("utf8"),
+        });
+    });
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(prompt);
+  });
+}
+
+/**
+ * Makes CLI text safe for logs: no token, no control characters, bounded length. Redaction runs on
+ * the whole text before truncation.
+ */
+function sanitize(text: string, token: string, keep: "head" | "tail"): string {
+  const clean = text
+    .replaceAll(token, "[redacted]")
+    .replace(/sk-ant-[\w-]+/g, "[redacted]")
+    .replace(/[^\x20-\x7e]+/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+  if (clean.length <= detailChars) return clean;
+  return keep === "head" ? clean.slice(0, detailChars) : clean.slice(-detailChars);
+}
+
+/**
+ * Names a provider failure with a stable code and the CLI's own reason, so an expired token or a
+ * plan rate limit reads differently from a model failure.
+ */
+function providerError(
+  code: string,
+  run: Run,
+  token: string,
+  data: Record<string, unknown> = {},
+): Error {
+  const details = [
+    run.code === null ? `signal=${run.signal ?? "unknown"}` : `exit=${run.code}`,
+    ...(["subtype", "terminal_reason", "result"] as const).flatMap((key) => {
+      const value = data[key];
+      return typeof value === "string" && value
+        ? [`${key}=${JSON.stringify(sanitize(value, token, "head"))}`]
+        : [];
+    }),
+    ...(run.stderr.trim() ? [`stderr=${JSON.stringify(sanitize(run.stderr, token, "tail"))}`] : []),
+  ];
+  return new Error(`${code}: ${details.join(" ")}`);
+}
+
+function accept(
+  run: Run,
+  token: string,
+  chosen: ModelSelection,
+  schema: Record<string, unknown>,
+  data: unknown,
+): { response: Record<string, unknown>; value: unknown } {
+  if (run.code === null) throw providerError("provider_timeout", run, token);
+  if (data === undefined) throw providerError("provider_invalid_json", run, token);
+  if (!isJsonObject(data) || data.type !== "result")
+    throw providerError("provider_invalid_response", run, token);
+  if (run.code !== 0 || data.is_error !== false || data.subtype !== "success")
+    throw providerError(
+      data.subtype === "error_max_turns" ? "provider_incomplete" : "provider_failed",
+      run,
+      token,
+      data,
+    );
+  if (!Object.hasOwn(data, "structured_output"))
+    throw providerError("provider_no_structured_output", run, token, data);
+  if (!matches(schema, data.structured_output))
+    throw providerError("provider_schema_mismatch", run, token);
+  if (!isJsonObject(data.modelUsage) || !Object.hasOwn(data.modelUsage, chosen.model))
+    throw providerError("provider_model_mismatch", run, token);
+  return { response: data, value: data.structured_output };
+}
+
+async function writeReceipt(record: Record<string, unknown>, token: string): Promise<void> {
+  const directory = process.env.AI_MODEL_RECEIPTS_DIR;
+  if (!directory) return;
+  const receipt = JSON.stringify({ version: 1, ...record }).replaceAll(token, "[redacted]");
+  const hash = createHash("sha256").update(receipt).digest("hex");
   try {
-    while (true) {
-      const part = await reader.read();
-      if (part.done) break;
-      size += part.value.byteLength;
-      if (size > maxStreamBytes) throw new Error("provider_output_limit");
-      buffer = (buffer + decoder.decode(part.value, { stream: true })).replaceAll("\r\n", "\n");
-      for (let end = buffer.indexOf("\n\n"); end !== -1; end = buffer.indexOf("\n\n")) {
-        const data = buffer
-          .slice(0, end)
-          .split("\n")
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trimStart())
-          .join("\n");
-        buffer = buffer.slice(end + 2);
-        if (!data) continue;
-        let event: unknown;
-        try {
-          event = JSON.parse(data);
-        } catch (error) {
-          throw new Error("provider_invalid_json", { cause: error });
-        }
-        if (!isJsonObject(event)) throw new Error("provider_invalid_response");
-        yield event;
-      }
-    }
-  } finally {
-    await reader.cancel();
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, `${hash}.json`), receipt, { flag: "wx" });
+  } catch {
+    throw new Error("provider_receipt_unavailable");
   }
 }
 
-async function openaiResponse(body: ReadableStream<Uint8Array>): Promise<Record<string, unknown>> {
-  for await (const event of serverEvents(body)) {
-    if (event.type === "error") throw new Error("provider_failed");
-    if (
-      ["response.completed", "response.incomplete", "response.failed"].includes(String(event.type))
-    ) {
-      if (!isJsonObject(event.response)) throw new Error("provider_invalid_response");
-      return event.response;
-    }
-  }
-  throw new Error("provider_incomplete");
-}
-
-async function anthropicMessage(
-  body: ReadableStream<Uint8Array>,
-): Promise<Record<string, unknown>> {
-  let message: Record<string, unknown> | null = null;
-  const content: Record<string, unknown>[] = [];
-  for await (const event of serverEvents(body)) {
-    if (event.type === "error") throw new Error("provider_failed");
-    if (event.type === "message_start") {
-      if (!isJsonObject(event.message)) throw new Error("provider_invalid_response");
-      message = { ...event.message };
-    } else if (event.type === "content_block_start") {
-      if (!Number.isSafeInteger(event.index) || !isJsonObject(event.content_block))
-        throw new Error("provider_invalid_response");
-      content[Number(event.index)] = { ...event.content_block };
-    } else if (event.type === "content_block_delta") {
-      const block = content[Number(event.index)];
-      const delta = event.delta;
-      if (!block || !isJsonObject(delta)) throw new Error("provider_invalid_response");
-      if (delta.type === "text_delta" && typeof delta.text === "string")
-        block.text = `${typeof block.text === "string" ? block.text : ""}${delta.text}`;
-      if (delta.type === "thinking_delta" && typeof delta.thinking === "string")
-        block.thinking = `${typeof block.thinking === "string" ? block.thinking : ""}${delta.thinking}`;
-    } else if (event.type === "message_delta") {
-      if (!message || !isJsonObject(event.delta)) throw new Error("provider_invalid_response");
-      Object.assign(message, event.delta);
-      if (isJsonObject(event.usage))
-        message.usage = { ...(isJsonObject(message.usage) ? message.usage : {}), ...event.usage };
-    } else if (event.type === "message_stop") {
-      if (!message) throw new Error("provider_invalid_response");
-      return { ...message, content: Array.from(content) };
-    }
-  }
-  throw new Error("provider_incomplete");
-}
-
+/**
+ * Runs one prompt through the Claude Code CLI on the subscription in `CLAUDE_CODE_OAUTH_TOKEN`.
+ * The CLI runs in an empty directory with a fresh configuration, no tools and no MCP servers, and
+ * receives only the environment it needs, so no API key in the caller's environment reaches it.
+ */
 export async function runModel(
   input: ModelSelection,
   prompt: string,
@@ -192,156 +209,82 @@ export async function runModel(
     Buffer.byteLength(JSON.stringify(schema)) > 32_000
   )
     throw new Error("invalid_model_input");
-  const key =
-    chosen.provider === "openai" ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("setup_required");
-  const body =
-    chosen.provider === "openai"
-      ? {
-          model: chosen.model,
-          reasoning: { effort: chosen.effort },
-          input: prompt,
-          text: { format: { type: "json_schema", name: "result", strict: true, schema } },
-          max_output_tokens: outputTokenCaps[chosen.effort],
-          stream: true,
-          store: false,
-          service_tier: "default",
-        }
-      : {
-          model: chosen.model,
-          output_config: {
-            effort: chosen.effort,
-            format: { type: "json_schema", schema: anthropicSchema(schema) },
-          },
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: outputTokenCaps[chosen.effort],
-          stream: true,
-        };
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (chosen.provider === "openai") headers.authorization = `Bearer ${key}`;
-  else {
-    headers["x-api-key"] = key;
-    headers["anthropic-version"] = "2023-06-01";
-  }
-  let response: Response;
-  let data: Record<string, unknown>;
+  const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  if (!token) throw new Error("setup_required");
+  const args = [
+    "-p",
+    "--output-format",
+    "json",
+    "--json-schema",
+    JSON.stringify(schema),
+    "--model",
+    chosen.model,
+    "--effort",
+    chosen.effort,
+    "--tools",
+    "",
+    "--strict-mcp-config",
+    "--no-session-persistence",
+    "--max-turns",
+    String(maxTurns),
+  ];
   const started = Date.now();
-  const signal = AbortSignal.timeout(requestTimeoutMs);
+  const directory = await mkdtemp(join(tmpdir(), "ai-model-"));
+  let run: Run;
   try {
-    for (let attempt = 0; ; attempt++) {
-      response = await fetch(
-        chosen.provider === "openai"
-          ? "https://api.openai.com/v1/responses"
-          : "https://api.anthropic.com/v1/messages",
-        { method: "POST", redirect: "error", headers, body: JSON.stringify(body), signal },
-      );
-      if (response.ok) break;
-      await response.body?.cancel();
-      const delay = retryDelay(response, attempt);
-      if (delay === null) throw new Error(`provider_http_${response.status}`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    if (!response.body) throw new Error("provider_invalid_response");
-    data =
-      chosen.provider === "openai"
-        ? await openaiResponse(response.body)
-        : await anthropicMessage(response.body);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      /^provider_(http_\d{3}|output_limit|invalid_response|invalid_json|failed|incomplete)$/.test(
-        error.message,
-      )
-    )
-      throw error;
-    throw new Error("provider_unavailable", { cause: error });
+    run = await claude(args, prompt, directory, token);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
-  let text: string;
-  if (chosen.provider === "openai") {
-    if (data.status === "failed") throw new Error("provider_failed");
-    if (data.status !== "completed") throw new Error("provider_incomplete");
-    const output = Array.isArray(data.output) ? data.output : [];
-    const messages = output.filter((item) => isJsonObject(item) && item.type === "message");
-    if (
-      output.some(
-        (item) => !isJsonObject(item) || !["message", "reasoning"].includes(String(item.type)),
-      ) ||
-      messages.length !== 1
-    )
-      throw new Error("provider_invalid_response");
-    const content: unknown[] = Array.isArray(messages[0].content) ? messages[0].content : [];
-    if (content.some((item) => isJsonObject(item) && item.type === "refusal"))
-      throw new Error("provider_refused");
-    if (
-      content.length !== 1 ||
-      !isJsonObject(content[0]) ||
-      content[0].type !== "output_text" ||
-      typeof content[0].text !== "string"
-    )
-      throw new Error("provider_invalid_response");
-    text = content[0].text;
-  } else {
-    if (data.stop_reason === "refusal") throw new Error("provider_refused");
-    if (data.stop_reason !== "end_turn") throw new Error("provider_incomplete");
-    const content: unknown[] = Array.isArray(data.content) ? data.content : [];
-    if (
-      content.some(
-        (item) =>
-          !isJsonObject(item) ||
-          !["text", "thinking", "redacted_thinking"].includes(String(item.type)),
-      )
-    )
-      throw new Error("provider_invalid_response");
-    const texts = content.filter(
-      (item): item is Record<string, unknown> => isJsonObject(item) && item.type === "text",
-    );
-    if (texts.length !== 1 || typeof texts[0]?.text !== "string")
-      throw new Error("provider_invalid_response");
-    text = texts[0].text;
-  }
-  let value: unknown;
+  let data: unknown;
   try {
-    value = JSON.parse(text);
+    data = JSON.parse(run.stdout);
   } catch {
-    throw new Error("provider_invalid_json");
+    data = undefined;
   }
-  if (!matches(schema, value)) throw new Error("provider_schema_mismatch");
-  if (typeof data.model !== "string" || !/^[a-zA-Z0-9._-]{1,128}$/.test(data.model))
-    throw new Error("provider_invalid_response");
+  const request = { args, prompt };
+  let accepted: { response: Record<string, unknown>; value: unknown };
+  try {
+    accepted = accept(run, token, chosen, schema, data);
+  } catch (error) {
+    await writeReceipt(
+      {
+        request,
+        response: data ?? null,
+        stderr: sanitize(run.stderr, token, "tail"),
+        failure: error instanceof Error ? error.message : "provider_failed",
+      },
+      token,
+    ).catch((receiptError: unknown) => {
+      console.error(
+        JSON.stringify({
+          kind: "model_receipt_failure",
+          error: receiptError instanceof Error ? receiptError.message : "provider_receipt_failed",
+        }),
+      );
+    });
+    throw error;
+  }
+  const { response, value } = accepted;
   const execution = {
     selection: chosen,
-    actualModel: data.model,
-    effort: "sent_and_accepted",
-    maxOutputTokens: outputTokenCaps[chosen.effort],
+    models: isJsonObject(response.modelUsage) ? Object.keys(response.modelUsage) : [],
+    effort: "sent",
+    turns: typeof response.num_turns === "number" ? response.num_turns : null,
     durationMs: Date.now() - started,
-    usage: isJsonObject(data.usage)
+    usage: isJsonObject(response.usage)
       ? Object.fromEntries(
-          Object.entries(data.usage).filter(
+          Object.entries(response.usage).filter(
             (entry) => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0,
           ),
         )
       : null,
-    requestId: (response.headers.get("x-request-id") ?? response.headers.get("request-id") ?? "")
-      .replace(/[^a-zA-Z0-9_-]/g, "")
-      .slice(0, 128),
+    sessionId:
+      typeof response.session_id === "string"
+        ? response.session_id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 128)
+        : "",
   };
   console.log(JSON.stringify({ kind: "model_execution", ...execution }));
-  if (process.env.AI_MODEL_RECEIPTS_DIR) {
-    const receipt = JSON.stringify({
-      version: 1,
-      request: body,
-      response: data,
-      execution,
-    }).replaceAll(key, "[redacted]");
-    const hash = createHash("sha256").update(receipt).digest("hex");
-    try {
-      await mkdir(process.env.AI_MODEL_RECEIPTS_DIR, { recursive: true });
-      await writeFile(join(process.env.AI_MODEL_RECEIPTS_DIR, `${hash}.json`), receipt, {
-        flag: "wx",
-      });
-    } catch {
-      throw new Error("provider_receipt_unavailable");
-    }
-  }
+  await writeReceipt({ request, response, execution }, token);
   return value;
 }

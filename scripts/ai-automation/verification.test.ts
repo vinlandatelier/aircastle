@@ -191,16 +191,16 @@ test.each([
         ...(task === "request"
           ? ({
               task,
-              implementation: { provider: "openai", model: "fixture", effort: "high" },
+              implementation: { model: "fixture", effort: "high" },
             } as const)
           : { task }),
-        role: "codexImplementer",
+        role: "implementer",
         requester: snapshot.author,
         snapshot,
         instructions: "Fix value",
         thread: "",
         control: "e".repeat(40),
-        selection: { provider: "openai", model: "fixture", effort: "high" },
+        selection: { model: "fixture", effort: "high" },
         previous: "",
       };
       await mkdir(join(root, "plan"));

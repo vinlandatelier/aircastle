@@ -22,29 +22,6 @@ export function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function anthropicSchema(schema: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...schema };
-  const descriptions = typeof schema.description === "string" ? [schema.description] : [];
-  for (const key of ["minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems"]) {
-    const bound = schema[key];
-    if (typeof bound !== "number" || (key === "minItems" && [0, 1].includes(bound))) continue;
-    descriptions.push(`{${key}: ${bound}}`);
-    delete result[key];
-  }
-  if (descriptions.length) result.description = descriptions.join(" ");
-  if (isJsonObject(schema.properties))
-    result.properties = Object.fromEntries(
-      Object.entries(schema.properties).map(([key, value]) => [
-        key,
-        anthropicSchema(subschema(value)),
-      ]),
-    );
-  if (isJsonObject(schema.items)) result.items = anthropicSchema(schema.items);
-  if (Array.isArray(schema.anyOf))
-    result.anyOf = schema.anyOf.map((item) => anthropicSchema(subschema(item)));
-  return result;
-}
-
 export function checkSchema(schema: unknown, depth = 0): asserts schema is Record<string, unknown> {
   if (!isJsonObject(schema) || depth > 16 || Object.keys(schema).some((key) => !keywords.has(key)))
     throw new Error("unsupported_schema");

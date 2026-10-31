@@ -26,6 +26,6 @@ export const snapshot: Snapshot = {
 export const invocation: Invocation = {
   kind: "automatic",
   snapshot,
-  role: "codexReviewer",
+  role: "reviewer",
   control: "e".repeat(40),
 };

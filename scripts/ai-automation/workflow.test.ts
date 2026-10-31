@@ -16,16 +16,24 @@ const condition = (name: string) => {
     .trim();
 };
 
-test("comment events start planning only for PR comments that mention a bot from an associated author", () => {
+test("comment events start planning only for PR comments that mention @vinland-ai from the trigger login", () => {
   const gate = condition("prepare");
   expect(gate).toContain("github.event_name == 'issue_comment'");
   expect(gate).toContain("github.event.issue.pull_request");
   expect(gate).toContain("contains(github.event.comment.body, '@vinland-ai')");
   expect(gate).not.toContain("@claude");
-  expect(gate).not.toContain("@codex");
-  expect(gate).toContain(
-    `contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)`,
-  );
+  expect(gate).toContain("vars.AI_TRIGGER_LOGIN != ''");
+  expect(gate).toContain("github.event.comment.user.login == vars.AI_TRIGGER_LOGIN");
+  expect(gate).toContain("vars.AI_TRIGGER_USER_ID != ''");
+  expect(gate).toContain("github.event.comment.user.id == vars.AI_TRIGGER_USER_ID");
+  expect(gate).not.toContain("author_association");
+});
+
+test("both coordinator jobs receive the trigger login and user ID", () => {
+  for (const name of ["prepare", "publish"]) {
+    expect(job(name)).toContain("AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}");
+    expect(job(name)).toContain("AI_TRIGGER_USER_ID: ${{ vars.AI_TRIGGER_USER_ID }}");
+  }
 });
 
 test("verification runs only for planned fixes and publication reads each operation's own receipt", () => {
