@@ -81,7 +81,7 @@ Privileged workflows use the `ai-automation` environment, restricted to the `mai
 
 `.github/workflows/gardener.yml` runs the `.agents/skills/gardener` audit of `main` on the subscription token without GitHub credentials, and a separate job opens the resulting PRs with the AI App token. `tests/harness/gardener-workflow.test.ts` guards its secrets, token scope, held paths and merge calls.
 
-`.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
+`.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. On pull requests, the required check runs `scripts/mutate-changed.ts`. It skips a package unless the change touches its sources, the tests its Stryker command runs, or its test setup. For source-only changes it mutates the changed lines and fails on any surviving mutant there. When tests or setup changed it mutates the whole package against the package's Stryker break threshold. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
 
 ## Feature pattern
 
