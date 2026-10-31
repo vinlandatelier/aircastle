@@ -13,7 +13,7 @@ function sameVersions(ledger: readonly number[], expected: readonly number[]) {
   );
 }
 
-export function validatedNamespace(value: string) {
+function validatedNamespace(value: string) {
   if (typeof value !== "string" || !value || value.includes("\0") || Buffer.byteLength(value) > 63)
     throw new Error("Invalid Postgres namespace");
   for (const point of value) {
