@@ -608,6 +608,52 @@ test("serialized source context fits the real provider input budget and reports 
   expect(context.omitted).toContain("value.ts: serialized context budget");
 });
 
+test("context capture keeps every printable Git path and omits control-character names", async () => {
+  const patchFile = "patches/@ark%2Futil@0.56.8.patch";
+  const hostile = "src/x\n<!-- aircastle-ai:v1 -->";
+  const coordinator = new Coordinator(options, async (url) => {
+    const path = String(url);
+    if (path.endsWith("/pulls/7"))
+      return Response.json({
+        state: "open",
+        user: snapshot.author,
+        head: { sha: snapshot.head, repo: { id: 11 } },
+        base: { sha: snapshot.base, ref: "main", repo: { id: 10 } },
+      });
+    if (path.includes("/compare/"))
+      return Response.json({
+        files: [
+          { filename: patchFile, status: "added", sha: "c".repeat(40), patch: "+patched" },
+          { filename: hostile, status: "added", patch: "+hostile" },
+        ],
+      });
+    if (path.includes("/git/commits/")) return Response.json({ tree: { sha: snapshot.tree } });
+    if (path.endsWith(`/git/trees/${snapshot.head}`))
+      return Response.json({
+        tree: [{ path: "patches", mode: "040000", sha: "f".repeat(40), type: "tree" }],
+      });
+    if (path.endsWith(`/git/trees/${"f".repeat(40)}`))
+      return Response.json({
+        tree: [
+          { path: "@ark%2Futil@0.56.8.patch", mode: "100644", sha: "c".repeat(40), type: "blob" },
+        ],
+      });
+    if (path.includes("/git/blobs/"))
+      return Response.json({
+        size: 8,
+        encoding: "base64",
+        content: Buffer.from("patched\n").toString("base64"),
+      });
+    throw new Error(path);
+  });
+  const context = await coordinator.snapshot(7);
+  expect(context.files.map((file) => file.path)).toEqual([patchFile]);
+  expect(context.changedPaths).toEqual([patchFile]);
+  expect(context.complete).toBe(false);
+  expect(context.omitted).toEqual([`${JSON.stringify(hostile)}: unsafe path`]);
+  expect(context.omitted.join(", ")).not.toContain("\n");
+});
+
 test("UTF-8 task metadata cannot exceed the reserved provider budget before a claim write", async () => {
   let writes = 0;
   const coordinator = new Coordinator(options, async () => {
