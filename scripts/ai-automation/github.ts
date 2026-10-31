@@ -1,23 +1,24 @@
 import {
   authorize,
+  contextComplete,
   digest,
   integer,
+  isReceipt,
+  isTrigger,
   operationId,
   parseCommand,
   requireObject,
-  renderReview,
   safePath,
   sha,
   text,
-  validateEdits,
-  validateReview,
+  threadLimit,
   type Authorization,
   type Comment,
   type Fix,
   type Identity,
+  type Trigger,
   type Invocation,
   type Job,
-  type Membership,
   type Receipt,
   type Snapshot,
   type SourceFile,
@@ -25,6 +26,7 @@ import {
 } from "./index.ts";
 import type { ModelConfig, Role } from "../ai-models/index.ts";
 import { boundVerification, verificationPlan } from "./checks.ts";
+import { reviewPayload, type ReviewPasses } from "./reviews.ts";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type StoredReceipt = { commentId: number; receipt: Receipt };
@@ -32,16 +34,18 @@ type Options = {
   repository: string;
   token: string;
   botId: number;
-  stateIssue: number;
-  activatedAt: string;
   control: string;
   run: string;
+  trigger: Trigger;
   botLogin?: string;
 };
-type StreamCursor = { since: string; page: number; started: string };
-type Cursor = { version: 1; prPage: number; issue: StreamCursor; inline: StreamCursor };
 const marker = "<!-- aircastle-ai:v1 -->\n";
-const cursorMarker = "<!-- aircastle-ai-cursor:v1 -->\n";
+function receiptBody(receipt: Receipt): string {
+  const encoded = JSON.stringify(receipt).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
+  const body = `${marker}<!--\n${encoded}\n-->`;
+  if (Buffer.byteLength(body) > 55000) throw new Error("Receipt exceeds bound");
+  return body;
+}
 function identity(value: unknown): Identity {
   const user = requireObject(value);
   const login = text(user.login, 100);
@@ -60,11 +64,12 @@ export class Coordinator {
     if (
       !/^vinlandatelier\/[\w.-]+$/.test(options.repository) ||
       !options.token ||
-      !Number.isFinite(Date.parse(options.activatedAt))
+      !/^[a-zA-Z0-9-]{1,39}$/.test(options.trigger.login) ||
+      !Number.isSafeInteger(options.trigger.id) ||
+      options.trigger.id < 1
     )
-      throw new Error("setup_required: repository, App token, activation time required");
+      throw new Error("setup_required: repository, App token, trigger login and user ID required");
     integer(options.botId);
-    integer(options.stateIssue);
     sha(options.control);
     this.options = options;
     this.fetcher = fetcher;
@@ -129,18 +134,11 @@ export class Coordinator {
     }
     throw new Error("Bounded pagination incomplete; refusing authority from partial state");
   }
-  async membership(login: string): Promise<Membership> {
-    try {
-      const result = await this.request(
-        `/orgs/vinlandatelier/members/${encodeURIComponent(login)}`,
-      );
-      return result.status === 204 ? "member" : result.status === 404 ? "outside" : "unknown";
-    } catch {
-      return "unknown";
-    }
+  trusted(user: Pick<Identity, "id" | "login">): boolean {
+    return isTrigger(user, this.options.trigger);
   }
-  authorize(input: Invocation): Promise<Authorization> {
-    return authorize(input, this);
+  authorize(input: Invocation): Authorization {
+    return authorize(input, this.options.trigger);
   }
   async receipts(number: number): Promise<StoredReceipt[]> {
     const comments = await this.list(`${this.root}/issues/${integer(number)}/comments`);
@@ -154,14 +152,13 @@ export class Coordinator {
         !comment.body.startsWith(marker)
       )
         return [];
-      const value = requireObject(JSON.parse(comment.body.slice(marker.length)));
-      if (
-        value.version !== 1 ||
-        !/^[a-f0-9]{64}$/.test(String(value.id)) ||
-        !["claimed", "published", "stale", "failed"].includes(String(value.state))
-      )
+      const stored = comment.body.slice(marker.length);
+      const encoded =
+        stored.startsWith("<!--\n") && stored.endsWith("\n-->") ? stored.slice(5, -4) : stored;
+      const receipt: unknown = JSON.parse(encoded);
+      if (!isReceipt(receipt) || !/^[a-f0-9]{64}$/.test(receipt.id))
         throw new Error("Invalid bot receipt");
-      return [{ commentId: integer(comment.id), receipt: value as unknown as Receipt }];
+      return [{ commentId: integer(comment.id), receipt }];
     });
   }
   async claim(job: Job, existing: StoredReceipt[]): Promise<StoredReceipt | null> {
@@ -192,28 +189,27 @@ export class Coordinator {
       attempt: (prior?.receipt.attempt ?? 0) + 1,
       at: new Date().toISOString(),
     };
-    if (Buffer.byteLength(JSON.stringify(receipt)) > 55000)
-      throw new Error("Receipt exceeds bound");
+    const body = receiptBody(receipt);
     if (prior) {
       await this.api(`${this.root}/issues/comments/${prior.commentId}`, "PATCH", {
-        body: marker + JSON.stringify(receipt),
+        body,
       });
       return { commentId: prior.commentId, receipt };
     }
     const posted = requireObject(
       await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
-        body: marker + JSON.stringify(receipt),
+        body,
       }),
     );
     return { commentId: integer(posted.id), receipt };
   }
   async finish(claim: StoredReceipt, state: Receipt["state"]): Promise<void> {
     await this.api(`${this.root}/issues/comments/${claim.commentId}`, "PATCH", {
-      body: marker + JSON.stringify({ ...claim.receipt, state }),
+      body: receiptBody({ ...claim.receipt, state }),
     });
   }
   async current(job: Job): Promise<boolean> {
-    if ((await this.membership(job.requester.login)) !== "member") return false;
+    if (!this.trusted(job.requester)) return false;
     const user = requireObject(await this.api(`/users/${encodeURIComponent(job.requester.login)}`));
     if (user.id !== job.requester.id || user.type !== "User") return false;
     const pr = requireObject(await this.api(`${this.root}/pulls/${job.snapshot.number}`));
@@ -225,10 +221,9 @@ export class Coordinator {
   }
   async publishReview(
     job: Job,
-    value: unknown,
+    passes: ReviewPasses,
     claim: StoredReceipt,
   ): Promise<"published" | "stale"> {
-    const review = validateReview(value, job.snapshot);
     if (!(await this.current(job))) {
       await this.finish(claim, "stale");
       return "stale";
@@ -243,12 +238,27 @@ export class Coordinator {
         );
       })
     ) {
+      const payload = await reviewPayload(job, passes);
       await this.api(`${this.root}/pulls/${job.snapshot.number}/reviews`, "POST", {
-        event: "COMMENT",
-        commit_id: job.snapshot.head,
-        body: `${renderReview(job, review)}\n\n${receiptMarker}`,
+        ...payload,
+        body: `${payload.body}\n\n${receiptMarker}`,
       });
     }
+    await this.finish(claim, "published");
+    return "published";
+  }
+  async publishQuestion(
+    job: Job,
+    question: string,
+    claim: StoredReceipt,
+  ): Promise<"published" | "stale"> {
+    if (!(await this.current(job))) {
+      await this.finish(claim, "stale");
+      return "stale";
+    }
+    await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
+      body: `@${job.requester.login} ${question}`,
+    });
     await this.finish(claim, "published");
     return "published";
   }
@@ -366,44 +376,35 @@ export class Coordinator {
     existing: StoredReceipt[],
     head: string,
   ): Promise<string> {
-    const prior = existing
-      .filter(
-        (item) =>
-          item.receipt.state === "published" &&
-          item.receipt.job.role === role &&
-          item.receipt.job.task === "review",
-      )
+    const published = existing.filter(
+      (item) => item.receipt.state === "published" && item.receipt.job.role === role,
+    );
+    if (!published.length) return "Initial full base-to-head review.";
+    const reviews = (await this.list(`${this.root}/pulls/${number}/reviews`))
+      .map(requireObject)
+      .filter((review) => requireObject(review.user).id === this.options.botId);
+    const prior = published
+      .flatMap((item) => {
+        const review = reviews.find((candidate) =>
+          String(candidate.body).endsWith(`<!-- aircastle-ai-result:${item.receipt.id} -->`),
+        );
+        return review ? [{ old: item.receipt.job.snapshot.head, body: String(review.body) }] : [];
+      })
       .at(-1);
     if (!prior) return "Initial full base-to-head review.";
-    const old = prior.receipt.job.snapshot.head;
     const compare = requireObject(
-      await this.api(`${this.root}/compare/${sha(old)}...${sha(head)}`),
+      await this.api(`${this.root}/compare/${sha(prior.old)}...${sha(head)}`),
     );
     if (!["ahead", "identical"].includes(String(compare.status)))
-      return `History rewritten since ${old}; perform a full review.`;
-    const reviews = await this.list(`${this.root}/pulls/${number}/reviews`);
-    const review = reviews
-      .map(requireObject)
-      .find(
-        (r) =>
-          requireObject(r.user).id === this.options.botId &&
-          String(r.body).endsWith(`<!-- aircastle-ai-result:${prior.receipt.id} -->`),
-      );
-    return review
-      ? `Incremental review since ${old}. Previous advisory evidence:\n${String(review.body).slice(0, 16000)}`
-      : "Previous evidence unavailable; perform a full review.";
+      return `History rewritten since ${prior.old}; perform a full review.`;
+    return `Incremental review since ${prior.old}. Previous advisory evidence:\n${prior.body.slice(0, 16000)}`;
   }
   async command(
     raw: unknown,
     source: Comment["source"],
   ): Promise<{ number: number; comment: Comment } | null> {
     const c = requireObject(raw);
-    if (
-      typeof c.body !== "string" ||
-      !parseCommand(c.body) ||
-      c.created_at !== c.updated_at ||
-      Date.parse(String(c.created_at)) < Date.parse(this.options.activatedAt)
-    )
+    if (typeof c.body !== "string" || !parseCommand(c.body) || c.created_at !== c.updated_at)
       return null;
     const author = identity(c.user);
     if (author.type !== "User") return null;
@@ -425,10 +426,7 @@ export class Coordinator {
       for (const r of relevant) {
         const user = identity(r.user);
         if (!trusted.has(user.login))
-          trusted.set(
-            user.login,
-            user.id === this.options.botId || (await this.membership(user.login)) === "member",
-          );
+          trusted.set(user.login, user.id === this.options.botId || this.trusted(user));
       }
       thread = JSON.stringify(
         relevant.map((r) => ({
@@ -436,13 +434,13 @@ export class Coordinator {
           author: identity(r.user).login,
           body: trusted.get(identity(r.user).login)
             ? r.body
-            : "[omitted: not written by an organization member]",
+            : "[omitted: not written by the trigger user]",
           path: r.path,
           diff_hunk: r.diff_hunk,
           commit_id: r.commit_id,
           original_commit_id: r.original_commit_id,
         })),
-      ).slice(0, 24000);
+      ).slice(0, threadLimit);
     }
     return {
       number,
@@ -456,224 +454,95 @@ export class Coordinator {
       },
     };
   }
-  async cursor(): Promise<{ commentId: number | null; value: Cursor }> {
-    const comments = await this.list(`${this.root}/issues/${this.options.stateIssue}/comments`);
-    const owned = comments
-      .map(requireObject)
-      .find(
-        (c) =>
-          requireObject(c.user).id === this.options.botId &&
-          requireObject(c.user).type === "Bot" &&
-          String(c.body).startsWith(cursorMarker),
-      );
-    if (owned) {
-      const value = requireObject(JSON.parse(String(owned.body).slice(cursorMarker.length)));
-      integer(value.prPage);
-      for (const stream of [requireObject(value.issue), requireObject(value.inline)]) {
-        integer(stream.page);
-        if (
-          !Number.isFinite(Date.parse(String(stream.since))) ||
-          !Number.isFinite(Date.parse(String(stream.started)))
-        )
-          throw new Error("Invalid cursor time");
-      }
-      return { commentId: integer(owned.id), value: value as unknown as Cursor };
-    }
-    const initial = { since: this.options.activatedAt, started: new Date().toISOString(), page: 1 };
-    return {
-      commentId: null,
-      value: { version: 1, prPage: 1, issue: { ...initial }, inline: { ...initial } },
-    };
-  }
-  async prepare(config: ModelConfig, immediateComment?: number): Promise<Job[]> {
-    for (const role of [
-      "codexReviewer",
-      "codexImplementer",
-      "claudeReviewer",
-      "claudeImplementer",
-    ] as const) {
-      if (config.roles[role].provider !== (role.startsWith("codex") ? "openai" : "anthropic"))
-        throw new Error("setup_required: role provider does not match command provider");
-    }
-    const state = await this.cursor();
-    const jobs: Job[] = [];
-    const queue = async (number: number, role: Role, command?: Comment): Promise<boolean> => {
-      if (jobs.length >= 6) return false;
-      const response = await this.request(`${this.root}/pulls/${number}`);
-      if (response.status === 404) return true;
-      if (response.status !== 200) throw new Error("PR lookup unavailable");
-      const pr = requireObject(response.data);
-      if (pr.state !== "open") return true;
-      const requester = command?.author ?? identity(pr.user);
-      if (requester.type !== "User" || (await this.membership(requester.login)) !== "member")
-        return true;
-      const existing = await this.receipts(number);
-      const base = requireObject(pr.base),
-        head = requireObject(pr.head);
-      const bare: Snapshot = {
-        repositoryId: integer(requireObject(base.repo).id),
-        number,
-        base: sha(base.sha),
-        head: sha(head.sha),
-        headRepositoryId: integer(requireObject(head.repo).id),
-        baseRef: text(base.ref, 200),
-        author: identity(pr.user),
-        fork: requireObject(head.repo).id !== requireObject(base.repo).id,
-        tree: sha(head.sha),
-        files: [],
-        omitted: [],
-        changedPaths: [],
-        complete: false,
-      };
-      const invocation: Invocation = command
-        ? { kind: "manual", snapshot: bare, role, command, control: this.options.control }
-        : { kind: "automatic", snapshot: bare, role, control: this.options.control };
-      const id = operationId(invocation),
-        prior = existing.find((r) => r.receipt.id === id);
-      if (
-        prior &&
-        (prior.receipt.state === "published" ||
-          prior.receipt.state === "stale" ||
-          prior.receipt.attempt >= 2 ||
-          Date.now() - Date.parse(prior.receipt.at) < 30 * 60_000)
-      )
-        return true;
-      if (
-        prior &&
-        (prior.receipt.job.snapshot.head !== bare.head ||
-          prior.receipt.job.snapshot.base !== bare.base)
-      ) {
-        await this.finish(prior, "stale");
-        return true;
-      }
-      const authorization = await this.authorize(invocation);
-      if (authorization.kind !== "authorized") return true;
-      const snapshot = await this.snapshot(number, prior?.receipt.job.snapshot ?? bare);
-      const job: Job = {
-        version: 1,
-        id,
-        task: authorization.task,
-        role,
-        requester,
-        snapshot,
-        instructions: authorization.instructions,
-        thread: authorization.thread,
-        control: this.options.control,
-        selection: config.roles[role],
-        previous: await this.previous(number, role, existing, snapshot.head),
-      };
-      if (job.task === "fix" && (!snapshot.complete || job.thread.length >= 24000))
-        throw new Error("Fix requires complete bounded changed-file context");
-      if (prior && prior.receipt.digest !== digest(job)) return true;
-      if (await this.claim(job, existing)) jobs.push(job);
-      return true;
-    };
-    const manual = async (raw: unknown, source: Comment["source"]): Promise<boolean> => {
-      try {
-        const c = requireObject(raw);
-        if (typeof c.body !== "string" || !parseCommand(c.body)) return true;
-        if ((await this.membership(identity(c.user).login)) !== "member") return true;
-        const accepted = await this.command(raw, source);
-        if (!accepted) return true;
-        const cmd = parseCommand(accepted.comment.body)!;
-        const role: Role = `${cmd.provider === "openai" ? "codex" : "claude"}${cmd.kind === "fix" ? "Implementer" : "Reviewer"}`;
-        return await queue(accepted.number, role, accepted.comment);
-      } catch (error) {
-        console.error(
-          "Skipped PR command:",
-          error instanceof Error ? error.message : "unavailable",
-        );
-        return true;
-      }
-    };
-    if (immediateComment)
-      await manual(
-        await this.api(`${this.root}/issues/comments/${integer(immediateComment)}`),
-        "issue",
-      );
-    for (const source of ["issue", "inline"] as const) {
-      const stream = state.value[source];
-      const path = source === "issue" ? "issues/comments" : "pulls/comments";
-      const comments = await this.page(
-        `${this.root}/${path}?since=${encodeURIComponent(stream.since)}&sort=created&direction=asc`,
-        stream.page,
-      );
-      let consumed = true;
-      for (const raw of comments)
-        if (!(await manual(raw, source))) {
-          consumed = false;
-          break;
-        }
-      if (consumed) {
-        if (comments.length === 100) stream.page++;
-        else {
-          stream.since = new Date(
-            Math.max(Date.parse(this.options.activatedAt), Date.parse(stream.started) - 600000),
-          ).toISOString();
-          stream.started = new Date().toISOString();
-          stream.page = 1;
-        }
-      }
-    }
-    const prs = await this.page(
-      `${this.root}/pulls?state=open&sort=created&direction=asc`,
-      state.value.prPage,
+  async prepare(config: ModelConfig, commentId: number): Promise<Job[]> {
+    const accepted = await this.command(
+      await this.api(`${this.root}/issues/comments/${integer(commentId)}`),
+      "issue",
     );
-    let consumed = true;
-    for (const raw of prs) {
-      const number = integer(requireObject(raw).number);
-      try {
-        for (const role of ["codexReviewer", "claudeReviewer"] as const)
-          if (!(await queue(number, role))) {
-            consumed = false;
-            break;
-          }
-        if (!consumed) break;
-        const existing = await this.receipts(number);
-        for (const prior of existing.filter(
-          (r) => ["claimed", "failed"].includes(r.receipt.state) && r.receipt.attempt < 2,
-        )) {
-          const original = prior.receipt.job;
-          if (
-            Date.now() - Date.parse(prior.receipt.at) < 30 * 60_000 ||
-            jobs.length >= 6 ||
-            !(await this.current({ ...original, snapshot: { ...original.snapshot, files: [] } }))
-          )
-            continue;
-          const snapshot = await this.snapshot(number, original.snapshot);
-          const job: Job = {
-            ...original,
-            snapshot,
-            control: this.options.control,
-            selection: config.roles[original.role],
-          };
-          if (await this.claim(job, existing)) jobs.push(job);
-        }
-      } catch (error) {
-        console.error(
-          `Skipped PR #${number}:`,
-          error instanceof Error ? error.message : "unavailable",
-        );
-      }
+    if (!accepted) return [];
+    const { number, comment: command } = accepted;
+    const requester = command.author;
+    if (!this.trusted(requester)) return [];
+    const cmd = parseCommand(command.body)!;
+    const role: Role = cmd.kind === "fix" ? "implementer" : "reviewer";
+    const response = await this.request(`${this.root}/pulls/${number}`);
+    if (response.status === 404) return [];
+    if (response.status !== 200) throw new Error("PR lookup unavailable");
+    const pr = requireObject(response.data);
+    if (pr.state !== "open") return [];
+    const existing = await this.receipts(number);
+    const base = requireObject(pr.base),
+      head = requireObject(pr.head);
+    const bare: Snapshot = {
+      repositoryId: integer(requireObject(base.repo).id),
+      number,
+      base: sha(base.sha),
+      head: sha(head.sha),
+      headRepositoryId: integer(requireObject(head.repo).id),
+      baseRef: text(base.ref, 200),
+      author: identity(pr.user),
+      fork: requireObject(head.repo).id !== requireObject(base.repo).id,
+      tree: sha(head.sha),
+      files: [],
+      omitted: [],
+      changedPaths: [],
+      complete: false,
+    };
+    const invocation: Invocation = {
+      kind: "manual",
+      snapshot: bare,
+      role,
+      command,
+      control: this.options.control,
+    };
+    const id = operationId(invocation),
+      prior = existing.find((r) => r.receipt.id === id);
+    if (
+      prior &&
+      (prior.receipt.state === "published" ||
+        prior.receipt.state === "stale" ||
+        prior.receipt.attempt >= 2 ||
+        Date.now() - Date.parse(prior.receipt.at) < 30 * 60_000)
+    )
+      return [];
+    if (
+      prior &&
+      (prior.receipt.job.snapshot.head !== bare.head ||
+        prior.receipt.job.snapshot.base !== bare.base)
+    ) {
+      await this.finish(prior, "stale");
+      return [];
     }
-    if (consumed) state.value.prPage = prs.length === 100 ? state.value.prPage + 1 : 1;
-    if (state.commentId)
-      await this.api(`${this.root}/issues/comments/${state.commentId}`, "PATCH", {
-        body: cursorMarker + JSON.stringify(state.value),
-      });
-    else
-      await this.api(`${this.root}/issues/${this.options.stateIssue}/comments`, "POST", {
-        body: cursorMarker + JSON.stringify(state.value),
-      });
-    return jobs;
+    const authorization = this.authorize(invocation);
+    if (authorization.kind !== "authorized") return [];
+    const snapshot = await this.snapshot(number, prior?.receipt.job.snapshot ?? bare);
+    const job: Job = {
+      version: 1,
+      id,
+      ...(cmd.kind === "request"
+        ? ({ task: "request", implementation: config.roles.implementer } as const)
+        : { task: authorization.task }),
+      role,
+      requester,
+      snapshot,
+      instructions: authorization.instructions,
+      thread: authorization.thread,
+      control: this.options.control,
+      selection: config.roles[role],
+      previous: await this.previous(number, role, existing, snapshot.head),
+    };
+    if (job.task === "fix" && !contextComplete(job))
+      throw new Error("Fix requires complete bounded changed-file context");
+    if (prior && prior.receipt.digest !== digest(job)) return [];
+    return (await this.claim(job, existing)) ? [job] : [];
   }
   async publishFix(
     job: Job,
-    raw: unknown,
+    fix: Fix,
     verification: Verification,
     claim: StoredReceipt,
   ): Promise<string> {
-    const fix: Fix = validateEdits(raw, job.snapshot);
+    const selection = job.task === "request" ? job.implementation : job.selection;
     const commands = verificationPlan(fix.edits);
     if (!boundVerification(job, fix.edits, verification)) {
       await this.finish(claim, "failed");
@@ -774,7 +643,7 @@ export class Coordinator {
         title: `AI fix for #${job.snapshot.number}: ${fix.summary.slice(0, 100)}`,
         head: branch,
         base: job.snapshot.baseRef,
-        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${job.selection.model}; effort sent: ${job.selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}.\n\nSelected commands:\n\n\`\`\`text\n${commands.map((args) => args.join(" ")).join("\n")}\n\`\`\`\n\nOrdinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
+        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${selection.model}; effort sent: ${selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}.\n\nSelected commands:\n\n\`\`\`text\n${commands.map((args) => args.join(" ")).join("\n")}\n\`\`\`\n\nOrdinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
       }),
     );
     await this.finish(claim, "published");
@@ -797,7 +666,5 @@ export class Coordinator {
     const bot = requireObject(await this.api(`/user/${this.options.botId}`));
     if (bot.type !== "Bot" || (this.options.botLogin && bot.login !== this.options.botLogin))
       throw new Error("setup_required: configured bot identity must be a bot");
-    const members = await this.request("/orgs/vinlandatelier/members?per_page=1");
-    if (members.status !== 200) throw new Error("setup_required: App Members read unavailable");
   }
 }
