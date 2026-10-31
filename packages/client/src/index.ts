@@ -7,7 +7,7 @@ import type {
   Fetch,
   Result,
 } from "@aircastle/contracts";
-import type { InferInput, InferOutput } from "@aircastle/schema";
+import type { InferInput, InferRead } from "@aircastle/schema";
 import {
   deletedDocument,
   documentPage,
@@ -40,7 +40,7 @@ type TextFieldName<Collection extends Definition> = {
 /** A document as `findById`, `update` and `list` return it. */
 export type StoredDocument<Collection extends Definition> = {
   id: string;
-} & InferOutput<Collection>;
+} & InferRead<Collection>;
 /** Fields to replace. A property whose value is `undefined` changes nothing. */
 export type DocumentChanges<Collection extends Definition> = {
   [Name in FieldName<Collection>]?: InferInput<Collection>[Name] | undefined;

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   CollectionDescription,
   ContentDocument,
+  DocumentData,
   Permission,
   ProjectState,
   PublishedCollection,
@@ -46,6 +47,11 @@ export const articles: {
   },
 };
 export const collections: PublishedCollection[] = [{ name: "articles", description: articles }];
+
+/** A reference lookup or insert the service made, in call order. */
+export type StorageCall =
+  | { kind: "existing"; collection: string; ids: string[] }
+  | { kind: "insert"; collection: string; data: DocumentData };
 
 export function successful<Value>(result: Result<Value>): Value {
   expect(result.ok).toBe(true);
@@ -151,6 +157,7 @@ export function controlledStore(
     closed: 0,
     transactions: 0,
     authorization: [] as { project: string; verifier: string; permission: Permission }[],
+    storage: [] as StorageCall[],
   };
   const transaction: ProjectTransaction = {
     state: async () => structuredClone(state),
@@ -167,6 +174,7 @@ export function controlledStore(
       }
     },
     insert: async (collection, data, uniqueFields) => {
+      observations.storage.push({ kind: "insert", collection, data: structuredClone(data) });
       const existing = active(collection);
       const conflict = uniqueFields.find(
         (field) =>
@@ -223,6 +231,14 @@ export function controlledStore(
         )
         .sort((left, right) => comparePositions(order, left.position, right.position));
       return { entries: matching.slice(0, limit), more: matching.length > limit };
+    },
+    existing: async (collection, ids) => {
+      observations.storage.push({ kind: "existing", collection, ids: [...ids] });
+      return new Set(
+        active(collection)
+          .map((document) => document.id)
+          .filter((id) => ids.includes(id)),
+      );
     },
   };
   const store: ContentStore = {

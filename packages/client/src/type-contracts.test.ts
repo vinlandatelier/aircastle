@@ -133,6 +133,11 @@ describe.each(["source", "declarations"] as const)("%s client type contract", (t
     }
   }, 30_000);
 
+  test("field-type create inputs and read results use the inferred input and read types", () => {
+    const result = compile(configFor(target, join(root, "tests/types/field-types.ts")));
+    expect(result.status, result.output).toBe(0);
+  }, 30_000);
+
   test.each(cases)(
     "rejects $file at its intended expression",
     (fixture) => {

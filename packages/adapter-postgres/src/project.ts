@@ -7,7 +7,7 @@ import type {
   DocumentData,
   Result,
 } from "@aircastle/contracts";
-import { canonicalContract, parseCollections, uniqueFields } from "@aircastle/contracts";
+import { canonicalContract, compileDescription, uniqueFields } from "@aircastle/contracts";
 import { identifier } from "./identifier.ts";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -19,9 +19,11 @@ class UniqueConflict extends Error {
 }
 
 function description(value: string): CollectionDescription {
-  const parsed = parseCollections([{ name: "contract", description: JSON.parse(value) }]);
-  if (!parsed.ok || !parsed.data[0]) throw new Error("Invalid persisted collection definition");
-  return parsed.data[0].description;
+  try {
+    return compileDescription(JSON.parse(value)).describe();
+  } catch (error) {
+    throw new Error("Invalid persisted collection definition", { cause: error });
+  }
 }
 
 function document(row: { id: string; data: unknown }): ContentDocument {
@@ -29,8 +31,7 @@ function document(row: { id: string; data: unknown }): ContentDocument {
     throw new Error("Invalid persisted document object");
   const data: DocumentData = {};
   for (const [field, value] of Object.entries(row.data)) {
-    if (field === "id" || (value !== null && typeof value !== "string"))
-      throw new Error("Invalid persisted document value");
+    if (field === "id") throw new Error("Invalid persisted document value");
     Object.defineProperty(data, field, {
       value,
       enumerable: true,
@@ -257,6 +258,14 @@ export function projectTransaction(
         return { document: document(row), position };
       });
       return { entries, more: rows.length > request.limit };
+    },
+    existing: async (collection, ids) => {
+      if (ids.length === 0) return new Set<string>();
+      await resolveCollection(collection);
+      const rows = await sql<
+        { id: string }[]
+      >`SELECT id FROM ${table("documents")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} AND id = ANY(${ids as string[]}::uuid[]) FOR SHARE`;
+      return new Set(rows.map((row) => row.id));
     },
   };
 }
