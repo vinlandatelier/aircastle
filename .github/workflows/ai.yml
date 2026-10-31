@@ -41,7 +41,7 @@ jobs:
           repositories: ${{ github.event.repository.name }}
           permission-contents: read
           permission-issues: write
-          permission-pull-requests: read
+          permission-pull-requests: write
           permission-environments: read
           permission-administration: read
       - id: plan
