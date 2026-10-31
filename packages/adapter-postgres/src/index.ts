@@ -3,11 +3,11 @@ import postgres from "postgres";
 import { StorageUnavailable } from "@aircastle/core";
 import type { ContentStore, ProjectTransaction } from "@aircastle/core";
 import { identifier } from "./identifier.ts";
-import { initializeLayout, validatedNamespace } from "./layout.ts";
+import { connectionTarget, initializeLayout } from "./layout.ts";
 import { projectTransaction } from "./project.ts";
 
 export { readPostgresOptions } from "./config.ts";
-export { postgresAuthAdmission } from "./auth-admission.ts";
+export { postgresAuthAdmission } from "./auth/admission.ts";
 export { postgresAuthStore } from "./auth/index.ts";
 
 export interface PostgresOptions {
@@ -56,12 +56,8 @@ async function databaseOperation<Value>(operation: () => Promise<Value>): Promis
 }
 
 export function postgresAdapter(options: PostgresOptions): ContentStore {
-  const namespace = validatedNamespace(
-    options.namespace === undefined ? "aircastle" : options.namespace,
-  );
-  if (typeof options.url !== "string" || options.url.length === 0)
-    throw new Error("Postgres URL is required");
-  const sql = postgres(options.url, { max: 10, onnotice: () => {} });
+  const { url, namespace } = connectionTarget(options);
+  const sql = postgres(url, { max: 10, onnotice: () => {} });
   const table = (name: string) => identifier(sql, namespace, name);
   let closing: Promise<void> | undefined;
   return {

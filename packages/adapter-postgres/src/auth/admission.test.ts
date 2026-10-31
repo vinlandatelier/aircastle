@@ -3,8 +3,8 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import type { AuthAdmissionStore, AuthLimits, AuthLimitScope } from "@aircastle/core";
-import { postgresAuthAdmission } from "./index.ts";
-import { withDatabase } from "./test-support/database.ts";
+import { postgresAuthAdmission } from "../index.ts";
+import { withDatabase } from "../test-support/database.ts";
 
 const defaults: AuthLimits = {
   email: { fiveMinutes: 5, oneHour: 20 },
@@ -18,6 +18,67 @@ const generous: AuthLimits = {
 };
 const start = Date.UTC(2026, 0, 1);
 const request = { source: "127.0.0.1", email: "alex@example.test" };
+
+async function withAdmissionWorker(
+  database: { url: string; namespace: string },
+  run: (worker: {
+    output: () => Promise<string>;
+    send: (command: string) => void;
+    kill: () => Promise<void>;
+  }) => Promise<void>,
+) {
+  const child = spawn(
+    "bun",
+    [
+      "--conditions=development",
+      fileURLToPath(new URL("../test-support/auth-admission-worker.ts", import.meta.url)),
+    ],
+    {
+      env: {
+        ...process.env,
+        AIRCASTLE_DATABASE_URL: database.url,
+        AIRCASTLE_AUTH_TEST_NAMESPACE: database.namespace,
+      },
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  let stderr = "";
+  child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+  const exited = new Promise<void>((resolve, reject) => {
+    child.once("exit", () => resolve());
+    child.once("error", reject);
+  });
+  const output = async () => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        once(child.stdout, "data").then(([chunk]) => String(chunk).trim()),
+        exited.then(() => {
+          throw new Error(`Admission worker exited: ${stderr}`);
+        }),
+        new Promise<string>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`Admission worker timed out: ${stderr}`)),
+            10_000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+  const kill = async () => {
+    child.kill("SIGKILL");
+    await exited;
+  };
+  try {
+    await run({ output, send: (command) => child.stdin.write(`${command}\n`), kill });
+  } finally {
+    await kill();
+  }
+}
 
 async function withAdmission(
   run: (fixture: {
@@ -336,49 +397,10 @@ describe("durable auth request admission", () => {
       const parent = await open();
       for (let index = 0; index < 4; index++)
         expect(await parent.admit(request)).toEqual({ kind: "admitted" });
-      const child = spawn(
-        "bun",
-        [
-          "--conditions=development",
-          fileURLToPath(new URL("./test-support/auth-admission-worker.ts", import.meta.url)),
-        ],
-        {
-          env: {
-            ...process.env,
-            AIRCASTLE_DATABASE_URL: url,
-            AIRCASTLE_AUTH_TEST_NAMESPACE: namespace,
-          },
-          stdio: ["pipe", "pipe", "pipe"],
-        },
-      );
-      let stderr = "";
-      child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
-        stderr += chunk;
-      });
-      const exited = new Promise<void>((resolve, reject) => {
-        child.once("exit", () => resolve());
-        child.once("error", reject);
-      });
-      const output = async () => {
-        let timeout: ReturnType<typeof setTimeout> | undefined;
-        try {
-          return await Promise.race([
-            once(child.stdout, "data").then(([chunk]) => String(chunk).trim()),
-            exited.then(() => {
-              throw new Error(`Admission worker exited: ${stderr}`);
-            }),
-            new Promise<string>((_, reject) => {
-              timeout = setTimeout(() => reject(new Error(`Worker timed out: ${stderr}`)), 5_000);
-            }),
-          ]);
-        } finally {
-          clearTimeout(timeout);
-        }
-      };
-      try {
+      await withAdmissionWorker({ url, namespace }, async ({ output, send }) => {
         expect(await output()).toBe("ready");
         const childResult = output();
-        child.stdin.write("admit\n");
+        send("admit");
         const [local, remoteText] = await Promise.all([parent.admit(request), childResult]);
         const remote: unknown = JSON.parse(remoteText);
         expect(remote).toHaveProperty("kind");
@@ -397,62 +419,21 @@ describe("durable auth request admission", () => {
           retryAt: start + 300_000,
           scopes: ["email"],
         });
-      } finally {
-        child.kill("SIGKILL");
-        await exited;
-      }
+      });
     });
   });
 
   test("an abruptly killed process cannot permanently block a coordinated policy change", async () => {
     await withAdmission(async ({ open, url, namespace }) => {
-      const worker = fileURLToPath(
-        new URL("./test-support/auth-admission-worker.ts", import.meta.url),
-      );
-      const child = spawn("bun", ["--conditions=development", worker], {
-        env: {
-          ...process.env,
-          AIRCASTLE_DATABASE_URL: url,
-          AIRCASTLE_AUTH_TEST_NAMESPACE: namespace,
-        },
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      let stderr = "";
-      child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
-        stderr += chunk;
-      });
-      const exited = new Promise<void>((resolve, reject) => {
-        child.once("exit", () => resolve());
-        child.once("error", reject);
-      });
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        const ready = await Promise.race([
-          once(child.stdout, "data").then(([chunk]) => String(chunk).trim()),
-          exited.then(() => {
-            throw new Error(`Admission worker exited before ready: ${stderr}`);
-          }),
-          new Promise<string>((_, reject) => {
-            timer = setTimeout(
-              () => reject(new Error(`Admission worker did not start: ${stderr}`)),
-              10_000,
-            );
-          }),
-        ]);
-        clearTimeout(timer);
-        expect(ready).toBe("ready");
+      await withAdmissionWorker({ url, namespace }, async ({ output, kill }) => {
+        expect(await output()).toBe("ready");
         const changed = { ...defaults, global: { fiveMinutes: 31, oneHour: 100 } };
         await expect(open(changed)).rejects.toThrow(/policy|configuration|limits/i);
-        child.kill("SIGKILL");
-        await exited;
+        await kill();
         await expect.poll(() => open(changed), { timeout: 5_000 }).toHaveProperty("admit");
         const restarted = await open(changed);
         expect(await restarted.admit(request)).toEqual({ kind: "admitted" });
-      } finally {
-        clearTimeout(timer);
-        child.kill("SIGKILL");
-        await exited;
-      }
+      });
     });
   });
 });

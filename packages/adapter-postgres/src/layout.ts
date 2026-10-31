@@ -1,4 +1,5 @@
 import type postgres from "postgres";
+import type { PostgresOptions } from "./index.ts";
 import { identifier } from "./identifier.ts";
 
 type Transaction = postgres.TransactionSql;
@@ -12,6 +13,15 @@ export function validatedNamespace(value: string) {
       throw new Error("Invalid Postgres namespace Unicode");
   }
   return value;
+}
+
+export function connectionTarget(options: PostgresOptions) {
+  const namespace = validatedNamespace(
+    options.namespace === undefined ? "aircastle" : options.namespace,
+  );
+  if (typeof options.url !== "string" || options.url.length === 0)
+    throw new Error("Postgres URL is required");
+  return { url: options.url, namespace };
 }
 
 export async function initializeLayout(sql: Transaction, namespace: string) {

@@ -3,17 +3,13 @@ import { AuthStorageError } from "@aircastle/core";
 import type { AuthStore } from "@aircastle/core";
 import type { PostgresOptions } from "../index.ts";
 import { identifier } from "../identifier.ts";
-import { validatedNamespace } from "../layout.ts";
+import { connectionTarget } from "../layout.ts";
 import { initializeAuthLayout } from "./layout.ts";
 import { authTransaction } from "./transaction.ts";
 
 export async function postgresAuthStore(options: PostgresOptions): Promise<AuthStore> {
-  const namespace = validatedNamespace(
-    options.namespace === undefined ? "aircastle" : options.namespace,
-  );
-  if (typeof options.url !== "string" || options.url.length === 0)
-    throw new Error("Postgres URL is required");
-  const sql = postgres(options.url, { max: 10, prepare: false, onnotice: () => {} });
+  const { url, namespace } = connectionTarget(options);
+  const sql = postgres(url, { max: 10, prepare: false, onnotice: () => {} });
   try {
     await sql.begin((transaction) => initializeAuthLayout(transaction, namespace));
   } catch (error) {
@@ -37,8 +33,8 @@ export async function postgresAuthStore(options: PostgresOptions): Promise<AuthS
   ): Promise<Value> {
     let readyToCommit = false;
     try {
-      const result = await sql.begin(async (sql) => {
-        const value = await track(() => operation(sql));
+      const result = await sql.begin(async (transactionSql) => {
+        const value = await operation(transactionSql);
         readyToCommit = true;
         return { value };
       });

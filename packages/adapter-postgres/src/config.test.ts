@@ -40,9 +40,12 @@ describe("Postgres environment configuration", () => {
     expect(parsed.hash).toBe("");
   });
 
-  test.each(["::1", "[::1]"])("accepts IPv6 host %s", (host) => {
-    expect(new URL(readPostgresOptions({ AIRCASTLE_DB_HOST: host }).url).hostname).toBe("[::1]");
-  });
+  test.each(["::1", "[::1]"])(
+    "rejects IPv6 host %s, which the Postgres driver cannot reach",
+    (host) => {
+      expect(() => readPostgresOptions({ AIRCASTLE_DB_HOST: host })).toThrow("AIRCASTLE_DB_HOST");
+    },
+  );
 
   test.each(["1", "65535"])("accepts port boundary %s", (port) => {
     expect(new URL(readPostgresOptions({ AIRCASTLE_DB_PORT: port }).url).port).toBe(port);
@@ -60,10 +63,6 @@ describe("Postgres environment configuration", () => {
         AIRCASTLE_DB_PASSWORD: "ignored",
       }),
     ).toEqual({ url });
-  });
-
-  test("allows an explicitly empty password", () => {
-    expect(new URL(readPostgresOptions({ AIRCASTLE_DB_PASSWORD: "" }).url).password).toBe("");
   });
 
   test.each(["", "0", "-1", "65536", "5432.5", "bad", " 5432"])(
@@ -87,9 +86,12 @@ describe("Postgres environment configuration", () => {
     expect(() => readPostgresOptions({ AIRCASTLE_DB_HOST: host })).toThrow("AIRCASTLE_DB_HOST");
   });
 
-  test.each(["AIRCASTLE_DB_USER", "AIRCASTLE_DB_NAME"])("rejects empty %s", (name) => {
-    expect(() => readPostgresOptions({ [name]: "" })).toThrow(name);
-  });
+  test.each(["AIRCASTLE_DB_USER", "AIRCASTLE_DB_NAME", "AIRCASTLE_DB_PASSWORD"])(
+    "rejects empty %s",
+    (name) => {
+      expect(() => readPostgresOptions({ [name]: "" })).toThrow(name);
+    },
+  );
 
   test.each(["AIRCASTLE_DB_USER", "AIRCASTLE_DB_NAME", "AIRCASTLE_DB_PASSWORD"])(
     "rejects null bytes in %s without disclosing the value",
@@ -100,12 +102,15 @@ describe("Postgres environment configuration", () => {
     },
   );
 
-  test.each(["", "not-a-url", "https://host/database", "postgresql://host/database#fragment"])(
-    "rejects invalid explicit URL %j without falling back",
-    (url) => {
-      expect(() => readPostgresOptions({ AIRCASTLE_DATABASE_URL: url })).toThrow(
-        "AIRCASTLE_DATABASE_URL",
-      );
-    },
-  );
+  test.each([
+    "",
+    "not-a-url",
+    "https://host/database",
+    "postgresql://host/database#fragment",
+    "postgresql://user@[::1]:5432/database",
+  ])("rejects invalid explicit URL %j without falling back", (url) => {
+    expect(() => readPostgresOptions({ AIRCASTLE_DATABASE_URL: url })).toThrow(
+      "AIRCASTLE_DATABASE_URL",
+    );
+  });
 });

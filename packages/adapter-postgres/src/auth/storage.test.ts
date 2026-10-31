@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vite-plus/test";
-import { postgresAdapter, postgresAuthStore } from "../index.ts";
+import { postgresAdapter, postgresAuthAdmission, postgresAuthStore } from "../index.ts";
 import { withDatabase } from "../test-support/database.ts";
 
 async function withStore(
@@ -88,6 +88,33 @@ test("different namespaces never share signing material", async () => {
       const secret = await auth.signingSecret();
       expect(secret).not.toBe(await other.signingSecret());
     });
+  });
+});
+
+test("a version 1 auth namespace gains request admission storage on upgrade", async () => {
+  await withDatabase(async ({ store, sql, namespace, url }) => {
+    await store.initialize();
+    await (await postgresAuthStore({ url, namespace })).close();
+    await sql`DROP TABLE ${sql(namespace)}.auth_admission_events`;
+    await sql`DROP TABLE ${sql(namespace)}.auth_admission_policy`;
+    await sql`DELETE FROM ${sql(namespace)}.auth_migrations WHERE version = 2`;
+    const admission = await postgresAuthAdmission({
+      url,
+      namespace,
+      limits: {
+        email: { fiveMinutes: 5, oneHour: 20 },
+        ip: { fiveMinutes: 10, oneHour: 30 },
+        global: { fiveMinutes: 30, oneHour: 100 },
+      },
+    });
+    try {
+      expect(await admission.admit({ source: "127.0.0.1" })).toEqual({ kind: "admitted" });
+    } finally {
+      await admission.close();
+    }
+    expect(
+      await sql`SELECT version FROM ${sql(namespace)}.auth_migrations ORDER BY version`,
+    ).toEqual([{ version: 1 }, { version: 2 }]);
   });
 });
 
