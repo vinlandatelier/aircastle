@@ -11,8 +11,3 @@ export const projects = [
   { workspace: 'Personal', plan: 'Free', name: 'Notes' },
   { workspace: 'Personal', plan: 'Free', name: 'Experiments' },
 ]
-
-export const user = {
-  name: 'Shaban Haider',
-  email: 'shaban@efferd.com',
-}

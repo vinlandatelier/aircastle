@@ -1,11 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { AtSignIcon, ChevronLeftIcon } from 'lucide-react'
+import { ChevronLeftIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { FloatingFrames } from './floating-frames'
+import { AuthForm, ConfirmationPage, useAuth } from '@/features/auth'
 
-export function SignInPage() {
+export function SignInPage({ purpose = 'sign-in' }: { purpose?: 'setup' | 'sign-in' }) {
+  const { auth } = useAuth()
   return (
     <main
       data-theme-scope="marketing"
@@ -40,31 +40,16 @@ export function SignInPage() {
           <div className="flex items-center gap-2 lg:hidden">
             <span aria-hidden="true" className="brand-logo block size-7 shrink-0" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-wide">Sign in to Aircastle</h1>
-          <form onSubmit={(event) => event.preventDefault()}>
-            <FieldGroup className="gap-2">
-              <Field>
-                <FieldLabel className="sr-only" htmlFor="email">
-                  Email
-                </FieldLabel>
-                <InputGroup>
-                  <InputGroupInput
-                    id="email"
-                    name="email"
-                    placeholder="your.email@example.com"
-                    type="email"
-                    autoComplete="email"
-                  />
-                  <InputGroupAddon align="inline-start">
-                    <AtSignIcon aria-hidden="true" />
-                  </InputGroupAddon>
-                </InputGroup>
-              </Field>
-              <Button className="w-full" type="submit" disabled>
-                Continue with email
-              </Button>
-            </FieldGroup>
-          </form>
+          {auth.confirmation ? (
+            <ConfirmationPage key={auth.confirmation.token} confirmation={auth.confirmation} />
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold tracking-wide">
+                {purpose === 'setup' ? 'Create your super user account' : 'Sign in'}
+              </h1>
+              <AuthForm purpose={purpose} />
+            </>
+          )}
           <p className="mt-8 text-sm text-muted-foreground">
             By clicking continue, you agree to our{' '}
             <a
