@@ -1,5 +1,16 @@
 import { test, expect } from './support'
 import { landingDescription, landingTitle } from '../src/metadata'
+import { origins } from './origins'
+
+test.use({ baseURL: origins.fixture.url })
+
+test.beforeEach(async ({ baseURL }, info) => {
+  expect(baseURL).toBe(origins.fixture.url)
+  info.annotations.push({
+    type: 'scenario',
+    description: 'display-only auth transport for public routing, metadata, and recovery',
+  })
+})
 
 test('marketing entry keeps its URL and exact metadata before and after startup', async ({
   page,

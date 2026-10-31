@@ -64,15 +64,16 @@ async function enlargeText(page: Page) {
     .toBeGreaterThan(baseline.text)
 }
 
-async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
+async function exerciseControls(page: Page, scenario: 'default' | 'long-text') {
   await assertLayout(page)
   const project = page.getByRole('button', { name: /^Switch project:/ })
   await project.click()
   const input = page.getByRole('combobox')
   await expect(input).toBeFocused()
   await assertBounded(page, page.getByRole('dialog', { name: 'Switch project', exact: true }))
-  const identity = scenario === 'normal' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
-  await input.fill(scenario === 'normal' ? 'Marketing Site' : longName)
+  const identity =
+    scenario === 'default' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
+  await input.fill(scenario === 'default' ? 'Marketing Site' : longName)
   const option = page.getByRole('option', { name: identity, exact: true })
   await expect(option).toHaveAccessibleName(identity)
   await option.click()
@@ -141,7 +142,7 @@ test.afterEach(async ({ page }, testInfo) => {
   }
 })
 
-for (const scenario of ['normal', 'long-text'] as const) {
+for (const scenario of ['default', 'long-text'] as const) {
   for (const viewport of viewports) {
     for (const theme of ['Light', 'Dark'] as const) {
       test(`${scenario} ${viewport.width}x${viewport.height} ${theme}: controls and overlays remain reachable`, async ({
@@ -305,7 +306,7 @@ test('empty-candidates: empty search preserves the current project, dismissal an
   await assertLayout(page)
 })
 
-for (const scenario of ['normal', 'long-text'] as const) {
+for (const scenario of ['default', 'long-text'] as const) {
   test(`${scenario} sidebar boundary: 767px drawer and 768px desktop controls remain operable`, async ({
     page,
   }) => {
