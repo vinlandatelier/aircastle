@@ -1,5 +1,5 @@
 import { Scalar } from "@scalar/hono-api-reference";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { requestId } from "hono/request-id";
 import { bodyLimit } from "hono/body-limit";
 import { openAPIRouteHandler } from "hono-openapi";
@@ -19,7 +19,7 @@ export function cmsErrorReporter(logger: Logger): ReportError {
 export function createApp({
   logger,
   cms,
-  maxRequestBytes,
+  maxRequestBytes = 1_048_576,
   auth,
 }: {
   logger: Logger;
@@ -39,17 +39,14 @@ export function createApp({
       onResMessage: () => "Request completed",
     },
   });
+  const credentialBearingPath = (c: Context) =>
+    c.req.path.startsWith("/api/auth/") || c.req.path.startsWith("/api/development-inbox/");
   const app = new Hono<{ Bindings: { peerAddress?: string } }>()
     .use(requestId())
-    .use(
-      except(
-        (c) =>
-          c.req.path.startsWith("/api/auth/") || c.req.path.startsWith("/api/development-inbox/"),
-        ordinaryLogger,
-      ),
-    )
+    .use(except(credentialBearingPath, ordinaryLogger))
     .onError((error, c) => {
       c.error = ErrorSummary.of(error);
+      if (credentialBearingPath(c)) logger.error({ err: c.error }, "Unexpected auth error");
       return c.json({ error: "Internal server error" }, 500);
     })
     .basePath("/api")
@@ -59,7 +56,7 @@ export function createApp({
     app.all(
       "/auth/*",
       bodyLimit({
-        maxSize: maxRequestBytes ?? 1_048_576,
+        maxSize: maxRequestBytes,
         onError: (c) => c.json({ kind: "request-too-large" }, 413),
       }),
       (c) => auth.handle(c.req.raw, { address: c.env?.peerAddress }),
@@ -67,11 +64,7 @@ export function createApp({
     app.all("/development-inbox/*", (c) => auth.handle(c.req.raw, { address: c.env?.peerAddress }));
   }
 
-  if (cms)
-    app.route(
-      "/",
-      contentRoutes({ cms, ...(maxRequestBytes === undefined ? {} : { maxRequestBytes }) }),
-    );
+  if (cms) app.route("/", contentRoutes({ cms, maxRequestBytes }));
 
   return app
     .get(

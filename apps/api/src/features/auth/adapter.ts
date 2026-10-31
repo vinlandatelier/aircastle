@@ -50,7 +50,7 @@ export function librarySessionRecord(session: AuthSessionRecord) {
 export function createLibraryAdapter(storage: AuthStore) {
   const bindings = new WeakMap<object, AuthTransaction>();
   function database(options: BetterAuthOptions, transaction?: AuthTransaction): DBAdapter {
-    const adapter = createAdapterFactory({
+    return createAdapterFactory({
       config: {
         adapterId: "aircastle-auth",
         supportsDates: true,
@@ -59,9 +59,9 @@ export function createLibraryAdapter(storage: AuthStore) {
         transaction: transaction
           ? false
           : (operation) =>
-              storage.transaction(async (transaction) => {
-                const bound = database(options, transaction);
-                bindings.set(bound, transaction);
+              storage.transaction(async (tx) => {
+                const bound = database(options, tx);
+                bindings.set(bound, tx);
                 try {
                   return await operation(bound);
                 } finally {
@@ -110,7 +110,6 @@ export function createLibraryAdapter(storage: AuthStore) {
           incrementOne: unavailable,
         }) satisfies CustomAdapter,
     })(options);
-    return adapter;
   }
   return {
     database: (options: BetterAuthOptions) => database(options),

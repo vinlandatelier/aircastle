@@ -1,5 +1,5 @@
 FROM oven/bun:1.4.4-slim AS bun
-FROM node:24.22.1-bookworm-slim AS build
+FROM node:24.11.0-bookworm-slim AS build
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 ENV PATH="/app/node_modules/.bin:${PATH}"
