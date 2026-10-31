@@ -171,9 +171,9 @@ export function projectTransaction(
       return rows[0] ? document(rows[0]) : undefined;
     },
     existing: async (collection, ids) => {
+      await resolveCollection(collection);
       const candidates = ids.filter((id) => documentId.test(id));
       if (candidates.length === 0) return new Set<string>();
-      await resolveCollection(collection);
       const rows = await sql<
         { id: string }[]
       >`SELECT id FROM ${table("documents")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} AND id = ANY(${candidates}::uuid[]) FOR SHARE`;
