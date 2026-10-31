@@ -40,9 +40,19 @@ The API uses port 43122 in both development and built runs. Override it with `AI
 
 Open [API documentation](http://localhost:43122/api/docs) or its [OpenAPI document](http://localhost:43122/api/openapi.json). The documentation UI loads a pinned Scalar script from jsDelivr and requires internet access.
 
-The API validates its environment variables at startup and exits if one is invalid. `AIRCASTLE_PORT` must be an integer from 1 to 65535. `AIRCASTLE_LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`.
+The API validates its environment variables at startup and exits if one is invalid. `AIRCASTLE_PORT` must be an integer from 1 to 65535. `AIRCASTLE_LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`. `NODE_ENV` remains the standard runtime/build variable; use `AIRCASTLE_ENV` for Aircastle mode.
 
-Start both apps concurrently with `vp run dev`.
+Start both apps concurrently with `vp run dev`. The dev servers load workspace TypeScript source, so no initial `vp run build` is needed.
+
+The example environment enables local authentication at `http://localhost:43121`. Open that address to create the first super user. Open verification emails at `/development-inbox`; no email service is needed. Accounts are created after confirming the link. Set `AIRCASTLE_URL` to match if you change the browser's loopback address or port.
+
+To run the built application and Postgres together:
+
+```sh
+docker compose --env-file /dev/null -f compose.development.yaml up --build
+```
+
+Open `http://127.0.0.1:43121`. This Compose file enables development auth and keeps database data across container recreation. An image launched independently has local auth disabled unless `AIRCASTLE_ENV=development` and a loopback `AIRCASTLE_URL` are supplied. Production authentication is not included in this local workflow.
 
 The web dev server and local preview forward `/api` requests to the API, so browser code can use relative URLs such as `/api/health`. To change the API port for both servers, use `AIRCASTLE_PORT=43130 vp run dev`.
 
@@ -83,7 +93,7 @@ Install Docker with Compose v2.20 or later and start the Docker engine. The comm
 vp run db:up
 ```
 
-Postgres listens on `127.0.0.1:43123`. The example supplies `AIRCASTLE_DB_HOST`, `AIRCASTLE_DB_PORT`, `AIRCASTLE_DB_NAME`, `AIRCASTLE_DB_USER`, and `AIRCASTLE_DB_PASSWORD`. Their defaults are `127.0.0.1`, `43123`, `aircastle`, `aircastle`, and `aircastle-local`. The API and `dev:setup` build their connection from these settings. Set `AIRCASTLE_DATABASE_URL` to override all five, including connection options such as SSL. An explicitly empty or invalid URL fails configuration rather than falling back. Both commands read the root `.env`. `AIRCASTLE_DATABASE_NAMESPACE` selects the owned SQL namespace and defaults to `aircastle`. The API refuses a namespace that belongs to another application. Compose uses the configured database name and credentials when initializing new storage; changing them does not alter an existing database.
+Postgres listens on `127.0.0.1:43123`. The example supplies `AIRCASTLE_DB_HOST`, `AIRCASTLE_DB_PORT`, `AIRCASTLE_DB_NAME`, `AIRCASTLE_DB_USER`, and `AIRCASTLE_DB_PASSWORD`. Their defaults are `127.0.0.1`, `43123`, `aircastle`, `aircastle`, and `aircastle-local`. The API and `dev:setup` build their connection from these settings. Set `AIRCASTLE_DATABASE_URL` to override all five, including connection options such as SSL. An explicitly empty or invalid URL fails configuration rather than falling back. Both commands read the root `.env`. `AIRCASTLE_DATABASE_NAMESPACE` selects the owned SQL namespace and defaults to `aircastle`. The API refuses a namespace that belongs to another application. Compose uses the configured database name and credentials when initializing new storage; changing them does not alter an existing database. The bundled app container connects to `postgres:5432` internally, while `AIRCASTLE_DB_PORT` selects the host port.
 
 `db:up` waits for readiness. `vp run db:down` removes the container but preserves its data. `vp run db:logs` follows database logs. **`vp run db:reset` deletes this Compose project's database data.** Run `db:up` again to create an empty database.
 

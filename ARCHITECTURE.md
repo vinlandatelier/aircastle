@@ -8,9 +8,12 @@ This map records module ownership and the pattern for organizing features. Entri
 apps/
 ├── api/                      HTTP API and Bun startup
 │   └── src/
+│       ├── static.ts         Built browser assets and SPA HTTP boundary
 │       └── features/         HTTP interfaces by feature
 │           ├── health/       Process liveness and its response schema
-│           └── content/      Project schema publication and content HTTP routes
+│           ├── content/      Project schema publication and content HTTP routes
+│           ├── auth/         Local auth boundary, library configuration, and behavior tests
+│           └── development-inbox/  Local email capture interface and behavior tests
 └── web/                      React admin
     ├── scripts/              Brand icon generation
     └── src/
@@ -40,11 +43,11 @@ scripts/                      Repository checks and local development tooling
 .github/                      CI workflows, shared setup, and model selections
 ```
 
-The API assembles middleware, feature routes, and API documentation through `createApp({ logger, cms, maxRequestBytes })` in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. `src/cli.ts` exports a quiet app from the same factory with a silent logger and no `cms`, so it serves no content routes.
+The API assembles middleware, feature routes, and API documentation through `createApp({ logger, cms, auth, maxRequestBytes })` in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration and constructs the logger, CMS, and configured auth runtime before listening. `packages/adapter-postgres` owns the shared environment-to-connection parser used by API startup and development provisioning. An explicit database URL takes precedence over granular database settings. Development auth owns injected Postgres storage and admission resources plus a process-local inbox. Shutdown drains HTTP requests, then closes auth and owned database resources in reverse allocation order; partial startup failures close resources already created. `src/cli.ts` exports a quiet app from the same factory with a silent logger and no `cms`, so it serves no content routes.
 
 The server mounts every API route under `/api`, including `/api/docs` and `/api/openapi.json`. Feature routers use paths relative to that mount and follow the feature pattern below.
 
-Vite forwards `/api` requests unchanged during development and preview. The built API owns the same prefix without Vite. Hosted routing must forward `/api` unchanged to Bun. Production admin serving and deployment configuration are not implemented yet.
+Vite forwards `/api` requests unchanged during development and preview. The built API owns the same prefix without Vite. `src/static.ts` serves the built browser and SPA refreshes on the same Bun listener, with GET/HEAD handling, no-referrer responses, and file-boundary checks. API misses stay API responses. The root `Dockerfile` packages this runtime and normal browser output; `compose.development.yaml` supplies explicit local auth and persistent Postgres with loopback ports. Production auth and hosting configuration remain deferred.
 
 ## Web app structure
 
@@ -59,7 +62,9 @@ Paths in this section are relative to `apps/web`.
 
 `src/features/navigation` owns the page catalog, sidebar links, and keyboard page search. `src/router.tsx` registers destinations and their document titles under `/dash/workspaces/$workspaceId/projects/$projectId` from that catalog. Dashboard navigation preserves both route parameters, which currently accept arbitrary nonempty values without a workspace or project lookup. The project base redirects to its collections page. `/dash` redirects to `/dash/workspaces/demo/projects/demo/collections`; `/` reserves the marketing entry with a minimal branded placeholder and its landing-page metadata. Dashboard destinations currently render placeholders. `components.json` configures shadcn and the Efferd registry.
 
-`src/features/sign-in` vendors the Efferd `@efferd/auth-5` layout with Aircastle branding and email-only controls. The email action remains disabled until magic-link authentication is implemented. Legal links open `/terms-of-service` and `/privacy-policy` in new tabs; those pages are not implemented yet.
+`src/features/navigation` owns the page catalog, sidebar links, and keyboard page search. `src/router.tsx` registers destinations and their document titles under `/dash/workspaces/$workspaceId/projects/$projectId` from that catalog. `src/features/auth` owns browser HTTP, session resolution, setup/sign-in forms, confirmation, the development inbox, and workspace entry placeholders. Route guards request server authority and destinations before rendering the protected shell. Each router owns its auth state, and shell account controls receive identity and sign-out through props. The project base redirects to its collections page. `/` reserves the marketing entry with a minimal branded placeholder and its landing-page metadata. Dashboard destinations currently render placeholders. `components.json` configures shadcn and the Efferd registry.
+
+`src/features/sign-in` vendors the Efferd `@efferd/auth-5` presentation with Aircastle branding. The auth feature supplies form state and actions. Legal links open `/terms-of-service` and `/privacy-policy` in new tabs; those pages are not implemented yet.
 
 `src/features/not-found` owns the standalone recovery page for unmatched destinations, including unknown dashboard paths. The router handles these at its root so the page uses the marketing palette outside the CMS shell. Its links return to `/` or `/sign-in`; sign-in's Home link also returns to `/`.
 
@@ -127,6 +132,8 @@ This is a general pattern, not a required file inventory for every module. Exist
 - The core defines auth records, transactional persistence operations, session and entry state, and request-admission limits and outcomes. The Postgres adapter implements auth transactions, namespace-aware initialization, a separate auth migration ledger, and persistent local signing material. Setup completion and issuance markers survive deletion of their associated user or current link. Durable request admission records rolling-window timestamps in Postgres and coordinates active limit policies with database locks. Each instance holds one connection for policy ownership; transaction guards reject admission under a changed policy after reconnecting. Crashes release ownership without stale process records.
 - The Postgres adapter owns SQL, row mapping, database constraints, and migrations for Aircastle's own tables. User collection migrations belong with the user's project when the eventual storage design requires them. Project collections share JSONB document storage within an instance-owned namespace. Content migration execution is deferred.
 - `packages/contracts` owns browser-safe content result types, serialized collection contracts, compatibility and projection. It uses the schema package and has no server or SQL imports.
+- Shared auth input schemas also live in `packages/contracts`. They normalize and validate email and display names with ArkType, rejecting undeclared fields. API auth configuration uses the same email validator for its optional initial identity and validates explicit local mode, browser origin, and request ceilings at startup. The API development inbox retains the newest 100 complete messages in memory, with shared read state and isolated snapshots. Its preparation/publication boundary keeps pending captures invisible and makes commit/abort idempotent, so a failed durable link replacement need not expose a message. Each runtime factory starts with an empty inbox.
+- The API auth feature owns request guards, credential issuance and confirmation, session activity, durable dashboard entry, bounded diagnostics, and its private Better Auth bridge. The bridge binds user/session writes to the exact core transaction. Its shared library and plugin factories define the configured endpoint inventory; the HTTP boundary closes raw library routes. Credential coordination publishes prepared inbox messages only after a known commit and resolves lost acknowledgments through durable issuance markers. Application startup owns construction and shutdown of injected resources.
 - `packages/client` owns developer configuration and the typed application HTTP client. `packages/cli` owns publication and lockfile workflows and communicates over HTTP.
 - Browser code uses HTTP and browser-safe contracts. It does not import server implementations or executable collection configuration.
 
