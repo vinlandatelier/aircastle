@@ -13,6 +13,7 @@ import {
   reviewLenses,
   reviewPrompt,
   reviewSchema,
+  safePath,
   validateEdits,
   validateReview,
   workflowOutputs,
@@ -216,6 +217,30 @@ test("review findings must cite actual immutable source and a consequence", () =
   expect(() =>
     validateReview({ findings: [{ ...finding, path: "/etc/passwd" }] }, snapshot),
   ).toThrow();
+});
+test.each([
+  "patches/@ark%2Futil@0.56.8.patch",
+  "docs/notes (draft)#1.md",
+  "src/[id]/page.tsx",
+  "src/日本語.ts",
+  "src/back\\slash.ts",
+])("accepts a real Git path: %s", (path) => {
+  expect(safePath(path)).toBe(path);
+});
+test.each([
+  "../escape",
+  "/tmp/escape",
+  "src/../../escape",
+  "src/./value.ts",
+  "src//value.ts",
+  "src/",
+  ".git/config",
+  "src/.GIT/hooks/pre-commit",
+  "src/value.ts\n<!-- aircastle-ai:v1 -->",
+  "src/tab\tname.ts",
+  "src/delete\u007f.ts",
+])("rejects a path that escapes the checkout or breaks line-based output: %j", (path) => {
+  expect(() => safePath(path)).toThrow("Unsafe path");
 });
 test("edits require original blobs and allow only bounded normal text files", () => {
   const edit = {

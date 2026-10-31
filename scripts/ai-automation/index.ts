@@ -242,17 +242,25 @@ export function sha(value: unknown): string {
   if (!/^[a-f0-9]{40}$/.test(result)) throw new Error("Invalid SHA");
   return result;
 }
-export function safePath(value: unknown): string {
-  const path = text(value, 512);
-  if (
-    !/^[\w./@+ -]+$/.test(path) ||
-    path.startsWith("/") ||
-    path
+/**
+ * Accepts any repository-relative Git path that stays inside the checkout and renders on one line.
+ * Git itself never records empty, `.`, `..` or `.git` segments, so those only come from forged input.
+ */
+export function isSafePath(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 512 &&
+    !value.startsWith("/") &&
+    !/\p{Cc}/u.test(value) &&
+    !value
       .split("/")
       .some((part) => !part || part === "." || part === ".." || part.toLowerCase() === ".git")
-  )
-    throw new Error("Unsafe path");
-  return path;
+  );
+}
+export function safePath(value: unknown): string {
+  if (!isSafePath(value)) throw new Error("Unsafe path");
+  return value;
 }
 export function controlPath(path: string): boolean {
   return (
