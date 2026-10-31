@@ -1,6 +1,7 @@
 import type { IssuePath, ValidationIssue } from "./contract.ts";
 import { validationIssue } from "./errors.ts";
 import type { Outcome } from "./fields.ts";
+import { withoutNegativeZero } from "./numbers.ts";
 import { integrityIssues } from "./values.ts";
 
 const maxDepth = 64;
@@ -69,7 +70,7 @@ function walkValue(value: unknown, path: IssuePath, depth: number, walk: Walk): 
     return value;
   }
   if (typeof value === "number")
-    return Number.isFinite(value) ? (value === 0 ? 0 : value) : invalid(walk, path);
+    return Number.isFinite(value) ? withoutNegativeZero(value) : invalid(walk, path);
   if (typeof value !== "object") return invalid(walk, path);
   if (depth >= maxDepth) return invalid(walk, path);
   return Array.isArray(value)

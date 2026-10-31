@@ -3,6 +3,11 @@ import { validationIssue } from "./errors.ts";
 import type { NumberRules, Outcome } from "./fields.ts";
 import { receivedType } from "./records.ts";
 
+/** Postgres JSONB stores `-0` as `0`, so validated output uses `0` to round-trip unchanged. */
+export function withoutNegativeZero(value: number): number {
+  return value === 0 ? 0 : value;
+}
+
 export function validateNumber(value: unknown, rules: NumberRules, path: IssuePath): Outcome {
   if (typeof value !== "number" || !Number.isFinite(value))
     return {
@@ -22,5 +27,5 @@ export function validateNumber(value: unknown, rules: NumberRules, path: IssuePa
     issues.push(validationIssue(path, { code: "too_small", minimum: rules.min, actual: value }));
   if (rules.max !== undefined && value > rules.max)
     issues.push(validationIssue(path, { code: "too_large", maximum: rules.max, actual: value }));
-  return issues.length ? { ok: false, issues } : { ok: true, value: value === 0 ? 0 : value };
+  return issues.length ? { ok: false, issues } : { ok: true, value: withoutNegativeZero(value) };
 }

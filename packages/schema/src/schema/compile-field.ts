@@ -4,6 +4,7 @@ import { parseDate, parseDatetime } from "./dates.ts";
 import { fieldDefinition, type FieldDefinition, type Modifier } from "./declarations.ts";
 import { equalEditor, normalizeEditor } from "./editors.ts";
 import { schemaIssue } from "./errors.ts";
+import { withoutNegativeZero } from "./numbers.ts";
 import type { CompiledField, FieldEntries, Rules, TextRules } from "./fields.ts";
 import { receivedType, type RecordSnapshot } from "./records.ts";
 import { validateText } from "./values.ts";
@@ -139,9 +140,7 @@ const countBound = (value: unknown): number | undefined =>
 function numberBound(integer: boolean) {
   return (value: unknown): number | undefined =>
     typeof value === "number" && (integer ? Number.isSafeInteger(value) : Number.isFinite(value))
-      ? value === 0
-        ? 0
-        : value
+      ? withoutNegativeZero(value)
       : undefined;
 }
 
