@@ -3,6 +3,15 @@ import { identifier } from "./identifier.ts";
 
 type Transaction = postgres.TransactionSql;
 
+const knownMigrations = [1, 2] as const;
+
+function sameVersions(ledger: readonly number[], expected: readonly number[]) {
+  return (
+    ledger.length === expected.length &&
+    ledger.every((version, index) => version === expected[index])
+  );
+}
+
 export async function initializeLayout(sql: Transaction, namespace: string) {
   await sql`SELECT pg_advisory_xact_lock(hashtextextended(${namespace}, 0))`;
   const rootCollation = await sql<
@@ -30,9 +39,10 @@ export async function initializeLayout(sql: Transaction, namespace: string) {
     const migrations = await sql<
       { version: number }[]
     >`SELECT version FROM ${table("migrations")} ORDER BY version`;
-    const ledger = migrations.map((row) => row.version).join(",");
-    if (ledger === "1") await addCreationOrder();
-    else if (ledger !== "1,2") throw new Error("Unsupported Aircastle migration version");
+    const ledger = migrations.map((row) => row.version);
+    if (sameVersions(ledger, [1])) await addCreationOrder();
+    else if (!sameVersions(ledger, knownMigrations))
+      throw new Error("Unsupported Aircastle migration version");
     return;
   }
   const encoding = await sql<
