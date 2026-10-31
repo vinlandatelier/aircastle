@@ -56,23 +56,15 @@ export interface Lockfile {
   revision: string;
 }
 
-type PlainIssueCode =
-  | "required"
-  | "invalid_document"
-  | "invalid_unicode"
-  | "invalid_character"
-  | "invalid_email"
-  | "invalid_url"
-  | "unknown_field"
-  | "not_integer"
-  | "invalid_date"
-  | "invalid_datetime"
-  | "invalid_list"
-  | "invalid_object"
-  | "invalid_reference"
-  | "invalid_id"
-  | "invalid_json"
-  | "invalid_point";
+/** Issue codes whose issues carry no details beyond `code`, `path` and `message`. */
+type PlainIssueCode = {
+  [Code in ValidationIssue["code"]]: Exclude<
+    keyof Extract<ValidationIssue, { code: Code }>,
+    "code" | "path" | "message"
+  > extends never
+    ? Code
+    : never;
+}[ValidationIssue["code"]];
 type PlainErrorCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
 
 /** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
@@ -93,7 +85,7 @@ const plainIssueCodes = {
   invalid_id: "invalid_id",
   invalid_json: "invalid_json",
   invalid_point: "invalid_point",
-} satisfies { [Name in PlainIssueCode]: Name };
+} as const satisfies { [Name in PlainIssueCode]: Name };
 /** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
 const expectedTypes = {
   string: "string",
@@ -226,7 +218,7 @@ export function sameSchema(
 }
 
 function withoutEditors(field: FieldDescription): unknown {
-  const { editor: _editor, ...rest } = { ...field } as PlainRecord;
+  const rest = Object.fromEntries(Object.entries(field).filter(([key]) => key !== "editor"));
   if (field.type === "object") return { ...rest, fields: mapFields(field.fields, withoutEditors) };
   if (field.type === "list") return { ...rest, item: withoutEditors(field.item) };
   if (field.type === "blocks")
