@@ -111,6 +111,11 @@ test.each([
     [{ code: "invalid_description", path: ["fields", "title"] }],
   ],
   [
+    "a non-boolean flag",
+    { fields: { title: { ...plain, nullable: "false" } } },
+    [{ code: "invalid_description", path: ["fields", "title"] }],
+  ],
+  [
     "an unsupported format",
     { fields: { title: { ...plain, format: "uuid" } } },
     [{ code: "invalid_description", path: ["fields", "title", "format"] }],
@@ -123,6 +128,11 @@ test.each([
   [
     "a textarea without rows",
     { fields: { title: { ...plain, editor: { type: "textarea" } } } },
+    [{ code: "invalid_description", path: ["fields", "title", "editor"] }],
+  ],
+  [
+    "a code editor without a language",
+    { fields: { title: { ...plain, editor: { type: "code" } } } },
     [{ code: "invalid_description", path: ["fields", "title", "editor"] }],
   ],
   [
