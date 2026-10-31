@@ -55,6 +55,7 @@ test("source changes that only delete lines have nothing to mutate", () => {
     mutationScope({
       ...schema,
       changed: ["packages/schema/src/schema/values.ts"],
+      addedLines: () => [],
     }),
   ).toEqual({ kind: "skip" });
 });
