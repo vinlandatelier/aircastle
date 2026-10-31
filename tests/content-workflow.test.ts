@@ -190,3 +190,170 @@ test(
   },
   serverTestBudget,
 );
+
+test(
+  "R1-R13 SDK lifecycle: update, unset, paged lists, delete and a long-title cursor",
+  async () => {
+    const namespace = `workflow_${randomUUID().replaceAll("-", "")}`;
+    const store = postgresAdapter({ url: process.env.DATABASE_URL ?? "", namespace });
+    const app = await developerApp();
+    let server: Awaited<ReturnType<typeof standaloneServer>> | undefined;
+    try {
+      await store.initialize();
+      server = await standaloneServer(namespace);
+      const provisioned = await provisionDevelopment(store);
+      if (!provisioned.issued) throw new Error("Expected a new API key");
+      const metadata: { bin: { aircastle: string } } = JSON.parse(
+        await readFile(join(repository, "packages/cli/package.json"), "utf8"),
+      );
+      const pushed = await execute(
+        resolve(repository, "packages/cli", metadata.bin.aircastle),
+        ["push"],
+        {
+          cwd: app.cwd,
+          env: {
+            AIRCASTLE_URL: server.url,
+            AIRCASTLE_PROJECT_ID: provisioned.project,
+            AIRCASTLE_API_KEY: provisioned.apiKey,
+          },
+        },
+      );
+      expect(pushed.code, pushed.output).toBe(0);
+      const client = createClient({
+        ...defineConfig({
+          url: server.url,
+          project: provisioned.project,
+          collections: {
+            articles: collection({
+              title: text().min(1),
+              slug: text().unique(),
+              summary: text().optional(),
+              status: text().oneOf(["draft", "published"]).default("draft"),
+            }),
+          },
+        }),
+        apiKey: provisioned.apiKey,
+      });
+      const create = async (input: Parameters<typeof client.articles.create>[0]) => {
+        const created = await client.articles.create(input);
+        expect(created).toEqual({
+          ok: true,
+          data: { status: "draft", ...input, id: expect.any(String) },
+        });
+        if (!created.ok) throw new Error("Expected a saved document");
+        return created.data;
+      };
+      const apple = await create({ title: "Apple", slug: "apple", status: "published" });
+      const banana = await create({ title: "Banana", slug: "banana", summary: "Yellow" });
+      const cherry = await create({
+        title: "Cherry",
+        slug: "cherry",
+        summary: "Red",
+        status: "published",
+      });
+      const zebra = await create({ title: "Zebra", slug: "zebra", status: "published" });
+
+      const apricot = { ...apple, title: "Apricot" };
+      expect(await client.articles.update(apple.id, { title: "Apricot" })).toEqual({
+        ok: true,
+        data: apricot,
+      });
+      expect(await client.articles.update(zebra.id.toUpperCase(), { title: "Zebra" })).toEqual({
+        ok: true,
+        data: zebra,
+      });
+      const cherryPie = {
+        id: cherry.id,
+        title: "Cherry pie",
+        slug: "cherry",
+        status: "published",
+      };
+      expect(
+        await client.articles.update(cherry.id, { title: "Cherry pie" }, { unset: ["summary"] }),
+      ).toEqual({ ok: true, data: cherryPie });
+      expect(await client.articles.findById(cherry.id)).toEqual({ ok: true, data: cherryPie });
+
+      const first = await client.articles.list({
+        where: { status: "published" },
+        sort: "-title",
+        limit: 2,
+      });
+      expect(first).toEqual({
+        ok: true,
+        data: { documents: [zebra, cherryPie], next: expect.any(String) },
+      });
+      if (!first.ok || first.data.next === null) throw new Error("Expected a second page");
+      expect(
+        await client.articles.list({
+          where: { status: "published" },
+          sort: "-title",
+          limit: 2,
+          cursor: first.data.next,
+        }),
+      ).toEqual({ ok: true, data: { documents: [apricot], next: null } });
+      expect(await client.articles.list({ where: { summary: { empty: false } } })).toEqual({
+        ok: true,
+        data: { documents: [banana], next: null },
+      });
+      expect(await client.articles.list({ limit: 3 })).toEqual({
+        ok: true,
+        data: { documents: [zebra, cherryPie, banana], next: expect.any(String) },
+      });
+
+      expect(await client.articles.delete(banana.id)).toEqual({
+        ok: true,
+        data: { id: banana.id },
+      });
+      expect(await client.articles.delete(banana.id)).toEqual({
+        ok: false,
+        error: { code: "not_found" },
+      });
+      expect(await client.articles.findById(banana.id)).toEqual({
+        ok: false,
+        error: { code: "not_found" },
+      });
+      const recreated = await create({ title: "Banana bread", slug: "banana" });
+      expect(recreated.id).not.toBe(banana.id);
+
+      const long = await create({
+        title: `Long ${"x".repeat(20 * 1024)}`,
+        slug: "long",
+        status: "published",
+      });
+      const firstSorted = await client.articles.list({
+        where: { status: "published" },
+        sort: "title",
+        limit: 3,
+      });
+      expect(firstSorted).toEqual({
+        ok: true,
+        data: { documents: [apricot, cherryPie, long], next: expect.any(String) },
+      });
+      if (!firstSorted.ok || firstSorted.data.next === null)
+        throw new Error("Expected a cursor after the long title");
+      expect(
+        await client.articles.list({
+          where: { status: "published" },
+          sort: "title",
+          limit: 3,
+          cursor: firstSorted.data.next,
+        }),
+      ).toEqual({ ok: true, data: { documents: [zebra], next: null } });
+      expect(await client.articles.list()).toEqual({
+        ok: true,
+        data: { documents: [long, recreated, zebra, cherryPie, apricot], next: null },
+      });
+    } finally {
+      try {
+        await server?.close();
+      } finally {
+        try {
+          await store.close();
+        } finally {
+          await app.cleanup();
+        }
+      }
+    }
+  },
+  durableWorkflowBudget,
+);
