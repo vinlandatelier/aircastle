@@ -447,7 +447,14 @@ test("job artifacts read back unchanged, including natural requests", () => {
 test.each([
   ["a request without its implementation model", { ...reviewJob, task: "request" }],
   ["an unknown task", { ...reviewJob, task: "deploy" }],
-  ["a snapshot file without text", { ...reviewJob, snapshot: { ...snapshot, files: [{}] } }],
+  [
+    "a snapshot file with non-string text",
+    { ...reviewJob, snapshot: { ...snapshot, files: [{ ...snapshot.files[0], text: 1 }] } },
+  ],
+  [
+    "an invalid model name",
+    { ...reviewJob, selection: { ...reviewJob.selection, model: "bad model" } },
+  ],
 ])("job artifacts are rejected for %s", (_case, value) => {
   expect(() => parseJob(value)).toThrow("Invalid job");
 });

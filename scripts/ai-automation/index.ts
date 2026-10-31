@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import type { Effort, ModelSelection, Provider, Role } from "../ai-models/index.ts";
+import {
+  isJsonObject,
+  isModelSelection,
+  isRole,
+  type ModelSelection,
+  type Role,
+} from "../ai-models/index.ts";
 
 export type ReviewerRole = Extract<Role, `${string}Reviewer`>;
 type Lens = { title: string; brief: string; readsRepositoryInstructions: boolean };
@@ -107,11 +113,8 @@ export const threadLimit = 24000;
 export function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 export function requireObject(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) throw new Error("Expected object");
+  if (!isJsonObject(value)) throw new Error("Expected object");
   return value;
 }
 function oneOf<T extends string>(options: Record<T, true>): (value: unknown) => value is T {
@@ -129,14 +132,6 @@ function isInteger(value: unknown): value is number {
 function isArrayOf<T>(value: unknown, item: (entry: unknown) => entry is T): value is T[] {
   return Array.isArray(value) && value.every((entry) => item(entry));
 }
-const isRole = oneOf<Role>({
-  codexReviewer: true,
-  codexImplementer: true,
-  claudeReviewer: true,
-  claudeImplementer: true,
-});
-const isProvider = oneOf<Provider>({ openai: true, anthropic: true });
-const isEffort = oneOf<Effort>({ low: true, medium: true, high: true, xhigh: true, max: true });
 const isModelTask = oneOf<Exclude<Job["task"], "request">>({ review: true, fix: true });
 const isReceiptState = oneOf<Receipt["state"]>({
   claimed: true,
@@ -152,11 +147,13 @@ const isSeverity = oneOf<Finding["severity"]>({
   advisory: true,
 });
 function isIdentity(value: unknown): value is Identity {
-  return isRecord(value) && isInteger(value.id) && isString(value.login) && isString(value.type);
+  return (
+    isJsonObject(value) && isInteger(value.id) && isString(value.login) && isString(value.type)
+  );
 }
 function isSourceFile(value: unknown): value is SourceFile {
   return (
-    isRecord(value) &&
+    isJsonObject(value) &&
     isString(value.path) &&
     isNullableString(value.sha) &&
     isString(value.mode) &&
@@ -166,7 +163,7 @@ function isSourceFile(value: unknown): value is SourceFile {
 }
 function isRevision(value: unknown): value is Receipt["job"]["snapshot"] {
   return (
-    isRecord(value) &&
+    isJsonObject(value) &&
     isInteger(value.repositoryId) &&
     isInteger(value.number) &&
     isString(value.base) &&
@@ -182,22 +179,19 @@ function isRevision(value: unknown): value is Receipt["job"]["snapshot"] {
   );
 }
 function isSnapshot(value: unknown): value is Snapshot {
-  return isRecord(value) && isArrayOf(value.files, isSourceFile) && isRevision(value);
-}
-function isSelection(value: unknown): value is ModelSelection {
-  return (
-    isRecord(value) && isProvider(value.provider) && isString(value.model) && isEffort(value.effort)
-  );
+  return isJsonObject(value) && isArrayOf(value.files, isSourceFile) && isRevision(value);
 }
 function isJobTask(value: Record<string, unknown>): value is Record<string, unknown> & JobTask {
-  return value.task === "request" ? isSelection(value.implementation) : isModelTask(value.task);
+  return value.task === "request"
+    ? isModelSelection(value.implementation)
+    : isModelTask(value.task);
 }
 function isJobWith<S>(
   value: unknown,
   isOperationSnapshot: (snapshot: unknown) => snapshot is S,
 ): value is Omit<JobBase, "snapshot"> & JobTask & { snapshot: S } {
   return (
-    isRecord(value) &&
+    isJsonObject(value) &&
     value.version === 1 &&
     isString(value.id) &&
     isJobTask(value) &&
@@ -207,7 +201,7 @@ function isJobWith<S>(
     isString(value.instructions) &&
     isString(value.thread) &&
     isString(value.control) &&
-    isSelection(value.selection) &&
+    isModelSelection(value.selection) &&
     isString(value.previous)
   );
 }
@@ -219,13 +213,11 @@ export function parseJob(value: unknown): Job {
   sha(value.snapshot.head);
   sha(value.snapshot.base);
   integer(value.snapshot.number);
-  text(value.selection.model, 200);
-  if (value.task === "request") text(value.implementation.model, 200);
   return value;
 }
 export function isReceipt(value: unknown): value is Receipt {
   return (
-    isRecord(value) &&
+    isJsonObject(value) &&
     value.version === 1 &&
     isString(value.id) &&
     isJobWith(value.job, isRevision) &&

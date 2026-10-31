@@ -36,7 +36,7 @@ export function anthropicSchema(schema: Record<string, unknown>): Record<string,
     result.properties = Object.fromEntries(
       Object.entries(schema.properties).map(([key, value]) => [
         key,
-        isJsonObject(value) ? anthropicSchema(value) : value,
+        anthropicSchema(subschema(value)),
       ]),
     );
   if (isJsonObject(schema.items)) result.items = anthropicSchema(schema.items);

@@ -3,6 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { anthropicSchema, checkSchema, matches, isJsonObject } from "./schema.ts";
 
+export { isJsonObject };
+
 export type Role = "codexReviewer" | "codexImplementer" | "claudeReviewer" | "claudeImplementer";
 export type Provider = "openai" | "anthropic";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
@@ -10,6 +12,10 @@ export type ModelSelection = { provider: Provider; model: string; effort: Effort
 export type ModelConfig = { version: 1; roles: Record<Role, ModelSelection> };
 
 const roles: Role[] = ["codexReviewer", "codexImplementer", "claudeReviewer", "claudeImplementer"];
+
+export function isRole(value: unknown): value is Role {
+  return roles.some((role) => role === value);
+}
 /**
  * Output cap per request, counting reasoning or thinking tokens as well as the visible answer.
  * OpenAI counts reasoning tokens against `max_output_tokens` and advises reserving at least
@@ -44,16 +50,19 @@ function retryDelay(response: Response, attempt: number): number | null {
   );
 }
 
+export function isModelSelection(value: unknown): value is ModelSelection {
+  return (
+    isJsonObject(value) &&
+    Object.keys(value).sort().join() === "effort,model,provider" &&
+    (value.provider === "openai" || value.provider === "anthropic") &&
+    typeof value.model === "string" &&
+    /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value.model) &&
+    effort(value.effort)
+  );
+}
+
 function selection(value: unknown): ModelSelection {
-  if (
-    !isJsonObject(value) ||
-    Object.keys(value).sort().join() !== "effort,model,provider" ||
-    (value.provider !== "openai" && value.provider !== "anthropic") ||
-    typeof value.model !== "string" ||
-    !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value.model) ||
-    !effort(value.effort)
-  )
-    throw new Error("invalid_model_config");
+  if (!isModelSelection(value)) throw new Error("invalid_model_config");
   return { provider: value.provider, model: value.model, effort: value.effort };
 }
 

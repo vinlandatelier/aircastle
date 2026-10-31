@@ -2,14 +2,7 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Coordinator } from "./github.ts";
 import { renderPatch } from "./materialize.ts";
-import {
-  digest,
-  integer,
-  parseJob,
-  requireObject,
-  sha,
-  workflowOutputs,
-} from "./index.ts";
+import { digest, integer, parseJob, requireObject, sha, workflowOutputs } from "./index.ts";
 import { boundVerification } from "./checks.ts";
 import { verify } from "./verify.ts";
 import { executeOperation, boundModelOutput, type ModelOutput } from "./operations.ts";
