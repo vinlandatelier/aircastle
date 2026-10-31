@@ -2,8 +2,8 @@
 
 Follow [the architecture map](../ARCHITECTURE.md) for tooling ownership.
 
-- `ci.yml` owns deterministic pull-request verification. The only required status checks are its `Lint, typecheck and test` job and the `UI evidence` job in `pr-evidence.yml`.
-- `pr-evidence.yml` fails a PR that changes shipped web UI unless its body has uploaded media (a `https://github.com/user-attachments/assets/<id>` link) under `## Screenshots` or a line `No visible UI change: <reason>` with a real reason. HTML comments in the body don't count. Shipped UI means `apps/web/index.html`, `apps/web/public/`, and `apps/web/src/` except tests, `test-setup.ts` and `test-utils.tsx`. The job reads the body from the event payload through an environment variable and runs no PR code. In the merge queue it passes without checking.
+- `ci.yml` owns deterministic pull-request verification. Its `Lint, typecheck and test` job is the only required status check.
+- `pr-evidence.yml` runs the advisory `UI evidence` check. It is not required, so it never blocks a merge; a failure tells the author to add evidence. It fails a PR that changes shipped web UI unless its body has uploaded media (a `https://github.com/user-attachments/assets/<id>` link) under `## Screenshots` or a line `No visible UI change: <reason>` with a real reason. HTML comments in the body don't count. Shipped UI means `apps/web/index.html`, `apps/web/public/`, and `apps/web/src/` except tests, `test-setup.ts` and `test-utils.tsx`. The job reads the body from the event payload through an environment variable and runs no PR code.
 - `approval-label.yml` removes `ready-for-human-approval` when a PR gets new commits or is reopened. It runs on `pull_request_target` and must never check out or run PR code.
 - AI reviews are advisory. Keep them outside the required status check, required approvals, and required conversation resolution. Never enable automatic merging.
 - Run privileged AI operations from trusted default-branch code with the `ai-automation` environment. Keep that environment restricted to the `main` branch, with no tag policies.

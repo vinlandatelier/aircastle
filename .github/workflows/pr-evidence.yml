@@ -2,13 +2,12 @@ name: PR evidence
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-  merge_group:
 permissions:
   contents: read
   pull-requests: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 defaults:
   run:
     shell: bash
@@ -18,8 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require recorded evidence for UI changes
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: Check for recorded evidence of UI changes
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}

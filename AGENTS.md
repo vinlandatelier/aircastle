@@ -60,7 +60,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Use one focused audit of the completed change. Follow up on named findings and affected code instead of restarting a broad review. The author checks the reviewer's evidence and log; do not create recursive audit chains.
 - Write PR bodies by filling in a copy of `.github/pull_request_template.md`, keeping its sections and order. Pass it with `gh pr create --body-file`, because `gh pr create --body` ignores the template.
 - `.github/workflows/ci.yml` runs the required `Lint, typecheck and test` check. Each `vp run` step runs one package script; rerun that script locally to reproduce a failure.
-- `.github/workflows/pr-evidence.yml` runs the required `UI evidence` check on PRs that change shipped web UI. [Automation instructions](.github/AGENTS.md) define what it accepts.
+- `.github/workflows/pr-evidence.yml` runs the advisory `UI evidence` check on PRs that change shipped web UI. [Automation instructions](.github/AGENTS.md) define what it accepts.
 
 ## Public documentation
 
