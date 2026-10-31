@@ -4,8 +4,7 @@
   "ignoreDependencies": ["@stryker-mutator/command-runner"],
   "ignoreUnresolved": [
     "^scripts/with-postgres\\.ts$",
-    "^packages/schema/scripts/classify-mutations\\.ts$",
-    "^scripts/test-strength\\.ts$"
+    "^packages/schema/scripts/classify-mutations\\.ts$"
   ],
   "ignoreIssues": {
     "apps/web/src/components/ui/**": ["exports", "types"]
@@ -25,11 +24,7 @@
     "apps/web": {
       "entry": ["e2e/fixture-modules/*.ts"],
       "vitest": {
-        "config": ["vite.config.ts", "vite.verification.config.ts"]
-      },
-      "playwright": {
-        "config": [],
-        "entry": ["playwright.config.ts", "e2e/**/*.spec.ts"]
+        "config": ["vite.config.ts"]
       }
     },
     "packages/client": {

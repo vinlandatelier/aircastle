@@ -13,11 +13,8 @@
     "lint": "vp lint",
     "preview": "vp preview",
     "check": "vp check",
-    "test:e2e": "node scripts/verify-web.ts e2e",
-    "test:coverage": "node scripts/verify-web.ts coverage",
-    "test:verification": "vp test run --config vite.verification.config.ts",
-    "verify": "node scripts/verify-web.ts verify",
-    "test:strength": "bun scripts/test-strength.ts"
+    "test:e2e": "bun scripts/generate-icons.mjs && playwright test",
+    "test:coverage": "vp test run --coverage"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

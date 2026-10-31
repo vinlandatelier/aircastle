@@ -1,21 +1,21 @@
 name: Advisory AI review and explicit fixes
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   issue_comment:
     types: [created]
-  workflow_dispatch:
 permissions: {}
 concurrency:
-  group: ai-automation-coordinator
+  group: >-
+    ${{ contains(github.event.comment.body, '@vinland-ai') && github.event.comment.user.id == vars.AI_TRIGGER_USER_ID
+    && format('ai-automation-pr-{0}', github.event.issue.number) || format('ai-automation-run-{0}', github.run_id) }}
   cancel-in-progress: false
 jobs:
   prepare:
     if: >-
       github.ref == 'refs/heads/main' && github.repository_owner == 'vinlandatelier' &&
-      (github.event_name != 'issue_comment' || (github.event.issue.pull_request &&
-      (contains(github.event.comment.body, '@codex') || contains(github.event.comment.body, '@claude')) &&
-      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)))
+      github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@vinland-ai') && vars.AI_TRIGGER_LOGIN != '' &&
+      vars.AI_TRIGGER_USER_ID != '' && github.event.comment.user.login == vars.AI_TRIGGER_LOGIN &&
+      github.event.comment.user.id == vars.AI_TRIGGER_USER_ID
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: ai-automation
@@ -25,7 +25,7 @@ jobs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has_jobs: ${{ steps.plan.outputs.has_jobs }}
       verify_matrix: ${{ steps.plan.outputs.verify_matrix }}
-      has_fixes: ${{ steps.plan.outputs.has_fixes }}
+      has_verification: ${{ steps.plan.outputs.has_verification }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -41,10 +41,9 @@ jobs:
           private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
           owner: vinlandatelier
           repositories: ${{ github.event.repository.name }}
-          permission-members: read
           permission-contents: read
           permission-issues: write
-          permission-pull-requests: read
+          permission-pull-requests: write
           permission-environments: read
           permission-administration: read
       - id: plan
@@ -53,8 +52,8 @@ jobs:
           AI_GITHUB_TOKEN: ${{ steps.app.outputs.token }}
           AI_APP_SLUG: ${{ steps.app.outputs.app-slug }}
           AI_BOT_USER_ID: ${{ vars.AI_BOT_USER_ID }}
-          AI_STATE_ISSUE: ${{ vars.AI_STATE_ISSUE }}
-          AI_ACTIVATED_AT: ${{ vars.AI_ACTIVATED_AT }}
+          AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}
+          AI_TRIGGER_USER_ID: ${{ vars.AI_TRIGGER_USER_ID }}
           AI_CONTROL_SHA: ${{ github.sha }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -86,13 +85,13 @@ jobs:
         with:
           name: ai-plan
           path: ai-data/plan
+      - run: npm install --global @anthropic-ai/claude-code@2.1.308
       - run: node scripts/ai-automation/cli.ts model
         env:
           AI_OPERATION_ID: ${{ matrix.id }}
           AI_CONTROL_SHA: ${{ github.sha }}
           AI_MODEL_RECEIPTS_DIR: ai-data/model/receipts
-          OPENAI_API_KEY: ${{ matrix.provider == 'openai' && secrets.OPENAI_API_KEY || '' }}
-          ANTHROPIC_API_KEY: ${{ matrix.provider == 'anthropic' && secrets.ANTHROPIC_API_KEY || '' }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -102,7 +101,7 @@ jobs:
           retention-days: 14
   verify:
     needs: [prepare, model]
-    if: always() && needs.prepare.outputs.has_fixes == 'true'
+    if: always() && needs.prepare.outputs.has_verification == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.verify_matrix) }}
@@ -155,9 +154,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version-file: .node-version
+      - uses: ./.github/actions/setup
       - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
         id: app
         with:
@@ -165,7 +162,6 @@ jobs:
           private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
           owner: vinlandatelier
           repositories: ${{ github.event.repository.name }}
-          permission-members: read
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
@@ -179,7 +175,7 @@ jobs:
           name: ai-model-${{ matrix.id }}
           path: ai-data/model
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        if: matrix.task == 'fix'
+        if: matrix.task != 'review'
         continue-on-error: true
         with:
           name: ai-verification-${{ matrix.id }}
@@ -190,6 +186,6 @@ jobs:
           AI_GITHUB_TOKEN: ${{ steps.app.outputs.token }}
           AI_APP_SLUG: ${{ steps.app.outputs.app-slug }}
           AI_BOT_USER_ID: ${{ vars.AI_BOT_USER_ID }}
-          AI_STATE_ISSUE: ${{ vars.AI_STATE_ISSUE }}
-          AI_ACTIVATED_AT: ${{ vars.AI_ACTIVATED_AT }}
+          AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}
+          AI_TRIGGER_USER_ID: ${{ vars.AI_TRIGGER_USER_ID }}
           AI_CONTROL_SHA: ${{ github.sha }}
