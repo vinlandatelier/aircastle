@@ -10,7 +10,7 @@ export const development = {
 };
 
 export const databaseUrl = () => {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.AIRCASTLE_DATABASE_URL;
   if (!url) throw new Error("Run these tests through vp run db:test");
   return url;
 };

@@ -3,8 +3,12 @@ import postgres from "postgres";
 import { StorageUnavailable } from "@aircastle/core";
 import type { ContentStore, ProjectTransaction } from "@aircastle/core";
 import { identifier } from "./identifier.ts";
-import { initializeLayout } from "./layout.ts";
+import { initializeLayout, validatedNamespace } from "./layout.ts";
 import { projectTransaction } from "./project.ts";
+
+export { readPostgresOptions } from "./config.ts";
+export { postgresAuthAdmission } from "./auth-admission.ts";
+export { postgresAuthStore } from "./auth/index.ts";
 
 export interface PostgresOptions {
   url: string;
@@ -12,17 +16,6 @@ export interface PostgresOptions {
 }
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
-
-function validatedNamespace(value: string) {
-  if (typeof value !== "string" || !value || value.includes("\0") || Buffer.byteLength(value) > 63)
-    throw new Error("Invalid Postgres namespace");
-  for (const point of value) {
-    const code = point.charCodeAt(0);
-    if (point.length === 1 && code >= 0xd800 && code <= 0xdfff)
-      throw new Error("Invalid Postgres namespace Unicode");
-  }
-  return value;
-}
 
 async function databaseOperation<Value>(operation: () => Promise<Value>): Promise<Value> {
   try {

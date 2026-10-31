@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
       port: 43121,
       strictPort: true,
       proxy: {
-        '^/api(?:/|$)': { target: `http://127.0.0.1:${env.PORT ?? 43122}` },
+        '^/api(?:/|$)': { target: `http://127.0.0.1:${env.AIRCASTLE_PORT ?? 43122}` },
       },
     },
     preview: { port: 43121, strictPort: true },
