@@ -27,7 +27,7 @@ apps/
 
 packages/
 ├── schema/                   Collection definitions, validation, and descriptions
-├── contracts/                Shared content contracts and schema compatibility
+├── contracts/                Shared content contracts, auth input validation, and compatibility
 ├── core/                     CMS operations, authorization, publication, and resource lifecycle
 ├── adapter-postgres/         Owned SQL storage, constraints, and migrations
 ├── client/                   Developer config and typed HTTP client
@@ -111,7 +111,7 @@ content/
 
 `apps/api/AGENTS.md` describes how API routes declare schemas, how content routes check input, and where handlers go. Test supporting files through the feature's public behavior; do not export them from the entry point solely for tests.
 
-`tests/harness/module-boundaries.test.ts` fails when a file under `apps/api/src` or `apps/web/src` reaches into another feature's or the web shell's private files through a relative or web `@/` static import, re-export, import-type query, `import x = require`, dynamic `import()`, `require`, or `createRequire` loader. Lint and `vp run check:policy` enforce the browser boundary and imports between workspaces.
+`tests/harness/module-boundaries.test.ts` fails when a file under `apps/api/src` or `apps/web/src` reaches into another feature's or the web shell's private files through a relative or web `@/` static import, re-export, import-type query, `import x = require`, dynamic `import()`, `require`, or `createRequire` loader. Lint and `vp run check:policy` enforce the browser boundary and imports between workspaces. Lint also keeps auth and HTTP libraries out of browser-safe code and keeps HTTP, auth libraries, and database drivers out of `packages/core/src`.
 
 This is a general pattern, not a required file inventory for every module. Existing modules can adopt it when relevant work warrants a change.
 

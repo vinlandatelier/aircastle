@@ -330,6 +330,23 @@ export async function createAircastle(config: {
   };
 }
 
+export { AuthStorageError } from "./auth.ts";
+export type {
+  AuthLimits,
+  AuthLimitScope,
+  AuthAdmission,
+  AuthAdmissionStore,
+  AuthDestination,
+  ProtectedDestination,
+  AuthUserRecord,
+  AuthSessionRecord,
+  AuthLinkRecord,
+  AuthEntryRecord,
+  AuthTransaction,
+  AuthStore,
+  AuthEvent,
+} from "./auth.ts";
+
 export async function provisionDevelopment(
   store: ContentStore,
   options: { key?: KeyMode } = {},

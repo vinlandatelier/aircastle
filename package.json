@@ -80,5 +80,8 @@
     "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
     "vite-plus": "1.4.0"
+  },
+  "patchedDependencies": {
+    "@ark/util@0.56.8": "patches/@ark%2Futil@0.56.8.patch"
   }
 }
