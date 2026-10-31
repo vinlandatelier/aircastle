@@ -19,5 +19,5 @@
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "bundler"
   },
-  "include": ["playwright.config.ts", "e2e/**/*.ts", "scripts/**/*.ts"]
+  "include": ["playwright.config.ts", "e2e/**/*.ts"]
 }

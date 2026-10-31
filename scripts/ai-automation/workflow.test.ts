@@ -16,19 +16,50 @@ const condition = (name: string) => {
     .trim();
 };
 
-test("comment events start planning only for PR comments that mention a bot from an associated author", () => {
-  const gate = condition("prepare");
-  expect(gate).toContain("github.event_name != 'issue_comment' ||");
-  expect(gate).toContain("github.event.issue.pull_request");
-  expect(gate).toContain("contains(github.event.comment.body, '@codex')");
-  expect(gate).toContain("contains(github.event.comment.body, '@claude')");
-  expect(gate).toContain(
-    `contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)`,
+test("only tagged comments from the trigger account queue, and only behind requests on the same PR", () => {
+  const block = /\nconcurrency:\n((?: {2}.*\n)+)/.exec(workflow)?.[1] ?? "";
+  const group = /group: >-\n((?: {4}.*\n)+)/
+    .exec(block)?.[1]
+    ?.split("\n")
+    .map((line) => line.trim())
+    .join(" ")
+    .trim();
+  expect(group).toBe(
+    "${{ contains(github.event.comment.body, '@vinland-ai') && github.event.comment.user.id == vars.AI_TRIGGER_USER_ID && format('ai-automation-pr-{0}', github.event.issue.number) || format('ai-automation-run-{0}', github.run_id) }}",
   );
+  expect(block).toContain("cancel-in-progress: false");
+});
+
+test("comment events start planning only for PR comments that mention @vinland-ai from the trigger login", () => {
+  const gate = condition("prepare");
+  expect(gate).toContain("github.event_name == 'issue_comment'");
+  expect(gate).toContain("github.event.issue.pull_request");
+  expect(gate).toContain("contains(github.event.comment.body, '@vinland-ai')");
+  expect(gate).not.toContain("@claude");
+  expect(gate).toContain("vars.AI_TRIGGER_LOGIN != ''");
+  expect(gate).toContain("github.event.comment.user.login == vars.AI_TRIGGER_LOGIN");
+  expect(gate).toContain("vars.AI_TRIGGER_USER_ID != ''");
+  expect(gate).toContain("github.event.comment.user.id == vars.AI_TRIGGER_USER_ID");
+  expect(gate).not.toContain("author_association");
+});
+
+test("both coordinator jobs receive the trigger login and user ID", () => {
+  for (const name of ["prepare", "publish"]) {
+    expect(job(name)).toContain("AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}");
+    expect(job(name)).toContain("AI_TRIGGER_USER_ID: ${{ vars.AI_TRIGGER_USER_ID }}");
+  }
 });
 
 test("verification runs only for planned fixes and publication reads each operation's own receipt", () => {
   expect(job("verify")).toContain("matrix: ${{ fromJSON(needs.prepare.outputs.verify_matrix) }}");
-  expect(condition("verify")).toBe("always() && needs.prepare.outputs.has_fixes == 'true'");
+  expect(condition("verify")).toBe("always() && needs.prepare.outputs.has_verification == 'true'");
   expect(job("publish")).not.toContain("needs.verify.result");
+});
+
+test("AI automation runs from new PR conversation tags without scheduled recovery state", () => {
+  expect(workflow).toContain("issue_comment:\n    types: [created]");
+  expect(workflow).not.toContain("schedule:");
+  expect(workflow).not.toContain("workflow_dispatch:");
+  expect(workflow).not.toContain("AI_STATE_ISSUE");
+  expect(workflow).not.toContain("AI_ACTIVATED_AT");
 });

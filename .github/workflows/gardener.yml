@@ -1,0 +1,189 @@
+name: Gardener
+on: workflow_dispatch
+permissions: {}
+concurrency:
+  group: gardener
+  cancel-in-progress: false
+env:
+  GARDENER_MAX_PRS: "3"
+defaults:
+  run:
+    shell: bash
+jobs:
+  audit:
+    if: >-
+      github.ref == 'refs/heads/main' && github.repository_owner == 'vinlandatelier' &&
+      vars.AI_TRIGGER_LOGIN != '' && vars.AI_TRIGGER_USER_ID != '' &&
+      github.triggering_actor == vars.AI_TRIGGER_LOGIN &&
+      github.event.sender.id == vars.AI_TRIGGER_USER_ID
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    environment: ai-automation
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      count: ${{ steps.bundle.outputs.count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          cache-save: false
+      - run: npm install --global @anthropic-ai/claude-code@2.1.308
+      - name: Prepare the command sandbox
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap socat
+          if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null)" = 1 ]; then
+            sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+            include if exists <local/bwrap>
+          }
+          EOF
+            sudo systemctl reload apparmor
+          fi
+          sudo systemctl stop docker.socket docker.service
+          if docker info > /dev/null 2>&1; then
+            echo "::error::Docker is still reachable. Its socket would bypass the sandbox."
+            exit 1
+          fi
+      - name: List pull requests the gardener must not duplicate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/gardener/out"
+          {
+            gh pr list --repo "$GITHUB_REPOSITORY" --state open --author "$AI_TRIGGER_LOGIN" --limit 500 --json number,title,state,headRefName
+            gh pr list --repo "$GITHUB_REPOSITORY" --state all --label gardener --limit 500 --json number,title,state,headRefName
+          } | jq -s 'add | unique_by(.number) | map({number, title, headRefName, state})' > "$RUNNER_TEMP/gardener/known-prs.json"
+      - name: Run the gardener
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+        run: |
+          export GARDENER_OUT="$RUNNER_TEMP/gardener/out"
+          export GARDENER_PRS="$RUNNER_TEMP/gardener/known-prs.json"
+          export CLAUDE_CONFIG_DIR="$RUNNER_TEMP/gardener/claude"
+          GARDENER_DEADLINE=$(($(date +%s) + 150 * 60))
+          export GARDENER_DEADLINE
+          mkdir -p "$CLAUDE_CONFIG_DIR"
+          jq --arg workspace "$GITHUB_WORKSPACE" --arg out "$GARDENER_OUT" --arg prs "$GARDENER_PRS" \
+            '.permissions.allow += ["Edit(/\($workspace)/**)", "Edit(/\($out)/**)", "Read(/\($prs))"]' \
+            .github/gardener-settings.json > "$CLAUDE_CONFIG_DIR/settings.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          timeout 155m claude -p "Follow .agents/skills/gardener/SKILL.md." \
+            --model "$(jq -r .roles.implementer.model .github/ai-models.json)" \
+            --effort "$(jq -r .roles.implementer.effort .github/ai-models.json)" \
+            --settings "$CLAUDE_CONFIG_DIR/settings.json" --add-dir "$GARDENER_OUT" \
+            --permission-prompts none --output-format json < /dev/null |
+            jq '{subtype, is_error, num_turns, duration_ms, denied: [.permission_denials[]?.tool_name]}'
+      - id: bundle
+        name: Bundle approved branches
+        if: ${{ !cancelled() }}
+        run: |
+          out="$RUNNER_TEMP/gardener/out"
+          if [ -f "$out/report.md" ]; then cat "$out/report.md" >> "$GITHUB_STEP_SUMMARY"; fi
+          count=$(jq 'if type == "array" then length else 0 end' "$out/prs.json" 2>/dev/null || echo 0)
+          if [ "$count" -gt 0 ] && [ -n "$(git for-each-ref --count=1 refs/heads/gardener/)" ]; then
+            git bundle create "$out/branches.bundle" --branches='gardener/*' "^$GITHUB_SHA"
+          else
+            count=0
+          fi
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: gardener
+          path: ${{ runner.temp }}/gardener/out
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Delete the Git directory the audit could write
+        if: always()
+        run: rm -rf "$GITHUB_WORKSPACE/.git"
+  publish:
+    needs: audit
+    if: >-
+      !cancelled() && needs.audit.outputs.count != '' && needs.audit.outputs.count != '0' &&
+      vars.AI_TRIGGER_LOGIN != '' && github.triggering_actor == vars.AI_TRIGGER_LOGIN
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: ai-automation
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        id: app
+        with:
+          app-id: ${{ vars.AI_APP_ID }}
+          private-key: ${{ secrets.AI_APP_PRIVATE_KEY }}
+          owner: vinlandatelier
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: gardener
+          path: ${{ runner.temp }}/gardener/out
+      - name: Open labeled pull requests
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/gardener"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          held_paths=(.github .claude .agents/skills/gardener scripts/ai-automation scripts/ai-models tests/harness/gardener-workflow.test.ts tests/harness/ai-credentials.test.ts)
+          status=0
+          gh label create gardener --repo "$GITHUB_REPOSITORY" --force \
+            --color 2E7D32 --description "Opened by the gardener"
+          git fetch --no-tags "$dir/out/branches.bundle" '+refs/heads/gardener/*:refs/remotes/gardener/*'
+          while IFS= read -r entry; do
+            branch=$(jq -r .branch <<<"$entry")
+            title=$(jq -r .title <<<"$entry")
+            if [[ ! "$branch" =~ ^gardener/[a-z0-9]+(-[a-z0-9]+)*$ ]] || [[ -z "$title" || "$title" == *$'\n'* ]]; then
+              echo "::error::Rejected a malformed manifest entry."
+              status=1
+              continue
+            fi
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/$branch"; then
+              echo "::error::$branch does not start from $GITHUB_SHA. Skipped."
+              status=1
+              continue
+            fi
+            if [ -n "$(git diff --no-renames --name-only "$GITHUB_SHA" "refs/remotes/$branch" -- "${held_paths[@]}")" ]; then
+              echo "::warning::$branch changes automation or its guards. Held for the owner."
+              echo "- Held for the owner: \`$branch\` changes automation or its guards. $title" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            local_head=$(git rev-parse "refs/remotes/$branch")
+            remote_head=$(git ls-remote --heads "$remote" "refs/heads/$branch" | cut -f1)
+            if [ -n "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state all --json number --jq '.[].number')" ]; then
+              echo "::notice::$branch already has a pull request. Skipped."
+              continue
+            fi
+            if [ -z "$remote_head" ]; then
+              git push "$remote" "refs/remotes/$branch:refs/heads/$branch"
+            elif [ "$remote_head" != "$local_head" ]; then
+              echo "::error::$branch exists on the remote with other commits and no pull request. Skipped."
+              status=1
+              continue
+            fi
+            jq -r .body <<<"$entry" > "$dir/body.md"
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+              --title "$title" --body-file "$dir/body.md" --label gardener
+          done < <(jq -c --argjson max "$GARDENER_MAX_PRS" '.[:$max][]' "$dir/out/prs.json")
+          exit "$status"
