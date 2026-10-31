@@ -11,6 +11,7 @@ import {
 } from "@aircastle/schema";
 import { collectionName, decodeCollections, decodeDescription, fieldName } from "./decode.ts";
 
+export { authEmail, authSetupInput, authSignInInput } from "./auth.ts";
 export type { CollectionDescription, CollectionDefinitions } from "@aircastle/schema";
 export type DocumentData = Record<string, string | null>;
 export type ContentDocument = DocumentData & { id: string };
