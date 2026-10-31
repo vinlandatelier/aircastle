@@ -2,23 +2,10 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Coordinator } from "./github.ts";
 import { renderPatch } from "./materialize.ts";
-import {
-  digest,
-  fixSchema,
-  integer,
-  prompt,
-  requireObject,
-  reviewSchema,
-  sha,
-  text,
-  validateEdits,
-  validateReview,
-  workflowOutputs,
-  type Job,
-  type ModelOutput,
-} from "./index.ts";
+import { digest, integer, parseJob, requireObject, sha, workflowOutputs } from "./index.ts";
 import { boundVerification } from "./checks.ts";
 import { verify } from "./verify.ts";
+import { executeOperation, boundModelOutput, type ModelOutput } from "./operations.ts";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -36,10 +23,12 @@ function coordinator(): Coordinator {
     token: required("AI_GITHUB_TOKEN"),
     botId: integer(Number(required("AI_BOT_USER_ID"))),
     botLogin: `${required("AI_APP_SLUG")}[bot]`,
-    stateIssue: integer(Number(required("AI_STATE_ISSUE"))),
-    activatedAt: required("AI_ACTIVATED_AT"),
     control: sha(required("AI_CONTROL_SHA")),
     run: required("GITHUB_RUN_ID"),
+    trigger: {
+      login: required("AI_TRIGGER_LOGIN"),
+      id: Number(required("AI_TRIGGER_USER_ID")),
+    },
   });
 }
 async function json(path: string, max = 2_000_000): Promise<unknown> {
@@ -51,51 +40,18 @@ async function output(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value));
 }
-function inputJob(value: unknown): Job {
-  const job = requireObject(value),
-    snapshot = requireObject(job.snapshot),
-    selection = requireObject(job.selection);
-  if (
-    job.version !== 1 ||
-    !/^[a-f0-9]{64}$/.test(String(job.id)) ||
-    !["review", "fix"].includes(String(job.task)) ||
-    !["codexReviewer", "codexImplementer", "claudeReviewer", "claudeImplementer"].includes(
-      String(job.role),
-    )
-  )
-    throw new Error("Invalid job");
-  sha(job.control);
-  sha(snapshot.head);
-  sha(snapshot.base);
-  integer(snapshot.number);
-  text(selection.model, 200);
-  text(selection.effort, 40);
-  if (
-    !Array.isArray(snapshot.files) ||
-    !Array.isArray(snapshot.changedPaths) ||
-    !Array.isArray(snapshot.omitted)
-  )
-    throw new Error("Invalid context bundle");
-  return job as unknown as Job;
-}
 async function main(): Promise<void> {
   const command = process.argv[2];
   const root = resolve(import.meta.dirname, "../..");
   const target = process.env.AI_DATA_DIR ?? "ai-data";
   if (command === "setup") {
     required("AI_GITHUB_TOKEN");
-    required("OPENAI_API_KEY");
-    required("ANTHROPIC_API_KEY");
+    required("CLAUDE_CODE_OAUTH_TOKEN");
     const api = coordinator();
     await api.setup();
     const { parseModelConfig, runModel } = await import("../ai-models/index.ts");
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
-    for (const role of [
-      "codexReviewer",
-      "codexImplementer",
-      "claudeReviewer",
-      "claudeImplementer",
-    ] as const) {
+    for (const role of ["reviewer", "implementer"] as const) {
       const result = requireObject(
         await runModel(config.roles[role], 'Return {"ready":true} using the requested schema.', {
           type: "object",
@@ -110,7 +66,7 @@ async function main(): Promise<void> {
         JSON.stringify({
           role,
           selection: config.roles[role],
-          compatibility: "live API/schema accepted",
+          compatibility: "live Claude Code CLI/schema accepted",
           evaluation: "not evaluated",
         }),
       );
@@ -125,13 +81,14 @@ async function main(): Promise<void> {
     await api.setup();
     const { parseModelConfig } = await import("../ai-models/index.ts");
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
-    let immediate: number | undefined;
-    if (process.env.GITHUB_EVENT_NAME === "issue_comment") {
-      const event = requireObject(await json(required("GITHUB_EVENT_PATH")));
-      if (event.action === "created" && requireObject(event.issue).pull_request)
-        immediate = integer(requireObject(event.comment).id);
-    }
-    const jobs = await api.prepare(config, immediate);
+    const event = requireObject(await json(required("GITHUB_EVENT_PATH")));
+    if (
+      process.env.GITHUB_EVENT_NAME !== "issue_comment" ||
+      event.action !== "created" ||
+      !requireObject(event.issue).pull_request
+    )
+      throw new Error("New PR conversation comment required");
+    const jobs = await api.prepare(config, integer(requireObject(event.comment).id));
     await mkdir(`${target}/plan`, { recursive: true });
     for (const job of jobs) await output(`${target}/plan/${job.id}.json`, job);
     await appendFile(required("GITHUB_OUTPUT"), workflowOutputs(jobs));
@@ -142,50 +99,36 @@ async function main(): Promise<void> {
     throw new Error("Usage: node scripts/ai-automation/cli.ts setup|prepare|model|verify|publish");
   const id = required("AI_OPERATION_ID");
   if (!/^[a-f0-9]{64}$/.test(id)) throw new Error("Invalid operation ID");
-  const job = inputJob(await json(`${target}/plan/${id}.json`));
+  const job = parseJob(await json(`${target}/plan/${id}.json`));
   if (job.id !== id || job.control !== required("AI_CONTROL_SHA"))
     throw new Error("Control revision mismatch");
   if (command === "model") {
-    const { parseModelConfig, runModel } = await import("../ai-models/index.ts");
+    const { parseModelConfig } = await import("../ai-models/index.ts");
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
-    if (digest(config.roles[job.role]) !== digest(job.selection))
+    if (
+      digest(config.roles[job.role]) !== digest(job.selection) ||
+      (job.task === "request" && digest(job.implementation) !== digest(config.roles.implementer))
+    )
       throw new Error("Trusted model configuration mismatch");
-    required(job.selection.provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY");
     console.log(
       JSON.stringify({ operation: id, head: job.snapshot.head, selection: job.selection }),
     );
-    const result = await runModel(
-      job.selection,
-      prompt(job, await readFile(resolve(root, "AGENTS.md"), "utf8")),
-      job.task === "fix" ? fixSchema : reviewSchema,
-    );
-    const valid =
-      job.task === "fix"
-        ? validateEdits(result, job.snapshot)
-        : validateReview(result, job.snapshot);
-    if (job.task === "fix") {
+    const model = await executeOperation(job, await readFile(resolve(root, "AGENTS.md"), "utf8"));
+    if (model.task === "fix") {
       await mkdir(`${target}/model`, { recursive: true });
-      await writeFile(
-        `${target}/model/${id}.patch`,
-        renderPatch(validateEdits(valid, job.snapshot), job.snapshot),
-      );
+      await writeFile(`${target}/model/${id}.patch`, renderPatch(model.result, job.snapshot));
     }
-    await output(`${target}/model/${id}.json`, {
-      id,
-      digest: digest(job),
-      result: valid,
-      selection: job.selection,
-    });
+    await output(`${target}/model/${id}.json`, model);
     return;
   }
   const modelPath = `${target}/model/${id}.json`;
   if (command === "verify") {
-    if (job.task !== "fix") {
-      await output(`${target}/verification/${id}.json`, { id, skipped: "review-only" });
+    const model = boundModelOutput(job, await json(modelPath));
+    if (model.task !== "fix") {
+      await output(`${target}/verification/${id}.json`, { id, skipped: `${model.task}-only` });
       return;
     }
-    const model = requireObject(await json(modelPath)) as unknown as ModelOutput;
-    const receipt = await verify(job, model, required("GITHUB_REPOSITORY"));
+    const receipt = await verify(job, model.result, required("GITHUB_REPOSITORY"));
     await output(`${target}/verification/${id}.json`, receipt);
     if (receipt.commands !== null && !receipt.passed)
       throw new Error("Secretless verification failed; no fix branch authorized");
@@ -211,22 +154,18 @@ async function main(): Promise<void> {
     throw new Error("Publisher immutable context revalidation failed");
   let model: ModelOutput;
   try {
-    model = requireObject(await json(modelPath)) as unknown as ModelOutput;
+    model = boundModelOutput(original, await json(modelPath));
   } catch {
     await api.finish(claim, "failed");
     throw new Error("Model output unavailable; no successful review or fix was produced");
   }
-  if (
-    model.id !== id ||
-    model.digest !== digest(original) ||
-    digest(model.selection) !== digest(original.selection)
-  )
-    throw new Error("Model result input binding mismatch");
-  if (job.task === "review") console.log(await api.publishReview(original, model.result, claim));
+  if (model.task === "review") console.log(await api.publishReview(original, model.result, claim));
+  else if (model.task === "clarify")
+    console.log(await api.publishQuestion(original, model.result, claim));
   else {
     const receipt = boundVerification(
       original,
-      validateEdits(model.result, original.snapshot).edits,
+      model.result.edits,
       await json(`${target}/verification/${id}.json`).catch(() => null),
     );
     if (!receipt) {
