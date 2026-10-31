@@ -83,7 +83,7 @@ vp run test-web:e2e
 
 Playwright builds the web app twice, once with its real data and once with fixture data, and serves each build until the run ends. The normal build listens on `WEB_E2E_PORT`, which defaults to 43124, the fixture build listens on the next port, and the auth journey server listens on the port after that. An occupied port stops the run. To run browser journeys in two worktrees at once, give each run its own port, for example `WEB_E2E_PORT=43224 vp run test-web:e2e`. Auth journeys also start a real API and a disposable Postgres, so they require Docker.
 
-Each run overwrites its reports in `apps/web/reports/`. `html/` holds the HTML report, `results.json` holds the JSON results, `test-results/` holds traces and screenshots of failed tests, and `build/normal/` and `build/fixture/` hold the two builds. Open the HTML report with `vp -C apps/web exec playwright show-report reports/html`. Run a focused scenario with `vp run test-web:e2e stress.spec.ts --grep long-text`.
+Each run overwrites its reports in `apps/web/reports/`. `html/` holds the HTML report, `results.json` holds the JSON results, `test-results/` holds traces and screenshots of failed tests, and `build/normal/` and `build/fixture/` hold the two builds. Open the HTML report with `vp -C apps/web exec playwright show-report reports/html`. To record a video of every auth journey, run `vp run test-auth:record`; each test saves `video.webm` in its folder under `test-results/`. Normal runs record no video. Run a focused scenario with `vp run test-web:e2e stress.spec.ts --grep long-text`.
 
 ## Local Postgres
 
