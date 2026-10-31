@@ -11,7 +11,14 @@ if (!command.length) {
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const project = `aircastle-test-${randomUUID()}`;
-const env = { ...process.env, COMPOSE_PROJECT_NAME: project, AIRCASTLE_DB_PORT: "0" };
+const env = {
+  ...process.env,
+  COMPOSE_PROJECT_NAME: project,
+  AIRCASTLE_DB_PORT: "0",
+  AIRCASTLE_DB_NAME: "aircastle",
+  AIRCASTLE_DB_USER: "aircastle",
+  AIRCASTLE_DB_PASSWORD: "aircastle-local",
+};
 const compose = ["compose", "--project-name", project, "-f", `${root}compose.yaml`];
 let active: ReturnType<typeof Bun.spawn> | undefined;
 let interrupted = 0;
@@ -78,8 +85,8 @@ try {
   const address = port.stdout?.trim();
   if (port.status !== 0 || !/^127\.0\.0\.1:\d+$/.test(address))
     throw new Error("Cannot resolve Postgres port");
-  const DATABASE_URL = `postgresql://aircastle:aircastle-local@${address}/aircastle`;
-  process.exitCode = await run(command, { ...env, DATABASE_URL });
+  const AIRCASTLE_DATABASE_URL = `postgresql://aircastle:aircastle-local@${address}/aircastle`;
+  process.exitCode = await run(command, { ...env, AIRCASTLE_DATABASE_URL });
 } catch (error) {
   console.error(error);
   process.exitCode = 1;
