@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { Result } from "@aircastle/contracts";
+import type { DocumentListQuery, DocumentUpdate, Result } from "@aircastle/contracts";
 import type { Access } from "@aircastle/core";
 import { failure } from "./responses.ts";
 
@@ -57,6 +57,79 @@ export async function jsonBody(c: Context, limit: number): Promise<Result<unknow
   } catch (error) {
     if (error instanceof TypeError || error instanceof SyntaxError)
       return failure("invalid_request");
+    throw error;
+  }
+}
+
+const limitPattern = /^[1-9][0-9]{0,2}$/;
+const sortPattern = /^-?[A-Za-z_][A-Za-z0-9_]*$/;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNameList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((name) => typeof name === "string") &&
+    new Set(value).size === value.length
+  );
+}
+
+export function updateRequest(input: unknown): Result<DocumentUpdate> {
+  if (!isRecord(input) || !isRecord(input.changes)) return failure("invalid_request");
+
+  const { changes, unset = [], ...unknown } = input;
+  if (Object.keys(unknown).length > 0 || !isNameList(unset)) return failure("invalid_request");
+  if (unset.some((name) => Object.hasOwn(changes, name))) return failure("invalid_request");
+
+  return { ok: true, data: { changes, unset } };
+}
+
+export function listQuery(input: unknown): Result<DocumentListQuery> {
+  if (!isRecord(input)) return failure("invalid_request");
+
+  const query: DocumentListQuery = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (key === "where" && isRecord(value)) query.where = value;
+    else if (key === "sort" && typeof value === "string" && sortPattern.test(value))
+      query.sort = value;
+    else if (
+      key === "limit" &&
+      Number.isInteger(value) &&
+      Number(value) >= 1 &&
+      Number(value) <= 100
+    )
+      query.limit = Number(value);
+    else if (key === "cursor" && typeof value === "string" && value !== "") query.cursor = value;
+    else return failure("invalid_request");
+  }
+
+  return { ok: true, data: query };
+}
+
+export function searchQuery(c: Context): Result<DocumentListQuery> {
+  const entries = [...new URL(c.req.url).searchParams];
+  const keys = new Set(entries.map(([key]) => key));
+  if (keys.size !== entries.length || entries.some(([, value]) => value === ""))
+    return failure("invalid_request");
+
+  return listQuery(
+    Object.fromEntries(
+      entries.map(([key, value]) => {
+        if (key === "where") return [key, parsedJson(value)];
+        if (key === "limit") return [key, limitPattern.test(value) ? Number(value) : value];
+        return [key, value];
+      }),
+    ),
+  );
+}
+
+function parsedJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined;
     throw error;
   }
 }
