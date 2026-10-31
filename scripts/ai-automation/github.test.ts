@@ -55,6 +55,29 @@ test("forged receipt markers authored by another identity do not suppress work",
   );
   expect(await coordinator.receipts(7)).toEqual([]);
 });
+test("a bot receipt whose stored job is malformed is rejected", async () => {
+  const { files: _files, ...revision } = snapshot;
+  const receipt = {
+    version: 1,
+    id: job.id,
+    job: { ...job, snapshot: { ...revision, head: 7 } },
+    digest: digest(job),
+    attempt: 1,
+    state: "claimed",
+    run: options.run,
+    at: "2026-10-25T00:00:00Z",
+  };
+  const coordinator = new Coordinator(options, async () =>
+    Response.json([
+      {
+        id: 90,
+        user: { id: options.botId, type: "Bot" },
+        body: `<!-- aircastle-ai:v1 -->\n${JSON.stringify(receipt)}`,
+      },
+    ]),
+  );
+  await expect(coordinator.receipts(7)).rejects.toThrow("Invalid bot receipt");
+});
 test("claim writes immutable revision and retries retain it", async () => {
   const writes: unknown[] = [];
   const coordinator = new Coordinator(options, async (_url, init) => {

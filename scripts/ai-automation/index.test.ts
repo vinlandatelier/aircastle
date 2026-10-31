@@ -3,6 +3,7 @@ import {
   authorize,
   operationId,
   parseCommand,
+  parseJob,
   prompt,
   reviewLenses,
   validateEdits,
@@ -431,6 +432,31 @@ test("natural requests enter secretless verification because they may resolve to
     'verify_matrix={"include":[{"id":"' + request.id + '","provider":"openai","task":"request"}]}',
   );
   expect(output).toContain("has_verification=true");
+});
+
+test("job artifacts read back unchanged, including natural requests", () => {
+  const request: Job = {
+    ...reviewJob,
+    task: "request",
+    implementation: { provider: "anthropic", model: "fixture", effort: "high" },
+  };
+  expect(parseJob(structuredClone(reviewJob))).toEqual(reviewJob);
+  expect(parseJob(structuredClone(request))).toEqual(request);
+});
+
+test.each([
+  ["a request without its implementation model", { ...reviewJob, task: "request" }],
+  ["an unknown task", { ...reviewJob, task: "deploy" }],
+  [
+    "a snapshot file with non-string text",
+    { ...reviewJob, snapshot: { ...snapshot, files: [{ ...snapshot.files[0], text: 1 }] } },
+  ],
+  [
+    "an invalid model name",
+    { ...reviewJob, selection: { ...reviewJob.selection, model: "bad model" } },
+  ],
+])("job artifacts are rejected for %s", (_case, value) => {
+  expect(() => parseJob(value)).toThrow("Invalid job");
 });
 
 test.each([

@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import type { ModelSelection, Role } from "../ai-models/index.ts";
+import {
+  isJsonObject,
+  isModelSelection,
+  isRole,
+  type ModelSelection,
+  type Role,
+} from "../ai-models/index.ts";
 
 export type ReviewerRole = Extract<Role, `${string}Reviewer`>;
 type Lens = { title: string; brief: string; readsRepositoryInstructions: boolean };
@@ -108,9 +114,119 @@ export function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 export function requireObject(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error("Expected object");
-  return value as Record<string, unknown>;
+  if (!isJsonObject(value)) throw new Error("Expected object");
+  return value;
+}
+function oneOf<T extends string>(options: Record<T, true>): (value: unknown) => value is T {
+  return (value): value is T => typeof value === "string" && Object.hasOwn(options, value);
+}
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+function isInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value);
+}
+function isArrayOf<T>(value: unknown, item: (entry: unknown) => entry is T): value is T[] {
+  return Array.isArray(value) && value.every((entry) => item(entry));
+}
+const isModelTask = oneOf<Exclude<Job["task"], "request">>({ review: true, fix: true });
+const isReceiptState = oneOf<Receipt["state"]>({
+  claimed: true,
+  published: true,
+  stale: true,
+  failed: true,
+});
+const isSeverity = oneOf<Finding["severity"]>({
+  critical: true,
+  high: true,
+  medium: true,
+  low: true,
+  advisory: true,
+});
+function isIdentity(value: unknown): value is Identity {
+  return (
+    isJsonObject(value) && isInteger(value.id) && isString(value.login) && isString(value.type)
+  );
+}
+function isSourceFile(value: unknown): value is SourceFile {
+  return (
+    isJsonObject(value) &&
+    isString(value.path) &&
+    isNullableString(value.sha) &&
+    isString(value.mode) &&
+    isNullableString(value.text) &&
+    isString(value.patch)
+  );
+}
+function isRevision(value: unknown): value is Receipt["job"]["snapshot"] {
+  return (
+    isJsonObject(value) &&
+    isInteger(value.repositoryId) &&
+    isInteger(value.number) &&
+    isString(value.base) &&
+    isString(value.head) &&
+    isInteger(value.headRepositoryId) &&
+    isString(value.baseRef) &&
+    isIdentity(value.author) &&
+    typeof value.fork === "boolean" &&
+    isString(value.tree) &&
+    isArrayOf(value.omitted, isString) &&
+    isArrayOf(value.changedPaths, isString) &&
+    typeof value.complete === "boolean"
+  );
+}
+function isSnapshot(value: unknown): value is Snapshot {
+  return isJsonObject(value) && isArrayOf(value.files, isSourceFile) && isRevision(value);
+}
+function isJobTask(value: Record<string, unknown>): value is Record<string, unknown> & JobTask {
+  return value.task === "request"
+    ? isModelSelection(value.implementation)
+    : isModelTask(value.task);
+}
+function isJobWith<S>(
+  value: unknown,
+  isOperationSnapshot: (snapshot: unknown) => snapshot is S,
+): value is Omit<JobBase, "snapshot"> & JobTask & { snapshot: S } {
+  return (
+    isJsonObject(value) &&
+    value.version === 1 &&
+    isString(value.id) &&
+    isJobTask(value) &&
+    isRole(value.role) &&
+    isIdentity(value.requester) &&
+    isOperationSnapshot(value.snapshot) &&
+    isString(value.instructions) &&
+    isString(value.thread) &&
+    isString(value.control) &&
+    isModelSelection(value.selection) &&
+    isString(value.previous)
+  );
+}
+/** Accepts a job read back from a workflow artifact, with bounded identifiers and context. */
+export function parseJob(value: unknown): Job {
+  if (!isJobWith(value, isSnapshot) || !/^[a-f0-9]{64}$/.test(value.id))
+    throw new Error("Invalid job");
+  sha(value.control);
+  sha(value.snapshot.head);
+  sha(value.snapshot.base);
+  integer(value.snapshot.number);
+  return value;
+}
+export function isReceipt(value: unknown): value is Receipt {
+  return (
+    isJsonObject(value) &&
+    value.version === 1 &&
+    isString(value.id) &&
+    isJobWith(value.job, isRevision) &&
+    isString(value.digest) &&
+    isInteger(value.attempt) &&
+    isReceiptState(value.state) &&
+    isString(value.run) &&
+    isString(value.at)
+  );
 }
 export function text(value: unknown, max = 8000): string {
   if (typeof value !== "string" || value.length === 0 || value.length > max || value.includes("\0"))
@@ -249,8 +365,7 @@ export function validateReview(value: unknown, snapshot: Snapshot): Review {
   const findings = result.findings.map((raw): Finding => {
     const f = requireObject(raw);
     const severity = text(f.severity);
-    if (!["critical", "high", "medium", "low", "advisory"].includes(severity))
-      throw new Error("Invalid severity");
+    if (!isSeverity(severity)) throw new Error("Invalid severity");
     const path = safePath(f.path);
     const file = snapshot.files.find((candidate) => candidate.path === path);
     const startLine = integer(f.startLine),
@@ -268,7 +383,7 @@ export function validateReview(value: unknown, snapshot: Snapshot): Review {
     )
       throw new Error("Finding evidence does not exist at reviewed SHA");
     return {
-      severity: severity as Finding["severity"],
+      severity,
       path,
       startLine,
       endLine,

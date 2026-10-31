@@ -1,3 +1,4 @@
+import { isJsonObject } from "../ai-models/index.ts";
 import { digest, type Edit, type Job, type Verification } from "./index.ts";
 
 const uiTests = new Map([
@@ -48,9 +49,8 @@ export function verificationPlan(edits: Edit[]): string[][] | null {
  * Returns the verification receipt only when it belongs to this operation and these edits,
  * and its result matches the plan: passed for scoped checks, not passed for patch-only scopes.
  */
-export function boundVerification(job: Job, edits: Edit[], value: unknown): Verification | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const receipt = value as Record<string, unknown>;
+export function boundVerification(job: Job, edits: Edit[], receipt: unknown): Verification | null {
+  if (!isJsonObject(receipt)) return null;
   const commands = verificationPlan(edits);
   if (
     receipt.id !== job.id ||
