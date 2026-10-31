@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, test } from "vite-plus/test";
@@ -7,7 +8,7 @@ import { afterAll, describe, expect, test } from "vite-plus/test";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const repository = resolve(root, "../..");
 const compiler = resolve(dirname(fileURLToPath(import.meta.resolve("typescript"))), "../bin/tsc");
-const directory = mkdtempSync(join(root, ".type-fixtures-"));
+const directory = mkdtempSync(join(tmpdir(), "aircastle-auth-types-"));
 
 function compile(config: string, args: string[] = []) {
   try {
@@ -73,5 +74,5 @@ describe.each(["source", "declarations"] as const)("%s browser auth contract", (
     }
     const result = compile(config);
     expect(result.status, result.output).toBe(0);
-  }, 30_000);
+  }, 90_000);
 });

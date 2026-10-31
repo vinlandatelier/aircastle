@@ -65,6 +65,8 @@ const invalidEmails: readonly (readonly [string, unknown])[] = [
   ["domain underscore", "alex@exam_ple.test"],
   ["IPv4 literal", "alex@[127.0.0.1]"],
   ["IPv6 literal", "alex@[IPv6:::1]"],
+  ["unbracketed IPv4 domain", "alex@127.0.0.1"],
+  ["numeric top-level label", "alex@example.169"],
   [
     "255-character address",
     `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(62)}`,
@@ -166,6 +168,9 @@ describe("public auth contracts", () => {
     ["121 ASCII code points", "x".repeat(121)],
     ["121 astral code points", "😀".repeat(121)],
     ["121 decomposed code points", `${"e\u0301".repeat(60)}x`],
+    ["NUL character", "Al\u0000ex"],
+    ["unpaired high surrogate", "Al\uD800ex"],
+    ["unpaired low surrogate", "Al\uDC00ex"],
   ])("reports a name field error for %s", (_label, name) => {
     expectFieldError(authSetupInput({ name, email: "alex@example.test" }), "name");
   });
