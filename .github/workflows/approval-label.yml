@@ -1,7 +1,7 @@
 name: Clear stale approval label
 on:
   pull_request_target:
-    types: [synchronize]
+    types: [synchronize, reopened]
 permissions: {}
 concurrency: approval-label-${{ github.event.pull_request.number }}
 jobs:
@@ -12,7 +12,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - name: Remove ready-for-human-approval after new commits
+      - name: Remove ready-for-human-approval from the new head
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}

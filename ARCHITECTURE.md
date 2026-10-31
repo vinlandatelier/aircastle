@@ -79,7 +79,7 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
 
-`.github/workflows/approval-label.yml` removes the `ready-for-human-approval` label when a pull request gets new commits, so the label never marks an unreviewed head. It never checks out pull request code.
+`.github/workflows/approval-label.yml` removes the `ready-for-human-approval` label when a pull request gets new commits or is reopened, so the label never marks an unreviewed head. It never checks out pull request code.
 
 `.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
 
