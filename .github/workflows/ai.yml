@@ -22,7 +22,7 @@ jobs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has_jobs: ${{ steps.plan.outputs.has_jobs }}
       verify_matrix: ${{ steps.plan.outputs.verify_matrix }}
-      has_fixes: ${{ steps.plan.outputs.has_fixes }}
+      has_verification: ${{ steps.plan.outputs.has_verification }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -97,7 +97,7 @@ jobs:
           retention-days: 14
   verify:
     needs: [prepare, model]
-    if: always() && needs.prepare.outputs.has_fixes == 'true'
+    if: always() && needs.prepare.outputs.has_verification == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.verify_matrix) }}
@@ -150,9 +150,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version-file: .node-version
+      - uses: ./.github/actions/setup
       - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
         id: app
         with:
@@ -174,7 +172,7 @@ jobs:
           name: ai-model-${{ matrix.id }}
           path: ai-data/model
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        if: matrix.task == 'fix'
+        if: matrix.task != 'review'
         continue-on-error: true
         with:
           name: ai-verification-${{ matrix.id }}

@@ -29,7 +29,7 @@ export type Snapshot = {
 };
 export type Command = {
   provider: "openai" | "anthropic";
-  kind: "review" | "fix";
+  kind: "review" | "fix" | "request";
   instructions: string;
   expectedHead?: string;
 };
@@ -65,13 +65,12 @@ export type Finding = {
   consequence: string;
   correction: string;
 };
-export type Review = { summary: string; findings: Finding[] };
+export type Review = { findings: Finding[] };
 export type Edit = { path: string; expectedBlob: string | null; content: string | null };
 export type Fix = { summary: string; edits: Edit[] };
-export type Job = {
+type JobBase = {
   version: 1;
   id: string;
-  task: "review" | "fix";
   role: Role;
   requester: Identity;
   snapshot: Snapshot;
@@ -81,21 +80,17 @@ export type Job = {
   selection: ModelSelection;
   previous: string;
 };
+type JobTask = { task: "review" | "fix" } | { task: "request"; implementation: ModelSelection };
+export type Job = JobBase & JobTask;
 export type Receipt = {
   version: 1;
   id: string;
-  job: Omit<Job, "snapshot"> & { snapshot: Omit<Snapshot, "files"> };
+  job: Omit<JobBase, "snapshot"> & JobTask & { snapshot: Omit<Snapshot, "files"> };
   digest: string;
   attempt: number;
   state: "claimed" | "published" | "stale" | "failed";
   run: string;
   at: string;
-};
-export type ModelOutput = {
-  id: string;
-  digest: string;
-  result: unknown;
-  selection: ModelSelection;
 };
 export type Verification = {
   id: string;
@@ -106,6 +101,8 @@ export type Verification = {
   recipe: string;
   scope: string;
 };
+
+export const threadLimit = 24000;
 
 export function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -156,7 +153,8 @@ export function parseCommand(body: string): Command | null {
   if (body.length > 32000) return null;
   const lines = body.replace(/<!--[\s\S]*?(?:-->|$)/g, "").split(/\r?\n/);
   let fence: string | null = null;
-  const commands: Command[] = [];
+  const commands: (Command & { explicit: boolean })[] = [];
+  let surroundingProse = false;
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!;
     const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
@@ -167,18 +165,25 @@ export function parseCommand(body: string): Command | null {
     }
     if (fence || /^\s*>/.test(line) || /^(?: {4}|\t)/.test(line)) continue;
     const match = /^\s*@vinland-ai(?:\s+(.*))?\s*$/i.exec(line);
-    if (!match) continue;
+    if (!match) {
+      if (line.trim()) surroundingProse = true;
+      continue;
+    }
     let instructions = (match[1] ?? "").trim();
-    const kind = /^(?:(?:please|can you|could you)\s+)?fix\b/i.test(instructions)
-      ? "fix"
-      : "review";
-    instructions = instructions.replace(
-      /^(?:(?:please|can you|could you)\s+)?(?:fix|review)\b\s*/i,
-      "",
-    );
+    if (/@vinland-ai\b/i.test(instructions)) return null;
+    const action = /^(?:(?:please|can you|could you)\s+)?(fix|review)\b\s*/i.exec(instructions);
+    if (action) instructions = instructions.slice(action[0].length);
     const expected = /^head=([a-f0-9]{40})(?:\s+|$)/.exec(instructions);
     if (expected) instructions = instructions.slice(expected[0].length);
+    const kind = action
+      ? action[1]!.toLowerCase() === "fix"
+        ? "fix"
+        : "review"
+      : instructions
+        ? "request"
+        : "review";
     commands.push({
+      explicit: action !== null,
       provider: "anthropic",
       kind,
       instructions: [...lines.slice(0, index), instructions, ...lines.slice(index + 1)]
@@ -187,7 +192,9 @@ export function parseCommand(body: string): Command | null {
       ...(expected ? { expectedHead: expected[1]! } : {}),
     });
   }
-  return commands.length === 1 ? commands[0]! : null;
+  if (commands.length !== 1) return null;
+  const { explicit, ...command } = commands[0]!;
+  return !explicit && surroundingProse ? { ...command, kind: "request" } : command;
 }
 export function operationId(input: Invocation): string {
   const s = input.snapshot;
@@ -209,7 +216,7 @@ export async function authorize(
   if (
     input.kind === "manual" &&
     (!parsed ||
-      parsed.kind !== task ||
+      (parsed.kind !== "request" && parsed.kind !== task) ||
       (parsed.provider === "openai") !== input.role.startsWith("codex"))
   )
     return { kind: "denied", reason: "invalidCommand" };
@@ -231,9 +238,11 @@ export async function authorize(
     thread: input.kind === "manual" ? input.command.thread : "",
   };
 }
+export function contextComplete(job: Job): boolean {
+  return job.snapshot.complete && job.thread.length < threadLimit;
+}
 export function validateReview(value: unknown, snapshot: Snapshot): Review {
   const result = requireObject(value);
-  const summary = text(result.summary);
   if (JSON.stringify(value).length > 40000) throw new Error("Review exceeds publication bound");
   if (!Array.isArray(result.findings) || result.findings.length > 30)
     throw new Error("Invalid findings");
@@ -268,7 +277,7 @@ export function validateReview(value: unknown, snapshot: Snapshot): Review {
       correction: text(f.correction, 2000),
     };
   });
-  return { summary, findings };
+  return { findings };
 }
 export function validateEdits(value: unknown, snapshot: Snapshot): Fix {
   const result = requireObject(value);
@@ -308,9 +317,8 @@ const stringSchema = { type: "string" };
 export const reviewSchema: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "findings"],
+  required: ["findings"],
   properties: {
-    summary: stringSchema,
     findings: {
       type: "array",
       items: {
@@ -399,20 +407,16 @@ export function prompt(job: Job, repositoryInstructions: string): string {
 }
 /**
  * GitHub Actions step outputs for the planned jobs. Every job gets a model and publish entry.
- * Only fix jobs get a verification entry.
+ * Fixes and natural requests get a verification entry.
  */
 export function workflowOutputs(jobs: Job[]): string {
   const entry = (job: Job) => ({ id: job.id, provider: job.selection.provider, task: job.task });
-  const fixes = jobs.filter((job) => job.task === "fix");
+  const verification = jobs.filter((job) => job.task !== "review");
   return [
     `matrix=${JSON.stringify({ include: jobs.map(entry) })}`,
     `has_jobs=${jobs.length > 0}`,
-    `verify_matrix=${JSON.stringify({ include: fixes.map(entry) })}`,
-    `has_fixes=${fixes.length > 0}`,
+    `verify_matrix=${JSON.stringify({ include: verification.map(entry) })}`,
+    `has_verification=${verification.length > 0}`,
     "",
   ].join("\n");
-}
-export function renderReview(job: Job, review: Review): string {
-  if (!reviewer(job.role)) throw new Error("Only reviewer roles publish reviews");
-  return `${job.role}: advisory ${reviewLenses[job.role].title} review\n\nReviewed SHA: \`${job.snapshot.head}\`\nBase SHA: \`${job.snapshot.base}\`\nModel: \`${job.selection.model}\`; effort sent: \`${job.selection.effort}\`\nContext: ${job.snapshot.complete && job.thread.length < 24000 ? "bounded changed-file context complete" : "INCOMPLETE"}. Unchanged repository files were not reviewed.\nOmitted: ${[...job.snapshot.omitted, ...(job.thread.length >= 24000 ? ["inline thread truncated"] : [])].join(", ") || "none"}\n\n${review.summary}\n\n${review.findings.map((f) => `- ${f.severity}: ${f.path}:${f.startLine}-${f.endLine}\n  Evidence: ${JSON.stringify(f.quote)}\n  Consequence: ${f.consequence}\n  Correction: ${f.correction}`).join("\n") || "No findings in the supplied context."}\n\nThis COMMENT review is advisory. It does not approve, block, or merge this PR.`;
 }

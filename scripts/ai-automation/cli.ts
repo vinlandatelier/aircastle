@@ -2,23 +2,10 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Coordinator } from "./github.ts";
 import { renderPatch } from "./materialize.ts";
-import {
-  digest,
-  fixSchema,
-  integer,
-  prompt,
-  requireObject,
-  reviewSchema,
-  sha,
-  text,
-  validateEdits,
-  validateReview,
-  workflowOutputs,
-  type Job,
-  type ModelOutput,
-} from "./index.ts";
+import { digest, integer, requireObject, sha, text, workflowOutputs, type Job } from "./index.ts";
 import { boundVerification } from "./checks.ts";
 import { verify } from "./verify.ts";
+import { executeOperation, boundModelOutput, type ModelOutput } from "./operations.ts";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -56,7 +43,7 @@ function inputJob(value: unknown): Job {
   if (
     job.version !== 1 ||
     !/^[a-f0-9]{64}$/.test(String(job.id)) ||
-    !["review", "fix"].includes(String(job.task)) ||
+    !["review", "fix", "request"].includes(String(job.task)) ||
     !["codexReviewer", "codexImplementer", "claudeReviewer", "claudeImplementer"].includes(
       String(job.role),
     )
@@ -68,6 +55,11 @@ function inputJob(value: unknown): Job {
   integer(snapshot.number);
   text(selection.model, 200);
   text(selection.effort, 40);
+  if (job.task === "request") {
+    const implementation = requireObject(job.implementation);
+    text(implementation.model, 200);
+    text(implementation.effort, 40);
+  }
   if (
     !Array.isArray(snapshot.files) ||
     !Array.isArray(snapshot.changedPaths) ||
@@ -145,46 +137,34 @@ async function main(): Promise<void> {
   if (job.id !== id || job.control !== required("AI_CONTROL_SHA"))
     throw new Error("Control revision mismatch");
   if (command === "model") {
-    const { parseModelConfig, runModel } = await import("../ai-models/index.ts");
+    const { parseModelConfig } = await import("../ai-models/index.ts");
     const config = parseModelConfig(await json(resolve(root, ".github/ai-models.json")));
-    if (digest(config.roles[job.role]) !== digest(job.selection))
+    if (
+      digest(config.roles[job.role]) !== digest(job.selection) ||
+      (job.task === "request" &&
+        digest(job.implementation) !== digest(config.roles.claudeImplementer))
+    )
       throw new Error("Trusted model configuration mismatch");
     required(job.selection.provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY");
     console.log(
       JSON.stringify({ operation: id, head: job.snapshot.head, selection: job.selection }),
     );
-    const result = await runModel(
-      job.selection,
-      prompt(job, await readFile(resolve(root, "AGENTS.md"), "utf8")),
-      job.task === "fix" ? fixSchema : reviewSchema,
-    );
-    const valid =
-      job.task === "fix"
-        ? validateEdits(result, job.snapshot)
-        : validateReview(result, job.snapshot);
-    if (job.task === "fix") {
+    const model = await executeOperation(job, await readFile(resolve(root, "AGENTS.md"), "utf8"));
+    if (model.task === "fix") {
       await mkdir(`${target}/model`, { recursive: true });
-      await writeFile(
-        `${target}/model/${id}.patch`,
-        renderPatch(validateEdits(valid, job.snapshot), job.snapshot),
-      );
+      await writeFile(`${target}/model/${id}.patch`, renderPatch(model.result, job.snapshot));
     }
-    await output(`${target}/model/${id}.json`, {
-      id,
-      digest: digest(job),
-      result: valid,
-      selection: job.selection,
-    });
+    await output(`${target}/model/${id}.json`, model);
     return;
   }
   const modelPath = `${target}/model/${id}.json`;
   if (command === "verify") {
-    if (job.task !== "fix") {
-      await output(`${target}/verification/${id}.json`, { id, skipped: "review-only" });
+    const model = boundModelOutput(job, await json(modelPath));
+    if (model.task !== "fix") {
+      await output(`${target}/verification/${id}.json`, { id, skipped: `${model.task}-only` });
       return;
     }
-    const model = requireObject(await json(modelPath)) as unknown as ModelOutput;
-    const receipt = await verify(job, model, required("GITHUB_REPOSITORY"));
+    const receipt = await verify(job, model.result, required("GITHUB_REPOSITORY"));
     await output(`${target}/verification/${id}.json`, receipt);
     if (receipt.commands !== null && !receipt.passed)
       throw new Error("Secretless verification failed; no fix branch authorized");
@@ -210,22 +190,18 @@ async function main(): Promise<void> {
     throw new Error("Publisher immutable context revalidation failed");
   let model: ModelOutput;
   try {
-    model = requireObject(await json(modelPath)) as unknown as ModelOutput;
+    model = boundModelOutput(original, await json(modelPath));
   } catch {
     await api.finish(claim, "failed");
     throw new Error("Model output unavailable; no successful review or fix was produced");
   }
-  if (
-    model.id !== id ||
-    model.digest !== digest(original) ||
-    digest(model.selection) !== digest(original.selection)
-  )
-    throw new Error("Model result input binding mismatch");
-  if (job.task === "review") console.log(await api.publishReview(original, model.result, claim));
+  if (model.task === "review") console.log(await api.publishReview(original, model.result, claim));
+  else if (model.task === "clarify")
+    console.log(await api.publishQuestion(original, model.result, claim));
   else {
     const receipt = boundVerification(
       original,
-      validateEdits(model.result, original.snapshot).edits,
+      model.result.edits,
       await json(`${target}/verification/${id}.json`).catch(() => null),
     );
     if (!receipt) {

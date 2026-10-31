@@ -30,7 +30,7 @@ test("comment events start planning only for PR comments that mention a bot from
 
 test("verification runs only for planned fixes and publication reads each operation's own receipt", () => {
   expect(job("verify")).toContain("matrix: ${{ fromJSON(needs.prepare.outputs.verify_matrix) }}");
-  expect(condition("verify")).toBe("always() && needs.prepare.outputs.has_fixes == 'true'");
+  expect(condition("verify")).toBe("always() && needs.prepare.outputs.has_verification == 'true'");
   expect(job("publish")).not.toContain("needs.verify.result");
 });
 

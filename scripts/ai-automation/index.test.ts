@@ -4,7 +4,6 @@ import {
   operationId,
   parseCommand,
   prompt,
-  renderReview,
   reviewLenses,
   validateEdits,
   validateReview,
@@ -31,6 +30,91 @@ test("explicit fix commands preserve task instructions and optional expected SHA
   });
 });
 test.each([
+  "can u pls change this to XYZ",
+  "could you explain why the value is wrong?",
+  "please make this faster",
+  "can you help with this?",
+])("keeps natural prose for interpretation: %s", (instructions) => {
+  expect(parseCommand(`@vinland-ai ${instructions}`)).toEqual({
+    provider: "anthropic",
+    kind: "request",
+    instructions,
+  });
+});
+test.each(["review", "fix"] as const)("keeps polite %s commands explicit", (kind) => {
+  for (const prefix of ["", "please ", "can you ", "could you "]) {
+    expect(parseCommand(`@vinland-ai ${prefix}${kind} this`)).toEqual({
+      provider: "anthropic",
+      kind,
+      instructions: "this",
+    });
+  }
+});
+test("natural requests preserve an expected SHA and multiline instructions", () => {
+  expect(
+    parseCommand(`@vinland-ai head=${sha} can u pls change this to XYZ\nKeep the API.`),
+  ).toEqual({
+    provider: "anthropic",
+    kind: "request",
+    instructions: "can u pls change this to XYZ\nKeep the API.",
+    expectedHead: sha,
+  });
+});
+test("a head-bound bare mention still requests a review", () => {
+  expect(parseCommand(`@vinland-ai head=${sha}`)).toEqual({
+    provider: "anthropic",
+    kind: "review",
+    instructions: "",
+    expectedHead: sha,
+  });
+});
+test.each(["> @vinland-ai fix\n@vinland-ai", "```\n@vinland-ai fix\n```\n@vinland-ai"])(
+  "quoted commands do not turn a bare mention into a request: %s",
+  (body) => {
+    expect(parseCommand(body)?.kind).toBe("review");
+  },
+);
+test("an authorized natural request runs under the reviewer role", async () => {
+  const command = {
+    id: 90,
+    author: { id: 21, login: "reply-member", type: "User" },
+    body: `@vinland-ai head=${sha} can u pls change this to XYZ`,
+    createdAt: "2026-10-25T00:00:00Z",
+    thread: "Referenced finding",
+    source: "inline" as const,
+  };
+  const membership = vi.fn(async () => "member" as const);
+  expect(
+    await authorize(
+      { ...invocation, kind: "manual", role: "claudeReviewer", command },
+      { membership },
+    ),
+  ).toMatchObject({
+    kind: "authorized",
+    requester: command.author,
+    task: "review",
+    instructions: "can u pls change this to XYZ",
+    thread: command.thread,
+  });
+  expect(membership).toHaveBeenCalledExactlyOnceWith("reply-member");
+});
+test("a natural request still passes through the later authorization checks", async () => {
+  const command = {
+    id: 91,
+    author: snapshot.author,
+    body: `@vinland-ai head=${"f".repeat(40)} can u pls change this to XYZ`,
+    createdAt: "2026-10-25T00:00:00Z",
+    thread: "",
+    source: "issue" as const,
+  };
+  expect(
+    await authorize(
+      { ...invocation, kind: "manual", role: "claudeReviewer", command },
+      { membership: async () => "member" },
+    ),
+  ).toEqual({ kind: "denied", reason: "stale" });
+});
+test.each([
   "@claude review",
   "@codex review",
   "> @vinland-ai fix",
@@ -40,6 +124,10 @@ test.each([
   "@vinland-ai fix\n@vinland-ai review",
   "text @vinland-ai fix",
   "@vinland-ai-extra fix",
+  "> @vinland-ai can u pls change this to XYZ",
+  "```\n@vinland-ai can u pls change this to XYZ\n```",
+  "    @vinland-ai can u pls change this to XYZ",
+  "@vinland-ai fix @vinland-ai review",
 ])("ignores quoted, ambiguous, or spoofed commands: %s", (body) => {
   expect(parseCommand(body)).toBeNull();
 });
@@ -139,24 +227,12 @@ test("review findings must cite actual immutable source and a consequence", () =
     consequence: "The API returns the wrong value",
     correction: "Use zero",
   };
-  expect(
-    validateReview({ summary: "Wrong value", findings: [finding] }, snapshot).findings,
-  ).toHaveLength(1);
+  expect(validateReview({ findings: [finding] }, snapshot).findings).toHaveLength(1);
   expect(() =>
-    validateReview(
-      { summary: "Wrong value", findings: [{ ...finding, quote: "invented" }] },
-      snapshot,
-    ),
+    validateReview({ findings: [{ ...finding, quote: "invented" }] }, snapshot),
   ).toThrow();
-  expect(() =>
-    validateReview({ summary: "Wrong value", findings: [{ ...finding, startLine: 2 }] }, snapshot),
-  ).toThrow();
-  expect(() =>
-    validateReview(
-      { summary: "Wrong value", findings: [{ ...finding, consequence: "" }] },
-      snapshot,
-    ),
-  ).toThrow();
+  expect(() => validateReview({ findings: [{ ...finding, startLine: 2 }] }, snapshot)).toThrow();
+  expect(() => validateReview({ findings: [{ ...finding, consequence: "" }] }, snapshot)).toThrow();
 });
 test("edits require original blobs and allow only bounded normal text files", () => {
   const edit = {
@@ -228,7 +304,7 @@ test.each(["review", "fix"] as const)(
     const receipts = process.env.AI_MODEL_RECEIPTS_DIR;
     const result =
       kind === "review"
-        ? { summary: "Fixture review", findings: [] }
+        ? { findings: [] }
         : {
             summary: "Fixture fix",
             edits: [{ path: "src/value.ts", expectedBlob: "c".repeat(40), content: "fixed\n" }],
@@ -321,15 +397,6 @@ test.each(["codexImplementer", "claudeImplementer"] as const)(
   },
 );
 
-test.each(["codexReviewer", "claudeReviewer"] as const)(
-  "%s published review names its lens",
-  (role) => {
-    expect(renderReview({ ...reviewJob, role }, { summary: "Fine", findings: [] })).toMatch(
-      new RegExp(`^${role}: advisory ${reviewLenses[role].title} review\n`),
-    );
-  },
-);
-
 test("only fix jobs enter the verification matrix", () => {
   const fix = {
     ...reviewJob,
@@ -352,7 +419,26 @@ test("only fix jobs enter the verification matrix", () => {
   expect(JSON.parse(String(both.verify_matrix)).include).toEqual([
     { id: fix.id, provider: "openai", task: "fix" },
   ]);
-  expect(both.has_fixes).toBe("true");
-  expect(outputs([reviewJob]).has_fixes).toBe("false");
+  expect(both.has_verification).toBe("true");
+  expect(outputs([reviewJob]).has_verification).toBe("false");
   expect(outputs([]).has_jobs).toBe("false");
+});
+
+test("natural requests enter secretless verification because they may resolve to fixes", () => {
+  const request: Job = { ...reviewJob, task: "request", implementation: reviewJob.selection };
+  const output = workflowOutputs([request]);
+  expect(output).toContain(
+    'verify_matrix={"include":[{"id":"' + request.id + '","provider":"openai","task":"request"}]}',
+  );
+  expect(output).toContain("has_verification=true");
+});
+
+test.each([
+  "@vinland-ai\ncan u pls change this to XYZ",
+  "can u pls change this to XYZ\n\n@vinland-ai",
+])("natural prose around the mention still requests interpretation: %s", (body) => {
+  expect(parseCommand(body)).toMatchObject({
+    kind: "request",
+    instructions: expect.stringContaining("can u pls change this to XYZ"),
+  });
 });

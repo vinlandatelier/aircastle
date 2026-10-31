@@ -1,16 +1,15 @@
 import {
   authorize,
+  contextComplete,
   digest,
   integer,
   operationId,
   parseCommand,
   requireObject,
-  renderReview,
   safePath,
   sha,
   text,
-  validateEdits,
-  validateReview,
+  threadLimit,
   type Authorization,
   type Comment,
   type Fix,
@@ -25,6 +24,7 @@ import {
 } from "./index.ts";
 import type { ModelConfig, Role } from "../ai-models/index.ts";
 import { boundVerification, verificationPlan } from "./checks.ts";
+import { reviewPayload, type ReviewPasses } from "./reviews.ts";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type StoredReceipt = { commentId: number; receipt: Receipt };
@@ -37,6 +37,12 @@ type Options = {
   botLogin?: string;
 };
 const marker = "<!-- aircastle-ai:v1 -->\n";
+function receiptBody(receipt: Receipt): string {
+  const encoded = JSON.stringify(receipt).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
+  const body = `${marker}<!--\n${encoded}\n-->`;
+  if (Buffer.byteLength(body) > 55000) throw new Error("Receipt exceeds bound");
+  return body;
+}
 function identity(value: unknown): Identity {
   const user = requireObject(value);
   const login = text(user.login, 100);
@@ -144,7 +150,10 @@ export class Coordinator {
         !comment.body.startsWith(marker)
       )
         return [];
-      const value = requireObject(JSON.parse(comment.body.slice(marker.length)));
+      const stored = comment.body.slice(marker.length);
+      const encoded =
+        stored.startsWith("<!--\n") && stored.endsWith("\n-->") ? stored.slice(5, -4) : stored;
+      const value = requireObject(JSON.parse(encoded));
       if (
         value.version !== 1 ||
         !/^[a-f0-9]{64}$/.test(String(value.id)) ||
@@ -182,24 +191,23 @@ export class Coordinator {
       attempt: (prior?.receipt.attempt ?? 0) + 1,
       at: new Date().toISOString(),
     };
-    if (Buffer.byteLength(JSON.stringify(receipt)) > 55000)
-      throw new Error("Receipt exceeds bound");
+    const body = receiptBody(receipt);
     if (prior) {
       await this.api(`${this.root}/issues/comments/${prior.commentId}`, "PATCH", {
-        body: marker + JSON.stringify(receipt),
+        body,
       });
       return { commentId: prior.commentId, receipt };
     }
     const posted = requireObject(
       await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
-        body: marker + JSON.stringify(receipt),
+        body,
       }),
     );
     return { commentId: integer(posted.id), receipt };
   }
   async finish(claim: StoredReceipt, state: Receipt["state"]): Promise<void> {
     await this.api(`${this.root}/issues/comments/${claim.commentId}`, "PATCH", {
-      body: marker + JSON.stringify({ ...claim.receipt, state }),
+      body: receiptBody({ ...claim.receipt, state }),
     });
   }
   async current(job: Job): Promise<boolean> {
@@ -215,10 +223,9 @@ export class Coordinator {
   }
   async publishReview(
     job: Job,
-    value: unknown,
+    passes: ReviewPasses,
     claim: StoredReceipt,
   ): Promise<"published" | "stale"> {
-    const review = validateReview(value, job.snapshot);
     if (!(await this.current(job))) {
       await this.finish(claim, "stale");
       return "stale";
@@ -233,12 +240,27 @@ export class Coordinator {
         );
       })
     ) {
+      const payload = await reviewPayload(job, passes);
       await this.api(`${this.root}/pulls/${job.snapshot.number}/reviews`, "POST", {
-        event: "COMMENT",
-        commit_id: job.snapshot.head,
-        body: `${renderReview(job, review)}\n\n${receiptMarker}`,
+        ...payload,
+        body: `${payload.body}\n\n${receiptMarker}`,
       });
     }
+    await this.finish(claim, "published");
+    return "published";
+  }
+  async publishQuestion(
+    job: Job,
+    question: string,
+    claim: StoredReceipt,
+  ): Promise<"published" | "stale"> {
+    if (!(await this.current(job))) {
+      await this.finish(claim, "stale");
+      return "stale";
+    }
+    await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
+      body: `@${job.requester.login} ${question}`,
+    });
     await this.finish(claim, "published");
     return "published";
   }
@@ -356,32 +378,28 @@ export class Coordinator {
     existing: StoredReceipt[],
     head: string,
   ): Promise<string> {
-    const prior = existing
-      .filter(
-        (item) =>
-          item.receipt.state === "published" &&
-          item.receipt.job.role === role &&
-          item.receipt.job.task === "review",
-      )
+    const published = existing.filter(
+      (item) => item.receipt.state === "published" && item.receipt.job.role === role,
+    );
+    if (!published.length) return "Initial full base-to-head review.";
+    const reviews = (await this.list(`${this.root}/pulls/${number}/reviews`))
+      .map(requireObject)
+      .filter((review) => requireObject(review.user).id === this.options.botId);
+    const prior = published
+      .flatMap((item) => {
+        const review = reviews.find((candidate) =>
+          String(candidate.body).endsWith(`<!-- aircastle-ai-result:${item.receipt.id} -->`),
+        );
+        return review ? [{ old: item.receipt.job.snapshot.head, body: String(review.body) }] : [];
+      })
       .at(-1);
     if (!prior) return "Initial full base-to-head review.";
-    const old = prior.receipt.job.snapshot.head;
     const compare = requireObject(
-      await this.api(`${this.root}/compare/${sha(old)}...${sha(head)}`),
+      await this.api(`${this.root}/compare/${sha(prior.old)}...${sha(head)}`),
     );
     if (!["ahead", "identical"].includes(String(compare.status)))
-      return `History rewritten since ${old}; perform a full review.`;
-    const reviews = await this.list(`${this.root}/pulls/${number}/reviews`);
-    const review = reviews
-      .map(requireObject)
-      .find(
-        (r) =>
-          requireObject(r.user).id === this.options.botId &&
-          String(r.body).endsWith(`<!-- aircastle-ai-result:${prior.receipt.id} -->`),
-      );
-    return review
-      ? `Incremental review since ${old}. Previous advisory evidence:\n${String(review.body).slice(0, 16000)}`
-      : "Previous evidence unavailable; perform a full review.";
+      return `History rewritten since ${prior.old}; perform a full review.`;
+    return `Incremental review since ${prior.old}. Previous advisory evidence:\n${prior.body.slice(0, 16000)}`;
   }
   async command(
     raw: unknown,
@@ -427,7 +445,7 @@ export class Coordinator {
           commit_id: r.commit_id,
           original_commit_id: r.original_commit_id,
         })),
-      ).slice(0, 24000);
+      ).slice(0, threadLimit);
     }
     return {
       number,
@@ -515,7 +533,9 @@ export class Coordinator {
     const job: Job = {
       version: 1,
       id,
-      task: authorization.task,
+      ...(cmd.kind === "request"
+        ? ({ task: "request", implementation: config.roles.claudeImplementer } as const)
+        : { task: authorization.task }),
       role,
       requester,
       snapshot,
@@ -525,18 +545,18 @@ export class Coordinator {
       selection: config.roles[role],
       previous: await this.previous(number, role, existing, snapshot.head),
     };
-    if (job.task === "fix" && (!snapshot.complete || job.thread.length >= 24000))
+    if (job.task === "fix" && !contextComplete(job))
       throw new Error("Fix requires complete bounded changed-file context");
     if (prior && prior.receipt.digest !== digest(job)) return [];
     return (await this.claim(job, existing)) ? [job] : [];
   }
   async publishFix(
     job: Job,
-    raw: unknown,
+    fix: Fix,
     verification: Verification,
     claim: StoredReceipt,
   ): Promise<string> {
-    const fix: Fix = validateEdits(raw, job.snapshot);
+    const selection = job.task === "request" ? job.implementation : job.selection;
     const commands = verificationPlan(fix.edits);
     if (!boundVerification(job, fix.edits, verification)) {
       await this.finish(claim, "failed");
@@ -637,7 +657,7 @@ export class Coordinator {
         title: `AI fix for #${job.snapshot.number}: ${fix.summary.slice(0, 100)}`,
         head: branch,
         base: job.snapshot.baseRef,
-        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${job.selection.model}; effort sent: ${job.selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}.\n\nSelected commands:\n\n\`\`\`text\n${commands.map((args) => args.join(" ")).join("\n")}\n\`\`\`\n\nOrdinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
+        body: `Explicit fix requested by @${job.requester.login} for #${job.snapshot.number}.\n\nSource head: ${job.snapshot.head}\nModel: ${selection.model}; effort sent: ${selection.effort}.\n\n${fix.summary}\n\nVerification: ${verification.scope}. Recipe ${verification.recipe}.\n\nSelected commands:\n\n\`\`\`text\n${commands.map((args) => args.join(" ")).join("\n")}\n\`\`\`\n\nOrdinary deterministic CI must pass.\n\nThis successor PR includes the original source changes plus the fix. No automatic merge.\n\n<!-- aircastle-ai-fix:${job.id} -->`,
       }),
     );
     await this.finish(claim, "published");
