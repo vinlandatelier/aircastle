@@ -1,9 +1,13 @@
-import { test, expect, visit } from './support'
+import { test, expect } from './auth-service'
+import { authenticateShell } from './shell-journey'
 import { landingTitle } from '../src/metadata'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test('normal built entry loads assets and redirects to Collections', async ({ page }) => {
+test('shell:R2 normal built entry loads assets before authenticated shell navigation', async ({
+  page,
+  authService,
+}) => {
   const assets: { type: string; status: number; url: string }[] = []
   page.on('response', (response) => {
     const type = response.request().resourceType()
@@ -11,19 +15,8 @@ test('normal built entry loads assets and redirects to Collections', async ({ pa
       assets.push({ type, status: response.status(), url: response.url() })
     }
   })
-  await visit(page)
-  await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/collections$/)
-  await expect(page).toHaveTitle('Aircastle - Collections')
-  const entry = await page.request.get('/')
-  expect(await entry.text()).toContain(`<title>${landingTitle}</title>`)
-  await expect(page.getByRole('banner').getByRole('link', { name: 'Aircastle' })).toBeVisible()
-  await expect(page.getByRole('main')).toBeVisible()
-  const navigation = page.getByRole('navigation', { name: 'Main navigation' })
-  await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1)
-  await expect(navigation.getByRole('link', { name: 'Collections', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  )
+  await page.goto('/')
+  await expect(page).toHaveTitle(landingTitle)
   const origin = new URL(page.url()).origin
   for (const type of ['script', 'stylesheet']) {
     const loaded = assets.filter(
@@ -49,14 +42,36 @@ test('normal built entry loads assets and redirects to Collections', async ({ pa
   expect(response.ok, 'browser loads the current theme favicon').toBe(true)
   expect(response.type).toContain('image/svg+xml')
   expect(response.body).toContain('<svg')
+  const project = await authService.provisionProject()
+  const { email } = await authenticateShell(page)
+  await authService.grantWorkspace(email, project.workspaceId)
+  const collections = `/dash/workspaces/${project.workspaceId}/projects/${project.projectId}/collections`
+  await page.goto(collections)
+  await expect(page).toHaveURL(`${origin}${collections}`)
+  await expect(page.getByRole('banner').getByRole('link', { name: 'Aircastle' })).toBeVisible()
+  await expect(page.getByRole('main')).toBeVisible()
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' })
+  await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1)
+  await expect(navigation.getByRole('link', { name: 'Collections', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
 })
 
-test('direct Settings entry survives reload in the same context', async ({ page }) => {
-  await visit(page, 'normal', '/dash/workspaces/team-42/projects/site_beta/settings')
+test('shell:R2 direct Settings entry survives reload in the same context', async ({
+  page,
+  authService,
+}) => {
+  const project = await authService.provisionProject()
+  const { email } = await authenticateShell(page)
+  await authService.grantWorkspace(email, project.workspaceId)
+  const settings = `/dash/workspaces/${project.workspaceId}/projects/${project.projectId}/settings`
+  await page.goto(settings)
+  const origin = new URL(page.url()).origin
   for (const reload of [false, true]) {
     if (reload) await page.reload()
     await expect(page).toHaveTitle('Aircastle - Settings')
-    await expect(page).toHaveURL(/\/dash\/workspaces\/team-42\/projects\/site_beta\/settings$/)
+    await expect(page).toHaveURL(`${origin}${settings}`)
     await expect(page.getByRole('main')).toBeVisible()
     const navigation = page.getByRole('navigation', { name: 'Main navigation' })
     await expect(navigation.getByRole('link', { name: 'Settings', exact: true })).toHaveAttribute(

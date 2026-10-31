@@ -2,14 +2,16 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { createAppRouter } from '@/router'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vite-plus/test'
-import { renderApp } from '@/test-utils'
+import { authenticatedDisplayHttp, renderApp } from '@/test-utils'
 
-describe('App navigation', () => {
+describe('App navigation with display-only authenticated HTTP', () => {
   it.each(['tasks', 'collections', 'media', 'analytics', 'users', 'access-tokens', 'settings'])(
     'does not keep the old flat %s destination',
     async (page) => {
       const pathname = `/dash/${page}`
-      const router = createAppRouter(createMemoryHistory({ initialEntries: [pathname] }))
+      const router = createAppRouter(createMemoryHistory({ initialEntries: [pathname] }), {
+        fetch: authenticatedDisplayHttp().fetch,
+      })
       await router.load()
       expect(router.state.location.pathname).toBe(pathname)
       render(<RouterProvider router={router} />)
@@ -37,17 +39,15 @@ describe('App navigation', () => {
     )
   })
 
-  it('redirects the dashboard index to Collections', async () => {
-    const { router } = await renderApp('/dash')
-    expect(router.state.location.pathname).toBe('/dash/workspaces/demo/projects/demo/collections')
+  it.each(['/dash'])('routes authenticated %s through the workspace entry', async (path) => {
+    const { router } = await renderApp(path)
+    expect(await screen.findByRole('heading', { name: 'Workspaces' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/dash/workspaces')
     expect(router.history.length).toBe(1)
-    expect(screen.getByRole('link', { name: 'Aircastle' }).getAttribute('href')).toBe(
-      '/dash/workspaces/demo/projects/demo/collections',
-    )
   })
 
-  it('opens Collections by default and marks the current page', async () => {
-    const { router } = await renderApp()
+  it('opens the requested Collections page and marks it current', async () => {
+    const { router } = await renderApp('/dash/workspaces/demo/projects/demo/collections')
 
     expect(router.state.location.pathname).toBe('/dash/workspaces/demo/projects/demo/collections')
     expect(router.history.length).toBe(1)

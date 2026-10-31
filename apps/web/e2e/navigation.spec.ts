@@ -59,7 +59,7 @@ test.describe('routes and history', () => {
   test('Back and Forward follow visible navigation and the brand returns to Collections', async ({
     page,
   }) => {
-    await visit(page, 'normal', '/dash/workspaces/acme/projects/editorial/settings')
+    await visit(page, 'default', '/dash/workspaces/acme/projects/editorial/settings')
     await page.reload()
     await expectDestination(page, 'Settings', '/dash/workspaces/acme/projects/editorial/settings')
     const navigation = page.getByRole('navigation', { name: 'Main navigation' })

@@ -1,22 +1,31 @@
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   createRoute,
   createRouter,
-  Outlet,
   Link,
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router'
-import App from './App'
-import { AppShell } from '@/components/shell'
-import { SignInPage } from '@/features/sign-in'
 import { NotFoundPage } from '@/features/not-found'
+import { SignInPage } from '@/features/sign-in'
 import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { navigationPages } from '@/features/navigation'
 import { landingDescription, landingTitle } from '@/metadata'
+import {
+  AuthRoot,
+  DashboardLayout,
+  Workspaces,
+  createBrowserAuth,
+  DevelopmentInbox,
+  type AuthBrowserOptions,
+  type BrowserAuth,
+} from '@/features/auth'
 
-const rootRoute = createRootRoute({
-  component: App,
+const rootRoute = createRootRouteWithContext<{ auth: BrowserAuth }>()({
+  beforeLoad: async ({ context, location }) => ({
+    view: await context.auth.enter(location.pathname, location.search),
+  }),
+  component: AuthRoot,
   notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [
@@ -26,7 +35,13 @@ const rootRoute = createRootRoute({
       },
     ],
   }),
+  pendingComponent: () => (
+    <main role="status" className="p-8">
+      Loading…
+    </main>
+  ),
 })
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
@@ -46,29 +61,42 @@ const indexRoute = createRoute({
     </main>
   ),
 })
+const dashboardEntryRoute = createRoute({ getParentRoute: () => rootRoute, path: '/dash' })
+const setupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/setup',
+  component: () => <SignInPage purpose="setup" />,
+})
+const signInRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sign-in',
+  component: SignInPage,
+  head: () => ({ meta: [{ title: 'Aircastle - Sign in' }] }),
+})
+const inboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/development-inbox',
+  component: DevelopmentInbox,
+})
+const workspacesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash/workspaces',
+  component: () => <Workspaces title="Workspaces" />,
+})
+const createWorkspaceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash/workspaces/new',
+  component: () => <Workspaces title="Create a workspace" />,
+})
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash/workspaces/$workspaceId/projects',
+  component: () => <Workspaces title="Projects" />,
+})
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dash/workspaces/$workspaceId/projects/$projectId',
-  component: () => (
-    <AppShell>
-      <Outlet />
-    </AppShell>
-  ),
-})
-const dashboardEntryRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/dash',
-})
-const dashboardEntryIndexRoute = createRoute({
-  getParentRoute: () => dashboardEntryRoute,
-  path: '/',
-  beforeLoad: () => {
-    throw redirect({
-      to: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
-      params: { workspaceId: 'demo', projectId: 'demo' },
-      replace: true,
-    })
-  },
+  component: DashboardLayout,
 })
 const dashboardIndexRoute = createRoute({
   getParentRoute: () => dashboardRoute,
@@ -81,17 +109,11 @@ const dashboardIndexRoute = createRoute({
     })
   },
 })
-const signInRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/sign-in',
-  component: SignInPage,
-  head: () => ({ meta: [{ title: 'Aircastle - Sign in' }] }),
-})
+
 type DashboardPagePath =
   (typeof navigationPages)[number]['path'] extends `/dash/workspaces/$workspaceId/projects/$projectId/${infer Path}`
     ? Path
     : never
-
 const pageRoutes = navigationPages.map(({ path, title }) =>
   createRoute({
     getParentRoute: () => dashboardRoute,
@@ -105,17 +127,26 @@ const pageRoutes = navigationPages.map(({ path, title }) =>
 )
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  dashboardEntryRoute,
+  setupRoute,
   signInRoute,
-  dashboardEntryRoute.addChildren([dashboardEntryIndexRoute]),
+  inboxRoute,
+  workspacesRoute,
+  createWorkspaceRoute,
+  projectsRoute,
   dashboardRoute.addChildren([dashboardIndexRoute, ...pageRoutes]),
 ])
 
-export function createAppRouter(history: RouterHistory) {
+export function createAppRouter(history: RouterHistory, auth?: AuthBrowserOptions) {
   return createRouter({
     routeTree,
     history,
     notFoundMode: 'root',
     disableGlobalCatchBoundary: true,
+    context: { auth: createBrowserAuth(auth) },
+    defaultPendingMs: 0,
+    defaultPendingMinMs: 0,
+    defaultPreload: false,
   })
 }
 

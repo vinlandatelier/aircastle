@@ -1,13 +1,24 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './support'
 import { themeStorageKey } from '../src/theme'
+import { origins } from './origins'
 
 type Fault = 'runtime' | 'rejection'
 
 const faultMarker = (fault: Fault) => `Aircastle verification ${fault} failure: private details`
 
+test.use({ baseURL: origins.fixture.url })
+
+test.beforeEach(async ({ baseURL }, info) => {
+  expect(baseURL).toBe(origins.fixture.url)
+  info.annotations.push({
+    type: 'scenario',
+    description: 'display-only auth transport for public routing, metadata, and recovery',
+  })
+})
+
 async function failAfterStartup(page: Page, fault: Fault) {
-  await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await page.evaluate(
     ({ fault, marker }) => {
       setTimeout(() => {
@@ -39,7 +50,7 @@ for (const fault of ['runtime', 'rejection'] as const) {
         '/',
       )
       await page.getByRole('button', { name: 'Try again', exact: true }).click()
-      await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
       await expect(page).toHaveTitle('Aircastle - Sign in')
       await expect(page.locator('meta[name="robots"]')).toHaveCount(0)
     })
@@ -78,11 +89,11 @@ test('handled rejections and resource error events do not replace a healthy page
   page,
 }) => {
   await page.goto('/sign-in')
-  await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await page.evaluate(async () => {
     await Promise.reject(new Error('handled verification failure')).catch(() => undefined)
     window.dispatchEvent(new Event('error'))
   })
-  await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0)
 })
