@@ -106,15 +106,12 @@ test("read uses GET and the document identifier", async () => {
   ]);
 });
 
-test("R13 read forwards a case-insensitive path id in lowercase", async () => {
+test("R13 read accepts a case-insensitive path id", async () => {
   const { app, calls, headers } = fixture();
   const response = await app.request(`${documents}/${upperDocumentId}`, { headers });
   expect(response.status).toBe(200);
-  expect(calls.find((call) => call.operation === "read")?.args).toEqual([
-    "articles",
-    fingerprint,
-    lowerDocumentId,
-  ]);
+  expect(await response.json()).toEqual({ ok: true, data: document });
+  expect(forwardedId(calls, "read")).toBe(lowerDocumentId);
 });
 
 for (const [code, status] of [
