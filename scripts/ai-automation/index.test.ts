@@ -74,71 +74,45 @@ test.each(["> @vinland-ai fix\n@vinland-ai", "```\n@vinland-ai fix\n```\n@vinlan
     expect(parseCommand(body)?.kind).toBe("review");
   },
 );
-test.each(["claudeReviewer", "claudeImplementer"] as const)(
-  "an authorized natural request can use the resolved %s role",
-  async (role) => {
-    const command = {
-      id: 90,
-      author: { id: 21, login: "reply-member", type: "User" },
-      body: `@vinland-ai head=${sha} can u pls change this to XYZ`,
-      createdAt: "2026-10-25T00:00:00Z",
-      thread: "Referenced finding",
-      source: "inline" as const,
-    };
-    const membership = vi.fn(async () => "member" as const);
-    expect(
-      await authorize({ ...invocation, kind: "manual", role, command }, { membership }),
-    ).toMatchObject({
-      kind: "authorized",
-      requester: command.author,
-      task: role === "claudeImplementer" ? "fix" : "review",
-      instructions: "can u pls change this to XYZ",
-      thread: command.thread,
-    });
-    expect(membership).toHaveBeenCalledExactlyOnceWith("reply-member");
-  },
-);
-test.each([
-  {
-    role: "codexImplementer",
-    type: "User",
-    head: sha,
-    membership: "member",
-    reason: "invalidCommand",
-  },
-  {
-    role: "claudeImplementer",
-    type: "Bot",
-    head: sha,
-    membership: "member",
-    reason: "invalidActor",
-  },
-  {
-    role: "claudeImplementer",
-    type: "User",
-    head: "f".repeat(40),
-    membership: "member",
-    reason: "stale",
-  },
-  { role: "claudeImplementer", type: "User", head: sha, membership: "outside", reason: "outside" },
-  { role: "claudeImplementer", type: "User", head: sha, membership: "unknown", reason: "unknown" },
-] as const)("natural requests preserve the $reason authorization check", async (fixture) => {
+test("an authorized natural request runs under the reviewer role", async () => {
+  const command = {
+    id: 90,
+    author: { id: 21, login: "reply-member", type: "User" },
+    body: `@vinland-ai head=${sha} can u pls change this to XYZ`,
+    createdAt: "2026-10-25T00:00:00Z",
+    thread: "Referenced finding",
+    source: "inline" as const,
+  };
+  const membership = vi.fn(async () => "member" as const);
+  expect(
+    await authorize(
+      { ...invocation, kind: "manual", role: "claudeReviewer", command },
+      { membership },
+    ),
+  ).toMatchObject({
+    kind: "authorized",
+    requester: command.author,
+    task: "review",
+    instructions: "can u pls change this to XYZ",
+    thread: command.thread,
+  });
+  expect(membership).toHaveBeenCalledExactlyOnceWith("reply-member");
+});
+test("a natural request still passes through the later authorization checks", async () => {
   const command = {
     id: 91,
-    author: { ...snapshot.author, type: fixture.type },
-    body: `@vinland-ai head=${fixture.head} can u pls change this to XYZ`,
+    author: snapshot.author,
+    body: `@vinland-ai head=${"f".repeat(40)} can u pls change this to XYZ`,
     createdAt: "2026-10-25T00:00:00Z",
     thread: "",
     source: "issue" as const,
   };
   expect(
     await authorize(
-      { ...invocation, kind: "manual", role: fixture.role, command },
-      {
-        membership: async () => fixture.membership,
-      },
+      { ...invocation, kind: "manual", role: "claudeReviewer", command },
+      { membership: async () => "member" },
     ),
-  ).toEqual({ kind: "denied", reason: fixture.reason });
+  ).toEqual({ kind: "denied", reason: "stale" });
 });
 test.each([
   "@claude review",
@@ -253,24 +227,12 @@ test("review findings must cite actual immutable source and a consequence", () =
     consequence: "The API returns the wrong value",
     correction: "Use zero",
   };
-  expect(
-    validateReview({ summary: "Wrong value", findings: [finding] }, snapshot).findings,
-  ).toHaveLength(1);
+  expect(validateReview({ findings: [finding] }, snapshot).findings).toHaveLength(1);
   expect(() =>
-    validateReview(
-      { summary: "Wrong value", findings: [{ ...finding, quote: "invented" }] },
-      snapshot,
-    ),
+    validateReview({ findings: [{ ...finding, quote: "invented" }] }, snapshot),
   ).toThrow();
-  expect(() =>
-    validateReview({ summary: "Wrong value", findings: [{ ...finding, startLine: 2 }] }, snapshot),
-  ).toThrow();
-  expect(() =>
-    validateReview(
-      { summary: "Wrong value", findings: [{ ...finding, consequence: "" }] },
-      snapshot,
-    ),
-  ).toThrow();
+  expect(() => validateReview({ findings: [{ ...finding, startLine: 2 }] }, snapshot)).toThrow();
+  expect(() => validateReview({ findings: [{ ...finding, consequence: "" }] }, snapshot)).toThrow();
 });
 test("edits require original blobs and allow only bounded normal text files", () => {
   const edit = {
@@ -342,7 +304,7 @@ test.each(["review", "fix"] as const)(
     const receipts = process.env.AI_MODEL_RECEIPTS_DIR;
     const result =
       kind === "review"
-        ? { summary: "Fixture review", findings: [] }
+        ? { findings: [] }
         : {
             summary: "Fixture fix",
             edits: [{ path: "src/value.ts", expectedBlob: "c".repeat(40), content: "fixed\n" }],

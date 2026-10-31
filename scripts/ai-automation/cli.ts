@@ -2,20 +2,10 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Coordinator } from "./github.ts";
 import { renderPatch } from "./materialize.ts";
-import {
-  digest,
-  integer,
-  requireObject,
-  sha,
-  text,
-  validateEdits,
-  workflowOutputs,
-  type Job,
-  type ModelOutput,
-} from "./index.ts";
+import { digest, integer, requireObject, sha, text, workflowOutputs, type Job } from "./index.ts";
 import { boundVerification } from "./checks.ts";
 import { verify } from "./verify.ts";
-import { executeOperation, boundModelOutput } from "./operations.ts";
+import { executeOperation, boundModelOutput, type ModelOutput } from "./operations.ts";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -162,10 +152,7 @@ async function main(): Promise<void> {
     const model = await executeOperation(job, await readFile(resolve(root, "AGENTS.md"), "utf8"));
     if (model.task === "fix") {
       await mkdir(`${target}/model`, { recursive: true });
-      await writeFile(
-        `${target}/model/${id}.patch`,
-        renderPatch(validateEdits(model.result, job.snapshot), job.snapshot),
-      );
+      await writeFile(`${target}/model/${id}.patch`, renderPatch(model.result, job.snapshot));
     }
     await output(`${target}/model/${id}.json`, model);
     return;
@@ -173,11 +160,11 @@ async function main(): Promise<void> {
   const modelPath = `${target}/model/${id}.json`;
   if (command === "verify") {
     const model = boundModelOutput(job, await json(modelPath));
-    if (model.task === "review") {
-      await output(`${target}/verification/${id}.json`, { id, skipped: "review-only" });
+    if (model.task !== "fix") {
+      await output(`${target}/verification/${id}.json`, { id, skipped: `${model.task}-only` });
       return;
     }
-    const receipt = await verify(job, model, required("GITHUB_REPOSITORY"));
+    const receipt = await verify(job, model.result, required("GITHUB_REPOSITORY"));
     await output(`${target}/verification/${id}.json`, receipt);
     if (receipt.commands !== null && !receipt.passed)
       throw new Error("Secretless verification failed; no fix branch authorized");
@@ -209,10 +196,12 @@ async function main(): Promise<void> {
     throw new Error("Model output unavailable; no successful review or fix was produced");
   }
   if (model.task === "review") console.log(await api.publishReview(original, model.result, claim));
+  else if (model.task === "clarify")
+    console.log(await api.publishQuestion(original, model.result, claim));
   else {
     const receipt = boundVerification(
       original,
-      validateEdits(model.result, original.snapshot).edits,
+      model.result.edits,
       await json(`${target}/verification/${id}.json`).catch(() => null),
     );
     if (!receipt) {

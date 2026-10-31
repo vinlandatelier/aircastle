@@ -2,10 +2,8 @@ import { spawnSync } from "node:child_process";
 import { chmod, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { digest, validateEdits, type Job, type ModelOutput, type Verification } from "./index.ts";
-
+import { digest, type Fix, type Job, type Verification } from "./index.ts";
 import { verificationPlan } from "./checks.ts";
-import { boundModelOutput } from "./operations.ts";
 
 async function toolchainVersions(): Promise<Record<string, string>> {
   const root = new URL("../../", import.meta.url);
@@ -17,14 +15,7 @@ async function toolchainVersions(): Promise<Record<string, string>> {
     VITE_PLUS_VERSION: String(manifest.catalog["vite-plus"]),
   };
 }
-export async function verify(
-  job: Job,
-  output: ModelOutput,
-  repository: string,
-): Promise<Verification> {
-  const model = boundModelOutput(job, output);
-  if (model.task !== "fix") throw new Error("Verification requires a fix result");
-  const fix = validateEdits(model.result, job.snapshot);
+export async function verify(job: Job, fix: Fix, repository: string): Promise<Verification> {
   const commands = verificationPlan(fix.edits);
   const receipt: Verification = {
     id: job.id,
@@ -43,7 +34,7 @@ export async function verify(
   const name = `aircastle-ai-${job.id.slice(0, 20)}-${process.pid}`;
   try {
     await writeFile(join(root, "job.json"), JSON.stringify(job));
-    await writeFile(join(root, "result.json"), JSON.stringify(output));
+    await writeFile(join(root, "result.json"), JSON.stringify(fix));
     await chmod(root, 0o755);
     const dockerfile = await readFile(new URL("./Dockerfile", import.meta.url), "utf8");
     if (!dockerfile.includes("@sha256:")) throw new Error("Verification image must be pinned");

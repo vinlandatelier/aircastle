@@ -1,5 +1,6 @@
 import {
   authorize,
+  contextComplete,
   digest,
   integer,
   operationId,
@@ -8,7 +9,7 @@ import {
   safePath,
   sha,
   text,
-  validateEdits,
+  threadLimit,
   type Authorization,
   type Comment,
   type Fix,
@@ -23,7 +24,7 @@ import {
 } from "./index.ts";
 import type { ModelConfig, Role } from "../ai-models/index.ts";
 import { boundVerification, verificationPlan } from "./checks.ts";
-import { reviewPayload, validateReviewPasses } from "./reviews.ts";
+import { reviewPayload, type ReviewPasses } from "./reviews.ts";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 export type StoredReceipt = { commentId: number; receipt: Receipt };
@@ -222,10 +223,9 @@ export class Coordinator {
   }
   async publishReview(
     job: Job,
-    value: unknown,
+    passes: ReviewPasses,
     claim: StoredReceipt,
   ): Promise<"published" | "stale"> {
-    const passes = validateReviewPasses(value, job.snapshot);
     if (!(await this.current(job))) {
       await this.finish(claim, "stale");
       return "stale";
@@ -246,6 +246,21 @@ export class Coordinator {
         body: `${payload.body}\n\n${receiptMarker}`,
       });
     }
+    await this.finish(claim, "published");
+    return "published";
+  }
+  async publishQuestion(
+    job: Job,
+    question: string,
+    claim: StoredReceipt,
+  ): Promise<"published" | "stale"> {
+    if (!(await this.current(job))) {
+      await this.finish(claim, "stale");
+      return "stale";
+    }
+    await this.api(`${this.root}/issues/${job.snapshot.number}/comments`, "POST", {
+      body: `@${job.requester.login} ${question}`,
+    });
     await this.finish(claim, "published");
     return "published";
   }
@@ -363,32 +378,28 @@ export class Coordinator {
     existing: StoredReceipt[],
     head: string,
   ): Promise<string> {
-    const prior = existing
-      .filter(
-        (item) =>
-          item.receipt.state === "published" &&
-          item.receipt.job.role === role &&
-          item.receipt.job.task === "review",
-      )
+    const published = existing.filter(
+      (item) => item.receipt.state === "published" && item.receipt.job.role === role,
+    );
+    if (!published.length) return "Initial full base-to-head review.";
+    const reviews = (await this.list(`${this.root}/pulls/${number}/reviews`))
+      .map(requireObject)
+      .filter((review) => requireObject(review.user).id === this.options.botId);
+    const prior = published
+      .flatMap((item) => {
+        const review = reviews.find((candidate) =>
+          String(candidate.body).endsWith(`<!-- aircastle-ai-result:${item.receipt.id} -->`),
+        );
+        return review ? [{ old: item.receipt.job.snapshot.head, body: String(review.body) }] : [];
+      })
       .at(-1);
     if (!prior) return "Initial full base-to-head review.";
-    const old = prior.receipt.job.snapshot.head;
     const compare = requireObject(
-      await this.api(`${this.root}/compare/${sha(old)}...${sha(head)}`),
+      await this.api(`${this.root}/compare/${sha(prior.old)}...${sha(head)}`),
     );
     if (!["ahead", "identical"].includes(String(compare.status)))
-      return `History rewritten since ${old}; perform a full review.`;
-    const reviews = await this.list(`${this.root}/pulls/${number}/reviews`);
-    const review = reviews
-      .map(requireObject)
-      .find(
-        (r) =>
-          requireObject(r.user).id === this.options.botId &&
-          String(r.body).endsWith(`<!-- aircastle-ai-result:${prior.receipt.id} -->`),
-      );
-    return review
-      ? `Incremental review since ${old}. Previous advisory evidence:\n${String(review.body).slice(0, 16000)}`
-      : "Previous evidence unavailable; perform a full review.";
+      return `History rewritten since ${prior.old}; perform a full review.`;
+    return `Incremental review since ${prior.old}. Previous advisory evidence:\n${prior.body.slice(0, 16000)}`;
   }
   async command(
     raw: unknown,
@@ -434,7 +445,7 @@ export class Coordinator {
           commit_id: r.commit_id,
           original_commit_id: r.original_commit_id,
         })),
-      ).slice(0, 24000);
+      ).slice(0, threadLimit);
     }
     return {
       number,
@@ -534,18 +545,17 @@ export class Coordinator {
       selection: config.roles[role],
       previous: await this.previous(number, role, existing, snapshot.head),
     };
-    if (job.task === "fix" && (!snapshot.complete || job.thread.length >= 24000))
+    if (job.task === "fix" && !contextComplete(job))
       throw new Error("Fix requires complete bounded changed-file context");
     if (prior && prior.receipt.digest !== digest(job)) return [];
     return (await this.claim(job, existing)) ? [job] : [];
   }
   async publishFix(
     job: Job,
-    raw: unknown,
+    fix: Fix,
     verification: Verification,
     claim: StoredReceipt,
   ): Promise<string> {
-    const fix: Fix = validateEdits(raw, job.snapshot);
     const selection = job.task === "request" ? job.implementation : job.selection;
     const commands = verificationPlan(fix.edits);
     if (!boundVerification(job, fix.edits, verification)) {

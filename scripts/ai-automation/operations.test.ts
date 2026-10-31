@@ -1,5 +1,5 @@
-import { expect, test } from "vite-plus/test";
-import { executeOperation, boundModelOutput } from "./operations.ts";
+import { expect, test, vi } from "vite-plus/test";
+import { executeOperation, boundModelOutput, interpretRequest } from "./operations.ts";
 import { digest, type Job } from "./index.ts";
 import { snapshot } from "./fixtures.ts";
 
@@ -21,7 +21,7 @@ const fix = {
   summary: "Correct value.",
   edits: [{ path: "src/value.ts", expectedBlob: "c".repeat(40), content: "fixed\n" }],
 };
-const empty = { summary: "No findings.", findings: [] };
+const empty = { findings: [] };
 
 test("a natural change request selects the captured implementation model without changing its claim", async () => {
   const calls: string[] = [];
@@ -84,4 +84,31 @@ test("natural fixes still require complete source and bound model, revision, and
     { ...output, task: "other" },
   ])
     expect(() => boundModelOutput(request, changed)).toThrow();
+});
+
+test("an unclear natural request returns its clarification question for publication", async () => {
+  const runner = vi.fn(async () => ({ kind: "clarify", message: "Which behavior should change?" }));
+  const output = await executeOperation(request, "Rules", runner);
+  expect(output).toMatchObject({
+    task: "clarify",
+    selection: request.selection,
+    result: "Which behavior should change?",
+  });
+  expect(runner).toHaveBeenCalledTimes(1);
+  expect(boundModelOutput(request, output)).toEqual(output);
+  expect(() => boundModelOutput({ ...request, task: "review" }, output)).toThrow();
+});
+
+test("invalid structured intent fails instead of silently choosing review", async () => {
+  await expect(
+    interpretRequest("change this", request.selection, async () => ({ kind: "execute" })),
+  ).rejects.toThrow();
+});
+
+test("transport failures propagate without defaulting to review", async () => {
+  await expect(
+    interpretRequest("change this", request.selection, async () => {
+      throw new Error("provider_unavailable");
+    }),
+  ).rejects.toThrow("provider_unavailable");
 });

@@ -65,7 +65,7 @@ export type Finding = {
   consequence: string;
   correction: string;
 };
-export type Review = { summary: string; findings: Finding[] };
+export type Review = { findings: Finding[] };
 export type Edit = { path: string; expectedBlob: string | null; content: string | null };
 export type Fix = { summary: string; edits: Edit[] };
 type JobBase = {
@@ -92,13 +92,6 @@ export type Receipt = {
   run: string;
   at: string;
 };
-export type ModelOutput = {
-  task: "review" | "fix";
-  id: string;
-  digest: string;
-  result: unknown;
-  selection: ModelSelection;
-};
 export type Verification = {
   id: string;
   digest: string;
@@ -108,6 +101,8 @@ export type Verification = {
   recipe: string;
   scope: string;
 };
+
+export const threadLimit = 24000;
 
 export function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -243,9 +238,11 @@ export async function authorize(
     thread: input.kind === "manual" ? input.command.thread : "",
   };
 }
+export function contextComplete(job: Job): boolean {
+  return job.snapshot.complete && job.thread.length < threadLimit;
+}
 export function validateReview(value: unknown, snapshot: Snapshot): Review {
   const result = requireObject(value);
-  const summary = text(result.summary);
   if (JSON.stringify(value).length > 40000) throw new Error("Review exceeds publication bound");
   if (!Array.isArray(result.findings) || result.findings.length > 30)
     throw new Error("Invalid findings");
@@ -280,7 +277,7 @@ export function validateReview(value: unknown, snapshot: Snapshot): Review {
       correction: text(f.correction, 2000),
     };
   });
-  return { summary, findings };
+  return { findings };
 }
 export function validateEdits(value: unknown, snapshot: Snapshot): Fix {
   const result = requireObject(value);
@@ -320,9 +317,8 @@ const stringSchema = { type: "string" };
 export const reviewSchema: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "findings"],
+  required: ["findings"],
   properties: {
-    summary: { type: "string", maxLength: 240 },
     findings: {
       type: "array",
       items: {
@@ -343,8 +339,8 @@ export const reviewSchema: Record<string, unknown> = {
           startLine: { type: "integer" },
           endLine: { type: "integer" },
           quote: stringSchema,
-          consequence: { type: "string", maxLength: 360 },
-          correction: { type: "string", maxLength: 360 },
+          consequence: stringSchema,
+          correction: stringSchema,
         },
       },
     },

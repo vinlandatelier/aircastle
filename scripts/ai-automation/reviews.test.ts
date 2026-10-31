@@ -25,7 +25,7 @@ const finding: Finding = {
   consequence: "The API returns the wrong value.",
   correction: "Use zero.",
 };
-const empty = { summary: "No findings.", findings: [] };
+const empty = { findings: [] };
 
 test("one request runs separate correctness and quality prompts on the same revision", async () => {
   const calls: string[] = [];
@@ -55,9 +55,8 @@ test("a failed pass cannot produce a complete review", async () => {
 
 test("one compact review combines both passes, orders severity, and attaches inline findings", async () => {
   const payload = await reviewPayload(job, {
-    correctness: { summary: "Wrong value.", findings: [finding] },
+    correctness: { findings: [finding] },
     quality: {
-      summary: "Naming can improve.",
       findings: [
         {
           ...finding,
@@ -75,9 +74,14 @@ test("one compact review combines both passes, orders severity, and attaches inl
   expect(payload.body).toContain("**High**");
   expect(payload.body).toContain("**Advisory**");
   expect(payload.body.indexOf("**High**")).toBeLessThan(payload.body.indexOf("**Advisory**"));
-  expect(payload.comments).toHaveLength(2);
+  expect(payload.comments).toHaveLength(3);
   expect(payload.comments[0]).toMatchObject({ path: finding.path, line: 1, side: "RIGHT" });
   expect(payload.comments[0]?.body).toContain("Use zero.");
+  expect(payload.comments.map((comment) => comment.body.split("\n")[0])).toEqual([
+    "**High** · correctness",
+    "**Medium** · quality",
+    "**Advisory** · quality",
+  ]);
   expect(payload.body).not.toContain("Evidence:");
   expect(payload.body.length).toBeLessThan(1200);
 });
@@ -86,7 +90,7 @@ test("findings outside the diff stay in the top-level body with their correction
   const payload = await reviewPayload(
     { ...job, snapshot: { ...snapshot, files: [{ ...snapshot.files[0]!, patch: "" }] } },
     {
-      correctness: { summary: "Wrong value.", findings: [finding] },
+      correctness: { findings: [finding] },
       quality: empty,
     },
   );
@@ -111,7 +115,7 @@ test("context gaps and truncated patches cannot invent an inline location", asyn
   const payload = await reviewPayload(
     { ...job, snapshot: changed },
     {
-      correctness: { summary: "Range spans a gap.", findings: [span] },
+      correctness: { findings: [span] },
       quality: empty,
     },
   );
@@ -126,7 +130,7 @@ test("context gaps and truncated patches cannot invent an inline location", asyn
       },
     },
     {
-      correctness: { summary: "Wrong value.", findings: [finding] },
+      correctness: { findings: [finding] },
       quality: empty,
     },
   );
@@ -148,7 +152,6 @@ test("a multiline finding attaches only when its entire range is in one diff hun
     { ...job, snapshot: changed },
     {
       correctness: {
-        summary: "Wrong range.",
         findings: [{ ...finding, startLine: 1, endLine: 3, quote: "one" }],
       },
       quality: empty,
@@ -178,7 +181,6 @@ test("an oversized combined review fails visibly instead of dropping findings", 
   const path = "a".repeat(496) + ".tsx";
   const source = { ...snapshot, files: [{ ...snapshot.files[0]!, path, patch: "" }] };
   const pass = (prefix: string) => ({
-    summary: "Findings.",
     findings: Array.from({ length: 29 }, (_, index) => ({
       ...finding,
       path,

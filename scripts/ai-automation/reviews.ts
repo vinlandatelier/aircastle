@@ -1,4 +1,5 @@
 import {
+  contextComplete,
   prompt,
   requireObject,
   reviewSchema,
@@ -7,12 +8,12 @@ import {
   type Job,
   type Review,
   type Snapshot,
+  threadLimit,
 } from "./index.ts";
 import { runModel } from "../ai-models/index.ts";
 
 export type ReviewPasses = { correctness: Review; quality: Review };
 type Pass = keyof ReviewPasses;
-type CombinedFinding = { finding: Finding; passes: Pass[] };
 type InlineComment = {
   path: string;
   body: string;
@@ -45,7 +46,7 @@ export async function runReviewPasses(
   runner: typeof runModel = runModel,
 ): Promise<ReviewPasses> {
   const concise =
-    "Write for rapid reading. Use one short sentence for the summary, consequence, and correction. Omit praise, repeated evidence, and general advice.";
+    "Write for rapid reading. Use one short sentence for the consequence and the correction. Omit praise, repeated evidence, and general advice.";
   const [correctness, quality] = await Promise.all(
     (["codexReviewer", "claudeReviewer"] as const).map(async (role) =>
       validateReview(
@@ -61,25 +62,10 @@ export async function runReviewPasses(
   return { correctness: correctness!, quality: quality! };
 }
 
-function findings(reviews: ReviewPasses): CombinedFinding[] {
-  const result = new Map<string, CombinedFinding>();
-  for (const pass of ["correctness", "quality"] as const) {
-    for (const finding of reviews[pass].findings) {
-      const key = JSON.stringify([
-        finding.path,
-        finding.startLine,
-        finding.endLine,
-        compact(finding.consequence).toLowerCase(),
-        compact(finding.correction).toLowerCase(),
-      ]);
-      const prior = result.get(key);
-      if (prior) {
-        if (!prior.passes.includes(pass)) prior.passes.push(pass);
-        if (rank[finding.severity] < rank[prior.finding.severity]) prior.finding = finding;
-      } else result.set(key, { finding, passes: [pass] });
-    }
-  }
-  return [...result.values()].sort((a, b) => rank[a.finding.severity] - rank[b.finding.severity]);
+function findings(reviews: ReviewPasses): { finding: Finding; pass: Pass }[] {
+  return (["correctness", "quality"] as const)
+    .flatMap((pass) => reviews[pass].findings.map((finding) => ({ finding, pass })))
+    .sort((a, b) => rank[a.finding.severity] - rank[b.finding.severity]);
 }
 
 export async function reviewPayload(
@@ -94,22 +80,21 @@ export async function reviewPayload(
   const { parsePatch } = await import("diff");
   const rows: string[] = [];
   const comments: InlineComment[] = [];
-  for (const { finding, passes } of findings(reviews)) {
-    const file = job.snapshot.files.find((candidate) => candidate.path === finding.path);
-    let ranges: { first: number; last: number }[] = [];
-    if (file?.patch) {
-      try {
-        ranges = parsePatch(file.patch).flatMap((patch) =>
-          patch.hunks.map((hunk) => ({
-            first: hunk.newStart,
-            last: hunk.newStart + hunk.newLines - 1,
-          })),
-        );
-      } catch {
-        ranges = [];
-      }
+  const hunks = (patch: string) => {
+    try {
+      return parsePatch(patch).flatMap((file) =>
+        file.hunks.map((hunk) => ({
+          first: hunk.newStart,
+          last: hunk.newStart + hunk.newLines - 1,
+        })),
+      );
+    } catch {
+      return [];
     }
-    const inline = ranges.some(
+  };
+  const ranges = new Map(job.snapshot.files.map((file) => [file.path, hunks(file.patch)] as const));
+  for (const { finding, pass } of findings(reviews)) {
+    const inline = (ranges.get(finding.path) ?? []).some(
       ({ first, last }) => finding.startLine >= first && finding.endLine <= last,
     );
     const severity = `**${label(finding.severity)}**`;
@@ -124,13 +109,12 @@ export async function reviewPayload(
         ...(finding.startLine === finding.endLine
           ? {}
           : { start_line: finding.startLine, start_side: "RIGHT" as const }),
-        body: `${severity} · ${passes.join(" + ")}\n\n${compact(finding.consequence)}\n\nFix: ${compact(finding.correction)}`,
+        body: `${severity} · ${pass}\n\n${compact(finding.consequence)}\n\nFix: ${compact(finding.correction)}`,
       });
   }
-  const incomplete = !job.snapshot.complete || job.thread.length >= 24000;
-  const coverage = incomplete
-    ? `\nINCOMPLETE: ${[...job.snapshot.omitted, ...(job.thread.length >= 24000 ? ["thread truncated"] : [])].join(", ") || "changed-file context unavailable"}.`
-    : "";
+  const coverage = contextComplete(job)
+    ? ""
+    : `\nINCOMPLETE: ${[...job.snapshot.omitted, ...(job.thread.length >= threadLimit ? ["thread truncated"] : [])].join(", ") || "changed-file context unavailable"}.`;
   const body = `Correctness + quality · \`${job.snapshot.head}\`
 
 ${rows.join("\n") || "No findings in the supplied changed-file context."}${coverage}`;

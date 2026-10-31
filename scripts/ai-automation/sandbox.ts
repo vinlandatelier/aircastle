@@ -15,8 +15,7 @@ function run(command: string, args: string[], cwd: string, timeout = 300000): vo
     throw new Error(`Verification command failed: ${command}; status ${result.status}`);
 }
 const job = requireObject(JSON.parse(await readFile("/input/job.json", "utf8"))) as unknown as Job;
-const output = requireObject(JSON.parse(await readFile("/input/result.json", "utf8")));
-const fix = validateEdits(output.result, job.snapshot);
+const fix = validateEdits(JSON.parse(await readFile("/input/result.json", "utf8")), job.snapshot);
 const commands = verificationPlan(fix.edits);
 if (commands === null) throw new Error("Scoped verification unavailable");
 const repository = process.env.AI_REPOSITORY;

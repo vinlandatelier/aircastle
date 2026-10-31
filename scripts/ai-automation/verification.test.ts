@@ -220,8 +220,8 @@ test.each([
                   edits: [{ path, expectedBlob: "c".repeat(40), content: "fixed\n" }],
                 }
               : {
-                  correctness: { summary: "No findings", findings: [] },
-                  quality: { summary: "No findings", findings: [] },
+                  correctness: { findings: [] },
+                  quality: { findings: [] },
                 },
         }),
       );

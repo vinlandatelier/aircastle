@@ -99,8 +99,8 @@ test("stale publication never emits a review", async () => {
   const result = await coordinator.publishReview(
     job,
     {
-      correctness: { summary: "No findings", findings: [] },
-      quality: { summary: "No findings", findings: [] },
+      correctness: { findings: [] },
+      quality: { findings: [] },
     },
     { commentId: 91, receipt },
   );
@@ -140,8 +140,8 @@ test("COMMENT publication binds commit_id and displays incomplete coverage", asy
   await coordinator.publishReview(
     { ...job, snapshot: { ...snapshot, complete: false, omitted: ["huge.ts"] } },
     {
-      correctness: { summary: "No findings", findings: [] },
-      quality: { summary: "No findings", findings: [] },
+      correctness: { findings: [] },
+      quality: { findings: [] },
     },
     { commentId: 91, receipt },
   );
@@ -522,8 +522,8 @@ test("a result marker quoted inside another bot review does not forge publicatio
   await coordinator.publishReview(
     job,
     {
-      correctness: { summary: "Review complete", findings: [] },
-      quality: { summary: "Review complete", findings: [] },
+      correctness: { findings: [] },
+      quality: { findings: [] },
     },
     { commentId: 91, receipt },
   );
@@ -717,7 +717,7 @@ test("publication sends one combined review with inline comments and does not du
     throw new Error(`Unexpected request ${url}`);
   });
   const finding = {
-    severity: "high",
+    severity: "high" as const,
     path: "src/value.ts",
     startLine: 1,
     endLine: 1,
@@ -726,8 +726,8 @@ test("publication sends one combined review with inline comments and does not du
     correction: "Use zero.",
   };
   const value = {
-    correctness: { summary: "Wrong value.", findings: [finding] },
-    quality: { summary: "No findings.", findings: [] },
+    correctness: { findings: [finding] },
+    quality: { findings: [] },
   };
   const claim = {
     commentId: 91,
@@ -795,3 +795,87 @@ test("claim metadata stays inside HTML comments and round-trips even with commen
   ).toBe("");
   expect((await coordinator.receipts(7))[0]?.receipt.state).toBe("published");
 });
+test("a review published from a natural request is the next review's prior evidence", async () => {
+  const request: Job = {
+    ...job,
+    id: "2".repeat(64),
+    task: "request",
+    role: "claudeReviewer",
+    implementation: config.roles.claudeImplementer,
+  };
+  const { files: _files, ...revision } = snapshot;
+  const stored = (id: string) => ({
+    commentId: 91,
+    receipt: {
+      version: 1 as const,
+      id,
+      job: { ...request, id, snapshot: revision },
+      digest: "x",
+      attempt: 1,
+      state: "published" as const,
+      run: "123",
+      at: "2026-10-25T00:00:00Z",
+    },
+  });
+  const coordinator = new Coordinator(options, async (url) => {
+    const path = String(url);
+    if (path.includes("/pulls/7/reviews"))
+      return Response.json([
+        { user: { id: 99 }, body: `Prior finding\n\n<!-- aircastle-ai-result:${request.id} -->` },
+      ]);
+    if (path.includes("/compare/")) return Response.json({ status: "ahead" });
+    throw new Error(`Unexpected request ${path}`);
+  });
+  const head = "f".repeat(40);
+  expect(await coordinator.previous(7, "claudeReviewer", [stored(request.id)], head)).toContain(
+    `Incremental review since ${snapshot.head}`,
+  );
+  expect(await coordinator.previous(7, "claudeReviewer", [stored("3".repeat(64))], head)).toBe(
+    "Initial full base-to-head review.",
+  );
+});
+test("an unclear natural request asks its question on the PR and settles the claim", async () => {
+  const writes: { path: string; body: unknown }[] = [];
+  const coordinator = new Coordinator(options, async (url, init) => {
+    const path = String(url);
+    if (init?.method === "POST" || init?.method === "PATCH") {
+      writes.push({ path, body: JSON.parse(typeof init.body === "string" ? init.body : "null") });
+      return Response.json({});
+    }
+    if (path.endsWith("/users/member")) return Response.json(snapshot.author);
+    if (path.includes("/members/")) return new Response(null, { status: 204 });
+    if (path.endsWith("/pulls/7"))
+      return Response.json({
+        state: "open",
+        head: { sha: snapshot.head },
+        base: { sha: snapshot.base },
+      });
+    throw new Error(`Unexpected request ${path}`);
+  });
+  const { files: _files, ...revision } = snapshot;
+  const receipt = {
+    version: 1 as const,
+    id: job.id,
+    job: { ...job, snapshot: revision },
+    digest: "x",
+    attempt: 1,
+    state: "claimed" as const,
+    run: "123",
+    at: "2026-10-25T00:00:00Z",
+  };
+  expect(
+    await coordinator.publishQuestion(job, "Which behavior should change?", {
+      commentId: 91,
+      receipt,
+    }),
+  ).toBe("published");
+  expect(writes[0]).toEqual({
+    path: "https://api.github.com/repos/vinlandatelier/aircastle/issues/7/comments",
+    body: { body: "@member Which behavior should change?" },
+  });
+  expect(writes[1]?.path).toMatch(/issues\/comments\/91$/);
+  expect(String(requireBody(writes[1]?.body))).toContain('"state":"published"');
+});
+function requireBody(value: unknown): unknown {
+  return value && typeof value === "object" && "body" in value ? value.body : null;
+}
