@@ -134,6 +134,18 @@ describe("R11 R13 client update request", () => {
     expect(await requests[0]!.json()).toHaveProperty("changes", { summary: "Short" });
   });
 
+  test("sends the changes and unset as they were when update was called", async () => {
+    const { client, requests } = recording({ ok: true, data: article });
+    const changes: { title?: string; summary?: string } = { title: "Hello" };
+    const unset: ("summary" | "status")[] = ["summary"];
+    const pending = client.articles.update(id, changes, { unset });
+    changes.title = "Changed";
+    changes.summary = "Added";
+    unset.push("status");
+    await pending;
+    expect(await requests[0]!.json()).toEqual({ changes: { title: "Hello" }, unset: ["summary"] });
+  });
+
   test("returns the lowercase id the server returns for an uppercase request id", async () => {
     const updated = { ...article, id: lowerId };
     const { client, transport } = recording({ ok: true, data: updated });
