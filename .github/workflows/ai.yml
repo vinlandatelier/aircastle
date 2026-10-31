@@ -4,7 +4,9 @@ on:
     types: [created]
 permissions: {}
 concurrency:
-  group: ai-automation-coordinator
+  group: >-
+    ${{ contains(github.event.comment.body, '@vinland-ai') && github.event.comment.user.id == vars.AI_TRIGGER_USER_ID
+    && format('ai-automation-pr-{0}', github.event.issue.number) || format('ai-automation-run-{0}', github.run_id) }}
   cancel-in-progress: false
 jobs:
   prepare:

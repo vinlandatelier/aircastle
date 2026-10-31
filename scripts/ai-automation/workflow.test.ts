@@ -16,6 +16,20 @@ const condition = (name: string) => {
     .trim();
 };
 
+test("only tagged comments from the trigger account queue, and only behind requests on the same PR", () => {
+  const block = /\nconcurrency:\n((?: {2}.*\n)+)/.exec(workflow)?.[1] ?? "";
+  const group = /group: >-\n((?: {4}.*\n)+)/
+    .exec(block)?.[1]
+    ?.split("\n")
+    .map((line) => line.trim())
+    .join(" ")
+    .trim();
+  expect(group).toBe(
+    "${{ contains(github.event.comment.body, '@vinland-ai') && github.event.comment.user.id == vars.AI_TRIGGER_USER_ID && format('ai-automation-pr-{0}', github.event.issue.number) || format('ai-automation-run-{0}', github.run_id) }}",
+  );
+  expect(block).toContain("cancel-in-progress: false");
+});
+
 test("comment events start planning only for PR comments that mention @vinland-ai from the trigger login", () => {
   const gate = condition("prepare");
   expect(gate).toContain("github.event_name == 'issue_comment'");
