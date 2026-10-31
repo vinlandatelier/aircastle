@@ -1,5 +1,11 @@
 import type { Context } from "hono";
-import type { DocumentListQuery, DocumentUpdate, Result } from "@aircastle/contracts";
+import {
+  isListLimit,
+  isListSort,
+  type DocumentListQuery,
+  type DocumentUpdate,
+  type Result,
+} from "@aircastle/contracts";
 import type { Access } from "@aircastle/core";
 import { failure } from "./responses.ts";
 
@@ -61,9 +67,6 @@ export async function jsonBody(c: Context, limit: number): Promise<Result<unknow
   }
 }
 
-const limitPattern = /^[1-9][0-9]{0,2}$/;
-const sortPattern = /^-?[A-Za-z_][A-Za-z0-9_]*$/;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -92,15 +95,8 @@ export function listQuery(input: unknown): Result<DocumentListQuery> {
   const query: DocumentListQuery = {};
   for (const [key, value] of Object.entries(input)) {
     if (key === "where" && isRecord(value)) query.where = value;
-    else if (key === "sort" && typeof value === "string" && sortPattern.test(value))
-      query.sort = value;
-    else if (
-      key === "limit" &&
-      Number.isInteger(value) &&
-      Number(value) >= 1 &&
-      Number(value) <= 100
-    )
-      query.limit = Number(value);
+    else if (key === "sort" && isListSort(value)) query.sort = value;
+    else if (key === "limit" && isListLimit(value)) query.limit = value;
     else if (key === "cursor" && typeof value === "string" && value !== "") query.cursor = value;
     else return failure("invalid_request");
   }
@@ -118,11 +114,16 @@ export function searchQuery(c: Context): Result<DocumentListQuery> {
     Object.fromEntries(
       entries.map(([key, value]) => {
         if (key === "where") return [key, parsedJson(value)];
-        if (key === "limit") return [key, limitPattern.test(value) ? Number(value) : value];
+        if (key === "limit") return [key, decimal(value)];
         return [key, value];
       }),
     ),
   );
+}
+
+function decimal(text: string): number | string {
+  const value = Number(text);
+  return String(value) === text ? value : text;
 }
 
 function parsedJson(text: string): unknown {
