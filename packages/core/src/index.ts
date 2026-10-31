@@ -1,8 +1,10 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
+  assignIds,
   compatibleForCreate,
   compileDescription,
   contractId,
+  documentReferences,
   parseCollections,
   projectDocument,
   sameSchema,
@@ -38,6 +40,11 @@ export interface ProjectTransaction {
     uniqueFields: readonly string[],
   ) => Promise<Result<ContentDocument>>;
   read: (collection: string, id: string) => Promise<ContentDocument | undefined>;
+  /**
+   * Returns which of `ids` name documents in `collection`, locking the found documents against
+   * deletion until the transaction ends.
+   */
+  existing: (collection: string, ids: readonly string[]) => Promise<ReadonlySet<string>>;
 }
 export interface ProvisionedProject {
   workspace: string;
@@ -119,7 +126,37 @@ const failure = (code: SimpleCode): { ok: false; error: { code: SimpleCode } } =
   error: { code },
 });
 const verifier = (secret: string) => createHash("sha256").update(secret).digest("hex");
+const canonicalUuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+type Fields = CollectionDescription["fields"];
+
+function retargetsReference(previous: Fields, next: Fields): boolean {
+  return Object.entries(previous).some(([name, field]) => {
+    const proposed = next[name];
+    return proposed !== undefined && fieldRetargets(field, proposed);
+  });
+}
+
+function fieldRetargets(previous: Fields[string], next: Fields[string]): boolean {
+  if (previous.type === "reference")
+    return (
+      "collection" in previous &&
+      next.type === "reference" &&
+      "collection" in next &&
+      previous.collection !== next.collection
+    );
+  if (previous.type === "object" && next.type === "object")
+    return retargetsReference(previous.fields, next.fields);
+  if (previous.type === "list" && next.type === "list")
+    return fieldRetargets(previous.item, next.item);
+  if (previous.type === "blocks" && next.type === "blocks")
+    return Object.entries(previous.variants).some(([name, variant]) => {
+      const proposed = next.variants[name];
+      return proposed !== undefined && retargetsReference(variant.fields, proposed.fields);
+    });
+  return false;
+}
 
 class RejectedOperation extends Error {
   constructor(readonly failure: ContentError) {
@@ -207,6 +244,11 @@ export function createService(store: ContentStore, report: ReportError): Content
             )
               return failure("migration_required");
             const documents = await transaction.documents(collection.name);
+            if (
+              documents.length > 0 &&
+              retargetsReference(collection.description.fields, next.fields)
+            )
+              return failure("migration_required");
             const unique = new Map(uniqueFields(next).map((name) => [name, new Set<string>()]));
             for (const document of documents) {
               if (!validateStored(next, storedData(document))) return failure("migration_required");
@@ -237,14 +279,37 @@ export function createService(store: ContentStore, report: ReportError): Content
           const validated = compileDescription(collection.description).validate(input);
           if (!validated.ok)
             return { ok: false, error: { code: "validation_failed", issues: validated.issues } };
+          const references = documentReferences(collection.description, validated.data);
+          const targets = new Map<string, Set<string>>();
+          for (const reference of references) {
+            if (!canonicalUuid.test(reference.id)) continue;
+            const ids = targets.get(reference.collection) ?? new Set<string>();
+            ids.add(reference.id);
+            targets.set(reference.collection, ids);
+          }
+          const found = new Map<string, ReadonlySet<string>>();
+          for (const [target, ids] of targets)
+            found.set(target, await transaction.existing(target, [...ids]));
+          const missing = references.filter(
+            (reference) => !found.get(reference.collection)?.has(reference.id),
+          );
+          const [first, ...rest] = missing.map((reference) => ({
+            path: reference.path,
+            code: "not_found" as const,
+            collection: reference.collection,
+            message: "Referenced document does not exist",
+          }));
+          if (first)
+            return { ok: false, error: { code: "validation_failed", issues: [first, ...rest] } };
+          const data = assignIds(collection.description, validated.data, randomUUID);
           const projected = projectDocument(client, collection.description, {
-            ...validated.data,
+            ...data,
             id: randomUUID(),
           });
           if (!projected.ok) return projected;
           const inserted = await transaction.insert(
             collectionName,
-            validated.data,
+            data,
             uniqueFields(collection.description),
           );
           if (!inserted.ok) return inserted;

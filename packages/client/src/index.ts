@@ -13,7 +13,7 @@ import type {
   Fetch,
   Result,
 } from "@aircastle/contracts";
-import type { InferInput, InferOutput } from "@aircastle/schema";
+import type { InferInput, InferRead } from "@aircastle/schema";
 
 export interface AircastleConfig<Collections extends CollectionDefinitions> {
   url: string;
@@ -24,8 +24,8 @@ export type AircastleClient<Collections extends CollectionDefinitions> = {
   [Name in keyof Collections]: {
     create: (
       input: InferInput<Collections[Name]>,
-    ) => Promise<Result<{ id: string } & InferOutput<Collections[Name]>>>;
-    findById: (id: string) => Promise<Result<{ id: string } & InferOutput<Collections[Name]>>>;
+    ) => Promise<Result<{ id: string } & InferRead<Collections[Name]>>>;
+    findById: (id: string) => Promise<Result<{ id: string } & InferRead<Collections[Name]>>>;
   };
 };
 export class ConfigurationError extends Error {
@@ -176,7 +176,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
         const validated = definition.validate(input);
         if (!validated.ok)
           return { ok: false, error: { code: "validation_failed", issues: validated.issues } };
-        return send<InferOutput<Collections[typeof name]>>(
+        return send<InferRead<Collections[typeof name]>>(
           "POST",
           endpoint,
           description,
@@ -187,7 +187,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
         if (typeof id !== "string" || !uuid.test(id))
           return { ok: false, error: { code: "invalid_request" } };
         const normalized = id.toLowerCase();
-        return send<InferOutput<Collections[typeof name]>>(
+        return send<InferRead<Collections[typeof name]>>(
           "GET",
           `${endpoint}/${encodeURIComponent(normalized)}`,
           description,

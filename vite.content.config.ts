@@ -25,6 +25,7 @@ export default defineConfig({
           include: [
             "packages/adapter-postgres/src/**/*.test.ts",
             "tests/content-workflow.test.ts",
+            "tests/field-types-workflow.test.ts",
             "scripts/dev-setup.test.ts",
           ],
           environment: "node",

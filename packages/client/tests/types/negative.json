@@ -68,5 +68,40 @@
     "file": "success-needs-data.ts",
     "target": "result: CreateResult",
     "codes": [2322]
+  },
+  {
+    "file": "field-number-given-string.ts",
+    "target": "rating: \"4\"",
+    "codes": [2322]
+  },
+  {
+    "file": "field-read-block-id-defined.ts",
+    "target": "record",
+    "codes": [2322, 2741]
+  },
+  {
+    "file": "field-read-row-id-defined.ts",
+    "target": "record",
+    "codes": [2322, 2741]
+  },
+  {
+    "file": "field-read-nested-id-defined.ts",
+    "target": "record",
+    "codes": [2322, 2741]
+  },
+  {
+    "file": "field-read-block-id-undefined.ts",
+    "target": "id: undefined",
+    "codes": [2322, 2375]
+  },
+  {
+    "file": "field-unknown-block-type.ts",
+    "target": "type: \"banner\"",
+    "codes": [2322]
+  },
+  {
+    "file": "field-boolean-given-string.ts",
+    "target": "featured: PageInput",
+    "codes": [2322]
   }
 ]
