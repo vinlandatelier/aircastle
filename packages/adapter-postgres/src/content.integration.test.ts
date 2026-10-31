@@ -52,7 +52,7 @@ interface Fixture {
 }
 
 async function withCms(operation: (fixture: Fixture) => Promise<void>) {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.AIRCASTLE_DATABASE_URL;
   if (!url) throw new Error("Run these tests through vp run db:test");
   const namespace = `test_${randomUUID().replaceAll("-", "")}`;
   let store = postgresAdapter({ url, namespace });

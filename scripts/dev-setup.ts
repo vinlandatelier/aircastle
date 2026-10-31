@@ -1,4 +1,4 @@
-import { postgresAdapter } from "@aircastle/adapter-postgres";
+import { postgresAdapter, readPostgresOptions } from "@aircastle/adapter-postgres";
 import { provisionDevelopment } from "@aircastle/core";
 
 const args = process.argv.slice(2);
@@ -9,16 +9,11 @@ if (args.some((arg) => arg !== "--new-key") || args.length > 1) {
   let database: ReturnType<typeof postgresAdapter> | undefined;
   try {
     const url = new URL(
-      process.env.AIRCASTLE_URL ?? `http://localhost:${process.env.PORT ?? "43122"}`,
+      process.env.AIRCASTLE_URL ?? `http://localhost:${process.env.AIRCASTLE_PORT ?? "43122"}`,
     );
     if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.search || url.hash)
       throw new Error("Invalid AIRCASTLE_URL");
-    database = postgresAdapter({
-      url: process.env.DATABASE_URL ?? "",
-      ...(process.env.AIRCASTLE_DATABASE_NAMESPACE === undefined
-        ? {}
-        : { namespace: process.env.AIRCASTLE_DATABASE_NAMESPACE }),
-    });
+    database = postgresAdapter(readPostgresOptions(process.env));
     await database.initialize();
     const result = await provisionDevelopment(database, {
       key: args.includes("--new-key") ? "issue" : "reuse",
@@ -32,7 +27,7 @@ if (args.some((arg) => arg !== "--new-key") || args.length > 1) {
       );
   } catch {
     console.error(
-      "Development setup failed. Check DATABASE_URL, AIRCASTLE_DATABASE_NAMESPACE and AIRCASTLE_URL.",
+      "Development setup failed. Check AIRCASTLE_DATABASE_URL or AIRCASTLE_DB_* settings, AIRCASTLE_DATABASE_NAMESPACE and AIRCASTLE_URL.",
     );
     process.exitCode = 1;
   } finally {

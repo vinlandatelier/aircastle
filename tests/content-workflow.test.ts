@@ -46,7 +46,7 @@ test(
   "developer config, push, SDK create/read and restart form one durable workflow",
   async () => {
     const namespace = `workflow_${randomUUID().replaceAll("-", "")}`;
-    const store = postgresAdapter({ url: process.env.DATABASE_URL ?? "", namespace });
+    const store = postgresAdapter({ url: process.env.AIRCASTLE_DATABASE_URL ?? "", namespace });
     const app = await developerApp();
     let server: Awaited<ReturnType<typeof standaloneServer>> | undefined;
     try {
@@ -136,7 +136,7 @@ test(
   "built API honors the configured request-byte limit with valid credentials",
   async () => {
     const namespace = `workflow_${randomUUID().replaceAll("-", "")}`;
-    const store = postgresAdapter({ url: process.env.DATABASE_URL ?? "", namespace });
+    const store = postgresAdapter({ url: process.env.AIRCASTLE_DATABASE_URL ?? "", namespace });
     try {
       await store.initialize();
       const provisioned = await provisionDevelopment(store);
