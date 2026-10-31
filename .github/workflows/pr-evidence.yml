@@ -26,8 +26,9 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           BODY: ${{ github.event.pull_request.body }}
         run: |
-          ui_files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate \
-            --jq '.[] | .filename, (.previous_filename // empty)' \
+          changed_files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          ui_files=$(printf '%s\n' "$changed_files" \
             | grep -E '^apps/web/(src/|public/|index\.html$)' \
             | grep -vE '\.test\.tsx?$|^apps/web/src/test-(setup\.ts|utils\.tsx)$' \
             || true)
@@ -36,15 +37,15 @@ jobs:
             exit 0
           fi
           printf 'UI source changed:\n%s\n' "$ui_files"
-          body=$(printf '%s\n' "$BODY" | tr -d '\r')
-          if printf '%s\n' "$body" | grep -qE '^[[:space:]]*No visible UI change: *[^[:space:]]'; then
+          body=$(printf '%s\n' "$BODY" | tr -d '\r' | perl -0pe 's/<!--.*?-->//gs')
+          if printf '%s\n' "$body" | grep -E '^[[:space:]]*No visible UI change: *[^[:space:]]' | grep -qvF '<reason>'; then
             echo "The body declares no visible UI change."
             exit 0
           fi
           screenshots=$(printf '%s\n' "$body" | awk '/^##? /{inside = ($0 ~ /^## Screenshots[[:space:]]*$/); next} inside')
-          if printf '%s\n' "$screenshots" | grep -qF 'https://github.com/user-attachments/assets/'; then
+          if printf '%s\n' "$screenshots" | grep -qE 'https://github\.com/user-attachments/assets/[0-9a-fA-F-]{8}'; then
             echo "The Screenshots section has uploaded media."
             exit 0
           fi
-          echo "::error::This PR changes UI source but its body has no evidence. Upload videos and screenshots from 'vp run test-web:record <specs>' under '## Screenshots', or add a line 'No visible UI change: <reason>'."
+          echo "::error::This PR changes UI source but its body has no evidence. Upload media (videos and screenshots from 'vp run test-web:record <specs>') under '## Screenshots', or add a line 'No visible UI change: <reason>'."
           exit 1

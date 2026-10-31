@@ -81,7 +81,7 @@ Privileged workflows use the `ai-automation` environment, restricted to the `mai
 
 `.github/workflows/gardener.yml` runs the `.agents/skills/gardener` audit of `main` on the subscription token without GitHub credentials, and a separate job opens the resulting PRs with the AI App token. `tests/harness/gardener-workflow.test.ts` guards its secrets, token scope, held paths and merge calls.
 
-`.github/workflows/pr-evidence.yml` checks that PRs changing shipped web UI carry recorded media or a `No visible UI change: <reason>` line in the body.
+`.github/workflows/pr-evidence.yml` checks PR bodies for evidence of web UI changes, as [automation instructions](.github/AGENTS.md) define.
 
 `.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
 
