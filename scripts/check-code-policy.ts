@@ -2,9 +2,12 @@ import { parse, type ParserPlugin } from "@babel/parser";
 import { readFileSync } from "node:fs";
 import { posix, resolve } from "node:path";
 
-export interface PolicyViolation {
+interface Position {
   line: number;
   column: number;
+}
+
+export interface PolicyViolation extends Position {
   rule:
     | "ordinary-comment"
     | "type-suppression"
@@ -21,11 +24,6 @@ interface SyntaxNode {
   readonly [field: string]: unknown;
 }
 
-interface Position {
-  line: number;
-  column: number;
-}
-
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null;
 }
@@ -34,13 +32,13 @@ function isSyntaxNode(value: unknown): value is SyntaxNode {
   return isRecord(value) && typeof value.type === "string";
 }
 
-function nodeAt(node: SyntaxNode, field: string): SyntaxNode | undefined {
-  const value = node[field];
+function nodeAt(node: SyntaxNode | undefined, field: string): SyntaxNode | undefined {
+  const value = node?.[field];
   return isSyntaxNode(value) ? value : undefined;
 }
 
-function listAt(node: SyntaxNode, field: string): readonly unknown[] {
-  const value = node[field];
+function listAt(node: SyntaxNode | undefined, field: string): readonly unknown[] {
+  const value = node?.[field];
   return Array.isArray(value) ? value : [];
 }
 
@@ -112,17 +110,22 @@ function bindingNames(node: unknown): string[] {
   return [];
 }
 
+const unvisitedKeys = new Set(["loc", "leadingComments", "innerComments", "trailingComments"]);
+
 /** Whether code reads one of the names, ignoring property keys and reads that only discard the value. */
 function readsAny(value: unknown, names: ReadonlySet<string>): boolean {
   if (Array.isArray(value)) return value.some((entry) => readsAny(entry, names));
-  if (value === null || typeof value !== "object") return false;
+  if (!isRecord(value)) return false;
   const node = isSyntaxNode(value) ? value : undefined;
-  if (node?.type === "Identifier") return names.has(textAt(node, "name") ?? "");
+  if (node?.type === "Identifier") {
+    const name = textAt(node, "name");
+    return name !== undefined && names.has(name);
+  }
   if (node?.type === "ExpressionStatement" && nodeAt(node, "expression")?.type === "Identifier")
     return false;
   if (node?.type === "UnaryExpression" && node.operator === "void") return false;
   return Object.entries(value).some(([key, child]) => {
-    if (["loc", "leadingComments", "innerComments", "trailingComments"].includes(key)) return false;
+    if (unvisitedKeys.has(key)) return false;
     if (
       key === "property" &&
       (node?.type === "MemberExpression" || node?.type === "OptionalMemberExpression") &&
@@ -142,7 +145,7 @@ const rejectionArguments = new Map([
 function rejectionHandler(node: SyntaxNode): SyntaxNode | undefined {
   if (node.type !== "CallExpression" && node.type !== "OptionalCallExpression") return undefined;
   const callee = nodeAt(node, "callee");
-  const property = callee && nodeAt(callee, "property");
+  const property = nodeAt(callee, "property");
   const name =
     (callee?.type === "MemberExpression" || callee?.type === "OptionalMemberExpression") &&
     !callee.computed &&
@@ -175,7 +178,8 @@ function swallowsError(node: SyntaxNode): boolean {
 /** A package in the repository, where the root package has the directory "". */
 export interface Workspace {
   directory: string;
-  name: string;
+  /** Absent when the package manifest has no `name`. */
+  name: string | undefined;
   dependencies: readonly string[];
 }
 
@@ -188,17 +192,15 @@ const moduleSpecifierKeys: Record<string, string> = {
   TSExternalModuleReference: "expression",
 };
 
+function dynamicImportArgument(node: SyntaxNode): SyntaxNode | undefined {
+  if (node.type !== "CallExpression" || nodeAt(node, "callee")?.type !== "Import") return undefined;
+  const argument = listAt(node, "arguments")[0];
+  return isSyntaxNode(argument) ? argument : undefined;
+}
+
 function moduleSpecifier(node: SyntaxNode): { value: string; position: Position } | undefined {
   const key = moduleSpecifierKeys[node.type];
-  const firstArgument = listAt(node, "arguments")[0];
-  const candidate =
-    key !== undefined
-      ? nodeAt(node, key)
-      : node.type === "CallExpression" &&
-          nodeAt(node, "callee")?.type === "Import" &&
-          isSyntaxNode(firstArgument)
-        ? firstArgument
-        : undefined;
+  const candidate = key === undefined ? dynamicImportArgument(node) : nodeAt(node, key);
   const literal = candidate?.type === "TSLiteralType" ? nodeAt(candidate, "literal") : candidate;
   if (literal === undefined) return undefined;
   const value = literal.type === "StringLiteral" ? textAt(literal, "value") : templateText(literal);
@@ -257,7 +259,11 @@ function inspectSpecifier(
 
 /** Lists each dependency cycle between workspace packages as the package names along it. */
 export function workspaceCycles(workspaces: readonly Workspace[]): string[][] {
-  const byName = new Map(workspaces.map((workspace) => [workspace.name, workspace]));
+  const byName = new Map(
+    workspaces.flatMap((workspace) =>
+      workspace.name === undefined ? [] : [[workspace.name, workspace] as const],
+    ),
+  );
   const finished = new Set<string>();
   const path: string[] = [];
   const cycles: string[][] = [];
@@ -274,7 +280,7 @@ export function workspaceCycles(workspaces: readonly Workspace[]): string[][] {
     path.pop();
     finished.add(name);
   };
-  for (const workspace of workspaces) visit(workspace.name);
+  for (const name of byName.keys()) visit(name);
   return cycles;
 }
 
@@ -332,20 +338,10 @@ export function inspectCode(
       value.forEach(visit);
       return;
     }
-    if (value === null || typeof value !== "object") return;
+    if (!isRecord(value)) return;
     if (isSyntaxNode(value)) inspectNode(value);
     for (const [key, child] of Object.entries(value)) {
-      if (
-        ![
-          "comments",
-          "leadingComments",
-          "innerComments",
-          "trailingComments",
-          "loc",
-          "tokens",
-        ].includes(key)
-      )
-        visit(child);
+      if (!unvisitedKeys.has(key)) visit(child);
     }
   };
   visit(ast.program);
@@ -385,7 +381,7 @@ const dependencyFields = [
 ] as const;
 
 interface Manifest {
-  name: string;
+  name: string | undefined;
   workspaces: string[];
   dependencies: string[];
 }
@@ -393,13 +389,12 @@ interface Manifest {
 function readManifest(path: string): Manifest {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
   const fields = isRecord(parsed) ? parsed : {};
-  const { name, workspaces } = fields;
-  if (typeof name !== "string") throw new Error(`${path} must have a string "name"`);
+  const { name, workspaces = [] } = fields;
+  if (!Array.isArray(workspaces) || !workspaces.every((pattern) => typeof pattern === "string"))
+    throw new Error(`${path} "workspaces" must be a list of strings`);
   return {
-    name,
-    workspaces: Array.isArray(workspaces)
-      ? workspaces.filter((pattern) => typeof pattern === "string")
-      : [],
+    name: typeof name === "string" ? name : undefined,
+    workspaces,
     dependencies: dependencyFields.flatMap((field) => {
       const dependencies = fields[field];
       return isRecord(dependencies) ? Object.keys(dependencies) : [];
