@@ -11,7 +11,7 @@ import { canonicalContract, compileDescription, uniqueFields } from "@aircastle/
 import { identifier } from "./identifier.ts";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
-const documentId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 class UniqueConflict extends Error {
   constructor(readonly field: string) {
@@ -32,7 +32,8 @@ function document(row: { id: string; data: unknown }): ContentDocument {
     throw new Error("Invalid persisted document object");
   const data: DocumentData = {};
   for (const [field, value] of Object.entries(row.data)) {
-    if (field === "id") throw new Error("Invalid persisted document value");
+    if (field === "id")
+      throw new Error("Invalid persisted document: data contains the reserved id key");
     Object.defineProperty(data, field, {
       value,
       enumerable: true,
@@ -172,7 +173,7 @@ export function projectTransaction(
     },
     existing: async (collection, ids) => {
       await resolveCollection(collection);
-      const candidates = ids.filter((id) => documentId.test(id));
+      const candidates = ids.filter((id) => canonicalUuid.test(id));
       if (candidates.length === 0) return new Set<string>();
       const rows = await sql<
         { id: string }[]
