@@ -1,6 +1,7 @@
 import type {
   CompiledCollection,
   CompiledSchema,
+  ExpectedType,
   SchemaIssue,
   ValidationIssue,
   ValidationResult,
@@ -21,7 +22,55 @@ export type ValidationCodes = Assert<
     | "too_short"
     | "too_long"
     | "invalid_choice"
+    | "not_integer"
+    | "too_small"
+    | "too_large"
+    | "invalid_date"
+    | "invalid_datetime"
+    | "too_early"
+    | "too_late"
+    | "invalid_list"
+    | "too_few"
+    | "too_many"
+    | "invalid_object"
+    | "invalid_reference"
+    | "not_found"
+    | "invalid_block_type"
+    | "invalid_id"
+    | "duplicate_id"
+    | "invalid_json"
+    | "invalid_point"
+    | "out_of_range"
   >
+>;
+
+export type SchemaCodes = Assert<
+  Equal<
+    SchemaIssue["code"],
+    | "invalid_definition"
+    | "conflicting_defaults"
+    | "conflicting_formats"
+    | "conflicting_choices"
+    | "conflicting_editors"
+    | "invalid_bound"
+    | "conflicting_bounds"
+    | "invalid_default"
+    | "invalid_choices"
+    | "duplicate_choice"
+    | "invalid_editor"
+    | "unknown_editor"
+    | "invalid_editor_options"
+    | "incompatible_editor"
+    | "invalid_item"
+    | "invalid_blocks"
+    | "unknown_collection"
+    | "invalid_references"
+    | "unsupported_unique"
+  >
+>;
+
+export type ExpectedTypes = Assert<
+  Equal<ExpectedType, "string" | "number" | "boolean" | "array" | "object" | "json">
 >;
 
 declare const result: ValidationResult<{ title: string }>;

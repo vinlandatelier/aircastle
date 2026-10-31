@@ -6,13 +6,15 @@ import {
   type CollectionDefinitions,
   type CollectionDescription,
   type CompiledCollection,
+  type JsonValue,
+  type TextFieldDescription,
   type ValidationIssue,
   type ReceivedType,
 } from "@aircastle/schema";
 import { collectionName, decodeCollections, decodeDescription, fieldName } from "./decode.ts";
 
 export type { CollectionDescription, CollectionDefinitions } from "@aircastle/schema";
-export type DocumentData = Record<string, string | null>;
+export type DocumentData = Record<string, JsonValue>;
 export type ContentDocument = DocumentData & { id: string };
 export type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 export type Permission = "content:read" | "content:write" | "schema:publish";
@@ -53,10 +55,14 @@ export interface Lockfile {
   revision: string;
 }
 
-type PlainIssueCode = Exclude<
-  ValidationIssue["code"],
-  "invalid_type" | "too_short" | "too_long" | "invalid_choice"
->;
+type PlainIssueCode =
+  | "required"
+  | "invalid_document"
+  | "invalid_unicode"
+  | "invalid_character"
+  | "invalid_email"
+  | "invalid_url"
+  | "unknown_field";
 type PlainErrorCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
 
 /** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
@@ -163,7 +169,7 @@ export function canonicalContract(description: CollectionDescription): string {
   return canonical({
     fields: Object.fromEntries(
       Object.entries(description.fields).map(([name, field]) => {
-        const { editor: _editor, ...data } = field;
+        const { editor: _editor, ...data } = field as TextFieldDescription;
         return [name, data];
       }),
     ),
@@ -187,6 +193,7 @@ export function compatibleForCreate(
   return Object.entries(server.fields).every(([name, target]) => {
     if (!Object.hasOwn(client.fields, name)) return !target.required;
     const source = client.fields[name]!;
+    if (source.type !== "text" || target.type !== "text") return false;
     return (
       !(source.nullable && !target.nullable) &&
       !(!source.required && target.required) &&
@@ -204,7 +211,7 @@ export function compatibleForCreate(
 /** Names of the fields whose string values must be unique within the collection. */
 export function uniqueFields(description: CollectionDescription): string[] {
   return Object.entries(description.fields)
-    .filter(([, field]) => field.unique)
+    .filter(([, field]) => field.type === "text" && field.unique)
     .map(([name]) => name);
 }
 

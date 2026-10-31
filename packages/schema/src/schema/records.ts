@@ -50,3 +50,35 @@ export function snapshotChoices(value: unknown): unknown {
   }
   return Object.freeze(values);
 }
+
+/** Marks a default's accessor property: declaration never invokes getters, so validation sees a value that fits no field. */
+export const unreadable: unique symbol = Symbol("aircastle.unreadable");
+
+/**
+ * Deep-copies the plain data and arrays of a default at declaration time without invoking getters.
+ * Accessors become `unreadable` data and cycles are cut with the same marker, so validation rejects both.
+ */
+export function snapshotDefault(value: unknown, ancestors: readonly object[] = []): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (ancestors.includes(value)) return unreadable;
+  const isArray = Array.isArray(value);
+  const prototype = Object.getPrototypeOf(value);
+  if (!isArray && prototype !== null && prototype !== Object.prototype) return value;
+  const copy: object = isArray
+    ? Object.assign([], { length: value.length })
+    : Object.create(prototype);
+  const lineage = [...ancestors, value];
+  for (const key of Reflect.ownKeys(value)) {
+    if (isArray && key === "length") continue;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+    Object.defineProperty(copy, key, {
+      value: Object.hasOwn(descriptor, "value")
+        ? snapshotDefault(descriptor.value, lineage)
+        : unreadable,
+      enumerable: descriptor.enumerable === true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return copy;
+}

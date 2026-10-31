@@ -17,7 +17,11 @@ export const otherProject = "44444444-4444-4444-8444-444444444444";
 export const contract = `v1:${"1".repeat(64)}`;
 export const access: Access = { project, apiKey: "ac_test_secret_never_store_raw" };
 
-export const articles: CollectionDescription = {
+export const articles: {
+  readonly fields: Readonly<
+    Record<string, Extract<CollectionDescription["fields"][string], { type: "text" }>>
+  >;
+} = {
   fields: {
     title: { type: "text", required: true, nullable: false, unique: false, min: 1 },
     slug: { type: "text", required: true, nullable: false, unique: true },

@@ -1,20 +1,9 @@
 import { type } from "arktype";
-import type { IssuePath, TextEditorDescription, ValidationIssue } from "./contract.ts";
+import type { IssuePath, ValidationIssue } from "./contract.ts";
 import { validationIssue } from "./errors.ts";
+import type { TextRules } from "./fields.ts";
 import { isEmail, isUrl } from "./formats.ts";
 import { receivedType } from "./records.ts";
-
-export interface TextRules {
-  readonly optional: boolean;
-  readonly nullable: boolean;
-  readonly unique: boolean;
-  readonly min?: number;
-  readonly max?: number;
-  readonly format?: "email" | "url";
-  readonly choices?: readonly string[];
-  readonly default?: string | null;
-  readonly editor?: TextEditorDescription;
-}
 
 const stringType = type("string");
 const unpairedSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
@@ -27,12 +16,16 @@ function graphemeLength(value: string): number {
   return count;
 }
 
-export function validateValue(
-  value: unknown,
-  rules: TextRules,
-  path: IssuePath,
-): ValidationIssue[] {
-  if (value === null && rules.nullable) return [];
+/** The Unicode integrity issues of a string: unpaired surrogates, then NUL. Both can apply. */
+export function integrityIssues(value: string, path: IssuePath): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (unpairedSurrogate.test(value))
+    issues.push(validationIssue(path, { code: "invalid_unicode" }));
+  if (value.includes("\u0000")) issues.push(validationIssue(path, { code: "invalid_character" }));
+  return issues;
+}
+
+export function validateText(value: unknown, rules: TextRules, path: IssuePath): ValidationIssue[] {
   if (!stringType.allows(value))
     return [
       validationIssue(path, {
@@ -41,10 +34,7 @@ export function validateValue(
         received: receivedType(value),
       }),
     ];
-  const issues: ValidationIssue[] = [];
-  if (unpairedSurrogate.test(value))
-    issues.push(validationIssue(path, { code: "invalid_unicode" }));
-  if (value.includes("\u0000")) issues.push(validationIssue(path, { code: "invalid_character" }));
+  const issues = integrityIssues(value, path);
   if (issues.length) return issues;
   if (rules.min !== undefined || rules.max !== undefined) {
     const actual = graphemeLength(value);

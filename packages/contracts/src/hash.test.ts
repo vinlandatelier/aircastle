@@ -93,9 +93,11 @@ describe("canonical data contract identifiers", () => {
   });
 
   test("Unicode spelling remains significant and frozen input is not changed", async () => {
-    const decomposed = freezeDeep(description({ title: field({ choices: ["e\u0301"] }) }));
+    const decomposedTitle = field({ choices: ["e\u0301"] });
+    const decomposed = freezeDeep(description({ title: decomposedTitle }));
     const composed = description({ title: field({ choices: ["é"] }) });
     expect(await contractId(decomposed)).not.toBe(await contractId(composed));
-    expect(decomposed.fields.title!.choices).toEqual(["e\u0301"]);
+    expect(decomposed.fields.title).toBe(decomposedTitle);
+    expect(decomposedTitle.choices).toEqual(["e\u0301"]);
   });
 });
