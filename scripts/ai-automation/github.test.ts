@@ -130,8 +130,8 @@ test("stale publication never emits a review", async () => {
   const result = await coordinator.publishReview(
     job,
     {
-      correctness: { findings: [] },
-      quality: { findings: [] },
+      correctness: { findings: [], unverified: 0 },
+      quality: { findings: [], unverified: 0 },
     },
     { commentId: 91, receipt },
   );
@@ -170,8 +170,8 @@ test("COMMENT publication binds commit_id and displays incomplete coverage", asy
   await coordinator.publishReview(
     { ...job, snapshot: { ...snapshot, complete: false, omitted: ["huge.ts"] } },
     {
-      correctness: { findings: [] },
-      quality: { findings: [] },
+      correctness: { findings: [], unverified: 0 },
+      quality: { findings: [], unverified: 0 },
     },
     { commentId: 91, receipt },
   );
@@ -557,8 +557,8 @@ test("a result marker quoted inside another bot review does not forge publicatio
   await coordinator.publishReview(
     job,
     {
-      correctness: { findings: [] },
-      quality: { findings: [] },
+      correctness: { findings: [], unverified: 0 },
+      quality: { findings: [], unverified: 0 },
     },
     { commentId: 91, receipt },
   );
@@ -731,8 +731,8 @@ test("publication sends one combined review with inline comments and does not du
     correction: "Use zero.",
   };
   const value = {
-    correctness: { findings: [finding] },
-    quality: { findings: [] },
+    correctness: { findings: [finding], unverified: 0 },
+    quality: { findings: [], unverified: 0 },
   };
   const claim = {
     commentId: 91,
