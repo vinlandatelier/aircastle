@@ -52,8 +52,7 @@ export function projectTransaction(
     const rows = await sql<
       { name: string }[]
     >`SELECT name FROM ${table("collections")} WHERE project_id = ${project} AND name_key = ${collectionKey(name)}`;
-    if (rows[0]?.name !== name)
-      throw new Error("Unknown collection or collection name hash collision");
+    if (rows.length === 0) throw new Error("Unknown collection");
   };
   const claim = async (
     transaction: postgres.TransactionSql,
@@ -66,19 +65,7 @@ export function projectTransaction(
     const inserted = await transaction<
       { value: string }[]
     >`INSERT INTO ${table("unique_values")} (project_id, collection_name, field, digest, value, document_id) VALUES (${project}, ${collection}, ${field}, ${digest}, ${value}, ${id}) ON CONFLICT (project_id, collection_key, field_key, digest) DO NOTHING RETURNING value`;
-    if (inserted.length > 0) return;
-    const existing = await transaction<
-      { collection_name: string; field: string; value: string }[]
-    >`SELECT collection_name, field, value FROM ${table("unique_values")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} AND field_key = ${hash(field)} AND digest = ${digest}`;
-    const prior = existing[0];
-    if (
-      !prior ||
-      prior.collection_name !== collection ||
-      prior.field !== field ||
-      prior.value !== value
-    )
-      throw new Error("Unique key hash collision");
-    throw new UniqueConflict(field);
+    if (inserted.length === 0) throw new UniqueConflict(field);
   };
   const documents = async (collection: string) => {
     await resolveCollection(collection);
@@ -113,21 +100,11 @@ export function projectTransaction(
     documents,
     activate: async (collections, publication) => {
       for (const [ordinal, collection] of collections.entries()) {
-        const existing = await sql<
-          { name: string }[]
-        >`SELECT name FROM ${table("collections")} WHERE project_id = ${project} AND name_key = ${collectionKey(collection.name)}`;
-        if (existing[0] && existing[0].name !== collection.name)
-          throw new Error("Collection name hash collision");
         await sql`INSERT INTO ${table("collections")} (project_id, name, ordinal, definition) VALUES (${project}, ${collection.name}, ${ordinal}, ${JSON.stringify(collection.description)}) ON CONFLICT (project_id, name_key) DO UPDATE SET ordinal = excluded.ordinal, definition = excluded.definition`;
         const id = publication.contracts[collection.name];
         if (!id) throw new Error("Missing contract identifier");
         const canonical = canonicalContract(collection.description);
         await sql`INSERT INTO ${table("contracts")} (project_id, hash, definition, canonical) VALUES (${project}, ${id}, ${JSON.stringify(collection.description)}, ${canonical}) ON CONFLICT (project_id, hash) DO NOTHING`;
-        const stored = await sql<
-          { canonical: string }[]
-        >`SELECT canonical FROM ${table("contracts")} WHERE project_id = ${project} AND hash = ${id}`;
-        if (stored[0]?.canonical !== canonical)
-          throw new Error("Collection contract hash collision");
       }
       await sql`DELETE FROM ${table("unique_values")} WHERE project_id = ${project}`;
       for (const collection of collections) {
