@@ -1,0 +1,48 @@
+services:
+  postgres:
+    extends:
+      file: compose.yaml
+      service: postgres
+  aircastle:
+    image: ${AIRCASTLE_IMAGE:-aircastle:development}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      AIRCASTLE_PORT: "8080"
+      AIRCASTLE_DATABASE_URL:
+      AIRCASTLE_DB_HOST: postgres
+      AIRCASTLE_DB_PORT: "5432"
+      AIRCASTLE_DB_NAME: ${AIRCASTLE_DB_NAME:-aircastle}
+      AIRCASTLE_DB_USER: ${AIRCASTLE_DB_USER:-aircastle}
+      AIRCASTLE_DB_PASSWORD: ${AIRCASTLE_DB_PASSWORD-aircastle-local}
+      AIRCASTLE_DATABASE_NAMESPACE: ${AIRCASTLE_DATABASE_NAMESPACE:-aircastle}
+      AIRCASTLE_ENV: ${AIRCASTLE_ENV-development}
+      AIRCASTLE_URL: ${AIRCASTLE_URL:-http://127.0.0.1:43121}
+      AIRCASTLE_INITIAL_SUPER_USER_EMAIL:
+      AIRCASTLE_AUTH_EMAIL_LIMIT_5M: ${AIRCASTLE_AUTH_EMAIL_LIMIT_5M-5}
+      AIRCASTLE_AUTH_EMAIL_LIMIT_1H: ${AIRCASTLE_AUTH_EMAIL_LIMIT_1H-20}
+      AIRCASTLE_AUTH_IP_LIMIT_5M: ${AIRCASTLE_AUTH_IP_LIMIT_5M-10}
+      AIRCASTLE_AUTH_IP_LIMIT_1H: ${AIRCASTLE_AUTH_IP_LIMIT_1H-30}
+      AIRCASTLE_AUTH_GLOBAL_LIMIT_5M: ${AIRCASTLE_AUTH_GLOBAL_LIMIT_5M-30}
+      AIRCASTLE_AUTH_GLOBAL_LIMIT_1H: ${AIRCASTLE_AUTH_GLOBAL_LIMIT_1H-100}
+      AIRCASTLE_LOG_LEVEL: ${AIRCASTLE_LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:${AIRCASTLE_WEB_PORT:-43121}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    stop_grace_period: 30s
+volumes:
+  postgres-data:
