@@ -197,8 +197,8 @@ describe("malformed content errors", () => {
       { code: "invalid_type", path: ["title"], message, received: "number" },
     ],
     [
-      "wrong expected type",
-      { code: "invalid_type", path: ["title"], message, expected: "number", received: "number" },
+      "expected type outside the vocabulary",
+      { code: "invalid_type", path: ["title"], message, expected: "date", received: "number" },
     ],
     [
       "missing received type",
