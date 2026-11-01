@@ -10,7 +10,7 @@ Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defin
 - The [README](../../README.md#development) covers the Chromium install, `WEB_E2E_PORT` for concurrent worktrees, and report locations.
 - Follow the root [verification rules](../../AGENTS.md#changes-and-verification). `vp run check` is not a required completion gate.
 - Focus component and browser runs by file and case, for example `vp run test-web src/features/sign-in/index.test.tsx` or `vp run test-web:e2e metadata.spec.ts`. Add scenario filters such as `--grep long-text` where appropriate. Check changed UI in a browser without running unrelated journeys.
-- `vp run test-web:record <specs>` runs the same journeys and saves a `video.webm` and a final screenshot for every test under `reports/test-results/`. Normal runs record no video.
+- `vp run test-web:record <specs>` runs the same journeys and saves a `video.webm` and a final screenshot for every test under `reports/test-results/`. Recording slows each action by 500 ms, labels each action and step in the video, and raises the test timeout to 120 s. Normal runs record no video and keep full speed.
 - A PR that changes what a user sees or does needs recorded evidence in its body. Follow [Complete the feature](VERIFICATION.md#complete-the-feature).
 - Read `coverage/index.html` and `coverage/coverage-summary.json` together. Raw coverage includes shared UI wrappers and compiler-generated branches, excludes CSS, and has no percentage gate.
 - Lint rejects child processes, server launchers, and `test.skip` or `test.fixme` in browser tooling. Add servers to `webServer` and checks to package scripts instead of writing a runner.

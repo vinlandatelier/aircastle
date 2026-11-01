@@ -8,6 +8,7 @@ import {
   operationId,
   parseCommand,
   requireObject,
+  isSafePath,
   safePath,
   sha,
   text,
@@ -287,12 +288,17 @@ export class Coordinator {
       await this.api(`${this.root}/compare/${revision.base}...${revision.head}?per_page=1`),
     );
     const compared = array(comparison.files);
-    const changed = compared.slice(0, 300);
+    const files: SourceFile[] = [],
+      omitted: string[] = compared.length >= 300 ? ["comparison reached the 300-file bound"] : [];
+    const changed = compared.slice(0, 300).filter((raw) => {
+      const filename = requireObject(raw).filename;
+      if (isSafePath(filename)) return true;
+      omitted.push(`${JSON.stringify(text(filename, 4096))}: unsafe path`);
+      return false;
+    });
     const paths = changed.map((raw) => safePath(requireObject(raw).filename));
     const commit = requireObject(await this.api(`${this.root}/git/commits/${revision.head}`));
     const tree = sha(requireObject(commit.tree).sha);
-    const files: SourceFile[] = [],
-      omitted: string[] = compared.length >= 300 ? ["comparison reached the 300-file bound"] : [];
     const capture = (file: SourceFile): void => {
       if (Buffer.byteLength(JSON.stringify([...files, file])) > 100000)
         omitted.push(`${file.path}: serialized context budget`);
