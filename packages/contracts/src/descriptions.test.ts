@@ -7,6 +7,7 @@ import {
   field,
   freezeDeep,
   rejection,
+  malformedRejection,
   schemaRejection,
 } from "./support/fixtures.ts";
 
@@ -121,18 +122,10 @@ describe("published collection descriptions", () => {
     [
       "unknown description property",
       [{ name: "articles", description: { fields: {}, extra: 1 } }],
-      { reason: "invalid_description", path: [0, "description"] },
+      malformedRejection(),
     ],
-    [
-      "missing fields",
-      [{ name: "articles", description: {} }],
-      { reason: "invalid_description", path: [0, "description"] },
-    ],
-    [
-      "array fields",
-      [{ name: "articles", description: { fields: [] } }],
-      { reason: "invalid_description", path: [0, "description"] },
-    ],
+    ["missing fields", [{ name: "articles", description: {} }], malformedRejection()],
+    ["array fields", [{ name: "articles", description: { fields: [] } }], malformedRejection()],
     [
       "reserved id field",
       [{ name: "articles", description: description({ id: field() }) }],
@@ -146,32 +139,32 @@ describe("published collection descriptions", () => {
     [
       "null field",
       [{ name: "articles", description: { fields: { title: null } } }],
-      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+      malformedRejection("fields", "title"),
     ],
     [
       "unknown field kind",
       [{ name: "articles", description: { fields: { title: { ...field(), type: "number" } } } }],
-      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+      malformedRejection("fields", "title"),
     ],
     [
       "unknown field property",
       [{ name: "articles", description: { fields: { title: { ...field(), extra: true } } } }],
-      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+      malformedRejection("fields", "title"),
     ],
     [
       "invalid required flag",
       [{ name: "articles", description: { fields: { title: { ...field(), required: "yes" } } } }],
-      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+      malformedRejection("fields", "title"),
     ],
     [
       "invalid nullable flag",
       [{ name: "articles", description: { fields: { title: { ...field(), nullable: "yes" } } } }],
-      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+      malformedRejection("fields", "title"),
     ],
     [
       "invalid unique flag",
       [{ name: "articles", description: { fields: { title: { ...field(), unique: 1 } } } }],
-      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+      malformedRejection("fields", "title"),
     ],
     [
       "explicit undefined default",
@@ -191,7 +184,7 @@ describe("published collection descriptions", () => {
           description: { fields: { title: { type: "text", nullable: false, unique: false } } },
         },
       ],
-      { reason: "invalid_field", path: [0, "description", "fields", "title"] },
+      malformedRejection("fields", "title"),
     ],
     [
       "negative minimum",
@@ -246,7 +239,7 @@ describe("published collection descriptions", () => {
     [
       "invalid format",
       [{ name: "articles", description: { fields: { title: { ...field(), format: "uuid" } } } }],
-      { reason: "invalid_field", path: [0, "description", "fields", "title", "format"] },
+      malformedRejection("fields", "title", "format"),
     ],
     [
       "unknown editor",

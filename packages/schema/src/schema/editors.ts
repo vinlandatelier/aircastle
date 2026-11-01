@@ -61,31 +61,35 @@ export function normalizeEditor(modifier: EditorModifier, path: IssuePath): Edit
   }
   if (name === "textarea") {
     const rows = options.has("rows") ? options.get("rows") : 4;
-    if (!Number.isInteger(rows) || Number(rows) <= 0)
-      issues.push(
-        schemaIssue(path, {
-          code: "invalid_editor_options",
-          option: "rows",
-          reason: "invalid_value",
-        }),
-      );
-    return issues.length
-      ? { ok: false, issues }
-      : { ok: true, editor: { type: "textarea", rows: rows as number } };
+    if (typeof rows !== "number" || !Number.isInteger(rows) || rows <= 0)
+      return {
+        ok: false,
+        issues: [
+          ...issues,
+          schemaIssue(path, {
+            code: "invalid_editor_options",
+            option: "rows",
+            reason: "invalid_value",
+          }),
+        ],
+      };
+    return issues.length ? { ok: false, issues } : { ok: true, editor: { type: "textarea", rows } };
   }
   if (name === "code") {
     const language = options.has("language") ? options.get("language") : "plaintext";
     if (!isMember(languages, language))
-      issues.push(
-        schemaIssue(path, {
-          code: "invalid_editor_options",
-          option: "language",
-          reason: "invalid_value",
-        }),
-      );
-    return issues.length
-      ? { ok: false, issues }
-      : { ok: true, editor: { type: "code", language: language as CodeLanguage } };
+      return {
+        ok: false,
+        issues: [
+          ...issues,
+          schemaIssue(path, {
+            code: "invalid_editor_options",
+            option: "language",
+            reason: "invalid_value",
+          }),
+        ],
+      };
+    return issues.length ? { ok: false, issues } : { ok: true, editor: { type: "code", language } };
   }
   return issues.length ? { ok: false, issues } : { ok: true, editor: { type: "radio" } };
 }
