@@ -47,6 +47,12 @@ function fixture(error?: ContentError) {
       outcome("create", access, document, [collection, contract, input]),
     findById: async (access, collection, contract, id) =>
       outcome("read", access, document, [collection, contract, id]),
+    update: async (access, collection, contract, id, request) =>
+      outcome("update", access, document, [collection, contract, id, request]),
+    delete: async (access, collection, contract, id) =>
+      outcome("delete", access, { id }, [collection, contract, id]),
+    list: async (access, collection, contract, query) =>
+      outcome("list", access, { documents: [document], next: null }, [collection, contract, query]),
   };
   const app = createApp({ logger: pino({ level: "silent" }), cms });
   const headers = {

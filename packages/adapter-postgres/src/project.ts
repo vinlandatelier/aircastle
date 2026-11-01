@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type postgres from "postgres";
-import type { ProjectTransaction } from "@aircastle/core";
+import type { FieldFilter, ListPosition, PageRequest, ProjectTransaction } from "@aircastle/core";
 import type {
   CollectionDescription,
   ContentDocument,
@@ -39,6 +39,57 @@ function document(row: { id: string; data: unknown }): ContentDocument {
     });
   }
   return { ...data, id: row.id };
+}
+
+function filterCondition(
+  sql: postgres.TransactionSql,
+  filter: FieldFilter,
+): postgres.PendingQuery<postgres.Row[]> {
+  const value = sql`(data ->> ${filter.field})`;
+  switch (filter.operator) {
+    case "is":
+      return sql`${value} = ${filter.value} COLLATE "C"`;
+    case "not":
+      return sql`(${value} = ${filter.value} COLLATE "C") IS NOT TRUE`;
+    case "in":
+      return sql`${value} COLLATE "C" IN ${sql(filter.values)}`;
+    case "empty":
+      return filter.empty ? sql`${value} IS NULL` : sql`${value} IS NOT NULL`;
+    case "contains":
+      return sql`strpos(lower(${value} COLLATE "und-x-icu"), lower(${filter.text} COLLATE "und-x-icu")) > 0`;
+  }
+}
+
+function pageQuery(sql: postgres.TransactionSql, request: PageRequest) {
+  const { order } = request;
+  const conditions = request.filters.map((filter) => filterCondition(sql, filter));
+  if (order.by === "created") {
+    if (order.after) conditions.push(sql`creation_order < ${order.after.created.toString()}`);
+    return { conditions, sortValue: sql`NULL::text`, ordering: sql`creation_order DESC` };
+  }
+  const value = sql`(data ->> ${order.field})`;
+  const descending = order.direction === "descending";
+  const direction = descending ? sql`DESC` : sql`ASC`;
+  const after = order.after;
+  if (after) {
+    const created = after.created.toString();
+    if (after.value.kind === "empty")
+      conditions.push(sql`${value} IS NULL AND creation_order < ${created}`);
+    else {
+      const anchor = after.value.value;
+      const beyond = descending
+        ? sql`${value} COLLATE "und-x-icu" < ${anchor} OR (${value} COLLATE "und-x-icu" = ${anchor} AND ${value} COLLATE "C" < ${anchor})`
+        : sql`${value} COLLATE "und-x-icu" > ${anchor} OR (${value} COLLATE "und-x-icu" = ${anchor} AND ${value} COLLATE "C" > ${anchor})`;
+      conditions.push(
+        sql`(${value} IS NULL OR ${beyond} OR (${value} COLLATE "C" = ${anchor} AND creation_order < ${created}))`,
+      );
+    }
+  }
+  return {
+    conditions,
+    sortValue: value,
+    ordering: sql`${value} IS NULL, ${value} COLLATE "und-x-icu" ${direction}, ${value} COLLATE "C" ${direction}, creation_order DESC`,
+  };
 }
 
 export function projectTransaction(
@@ -80,12 +131,42 @@ export function projectTransaction(
       throw new Error("Unique key hash collision");
     throw new UniqueConflict(field);
   };
+  const claimAll = async (
+    transaction: postgres.TransactionSql,
+    collection: string,
+    data: DocumentData,
+    uniqueFields: readonly string[],
+    id: string,
+  ) => {
+    for (const field of uniqueFields) {
+      const value = data[field];
+      if (typeof value === "string") await claim(transaction, collection, field, value, id);
+    }
+  };
+  const claimingUniqueValues = async (
+    write: (transaction: postgres.TransactionSql) => Promise<ContentDocument>,
+  ): Promise<Result<ContentDocument>> => {
+    try {
+      return { ok: true, data: await sql.savepoint(write) };
+    } catch (error) {
+      if (error instanceof UniqueConflict)
+        return { ok: false, error: { code: "unique_conflict", field: error.field } };
+      throw error;
+    }
+  };
   const documents = async (collection: string) => {
     await resolveCollection(collection);
     const rows = await sql<
       { id: string; data: unknown }[]
     >`SELECT id, data FROM ${table("documents")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} ORDER BY id`;
     return rows.map(document);
+  };
+  const read = async (collection: string, id: string) => {
+    await resolveCollection(collection);
+    const rows = await sql<
+      { id: string; data: unknown }[]
+    >`SELECT id, data FROM ${table("documents")} WHERE id = ${id} AND project_id = ${project} AND collection_key = ${collectionKey(collection)}`;
+    return rows[0] ? document(rows[0]) : undefined;
   };
   return {
     state: async () => {
@@ -145,28 +226,60 @@ export function projectTransaction(
     },
     insert: async (collection, data, uniqueFields) => {
       await resolveCollection(collection);
-      try {
-        return await sql.savepoint(async (transaction): Promise<Result<ContentDocument>> => {
-          const id = randomUUID();
-          await transaction`INSERT INTO ${table("documents")} (id, project_id, collection_name, data) VALUES (${id}, ${project}, ${collection}, ${transaction.json(data)}::jsonb)`;
-          for (const field of uniqueFields) {
-            const value = data[field];
-            if (typeof value === "string") await claim(transaction, collection, field, value, id);
-          }
-          return { ok: true, data: { ...data, id } };
-        });
-      } catch (error) {
-        if (error instanceof UniqueConflict)
-          return { ok: false, error: { code: "unique_conflict", field: error.field } };
-        throw error;
-      }
+      return claimingUniqueValues(async (transaction) => {
+        const id = randomUUID();
+        await transaction`INSERT INTO ${table("documents")} (id, project_id, collection_name, data) VALUES (${id}, ${project}, ${collection}, ${transaction.json(data)}::jsonb)`;
+        await claimAll(transaction, collection, data, uniqueFields, id);
+        return { ...data, id };
+      });
     },
-    read: async (collection, id) => {
+    read,
+    replace: async (collection, id, data, uniqueFields) => {
       await resolveCollection(collection);
+      return claimingUniqueValues(async (transaction) => {
+        const updated = await transaction<
+          { id: string }[]
+        >`UPDATE ${table("documents")} SET data = ${transaction.json(data)}::jsonb WHERE id = ${id} AND project_id = ${project} AND collection_key = ${collectionKey(collection)} RETURNING id`;
+        const saved = updated[0];
+        if (!saved) throw new Error("Unknown document");
+        await transaction`DELETE FROM ${table("unique_values")} WHERE project_id = ${project} AND document_id = ${saved.id}`;
+        await claimAll(transaction, collection, data, uniqueFields, saved.id);
+        return { ...data, id: saved.id };
+      });
+    },
+    remove: async (collection, id) => {
+      await resolveCollection(collection);
+      await sql`DELETE FROM ${table("unique_values")} WHERE project_id = ${project} AND document_id IN (SELECT id FROM ${table("documents")} WHERE id = ${id} AND project_id = ${project} AND collection_key = ${collectionKey(collection)})`;
+      const removed =
+        await sql`DELETE FROM ${table("documents")} WHERE id = ${id} AND project_id = ${project} AND collection_key = ${collectionKey(collection)} RETURNING id`;
+      return removed.length > 0;
+    },
+    page: async (collection, request) => {
+      await resolveCollection(collection);
+      const { conditions, sortValue, ordering } = pageQuery(sql, request);
+      const matching = conditions.reduce(
+        (all, condition) => sql`${all} AND ${condition}`,
+        sql`project_id = ${project} AND collection_key = ${collectionKey(collection)}`,
+      );
       const rows = await sql<
-        { id: string; data: unknown }[]
-      >`SELECT id, data FROM ${table("documents")} WHERE id = ${id} AND project_id = ${project} AND collection_key = ${collectionKey(collection)}`;
-      return rows[0] ? document(rows[0]) : undefined;
+        { id: string; data: unknown; creation_order: string; sort_value: string | null }[]
+      >`SELECT id, data, creation_order, ${sortValue} AS sort_value FROM ${table("documents")} WHERE ${matching} ORDER BY ${ordering} LIMIT ${request.limit + 1}`;
+      const entries = rows.slice(0, request.limit).map((row) => {
+        const created = BigInt(row.creation_order);
+        const position: ListPosition =
+          request.order.by === "created"
+            ? { order: "created", created }
+            : {
+                order: "field",
+                value:
+                  row.sort_value === null
+                    ? { kind: "empty" }
+                    : { kind: "value", value: row.sort_value },
+                created,
+              };
+        return { document: document(row), position };
+      });
+      return { entries, more: rows.length > request.limit };
     },
   };
 }

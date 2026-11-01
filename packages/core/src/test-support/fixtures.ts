@@ -7,7 +7,16 @@ import type {
   PublishedCollection,
   Result,
 } from "@aircastle/contracts";
-import type { Access, ContentStore, ErrorSummary, ProjectTransaction } from "../index.ts";
+import type {
+  Access,
+  ContentStore,
+  ErrorSummary,
+  FieldFilter,
+  ListPosition,
+  PageRequest,
+  ProjectTransaction,
+  SortValue,
+} from "../index.ts";
 import { expect } from "vite-plus/test";
 
 const project = "11111111-1111-4111-8111-111111111111";
@@ -48,6 +57,57 @@ export function deferred<Value>() {
   return { promise, resolve: (value: Value) => release(value) };
 }
 
+const collator = new Intl.Collator("und");
+
+function compareSortValues(left: SortValue, right: SortValue): number {
+  if (left.kind === "empty" || right.kind === "empty")
+    return Number(left.kind === "empty") - Number(right.kind === "empty");
+  return (
+    collator.compare(left.value, right.value) ||
+    Buffer.compare(Buffer.from(left.value), Buffer.from(right.value))
+  );
+}
+
+function sortValue(document: ContentDocument, field: string): SortValue {
+  const value = document[field];
+  return typeof value === "string" ? { kind: "value", value } : { kind: "empty" };
+}
+
+function filterMatches(document: ContentDocument, filter: FieldFilter): boolean {
+  const value = document[filter.field];
+  const present = typeof value === "string";
+  switch (filter.operator) {
+    case "is":
+      return present && value === filter.value;
+    case "not":
+      return !(present && value === filter.value);
+    case "in":
+      return present && filter.values.includes(value);
+    case "empty":
+      return filter.empty !== present;
+    case "contains":
+      return present && value.toLowerCase().includes(filter.text.toLowerCase());
+  }
+}
+
+/**
+ * Orders positions as the requested list does: a negative result means `left` comes first. Field
+ * orders compare sort values, with empty values last in both directions; ties go newest first.
+ */
+function comparePositions(
+  order: PageRequest["order"],
+  left: ListPosition,
+  right: ListPosition,
+): number {
+  const newestFirst = Number(right.created - left.created);
+  if (order.by === "created" || left.order !== "field" || right.order !== "field")
+    return Math.sign(newestFirst);
+  const byValue = compareSortValues(left.value, right.value);
+  const bothValues = left.value.kind === "value" && right.value.kind === "value";
+  const directed = bothValues && order.direction === "descending" ? -byValue : byValue;
+  return directed || Math.sign(newestFirst);
+}
+
 export function controlledStore(
   options: {
     state?: ProjectState;
@@ -65,6 +125,17 @@ export function controlledStore(
   let state = structuredClone(options.state ?? { revision: "revision-start", collections });
   let documents = new Map(Object.entries(structuredClone(options.documents ?? {})));
   let inserted = 0;
+  const creation = new Map<string, Map<string, bigint>>();
+  let created = 0n;
+  const creationOrder = (collection: string, document: ContentDocument): bigint => {
+    const orders = creation.get(collection) ?? new Map<string, bigint>();
+    creation.set(collection, orders);
+    for (const entry of active(collection))
+      if (!orders.has(entry.id)) orders.set(entry.id, created++);
+    const order = orders.get(document.id);
+    if (order === undefined) throw new Error("Unknown document");
+    return order;
+  };
   const active = (collection: string) => {
     if (!state.collections.some((entry) => entry.name === collection))
       throw new Error("Unknown collection");
@@ -106,6 +177,49 @@ export function controlledStore(
     },
     read: async (collection, id) =>
       structuredClone(active(collection).find((entry) => entry.id === id)),
+    replace: async (collection, id, data, uniqueFields) => {
+      const existing = active(collection);
+      const index = existing.findIndex((entry) => entry.id === id);
+      if (index === -1) throw new Error("Unknown document");
+      const conflict = uniqueFields.find(
+        (field) =>
+          typeof data[field] === "string" &&
+          existing.some((document) => document.id !== id && document[field] === data[field]),
+      );
+      if (conflict !== undefined)
+        return { ok: false, error: { code: "unique_conflict", field: conflict } };
+      const saved = { ...structuredClone(data), id };
+      documents.set(
+        collection,
+        existing.map((entry, position) => (position === index ? saved : entry)),
+      );
+      return { ok: true, data: structuredClone(saved) };
+    },
+    remove: async (collection, id) => {
+      const existing = active(collection);
+      const remaining = existing.filter((entry) => entry.id !== id);
+      documents.set(collection, remaining);
+      return remaining.length < existing.length;
+    },
+    page: async (collection, { filters, order, limit }) => {
+      const position = (document: ContentDocument): ListPosition =>
+        order.by === "created"
+          ? { order: "created", created: creationOrder(collection, document) }
+          : {
+              order: "field",
+              value: sortValue(document, order.field),
+              created: creationOrder(collection, document),
+            };
+      const matching = active(collection)
+        .filter((document) => filters.every((filter) => filterMatches(document, filter)))
+        .map((document) => ({ document: structuredClone(document), position: position(document) }))
+        .filter(
+          (entry) =>
+            order.after === undefined || comparePositions(order, order.after, entry.position) < 0,
+        )
+        .sort((left, right) => comparePositions(order, left.position, right.position));
+      return { entries: matching.slice(0, limit), more: matching.length > limit };
+    },
   };
   const store: ContentStore = {
     initialize: async () => {
