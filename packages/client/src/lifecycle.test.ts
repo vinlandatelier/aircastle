@@ -148,12 +148,13 @@ describe("R11 R13 client update request", () => {
 
   test("returns the lowercase id the server returns for an uppercase request id", async () => {
     const updated = { ...article, id: lowerId };
-    const { client, transport } = recording({ ok: true, data: updated });
+    const { client, transport, requests } = recording({ ok: true, data: updated });
     expect(await client.articles.update(upperId, { title: "Hello" })).toEqual({
       ok: true,
       data: updated,
     });
     expect(transport).toHaveBeenCalledTimes(1);
+    expect(requests[0]!.url).toBe(`${endpoint}/${lowerId}`);
   });
 
   test.each([
@@ -162,6 +163,9 @@ describe("R11 R13 client update request", () => {
     ["non-string id", [42, { title: "X" }]],
     ["name in both lists", [id, { summary: "x" }, { unset: ["summary"] }]],
     ["null change in both lists", [id, { summary: null }, { unset: ["status", "summary"] }]],
+    ["unknown option key", [id, { title: "X" }, { unsett: ["summary"] }]],
+    ["null unset", [id, { title: "X" }, { unset: null }]],
+    ["string unset", [id, { title: "X" }, { unset: "summary" }]],
   ])("returns invalid_request locally for a %s", async (_name, args) => {
     const { client, transport } = recording({ ok: true, data: article });
     expect(await call(client, "update", args)).toEqual({
@@ -218,8 +222,9 @@ describe("R11 R13 client delete request", () => {
   });
 
   test("returns the lowercase id the server returns for an uppercase request id", async () => {
-    const { client } = recording({ ok: true, data: { id: lowerId } });
+    const { client, requests } = recording({ ok: true, data: { id: lowerId } });
     expect(await client.articles.delete(upperId)).toEqual({ ok: true, data: { id: lowerId } });
+    expect(requests[0]!.url).toBe(`${endpoint}/${lowerId}`);
   });
 
   test.each([["not-a-uuid"], [`{${id}}`], [42], [undefined]])(
@@ -299,6 +304,61 @@ describe("R11 R13 client list request", () => {
       error: { code: "invalid_request" },
     });
     expect(transport).not.toHaveBeenCalled();
+  });
+
+  test("sends the query as it was when list was called", async () => {
+    const { client, requests } = recording({ ok: true, data: page });
+    const where: { status?: "draft" | "published"; title?: { contains?: string; not?: string } } = {
+      status: "published",
+      title: { contains: "a" },
+    };
+    const query: { where: typeof where; limit?: number; sort?: "title" } = { where, limit: 2 };
+    const pending = client.articles.list(query);
+    where.status = "draft";
+    where.title!.contains = "z";
+    where.title!.not = "Apple";
+    query.limit = 5;
+    query.sort = "title";
+    await pending;
+    expect(await requests[0]!.json()).toEqual({
+      where: { status: "published", title: { contains: "a" } },
+      limit: 2,
+    });
+  });
+
+  const circular: Record<string, unknown> = { contains: "a" };
+  circular.self = circular;
+  test.each([
+    ["a bigint value", { where: { title: 1n } }],
+    ["a circular object", { where: { title: circular } }],
+    ["a function value", { where: { title: () => "Hello" } }],
+    ["a symbol value", { where: { title: Symbol("Hello") } }],
+    ["a Date value", { where: { title: new Date(0) } }],
+    ["a Map value", { where: { title: new Map([["is", "Hello"]]) } }],
+    ["an infinite number", { where: { title: { contains: Number.POSITIVE_INFINITY } } }],
+    ["a nested function", { where: { title: { in: ["a", () => "b"] } } }],
+  ])("returns invalid_request without sending for a where with %s", async (_name, query) => {
+    const { client, transport } = recording({ ok: true, data: page });
+    await expect(call(client, "list", [query])).resolves.toEqual({
+      ok: false,
+      error: { code: "invalid_request" },
+    });
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  test("returns a fresh invalid_request result on each call", async () => {
+    const { client } = recording({ ok: true, data: page });
+    const first = await call(client, "list", [{ limit: 0 }]);
+    expect(first).toEqual({ ok: false, error: { code: "invalid_request" } });
+    Reflect.set(first as object, "ok", true);
+    Reflect.set(Reflect.get(first as object, "error"), "code", "changed");
+    for (const method of ["list", "update", "delete"] as const) {
+      const args = method === "list" ? [{ limit: 0 }] : ["not-a-uuid", {}];
+      expect(await call(client, method, args)).toEqual({
+        ok: false,
+        error: { code: "invalid_request" },
+      });
+    }
   });
 
   test("returns a server invalid_request unchanged", async () => {
