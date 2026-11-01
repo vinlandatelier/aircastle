@@ -366,6 +366,22 @@ describe("declaration compilation", () => {
     );
   });
 
+  test("schema issue messages name the issue code in words", () => {
+    expect(() =>
+      compileCollection({
+        title: text().min(3).max(1),
+        body: text().oneOf("draft" as unknown as string[]),
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        issues: [
+          expect.objectContaining({ message: "Invalid schema declaration: conflicting bounds." }),
+          expect.objectContaining({ message: "Invalid schema declaration: invalid choices." }),
+        ],
+      }),
+    );
+  });
+
   test("field builders and collection declarations are frozen", () => {
     const field = text();
     for (const value of [field, field.min(1), collection({ title: field })]) {

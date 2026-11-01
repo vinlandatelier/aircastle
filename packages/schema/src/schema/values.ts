@@ -8,8 +8,7 @@ export interface TextRules {
   readonly optional: boolean;
   readonly nullable: boolean;
   readonly unique: boolean;
-  readonly min?: number;
-  readonly max?: number;
+  readonly bounds?: { readonly min?: number; readonly max?: number };
   readonly format?: "email" | "url";
   readonly choices?: readonly string[];
   readonly default?: string | null;
@@ -46,9 +45,9 @@ export function validateValue(
     issues.push(validationIssue(path, { code: "invalid_unicode" }));
   if (value.includes("\u0000")) issues.push(validationIssue(path, { code: "invalid_character" }));
   if (issues.length) return issues;
-  if (rules.min !== undefined || rules.max !== undefined) {
+  if (rules.bounds) {
     const actual = graphemeLength(value);
-    const { min = 0, max = Infinity } = rules;
+    const { min = 0, max = Infinity } = rules.bounds;
     if (actual < min)
       issues.push(
         validationIssue(path, { code: "too_short", minimum: min, actual, unit: "graphemes" }),

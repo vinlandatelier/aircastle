@@ -50,6 +50,7 @@
     "dev:setup": "bun --conditions=development scripts/dev-setup.ts",
     "test:all": "bun run test:typecheck && vp run --filter '@aircastle/*' --parallel test && vp test && bun run test:inference",
     "test:content:mutation": "vp -C packages/contracts run test:mutation",
+    "test:mutation:changed": "bun scripts/mutate-changed.ts",
     "test:prepared": "vp run db:test -- vp run test:all",
     "ai:setup": "node scripts/ai-automation/cli.ts setup",
     "test-web:e2e": "vp -C apps/web run test:e2e",
