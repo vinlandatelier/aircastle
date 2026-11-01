@@ -55,7 +55,7 @@ jobs:
           AI_TRIGGER_LOGIN: ${{ vars.AI_TRIGGER_LOGIN }}
           AI_TRIGGER_USER_ID: ${{ vars.AI_TRIGGER_USER_ID }}
           AI_CONTROL_SHA: ${{ github.sha }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ai-plan
           path: ai-data/plan
@@ -92,7 +92,7 @@ jobs:
           AI_CONTROL_SHA: ${{ github.sha }}
           AI_MODEL_RECEIPTS_DIR: ai-data/model/receipts
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: ai-model-${{ matrix.id }}
@@ -130,7 +130,7 @@ jobs:
         env:
           AI_OPERATION_ID: ${{ matrix.id }}
           AI_CONTROL_SHA: ${{ github.sha }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: ai-verification-${{ matrix.id }}
