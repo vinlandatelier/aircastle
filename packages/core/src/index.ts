@@ -23,6 +23,22 @@ import type {
 import { ErrorSummary } from "./error-summary.ts";
 
 export { ErrorSummary };
+export { AuthStorageError } from "./auth.ts";
+export type {
+  AuthLimits,
+  AuthLimitScope,
+  AuthAdmission,
+  AuthAdmissionStore,
+  AuthDestination,
+  ProtectedDestination,
+  AuthUserRecord,
+  AuthSessionRecord,
+  AuthLinkRecord,
+  AuthEntryRecord,
+  AuthTransaction,
+  AuthStore,
+  AuthEvent,
+} from "./auth.ts";
 
 export interface ProjectTransaction {
   state: () => Promise<ProjectState>;

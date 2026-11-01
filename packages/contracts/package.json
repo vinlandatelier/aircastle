@@ -18,7 +18,8 @@
     "test:mutation": "stryker run && bun ../schema/scripts/classify-mutations.ts reports/mutation/mutation.json . src"
   },
   "dependencies": {
-    "@aircastle/schema": "workspace:*"
+    "@aircastle/schema": "workspace:*",
+    "arktype": "2.2.9"
   },
   "devDependencies": {
     "@stryker-mutator/core": "10.0.0",
