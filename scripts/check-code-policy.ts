@@ -51,6 +51,10 @@ const deliberateCatchAllowances: Readonly<Record<string, { count: number; reason
     reason:
       "A failed request body stream is an invalid request, and cancelling an oversized body is best effort before payload_too_large.",
   },
+  "apps/web/src/features/auth/http.ts": {
+    count: 1,
+    reason: "Any transport or response-body failure is shown as a temporary failure.",
+  },
   "packages/core/src/index.ts": {
     count: 1,
     reason:

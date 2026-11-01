@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { test, expect } from './support'
+import { fixtureTest as test, expect } from './support'
 import { themeStorageKey } from '../src/theme'
 
 test('favicons embed small light and dark brand icons', async ({ request }) => {
@@ -26,7 +26,7 @@ for (const theme of ['light', 'dark'] as const) {
       value: theme,
     })
     await page.goto('/sign-in')
-    await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
       'href',
       `/brand/favicon-${theme}.svg`,

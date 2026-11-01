@@ -1,4 +1,4 @@
-import { test, expect } from './support'
+import { fixtureTest as test, expect } from './support'
 import { landingDescription, landingTitle } from '../src/metadata'
 
 test('marketing entry keeps its URL and exact metadata before and after startup', async ({

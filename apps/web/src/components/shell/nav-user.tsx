@@ -13,9 +13,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { UserIcon, SettingsIcon, CreditCardIcon, LogOutIcon } from 'lucide-react'
 
-import { user } from '@/components/shell/data'
+export interface ShellAccount {
+  user: { name: string; email: string }
+  signOut: () => Promise<void>
+}
 
-export function NavUser() {
+export function NavUser({ user, signOut }: ShellAccount) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -62,7 +65,7 @@ export function NavUser() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem variant="destructive">
+          <DropdownMenuItem variant="destructive" onClick={() => void signOut()}>
             <LogOutIcon />
             Log out
           </DropdownMenuItem>

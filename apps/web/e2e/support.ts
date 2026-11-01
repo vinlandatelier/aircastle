@@ -7,10 +7,15 @@ function runtimeMessage(error: string) {
   return firstLine.replace(/^Error: /, '')
 }
 
-export const test = base.extend<{ runtimeEvidence: void; expectedRuntimeErrors: string[] }>({
+export const test = base.extend<{
+  runtimeEvidence: void
+  expectedRuntimeErrors: string[]
+  expectedHttpErrors: string[]
+}>({
   expectedRuntimeErrors: [[], { option: true }],
+  expectedHttpErrors: [[], { option: true }],
   runtimeEvidence: [
-    async ({ page, expectedRuntimeErrors }, use, info) => {
+    async ({ page, expectedRuntimeErrors, expectedHttpErrors }, provide, info) => {
       for (const expected of expectedRuntimeErrors) {
         expect(
           expected.trim().length,
@@ -21,12 +26,17 @@ export const test = base.extend<{ runtimeEvidence: void; expectedRuntimeErrors: 
       const network: string[] = []
       page.on('pageerror', (error) => errors.push(error.message))
       page.on('console', (message) => {
-        if (message.type() === 'error') errors.push(message.text())
+        if (
+          message.type() === 'error' &&
+          !expectedHttpErrors.some((pathname) => message.location().url.includes(pathname))
+        )
+          errors.push(message.text())
       })
       page.on('response', (response) => {
         if (
           new URL(response.url()).origin === new URL(page.url()).origin &&
-          response.status() >= 400
+          response.status() >= 400 &&
+          !expectedHttpErrors.includes(new URL(response.url()).pathname)
         )
           network.push(`${response.status()} ${response.url()}`)
       })
@@ -37,7 +47,7 @@ export const test = base.extend<{ runtimeEvidence: void; expectedRuntimeErrors: 
         )
           network.push(`${request.failure()?.errorText} ${request.url()}`)
       })
-      await use()
+      await provide()
       await info.attach('browser-environment', {
         body: JSON.stringify({
           viewport: page.viewportSize(),
@@ -72,10 +82,31 @@ export const test = base.extend<{ runtimeEvidence: void; expectedRuntimeErrors: 
 
 export { expect }
 
-export async function visit(page: Page, scenario: Scenario = 'normal', pathname = '/dash') {
-  test.info().annotations.push({ type: 'scenario', description: scenario })
-  const url = new URL(pathname, scenario === 'normal' ? origins.normal.url : origins.fixture.url)
-  if (scenario !== 'normal') url.searchParams.set('scenario', scenario)
+/** Test bound to the fixture preview, whose display-only auth transport serves public routing, metadata, and recovery journeys. */
+export const fixtureTest = test.extend<{ fixtureScenario: void }>({
+  baseURL: origins.fixture.url,
+  fixtureScenario: [
+    async ({ baseURL }, provide, info) => {
+      info.annotations.push({
+        type: 'scenario',
+        description: `display-only auth transport at ${baseURL} for public routing, metadata, and recovery`,
+      })
+      await provide()
+    },
+    { auto: true },
+  ],
+})
+
+export async function visit(
+  page: Page,
+  scenario: Scenario = 'default',
+  pathname = '/dash/workspaces/demo/projects/demo/collections',
+) {
+  test
+    .info()
+    .annotations.push({ type: 'scenario', description: `display-only shell fixture: ${scenario}` })
+  const url = new URL(pathname, origins.fixture.url)
+  if (scenario !== 'default') url.searchParams.set('scenario', scenario)
   await page.goto(url.href)
   await expect(page.getByRole('main')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Aircastle', exact: true })).toBeVisible()

@@ -1,6 +1,7 @@
-import { test, expect, visit } from './support'
+import { test, expect } from './auth-service'
 
-test('real built entry positive control', async ({ page }) => {
-  await visit(page)
-  await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/collections$/)
+test('[shell:R2] real built entry positive control', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/$/)
 })

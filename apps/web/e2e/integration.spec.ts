@@ -1,7 +1,7 @@
 import { test, expect, visit, assertLayout, visibleSidebarTrigger } from './support'
 import { themeStorageKey } from '../src/theme'
 
-for (const scenario of ['normal', 'long-text'] as const) {
+for (const scenario of ['default', 'long-text'] as const) {
   test(`${scenario}: mobile project and Dark survive drawer and search navigation, route and theme survive reload`, async ({
     page,
   }, testInfo) => {
@@ -9,11 +9,11 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await visit(page, scenario)
     const longName = 'W'.repeat(1000)
     const identity =
-      scenario === 'normal' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
+      scenario === 'default' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
     const project = page.getByRole('button', { name: /^Switch project:/ })
     await project.click()
     const projectInput = page.getByRole('combobox')
-    await projectInput.fill(scenario === 'normal' ? 'Marketing Site' : longName)
+    await projectInput.fill(scenario === 'default' ? 'Marketing Site' : longName)
     await page.getByRole('option', { name: identity, exact: true }).click()
     await expect(projectInput).toBeHidden()
     await expect(project).toHaveAccessibleName(`Switch project: ${identity}`)

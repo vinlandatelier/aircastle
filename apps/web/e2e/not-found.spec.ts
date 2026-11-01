@@ -1,4 +1,4 @@
-import { test, expect } from './support'
+import { fixtureTest as test, expect } from './support'
 import { themeStorageKey } from '../src/theme'
 
 for (const theme of ['light', 'dark'] as const) {
