@@ -16,7 +16,7 @@ beforeEach(() => {
   copyFileSync(path.join(web, "vite.config.ts"), path.join(app, "vite.config.ts"));
   symlinkSync(path.join(web, "node_modules"), path.join(app, "node_modules"), "dir");
   writeFileSync(path.join(app, "probe.ts"), "export const environment = import.meta.env");
-  vi.stubEnv("PORT", undefined);
+  vi.stubEnv("AIRCASTLE_PORT", undefined);
   vi.stubEnv("VITE_ROOT_ENV_PROBE", undefined);
   vi.stubEnv("ROOT_ENV_PRIVATE_PROBE", undefined);
 });
@@ -45,10 +45,10 @@ async function inspectEnvironment() {
 }
 
 describe("root development environment", () => {
-  it("loads root PORT and public values without exposing private values", async () => {
+  it("loads root AIRCASTLE_PORT and public values without exposing private values", async () => {
     writeFileSync(
       path.join(directory, ".env"),
-      "PORT=45231\nVITE_ROOT_ENV_PROBE=root-public-sentinel\nROOT_ENV_PRIVATE_PROBE=root-private-sentinel\n",
+      "AIRCASTLE_PORT=45231\nVITE_ROOT_ENV_PROBE=root-public-sentinel\nROOT_ENV_PRIVATE_PROBE=root-private-sentinel\n",
     );
     const result = await inspectEnvironment();
     expect(result.target).toMatchObject({ target: "http://127.0.0.1:45231" });
@@ -58,14 +58,17 @@ describe("root development environment", () => {
     expect(result.transformed).not.toContain("root-private-sentinel");
   });
 
-  it("preserves exported shell PORT precedence", async () => {
-    writeFileSync(path.join(directory, ".env"), "PORT=45231\n");
-    vi.stubEnv("PORT", "45232");
+  it("preserves exported shell AIRCASTLE_PORT precedence", async () => {
+    writeFileSync(path.join(directory, ".env"), "AIRCASTLE_PORT=45231\n");
+    vi.stubEnv("AIRCASTLE_PORT", "45232");
     expect((await inspectEnvironment()).target).toMatchObject({ target: "http://127.0.0.1:45232" });
   });
 
   it("uses defaults without a root file and ignores app-local environment files", async () => {
-    writeFileSync(path.join(app, ".env"), "PORT=45233\nVITE_ROOT_ENV_PROBE=app-local-sentinel\n");
+    writeFileSync(
+      path.join(app, ".env"),
+      "AIRCASTLE_PORT=45233\nVITE_ROOT_ENV_PROBE=app-local-sentinel\n",
+    );
     const result = await inspectEnvironment();
     expect(result.target).toMatchObject({ target: "http://127.0.0.1:43122" });
     expect(result.environment).not.toHaveProperty("VITE_ROOT_ENV_PROBE");

@@ -94,16 +94,17 @@ export async function standaloneServer(
 ) {
   const port = await bindLoopbackPort(0);
   const url = `http://127.0.0.1:${port}`;
-  const child = spawn("bun", ["apps/api/dist/index.js"], {
+  const child = spawn("bun", ["--no-install", "apps/api/dist/index.js"], {
     cwd: repository,
     env: {
       ...process.env,
+      AIRCASTLE_ENV: "production",
       ...env,
-      DATABASE_URL: process.env.DATABASE_URL ?? "",
+      AIRCASTLE_DATABASE_URL: process.env.AIRCASTLE_DATABASE_URL ?? "",
       AIRCASTLE_DATABASE_NAMESPACE: namespace,
-      PORT: String(port),
+      AIRCASTLE_PORT: String(port),
       NODE_ENV: "production",
-      LOG_LEVEL: "silent",
+      AIRCASTLE_LOG_LEVEL: "silent",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

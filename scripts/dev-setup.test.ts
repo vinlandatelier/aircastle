@@ -45,3 +45,22 @@ test("setup reruns reuse the project and reveal no existing secret; new-key is e
   expect(newer.AIRCASTLE_API_KEY).toMatch(/^[A-Za-z0-9_-]{32,}$/);
   expect(newer.AIRCASTLE_API_KEY).not.toBe(original.AIRCASTLE_API_KEY);
 });
+
+test("development setup connects using granular database settings without a full URL", async () => {
+  const connection = new URL(process.env.AIRCASTLE_DATABASE_URL ?? "");
+  const namespace = `setup_${randomUUID().replaceAll("-", "")}`;
+  const result = await execute("vp", ["run", "dev:setup"], {
+    env: {
+      AIRCASTLE_DATABASE_URL: undefined,
+      AIRCASTLE_DB_HOST: connection.hostname,
+      AIRCASTLE_DB_PORT: connection.port,
+      AIRCASTLE_DB_NAME: decodeURIComponent(connection.pathname.slice(1)),
+      AIRCASTLE_DB_USER: decodeURIComponent(connection.username),
+      AIRCASTLE_DB_PASSWORD: decodeURIComponent(connection.password),
+      AIRCASTLE_DATABASE_NAMESPACE: namespace,
+      AIRCASTLE_URL: "http://localhost:43122",
+    },
+  });
+  expect(result.code, result.output).toBe(0);
+  expect(settings(result.output).AIRCASTLE_API_KEY).toMatch(/^[A-Za-z0-9_-]{32,}$/);
+});
