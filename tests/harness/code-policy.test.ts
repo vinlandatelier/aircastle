@@ -279,6 +279,61 @@ test("the policy command enforces workspace import boundaries from package manif
   }
 });
 
+test("the policy command checks packages whose manifests have no name", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-nameless-policy-"));
+  const write = (file: string, content: string) => {
+    mkdirSync(join(directory, file, ".."), { recursive: true });
+    writeFileSync(join(directory, file), content);
+  };
+  const run = () =>
+    spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    write("package.json", JSON.stringify({ private: true, workspaces: ["packages/*"] }));
+    write("packages/fixtures/package.json", JSON.stringify({ private: true }));
+    write("packages/two/package.json", JSON.stringify({ name: "@probe/two" }));
+    write("packages/two/src/index.ts", "export const two = 2;\n");
+    write("packages/fixtures/src/index.ts", "export const fixture = 1;\n");
+    const clean = run();
+    expect(clean.stderr).toBe("");
+    expect(clean.status).toBe(0);
+
+    write("packages/fixtures/src/index.ts", 'export { two } from "../../two/src/index.ts";\n');
+    const relative = run();
+    expect(relative.status).not.toBe(0);
+    expect(relative.stderr).toContain(
+      "packages/fixtures/src/index.ts:1:21 cross-workspace-relative-import",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test.each([
+  ["an object", { packages: ["packages/*"] }],
+  ["a string", "packages/*"],
+  ["a list with a non-string entry", ["packages/*", 1]],
+])("the policy command fails when the root workspaces field is %s", (_name, workspaces) => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-workspaces-policy-"));
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    writeFileSync(join(directory, "package.json"), JSON.stringify({ name: "root", workspaces }));
+    const result = spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('"workspaces" must be a list of strings');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 const swallowed = (file: string, source: string) =>
   inspectCode(file, source).filter((entry) => entry.rule === "swallowed-error");
 
