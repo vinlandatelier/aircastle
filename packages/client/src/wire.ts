@@ -14,11 +14,11 @@ import type {
   Result,
 } from "@aircastle/contracts";
 
-export const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** The lowercase form of a document id, or undefined when `id` is not a UUID string. */
-export function documentId(id: unknown): string | undefined {
-  return typeof id === "string" && uuid.test(id) ? id.toLowerCase() : undefined;
+/** The lowercase form of a UUID, or undefined when `value` is not a UUID string. */
+export function normalizedUuid(value: unknown): string | undefined {
+  return typeof value === "string" && uuid.test(value) ? value.toLowerCase() : undefined;
 }
 
 export function storedDocument(
@@ -83,7 +83,8 @@ export function updateRequest(
 ): { changes: Record<string, unknown>; unset: string[] } | undefined {
   if (!isPlainRecord(changes) || (options !== undefined && !isPlainRecord(options)))
     return undefined;
-  const unset: unknown = options?.unset ?? [];
+  const { unset = [], ...unknownOptions } = definedEntries(options ?? {});
+  if (Object.keys(unknownOptions).length > 0) return undefined;
   if (!Array.isArray(unset) || !unset.every((name) => typeof name === "string")) return undefined;
   const supplied = definedEntries(changes);
   if (new Set(unset).size !== unset.length || unset.some((name) => Object.hasOwn(supplied, name)))
@@ -95,14 +96,36 @@ export function listRequest(query: unknown): Record<string, unknown> | undefined
   if (query === undefined) return {};
   if (!isPlainRecord(query)) return undefined;
   const request = definedEntries(query);
-  const { where, sort, limit, cursor } = request;
+  const { sort, limit, cursor } = request;
+  const where = request.where === undefined ? undefined : jsonCopy(request.where);
   if (
     !Object.keys(request).every(isListQueryKey) ||
-    (where !== undefined && !isPlainRecord(where)) ||
+    (request.where !== undefined && !isPlainRecord(where)) ||
     (sort !== undefined && !isListSort(sort)) ||
     (limit !== undefined && !isListLimit(limit)) ||
     (cursor !== undefined && (typeof cursor !== "string" || cursor.length === 0))
   )
     return undefined;
-  return request;
+  return where === undefined ? request : { ...request, where };
+}
+
+/** A deep copy of a JSON value, or undefined when `value` holds anything JSON cannot represent exactly. */
+function jsonCopy(value: unknown, ancestors: readonly object[] = []): unknown {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "object" || ancestors.includes(value)) return undefined;
+  const within = [...ancestors, value];
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) return undefined;
+    const items = Array.from(value, (item) => jsonCopy(item, within));
+    return items.includes(undefined) ? undefined : items;
+  }
+  if (!isPlainRecord(value)) return undefined;
+  const entries: [string, unknown][] = [];
+  for (const [key, entry] of Object.entries(definedEntries(value))) {
+    const copy = jsonCopy(entry, within);
+    if (copy === undefined) return undefined;
+    entries.push([key, copy]);
+  }
+  return Object.fromEntries(entries);
 }
