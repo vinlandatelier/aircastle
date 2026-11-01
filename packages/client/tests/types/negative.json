@@ -68,5 +68,75 @@
     "file": "success-needs-data.ts",
     "target": "result: CreateResult",
     "codes": [2322]
+  },
+  {
+    "file": "unset-required-field.ts",
+    "target": "\"title\"",
+    "codes": [2322]
+  },
+  {
+    "file": "where-unknown-field.ts",
+    "target": "body: \"Unknown\"",
+    "codes": [2353]
+  },
+  {
+    "file": "sort-unknown-field.ts",
+    "target": "sort: \"-body\"",
+    "codes": [2322]
+  },
+  {
+    "file": "where-is-out-of-choice.ts",
+    "target": "is: \"archived\"",
+    "codes": [2322]
+  },
+  {
+    "file": "changes-wrong-value-type.ts",
+    "target": "title: 42",
+    "codes": [2322]
+  },
+  {
+    "file": "referenced-needs-collection.ts",
+    "target": "referencedError: ContentError",
+    "codes": [2322]
+  },
+  {
+    "file": "referenced-needs-field.ts",
+    "target": "referencedError: ContentError",
+    "codes": [2322]
+  },
+  {
+    "file": "unset-nullable-required-field.ts",
+    "target": "\"subtitle\"",
+    "codes": [2322]
+  },
+  {
+    "file": "unset-undeclared-field.ts",
+    "target": "\"body\"",
+    "codes": [2322]
+  },
+  {
+    "file": "where-not-out-of-choice.ts",
+    "target": "not: \"archived\"",
+    "codes": [2322]
+  },
+  {
+    "file": "where-in-out-of-choice.ts",
+    "target": "\"archived\"",
+    "codes": [2322]
+  },
+  {
+    "file": "where-bare-out-of-choice.ts",
+    "target": "status: \"archived\"",
+    "codes": [2322]
+  },
+  {
+    "file": "changes-id.ts",
+    "target": "id: \"44444444-4444-4444-8444-444444444444\"",
+    "codes": [2353]
+  },
+  {
+    "file": "changes-title-null.ts",
+    "target": "title: null",
+    "codes": [2322]
   }
 ]
