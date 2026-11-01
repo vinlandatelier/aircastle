@@ -1,0 +1,48 @@
+name: Stack check
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  stack:
+    name: Dependent PR is in a GitHub stack
+    if: github.event.pull_request.base.ref != github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check stack membership
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          find_stack() {
+            gh api "repos/$REPO/stacks?pull_request=$PR" --jq '
+              map(select(.open and (
+                [.pull_requests[:-1], .pull_requests[1:]]
+                | transpose
+                | any(.[]; .[0].head.ref == env.BASE and .[1].number == (env.PR | tonumber)))))
+              | first | .number // empty'
+          }
+          for attempt in 1 2 3 4 5 6; do
+            if ! stack=$(find_stack); then
+              echo "::error::Could not read GitHub stacks for PR #$PR. This is an API failure, not a stack violation. Rerun this check."
+              exit 1
+            fi
+            if [ -n "$stack" ]; then
+              echo "PR #$PR targets $BASE and is in open stack #$stack directly above the PR for $BASE."
+              exit 0
+            fi
+            if [ "$attempt" -lt 6 ]; then
+              sleep 10
+            fi
+          done
+          echo "::error::PR #$PR targets $BASE, not $DEFAULT_BRANCH, and no open GitHub stack places it directly above the PR for $BASE.%0AIf it depends on the PR for $BASE, link the chain from bottom to top, then rerun this check:%0A  gh stack link <bottom-pr> ... $PR%0A  gh run rerun $GITHUB_RUN_ID%0AIf it is independent, retarget it: gh pr edit $PR --base $DEFAULT_BRANCH"
+          exit 1
