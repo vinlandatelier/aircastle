@@ -52,7 +52,7 @@ Run common commands from the repository root:
 | --- | --- |
 | `vp run check` | Build, types, lint, unused code, runtime and database tests, browser journeys, and database runner checks |
 | `vp run test:db` | Disposable Postgres runner lifecycle checks |
-| `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases |
+| `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases and per-package coverage thresholds |
 | `vp run test-web` | Fast web component tests |
 | `vp run test-web:e2e` | Normal and fixture web builds, then Chromium journeys |
 | `vp run test-web:coverage` | Web V8 coverage with HTML and JSON reports |
