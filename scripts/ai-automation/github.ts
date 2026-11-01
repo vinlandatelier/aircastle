@@ -401,9 +401,32 @@ export class Coordinator {
     const compare = requireObject(
       await this.api(`${this.root}/compare/${sha(prior.old)}...${sha(head)}`),
     );
+    const replies = (await this.ownerReplies(number)).slice(0, 8000);
     if (!["ahead", "identical"].includes(String(compare.status)))
-      return `History rewritten since ${prior.old}; perform a full review.`;
-    return `Incremental review since ${prior.old}. Previous advisory evidence:\n${prior.body.slice(0, 16000)}`;
+      return `History rewritten since ${prior.old}; perform a full review.${replies}`;
+    return `Incremental review since ${prior.old}.${replies}\nPrevious advisory evidence:\n${prior.body}`.slice(
+      0,
+      16000,
+    );
+  }
+  async ownerReplies(number: number): Promise<string> {
+    const comments = (await this.list(`${this.root}/pulls/${number}/comments`, 10)).map(
+      requireObject,
+    );
+    const findings = new Map(
+      comments
+        .filter((c) => c.in_reply_to_id == null && requireObject(c.user).id === this.options.botId)
+        .map((c) => [c.id, `${String(c.path)}: ${String(c.body).split("\n")[0]}`]),
+    );
+    const lines = comments.flatMap((c) => {
+      const finding = findings.get(c.in_reply_to_id);
+      return finding && this.trusted(identity(c.user))
+        ? [`${finding}\nReply: ${String(c.body)}`]
+        : [];
+    });
+    return lines.length
+      ? `\nThe trigger user's replies to earlier inline findings. Do not raise a declined finding again unless the new changes alter its evidence:\n${lines.join("\n\n")}`
+      : "";
   }
   async command(
     raw: unknown,
