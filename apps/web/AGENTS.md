@@ -6,12 +6,10 @@ Follow [ARCHITECTURE.md](../../ARCHITECTURE.md#web-app-structure) for the web ap
 
 Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defines test placement, observable expectations, red evidence, and completion evidence.
 
-- Install Chromium once with `vp -C apps/web exec playwright install chromium` from the repository root.
 - Run `vp run test-web` for fast component behavior, `vp run test-web:e2e` for built-browser journeys, and `vp run test-web:coverage` for V8 HTML/JSON reports over all frontend source.
-- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). Run only checks relevant to the current change; `vp run check` is not a required completion gate.
+- The [README](../../README.md#development) covers the Chromium install, `WEB_E2E_PORT` for concurrent worktrees, and report locations.
+- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). `vp run check` is not a required completion gate.
 - Focus component and browser runs by file and case, for example `vp run test-web src/features/sign-in/index.test.tsx` or `vp run test-web:e2e metadata.spec.ts`. Add scenario filters such as `--grep long-text` where appropriate. Check changed UI in a browser without running unrelated journeys.
-- `playwright.config.ts` builds and serves the normal and fixture apps through `webServer` on `WEB_E2E_PORT` (default 43124) and the next port. Set a distinct `WEB_E2E_PORT` when another worktree may run journeys at the same time.
-- Browser runs write `apps/web/reports/html/`, `reports/results.json`, and traces and screenshots of failed tests under `reports/test-results/`. Open the report with `vp -C apps/web exec playwright show-report reports/html`.
 - `vp run test-web:record <specs>` runs the same journeys and saves a `video.webm` and a final screenshot for every test under `reports/test-results/`. Recording slows each action by 500 ms, labels each action and step in the video, and raises the test timeout to 120 s. Normal runs record no video and keep full speed.
 - A PR that changes what a user sees or does needs recorded evidence in its body. Follow [Complete the feature](VERIFICATION.md#complete-the-feature).
 - Read `coverage/index.html` and `coverage/coverage-summary.json` together. Raw coverage includes shared UI wrappers and compiler-generated branches, excludes CSS, and has no percentage gate.
