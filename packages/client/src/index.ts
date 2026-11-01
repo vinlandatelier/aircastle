@@ -10,13 +10,12 @@ import type {
 import type { InferInput, InferOutput } from "@aircastle/schema";
 import {
   deletedDocument,
-  documentId,
   documentPage,
   envelope,
   listRequest,
+  normalizedUuid,
   storedDocument,
   updateRequest,
-  uuid,
 } from "./wire.ts";
 
 export interface AircastleConfig<Collections extends CollectionDefinitions> {
@@ -94,7 +93,9 @@ export class ConfigurationError extends Error {
     this.name = "ConfigurationError";
   }
 }
-const invalidRequest = { ok: false, error: { code: "invalid_request" } } as const;
+function invalidRequest(): { ok: false; error: { code: "invalid_request" } } {
+  return { ok: false, error: { code: "invalid_request" } };
+}
 
 function parsedUrl(value: string | undefined): URL | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
@@ -124,9 +125,8 @@ export function defineConfig<const Collections extends CollectionDefinitions>(co
       "url",
       "Use an HTTP(S) CMS URL without credentials, query or fragment.",
     );
-  if (typeof config.project !== "string" || !uuid.test(config.project)) {
-    throw new ConfigurationError("project", "Use a valid project UUID.");
-  }
+  const project = normalizedUuid(config.project);
+  if (project === undefined) throw new ConfigurationError("project", "Use a valid project UUID.");
   try {
     describeCollections(config.collections);
   } catch (error) {
@@ -138,7 +138,7 @@ export function defineConfig<const Collections extends CollectionDefinitions>(co
   }
   return {
     url: url.href.replace(/\/+$/, ""),
-    project: config.project.toLowerCase(),
+    project,
     collections: { ...config.collections },
   };
 }
@@ -208,7 +208,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
     const documentUrl = (id: string) => `${endpoint}/${encodeURIComponent(id)}`;
     const parseStored = (expectedId?: string) => (data: unknown) => {
       const parsed = storedDocument(description, data);
-      if (!parsed || (expectedId !== undefined && parsed.id.toLowerCase() !== expectedId))
+      if (!parsed || (expectedId !== undefined && normalizedUuid(parsed.id) !== expectedId))
         return undefined;
       return parsed as Stored;
     };
@@ -224,8 +224,8 @@ export function createClient<const Collections extends CollectionDefinitions>(
         );
       },
       async findById(id) {
-        const normalized = documentId(id);
-        if (normalized === undefined) return invalidRequest;
+        const normalized = normalizedUuid(id);
+        if (normalized === undefined) return invalidRequest();
         return send(
           description,
           { method: "GET", url: documentUrl(normalized), write: false, status: 200 },
@@ -233,9 +233,9 @@ export function createClient<const Collections extends CollectionDefinitions>(
         );
       },
       async update(id, changes, options) {
-        const normalized = documentId(id);
+        const normalized = normalizedUuid(id);
         const body = updateRequest(changes, options);
-        if (normalized === undefined || !body) return invalidRequest;
+        if (normalized === undefined || !body) return invalidRequest();
         const validated = definition.validate(body.changes);
         const issues = validated.ok
           ? []
@@ -254,20 +254,20 @@ export function createClient<const Collections extends CollectionDefinitions>(
         );
       },
       async delete(id) {
-        const normalized = documentId(id);
-        if (normalized === undefined) return invalidRequest;
+        const normalized = normalizedUuid(id);
+        if (normalized === undefined) return invalidRequest();
         return send(
           description,
           { method: "DELETE", url: documentUrl(normalized), write: true, status: 200 },
           (data) => {
             const deleted = deletedDocument(data);
-            return deleted?.id.toLowerCase() === normalized ? deleted : undefined;
+            return normalizedUuid(deleted?.id) === normalized ? deleted : undefined;
           },
         );
       },
       async list(query) {
         const body = listRequest(query);
-        if (!body) return invalidRequest;
+        if (!body) return invalidRequest();
         return send(
           description,
           { method: "POST", url: `${endpoint}/query`, write: false, status: 200, body },
