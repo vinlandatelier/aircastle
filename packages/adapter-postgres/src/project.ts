@@ -7,10 +7,11 @@ import type {
   DocumentData,
   Result,
 } from "@aircastle/contracts";
-import { canonicalContract, parseCollections, uniqueFields } from "@aircastle/contracts";
+import { canonicalContract, compileDescription, uniqueFields } from "@aircastle/contracts";
 import { identifier } from "./identifier.ts";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 class UniqueConflict extends Error {
   constructor(readonly field: string) {
@@ -19,9 +20,11 @@ class UniqueConflict extends Error {
 }
 
 function description(value: string): CollectionDescription {
-  const parsed = parseCollections([{ name: "contract", description: JSON.parse(value) }]);
-  if (!parsed.ok || !parsed.data[0]) throw new Error("Invalid persisted collection definition");
-  return parsed.data[0].description;
+  try {
+    return compileDescription(JSON.parse(value)).describe();
+  } catch (error) {
+    throw new Error("Invalid persisted collection definition", { cause: error });
+  }
 }
 
 function document(row: { id: string; data: unknown }): ContentDocument {
@@ -29,8 +32,8 @@ function document(row: { id: string; data: unknown }): ContentDocument {
     throw new Error("Invalid persisted document object");
   const data: DocumentData = {};
   for (const [field, value] of Object.entries(row.data)) {
-    if (field === "id" || (value !== null && typeof value !== "string"))
-      throw new Error("Invalid persisted document value");
+    if (field === "id")
+      throw new Error("Invalid persisted document: data contains the reserved id key");
     Object.defineProperty(data, field, {
       value,
       enumerable: true,
@@ -167,6 +170,15 @@ export function projectTransaction(
         { id: string; data: unknown }[]
       >`SELECT id, data FROM ${table("documents")} WHERE id = ${id} AND project_id = ${project} AND collection_key = ${collectionKey(collection)}`;
       return rows[0] ? document(rows[0]) : undefined;
+    },
+    existing: async (collection, ids) => {
+      await resolveCollection(collection);
+      const candidates = ids.filter((id) => canonicalUuid.test(id));
+      if (candidates.length === 0) return new Set<string>();
+      const rows = await sql<
+        { id: string }[]
+      >`SELECT id FROM ${table("documents")} WHERE project_id = ${project} AND collection_key = ${collectionKey(collection)} AND id = ANY(${candidates}::uuid[]) FOR SHARE`;
+      return new Set(rows.map((row) => row.id));
     },
   };
 }
