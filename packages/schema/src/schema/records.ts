@@ -41,12 +41,47 @@ export function isMember<Key extends string>(
   return names.includes(value);
 }
 
-export function snapshotChoices(value: unknown): unknown {
-  if (!Array.isArray(value)) return value;
+export function snapshotArray(value: readonly unknown[]): readonly unknown[] {
   const values: unknown[] = [];
   for (let index = 0; index < value.length; index++) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     values.push(descriptor && Object.hasOwn(descriptor, "value") ? descriptor.value : undefined);
   }
   return Object.freeze(values);
+}
+
+export function snapshotChoices(value: unknown): unknown {
+  return Array.isArray(value) ? snapshotArray(value) : value;
+}
+
+/** Marks a default's accessor property: declaration never invokes getters, so validation sees a value that fits no field. */
+export const unreadable: unique symbol = Symbol("aircastle.unreadable");
+
+/**
+ * Deep-copies the plain data and arrays of a default at declaration time without invoking getters.
+ * Accessors become `unreadable` data and cycles are cut with the same marker, so validation rejects both.
+ */
+export function snapshotDefault(value: unknown, ancestors: readonly object[] = []): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (ancestors.includes(value)) return unreadable;
+  const isArray = Array.isArray(value);
+  const prototype = Object.getPrototypeOf(value);
+  if (!isArray && prototype !== null && prototype !== Object.prototype) return value;
+  const copy: object = isArray
+    ? Object.assign([], { length: value.length })
+    : Object.create(prototype);
+  const lineage = [...ancestors, value];
+  for (const key of Reflect.ownKeys(value)) {
+    if (isArray && key === "length") continue;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+    Object.defineProperty(copy, key, {
+      value: Object.hasOwn(descriptor, "value")
+        ? snapshotDefault(descriptor.value, lineage)
+        : unreadable,
+      enumerable: descriptor.enumerable === true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return copy;
 }
