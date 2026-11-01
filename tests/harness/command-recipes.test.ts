@@ -28,13 +28,23 @@ const workspaces: readonly Workspace[] = trackedFiles
     return { dir: dirname(file), name: manifest.name, scripts: manifest.scripts ?? {} };
   });
 
-const vendoredSkills = /^\.(agents|claude)\/skills\//;
+const skillSources: { skills: readonly { name: string }[] } = JSON.parse(
+  readFileSync(".agents/skills/SOURCES.json", "utf8"),
+);
+const vendoredSkillDirs = skillSources.skills.map((skill) => `.agents/skills/${skill.name}/`);
+
+function isSkippedSkill(file: string): boolean {
+  return (
+    file.startsWith(".claude/skills/") || vendoredSkillDirs.some((dir) => file.startsWith(dir))
+  );
+}
+
 const documentation =
   /\.md$|^\.github\/workflows\/[^/]+\.yml$|^\.github\/actions\/.+\/action\.yml$/;
 const literalScriptName = /^[\w@][\w@:./#-]*$/;
 
 const documentSources: readonly RecipeSource[] = trackedFiles
-  .filter((file) => documentation.test(file) && !vendoredSkills.test(file))
+  .filter((file) => documentation.test(file) && !isSkippedSkill(file))
   .map((file) => ({ origin: file, dir: ".", text: readFileSync(file, "utf8") }));
 
 const scriptSources: readonly RecipeSource[] = workspaces.flatMap((workspace) =>
