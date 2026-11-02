@@ -24,6 +24,26 @@ interface SyntaxKey {
   loc?: { start: { line: number; column: number } };
 }
 
+/** What each rule protects against and how to fix a violation, printed with every violation. */
+const ruleGuidance: Readonly<Record<PolicyViolation["rule"] | "workspace-cycle", string>> = {
+  "ordinary-comment":
+    "Comments drift from the code they describe. Delete it and carry the meaning in names or structure. JSDoc on a declaration is allowed; don't reformat the comment as one to pass.",
+  "type-suppression":
+    "A suppression hides a real type error. Fix the types, and check an expected error with a negative fixture.",
+  "cross-workspace-relative-import":
+    "A relative path into another package skips its public entry point. Import the package by name and declare it in package.json.",
+  "web-alias-escape":
+    "An @/ import outside apps/web/src reaches code the browser must not load. Import it through a package entry point.",
+  "undeclared-workspace-import":
+    "The package graph can't see this dependency. Add the package to this workspace's package.json dependencies.",
+  "swallowed-error":
+    "A catch that never reads its error hides the failure. Map it to a result or rethrow it with the cause. For a deliberate catch-all, raise the file's count in deliberateCatchAllowances in scripts/check-code-policy.ts and give the reason.",
+  "stale-catch-allowance":
+    "This file has fewer catch-alls than deliberateCatchAllowances in scripts/check-code-policy.ts allows, so the spare allowance would hide a new one. Lower the count or remove the entry.",
+  "workspace-cycle":
+    "Packages that depend on each other have no build order. Move the shared code into one of them or a package both can use.",
+};
+
 const workspaceSource = /^(?:packages|apps)\/[^/]+\/src\//;
 
 /** Catch clauses that deliberately map every failure to one outcome, as the exact count per file. */
@@ -378,7 +398,7 @@ export function checkCodePolicy(root = resolve(import.meta.dirname, "..")): void
   const workspaces = readWorkspaces(root, tracked);
   let failures = 0;
   for (const cycle of workspaceCycles(workspaces)) {
-    console.error(`workspace-cycle ${cycle.join(" -> ")}`);
+    console.error(`workspace-cycle ${cycle.join(" -> ")}: ${ruleGuidance["workspace-cycle"]}`);
     failures++;
   }
   for (const file of files) {
@@ -387,7 +407,9 @@ export function checkCodePolicy(root = resolve(import.meta.dirname, "..")): void
       readFileSync(resolve(root, file), "utf8"),
       workspaces,
     )) {
-      console.error(`${file}:${violation.line}:${violation.column} ${violation.rule}`);
+      console.error(
+        `${file}:${violation.line}:${violation.column} ${violation.rule}: ${ruleGuidance[violation.rule]}`,
+      );
       failures++;
     }
   }

@@ -91,6 +91,28 @@ test("the policy command checks untracked files and preserves docstrings", () =>
   }
 });
 
+test("each policy violation says why it fails and how to fix it", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-policy-guidance-"));
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    writeFileSync(
+      join(directory, "probe.ts"),
+      "// ordinary explanation\nexport const value = 1;\n",
+    );
+    const result = spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      "probe.ts:1:1 ordinary-comment: Comments drift from the code they describe.",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("the policy command preserves vendored shadcn code and checks authored skills", () => {
   const root = resolve(import.meta.dirname, "../..");
   const directory = mkdtempSync(join(tmpdir(), "aircastle-vendor-policy-"));
