@@ -1,6 +1,6 @@
 name: Clear stale approval label
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] runs main's copy, never checks out PR code, only removes a label
     types: [synchronize, reopened]
 permissions: {}
 concurrency: approval-label-${{ github.event.pull_request.number }}

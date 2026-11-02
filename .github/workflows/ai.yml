@@ -1,6 +1,6 @@
 name: Advisory AI review and explicit fixes
 on:
-  issue_comment:
+  issue_comment: # zizmor: ignore[dangerous-triggers] the prepare job, which every other job needs, runs only for the user in AI_TRIGGER_USER_ID
     types: [created]
 permissions: {}
 concurrency:
