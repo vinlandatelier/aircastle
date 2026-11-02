@@ -79,6 +79,8 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
 
+`.github/workflows/approval-label.yml` removes the `ready-for-human-approval` label when a pull request gets new commits or is reopened, so the label never marks an unreviewed head. It never checks out pull request code.
+
 `.github/workflows/gardener.yml` runs the `.agents/skills/gardener` audit of `main` on the subscription token without GitHub credentials, and a separate job opens the resulting PRs with the AI App token. `tests/harness/gardener-workflow.test.ts` guards its secrets, token scope, held paths and merge calls.
 
 `.github/workflows/pr-evidence.yml` checks PR bodies for evidence of web UI changes, as [automation instructions](.github/AGENTS.md) define.
