@@ -2,7 +2,7 @@
 
 Follow [the architecture map](../ARCHITECTURE.md) for tooling ownership.
 
-- `ci.yml` owns deterministic pull-request verification. Its `Lint, typecheck and test` job is the only required status check.
+- `ci.yml` owns deterministic pull-request verification. Its `Lint, typecheck and test` job is the only required status check. Schema coverage below the thresholds in `packages/schema/vite.config.ts` fails that job; the coverage table is in the run's summary page, not a PR comment.
 - `pr-evidence.yml` runs the advisory `UI evidence` check. It is not required, so it never blocks a merge; a failure tells the author to add evidence. It fails a PR that changes shipped web UI unless its body has uploaded media (a `https://github.com/user-attachments/assets/<id>` link) under `## Screenshots` or a line `No visible UI change: <reason>` with a real reason. HTML comments in the body don't count. Shipped UI means `apps/web/index.html`, `apps/web/public/`, and `apps/web/src/` except tests, `test-setup.ts` and `test-utils.tsx`. The job reads the body from the event payload through an environment variable and runs no PR code.
 - AI reviews are advisory. Keep them outside the required status check, required approvals, and required conversation resolution. Never enable automatic merging.
 - Run privileged AI operations from trusted default-branch code with the `ai-automation` environment. Keep that environment restricted to the `main` branch, with no tag policies.
