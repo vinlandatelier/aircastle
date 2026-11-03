@@ -26,6 +26,7 @@ import {
   loopDuration,
   prompt,
   stillFrame,
+  type CursorShape,
   type CursorState,
   type Frame,
   type Shortcut,
@@ -41,7 +42,8 @@ function sameFrame(left: Frame, right: Frame) {
     left.typed === right.typed &&
     left.sendPressed === right.sendPressed &&
     left.agentRow === right.agentRow &&
-    left.cursor === right.cursor
+    left.cursor === right.cursor &&
+    left.cursorShape === right.cursorShape
   )
 }
 
@@ -355,14 +357,14 @@ const cursorSpots = {
   row: { left: 300, top: 214 },
 } as const
 
-function DemoCursor({ state }: { state: CursorState }) {
+function DemoCursor({ state, shape }: { state: CursorState; shape: CursorShape }) {
   const spot = state === 'resting' ? cursorSpots.rest : cursorSpots.row
-  const Shape = state === 'hovering' ? PointerIcon : MousePointer2Icon
+  const Shape = shape === 'pointer' ? PointerIcon : MousePointer2Icon
   return (
     <span
       data-demo-cursor
       data-state={state}
-      data-shape={state === 'hovering' ? 'pointer' : 'arrow'}
+      data-shape={shape}
       style={{ left: spot.left, top: spot.top }}
       className={cn(
         'absolute z-40 transition-[left,top] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.25,1)]',
@@ -546,7 +548,7 @@ export function ProductDemo() {
           />
           <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
           <ShortcutChip shortcut={frame.shortcut} />
-          <DemoCursor state={frame.cursor} />
+          <DemoCursor state={frame.cursor} shape={frame.cursorShape} />
         </div>
       </div>
     </section>

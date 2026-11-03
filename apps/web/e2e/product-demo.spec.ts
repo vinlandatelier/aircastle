@@ -249,3 +249,17 @@ test('the preview table lists authors, with some posts written by several people
   expect(counts.some((count) => count > 1)).toBe(true)
   await expect(frame.locator('[data-demo-authors]').filter({ hasText: /agent/i })).toHaveCount(0)
 })
+
+test('the cursor turns into a pointer as soon as it is over any table row', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const cursor = frame.locator('[data-demo-cursor]')
+  await expect(cursor).toHaveAttribute('data-shape', 'arrow')
+  await page.clock.runFor(6900)
+  await expect(cursor).toHaveAttribute('data-state', 'moving')
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+})

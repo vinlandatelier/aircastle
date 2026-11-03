@@ -12,6 +12,8 @@ const cursorDelayAfterRow = 1300
 const cursorTravelDuration = 1400
 const hoverDuration = 3200
 const restAfterHover = 1800
+const rowsReachedAfter = 420
+const rowsLeftAfter = 980
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
   const pause = character === ' ' || character === ',' ? 40 : 0
@@ -30,6 +32,7 @@ export const loopDuration = hoverEndsAt + restAfterHover
 export type DialogState = 'closed' | 'open' | 'closing'
 export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering'
+export type CursorShape = 'arrow' | 'pointer'
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -39,6 +42,7 @@ export type Frame = {
   sendPressed: boolean
   agentRow: boolean
   cursor: CursorState
+  cursorShape: CursorShape
 }
 
 /** The still frame shown when motion is reduced. */
@@ -49,6 +53,7 @@ export const stillFrame: Frame = {
   sendPressed: false,
   agentRow: true,
   cursor: 'resting',
+  cursorShape: 'arrow',
 }
 
 function typedAt(elapsed: number) {
@@ -80,6 +85,10 @@ export function frameAt(elapsed: number): Frame {
     typed: typedAt(elapsed),
     sendPressed: elapsed >= sendAt && elapsed < dialogClosesAt,
     agentRow: elapsed >= dialogClosesAt,
+    cursorShape:
+      elapsed >= cursorShownAt + rowsReachedAfter && elapsed < hoverEndsAt + rowsLeftAfter
+        ? 'pointer'
+        : 'arrow',
     cursor:
       elapsed < cursorShownAt || elapsed >= hoverEndsAt
         ? 'resting'
