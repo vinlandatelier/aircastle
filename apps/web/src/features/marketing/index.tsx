@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Header } from './header'
 import { RotatingWord } from './rotating-word'
 
@@ -34,6 +35,12 @@ export function MarketingPage() {
             Aircastle is the headless CMS that gets you from idea to published faster. Our agents
             take on the busywork, so you can publish more than ever before.
           </p>
+          <Link
+            to="/sign-in"
+            className="mt-10 inline-flex items-center rounded-lg bg-primary px-5 py-3 text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Sign me up!
+          </Link>
         </section>
       </main>
     </div>
