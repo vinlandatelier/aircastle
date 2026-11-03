@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { cn } from 'cn'
 import { ArrowRightIcon, ChevronDownIcon } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -13,8 +15,24 @@ const centreItem =
   'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring'
 
 export function Header() {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const updateScrolled = () => setScrolled(window.scrollY > 0)
+    updateScrolled()
+    window.addEventListener('scroll', updateScrolled, { passive: true })
+    return () => window.removeEventListener('scroll', updateScrolled)
+  }, [])
+
   return (
-    <header className="sticky top-0 z-20 w-full border-b border-transparent text-foreground">
+    <header
+      className={cn(
+        'sticky top-0 z-20 w-full border-b text-foreground motion-safe:transition-colors motion-safe:duration-200',
+        scrolled
+          ? 'border-border/60 bg-background/80 backdrop-blur-md'
+          : 'border-transparent bg-transparent',
+      )}
+    >
       <nav
         aria-label="Marketing navigation"
         className="mx-auto grid min-h-16 w-full max-w-[85rem] grid-cols-[1fr_auto_1fr] items-center gap-4 px-4"
