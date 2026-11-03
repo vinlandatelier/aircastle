@@ -26,7 +26,7 @@
 
 .agentAvatar {
   box-shadow: 0 0 0 2px var(--agent-colour);
-  opacity: calc(40% + var(--agent-strength) * 0.6);
+  filter: brightness(calc(55% + var(--agent-strength) * 0.45));
   scale: calc(88% + var(--agent-strength) * 0.12);
 }
 
