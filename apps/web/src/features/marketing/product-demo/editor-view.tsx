@@ -513,7 +513,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
                     <li key={point}>{point}</li>
                   ))}
                 </ul>
-                <p className="text-muted-foreground">{researchBrief.scope}</p>
+                <p>{researchBrief.scope}</p>
               </BubbleContent>
             </Bubble>
           </MessageContent>

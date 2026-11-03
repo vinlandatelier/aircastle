@@ -540,6 +540,11 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(request).toContainText('so Thorfinn can write the announcement post')
   await expect(request.locator('li')).toHaveCount(3)
   await expect(request).toContainText('mark anything you couldn’t confirm')
+  const goalColour = await request
+    .locator('p')
+    .first()
+    .evaluate((element) => getComputedStyle(element).color)
+  await expect(request.locator('p').last()).toHaveCSS('color', goalColour)
   await expect(request).not.toContainText(/PR #|#482/)
   const sender = panel.locator('[data-demo-research-sender]')
   await expect(sender).toContainText('Air')
