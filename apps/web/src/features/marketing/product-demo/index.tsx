@@ -394,10 +394,7 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
         <div data-demo-agent-row className={cn(rowGrid, 'relative border-b py-3', styles.agentRow)}>
           <span className="truncate">Introducing Acme MCP</span>
           <span className="truncate text-muted-foreground italic">Agents are drafting…</span>
-          <span className="inline-flex items-center gap-1.5 justify-self-start rounded-full bg-violet-500/10 px-2.5 py-0.5 text-[13px] text-violet-600 dark:text-violet-400">
-            <SparklesIcon className="size-3.5" />
-            Drafting
-          </span>
+          <StatusPill status="Draft" />
           <span className="inline-flex items-center gap-2 text-muted-foreground">
             <Initial name="Abyan" />
             Abyan

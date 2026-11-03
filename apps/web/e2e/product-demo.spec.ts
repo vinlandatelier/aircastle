@@ -101,7 +101,13 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(agentRow).toHaveAttribute('data-state', 'shown')
   await expect(agentRow).toContainText('Introducing Acme MCP')
   await expect(agentRow).toContainText('Abyan')
-  await expect(agentRow).toContainText('Drafting')
+  await expect(agentRow.getByText('Draft', { exact: true })).toHaveCSS(
+    'background-color',
+    await frame
+      .getByText('Draft', { exact: true })
+      .last()
+      .evaluate((pill) => getComputedStyle(pill).backgroundColor),
+  )
   await expect(agentRow).toHaveAttribute('data-agents-working', 'true')
   await expect(frame.locator('[data-demo-count]')).toHaveText('7')
   const agents = frame.locator('[data-demo-agents]')
