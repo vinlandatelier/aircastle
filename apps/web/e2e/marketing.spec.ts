@@ -60,6 +60,34 @@ for (const theme of ['light', 'dark'] as const) {
   }
 }
 
+const rotatingWords = ['write', 'research', 'publish', 'audit'] as const
+const shownWord = (page: import('@playwright/test').Page) =>
+  page.getByRole('heading', { level: 1 }).locator('[aria-hidden="true"] > span > span')
+
+test('hero cycles its last word while its accessible name stays on write', async ({ page }) => {
+  await page.clock.install()
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const hero = page.getByRole('heading', {
+    level: 1,
+    name: /^Autopilot for everything you write\. /,
+  })
+  for (const word of [...rotatingWords, rotatingWords[0]]) {
+    await expect(shownWord(page)).toHaveText(word)
+    await expect(hero).toBeVisible()
+    await page.clock.runFor(4000)
+  }
+})
+
+test('hero keeps write with reduced motion', async ({ page }) => {
+  await page.clock.install()
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  await expect(shownWord(page)).toHaveText('write')
+  await page.clock.runFor(10000)
+  await expect(shownWord(page)).toHaveText('write')
+})
+
 test('hovering the home link spins the logo', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
@@ -69,6 +97,36 @@ test('hovering the home link spins the logo', async ({ page }) => {
   await home.hover()
   await expect(logo).toHaveCSS('animation-name', 'brand-spin')
 })
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`rotating word underline ${reducedMotion === 'reduce' ? 'stays still' : 'sweeps a beam'} with ${reducedMotion} motion`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion })
+    await page.goto('/')
+    const slot = page.getByRole('heading', { level: 1 }).locator('[aria-hidden="true"] > span')
+    const underline = await slot.evaluate((element) => {
+      const line = getComputedStyle(element, '::after')
+      const word = element.firstElementChild
+      const beam = word ? getComputedStyle(word, '::before') : undefined
+      return {
+        line: line.backgroundImage,
+        height: line.height,
+        beam: beam?.animationName,
+        beamGradient: beam?.backgroundImage,
+        beamRuns: beam?.animationIterationCount,
+      }
+    })
+    expect(underline.line).toBe('none')
+    expect(parseFloat(underline.height)).toBeGreaterThan(0)
+    if (reducedMotion === 'reduce') expect(underline.beam).toBe('none')
+    else {
+      expect(underline.beam).toContain('underline-beam')
+      expect(underline.beamRuns).toBe('1')
+      expect(underline.beamGradient).toContain('linear-gradient')
+    }
+  })
+}
 
 const centreLinks = [
   ['Pricing', '/pricing'],
