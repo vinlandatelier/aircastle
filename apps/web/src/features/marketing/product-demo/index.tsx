@@ -444,7 +444,7 @@ export function ProductDemo() {
           data-demo-frame
           aria-hidden="true"
           style={{ width: frameWidth, height: frameHeight, scale: String(scale) }}
-          className="absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-xl bg-card text-sm text-card-foreground shadow-xl select-none"
+          className="absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-[18px] bg-card text-sm text-card-foreground shadow-xl select-none"
         >
           <WindowDots />
           <DemoHeader />
