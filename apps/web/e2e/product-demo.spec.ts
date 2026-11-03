@@ -471,19 +471,23 @@ test('the editor top bar shows the source Canute is reading, one after another',
     current.locator('[data-demo-source-logo] svg, svg[data-demo-source-logo]'),
   ).toHaveCount(1)
   const firstWidth = (await research.boundingBox())?.width
-  await page.clock.runFor(1100)
+  await page.clock.runFor(700)
+  await expect(current.locator('[data-demo-source-url]')).toHaveText(
+    'github.com/acme/app/pulls?q=mcp+is:merged',
+  )
+  await page.clock.runFor(700)
   await expect(current.locator('[data-demo-source-url]')).toHaveText('github.com/acme/app/pull/482')
-  await page.clock.runFor(900)
+  await page.clock.runFor(800)
   await expect(current.locator('[data-demo-source-url]')).toHaveText(
     'linear.app/acme/issue/ACM-1290',
   )
-  await page.clock.runFor(900)
-  await expect(current.locator('[data-demo-source-url]')).toHaveText('docs.acme.com/search?q=mcp')
   expect((await research.boundingBox())?.width).toBe(firstWidth)
   const researchBox = await research.boundingBox()
   const previewBox = await editor.locator('[data-demo-preview]').boundingBox()
   if (!researchBox || !previewBox) throw new Error('Top bar is not laid out')
   expect(researchBox.x + researchBox.width).toBeLessThanOrEqual(previewBox.x)
+  await page.clock.runFor(800)
+  await expect(current.locator('[data-demo-source-url]')).toHaveText('docs.acme.com/search?q=mcp')
 })
 
 test('the cursor opens Canute’s research panel from the top bar', async ({ page }) => {
@@ -525,8 +529,16 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(panel.locator('[data-demo-thought]').first()).toHaveCSS('-webkit-line-clamp', '2')
   await expect(panel).toContainText('No MCP page')
   const request = panel.locator('[data-demo-research-request]')
-  await expect(request).toHaveText(prompt)
   await expect(request).toHaveAttribute('data-align', 'end')
+  await expect(request).not.toHaveText(prompt)
+  await expect(request).toContainText('so Thorfinn can write the announcement post')
+  await expect(request.locator('li')).toHaveCount(3)
+  await expect(request).toContainText('mark anything you couldn’t confirm')
+  await expect(request).not.toContainText(/PR #|#482/)
+  const sender = panel.locator('[data-demo-research-sender]')
+  await expect(sender).toContainText('Air')
+  await expect(sender).toContainText('Orchestrator')
+  await expect(sender.locator('.air-mascot')).toHaveCount(1)
   const chain = panel.locator('[data-demo-research-chain]')
   await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toContainText(
     'Researching',
@@ -588,7 +600,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(panel.locator('[data-demo-research-pending]')).toContainText('Thinking…')
 
   await page.clock.runFor(5300)
-  await expect(panel.locator('[data-demo-research-step]')).toHaveCount(11)
+  await expect(panel.locator('[data-demo-research-step]')).toHaveCount(12)
   const reply = panel.locator('[data-demo-research-reply]')
   const words = reply.locator('[data-demo-reply-word]')
   expect(await words.count()).toBeGreaterThan(10)
@@ -622,7 +634,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(panel).not.toContainText('Research complete')
   await expect(panel).not.toContainText('Researching')
   await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toContainText(
-    'Researched 11 sources',
+    'Researched 12 sources',
   )
   await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toHaveAttribute(
     'aria-expanded',

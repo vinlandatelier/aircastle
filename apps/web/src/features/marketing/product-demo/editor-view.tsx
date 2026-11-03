@@ -24,11 +24,16 @@ import {
 import { SiMarkdown } from '@icons-pack/react-simple-icons'
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
-import { researchLog, researchSources, type Artifact, type ResearchEntry } from './research'
-import { prompt } from './timeline'
-import { canute, thorfinn } from './agents'
+import {
+  researchBrief,
+  researchLog,
+  researchSources,
+  type Artifact,
+  type ResearchEntry,
+} from './research'
+import { canute, orchestrator, thorfinn } from './agents'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { Message, MessageContent } from '@/components/ui/message'
+import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
 import {
   InputGroup,
   InputGroupAddon,
@@ -491,9 +496,25 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
         <Message align="end" className="shrink-0">
-          <MessageContent>
-            <Bubble align="end" variant="muted" data-demo-research-request>
-              <BubbleContent>{prompt}</BubbleContent>
+          <MessageContent className="gap-1.5">
+            <MessageHeader data-demo-research-sender className="gap-1.5 px-0 text-muted-foreground">
+              <span className="air-mascot block size-4 shrink-0" />
+              {orchestrator.name}
+              <span className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none">
+                {orchestrator.role}
+              </span>
+            </MessageHeader>
+            <Bubble align="end" variant="muted" data-demo-research-request className="max-w-[92%]">
+              <BubbleContent className="flex flex-col gap-1.5">
+                <p>{researchBrief.goal}</p>
+                <p>The post should cover:</p>
+                <ul className="list-disc pl-4">
+                  {researchBrief.covers.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+                <p className="text-muted-foreground">{researchBrief.scope}</p>
+              </BubbleContent>
             </Bubble>
           </MessageContent>
         </Message>

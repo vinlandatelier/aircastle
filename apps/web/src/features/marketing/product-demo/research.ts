@@ -34,7 +34,7 @@ export const researchLog: readonly ResearchEntry[] = [
     text: 'Starting with the spec so the post explains MCP accurately before anything Acme-specific.',
   },
   {
-    at: 900,
+    at: 800,
     kind: 'source',
     source: {
       url: 'modelcontextprotocol.io/specification',
@@ -45,12 +45,27 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 1300,
+    at: 1100,
     kind: 'thought',
-    text: 'The spec covers resources, tools and prompts. PR #482 should say what Acme actually shipped, so checking its scope and auth next.',
+    text: 'The spec covers resources, tools and prompts. Next, the change that actually shipped MCP in Acme’s app.',
   },
   {
-    at: 1900,
+    at: 1500,
+    kind: 'source',
+    source: {
+      url: 'github.com/acme/app/pulls?q=mcp+is:merged',
+      logo: MarkGithubIcon,
+      action: 'Searched',
+      finding: 'PR #482, “Remote MCP server”, merged two days ago, looks like the launch.',
+    },
+  },
+  {
+    at: 1800,
+    kind: 'thought',
+    text: 'PR #482 is the launch. Reading it for scope and auth.',
+  },
+  {
+    at: 2200,
     kind: 'source',
     source: {
       url: 'github.com/acme/app/pull/482',
@@ -60,12 +75,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 2300,
+    at: 2500,
     kind: 'thought',
     text: 'A remote server with token scopes. The Linear issue may list the launch goals and who the post is for.',
   },
   {
-    at: 2800,
+    at: 2900,
     kind: 'source',
     source: {
       url: 'linear.app/acme/issue/ACM-1290',
@@ -203,6 +218,18 @@ export const researchLog: readonly ResearchEntry[] = [
     ],
   },
 ]
+
+/** The brief Air hands Canute, built from the request it was given. */
+export const researchBrief = {
+  goal: 'Research the MCP launch so Thorfinn can write the announcement post.',
+  covers: [
+    'What shipped, and who it’s for',
+    'How to set it up',
+    'What’s still in beta or coming later',
+  ],
+  scope:
+    'Dig wherever you need across GitHub, Linear, Notion and the docs. Return a brief with sources, and mark anything you couldn’t confirm.',
+} as const
 
 /** The sources in the research log, in reading order. */
 export const researchSources: readonly Source[] = researchLog.flatMap((entry) =>
