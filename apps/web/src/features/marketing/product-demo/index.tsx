@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  ArrowUpIcon,
   BookOpenIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -7,6 +8,7 @@ import {
   PlugIcon,
   PlusIcon,
   SearchIcon,
+  SparklesIcon,
   SunIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -15,9 +17,78 @@ import { Badge } from '@/components/ui/badge'
 import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
+import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
+import { frameAt, loopDuration, stillFrame, type Frame } from './timeline'
 
 const frameWidth = 1120
 const frameHeight = 680
+const tickMs = 30
+
+function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: boolean) {
+  const [frame, setFrame] = useState<Frame>(stillFrame)
+  useEffect(() => {
+    const element = stage.current
+    if (reducedMotion || !element) return
+    let timer: number | undefined
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting || timer !== undefined) return
+      const startedAt = performance.now()
+      timer = window.setInterval(
+        () => setFrame(frameAt((performance.now() - startedAt) % loopDuration)),
+        tickMs,
+      )
+    })
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+      window.clearInterval(timer)
+    }
+  }, [stage, reducedMotion])
+  return reducedMotion ? stillFrame : frame
+}
+
+function AgentDialog({ state }: { state: Frame['dialog'] }) {
+  if (state === 'closed') return null
+  return (
+    <div
+      data-demo-dialog
+      data-state={state}
+      className={cn(
+        'absolute top-[150px] left-1/2 z-30 w-[560px] -translate-x-1/2 rounded-xl border bg-popover p-4 text-base text-popover-foreground shadow-2xl transition-[opacity,scale,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-y-2 starting:scale-[0.97] starting:opacity-0',
+        state === 'closing' && 'translate-y-1 scale-[0.98] opacity-0',
+      )}
+    >
+      <p className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
+        <SparklesIcon className="size-4" />
+        Ask agents
+      </p>
+      <p className="min-h-20 text-lg text-muted-foreground/70">
+        Describe what you want written, researched or published…
+      </p>
+      <div className="mt-3 flex items-center justify-end">
+        <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <ArrowUpIcon className="size-5" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function ShortcutChip({ shown }: { shown: boolean }) {
+  return (
+    <div
+      data-demo-shortcut
+      data-state={shown ? 'shown' : 'hidden'}
+      className={cn(
+        'absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg transition-[opacity,translate] duration-300',
+        shown ? 'opacity-100' : 'translate-y-2 opacity-0',
+      )}
+    >
+      <Kbd className="h-7 min-w-7 text-sm">⌘</Kbd>
+      <Kbd className="h-7 min-w-7 text-sm">J</Kbd>
+    </div>
+  )
+}
 
 type Status = 'Published' | 'In review' | 'Draft'
 
@@ -243,6 +314,8 @@ function PostsView() {
 export function ProductDemo() {
   const stage = useRef<HTMLDivElement>(null)
   const scale = useFitScale(stage)
+  const reducedMotion = usePrefersReducedMotion()
+  const frame = usePlayback(stage, reducedMotion)
 
   return (
     <section
@@ -253,8 +326,8 @@ export function ProductDemo() {
         Aircastle preview
       </h2>
       <p className="sr-only">
-        The Aircastle dashboard with its sidebar collapsed, showing a posts collection with each
-        post's status, author and last update.
+        The Aircastle dashboard with its sidebar collapsed, showing a blog posts collection. A
+        keyboard shortcut opens a dialog for asking agents to do the work.
       </p>
       <div ref={stage} style={{ height: frameHeight * scale }} className="relative w-full">
         <div
@@ -268,6 +341,14 @@ export function ProductDemo() {
             <DemoSidebar />
             <PostsView />
           </div>
+          <div
+            className={cn(
+              'absolute inset-0 z-20 bg-background/30 backdrop-blur-[3px] transition-opacity duration-300',
+              frame.dialog === 'open' ? 'opacity-100' : 'opacity-0',
+            )}
+          />
+          <AgentDialog state={frame.dialog} />
+          <ShortcutChip shown={frame.shortcut} />
         </div>
       </div>
     </section>

@@ -55,3 +55,39 @@ test('product preview table shows truncated plain-text bodies and a count badge'
   )
   await expect(firstBody.locator('*')).toHaveCount(0)
 })
+
+test('a ⌘J shortcut opens the agent dialog over a blurred view for three seconds', async ({
+  page,
+}) => {
+  await page.clock.install()
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const preview = page.getByRole('region', { name: 'Aircastle preview' })
+  await preview.scrollIntoViewIfNeeded()
+  const frame = preview.locator('[data-demo-frame]')
+  const dialog = frame.locator('[data-demo-dialog]')
+  const shortcut = frame.locator('[data-demo-shortcut]')
+
+  await expect(dialog).toHaveCount(0)
+  await page.clock.runFor(1100)
+  await expect(shortcut).toHaveAttribute('data-state', 'shown')
+  await expect(shortcut).toContainText('⌘')
+  await expect(shortcut).toContainText('J')
+  await page.clock.runFor(500)
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText('Ask agents')
+  await page.clock.runFor(2800)
+  await expect(dialog).toBeVisible()
+  await page.clock.runFor(500)
+  await expect(dialog).toHaveCount(0)
+})
+
+test('the agent dialog stays closed with reduced motion', async ({ page }) => {
+  await page.clock.install()
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  await page.clock.runFor(8000)
+  await expect(frame.locator('[data-demo-dialog]')).toHaveCount(0)
+})
