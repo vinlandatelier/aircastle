@@ -16,6 +16,7 @@ Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defin
 
 ## UI conventions
 
+- Marketing pages use a larger type scale than the dashboard. `[data-theme-scope='marketing']` in `src/index.css` sets an 18px base at the normal weight; marketing text inherits both rather than using `text-sm`. Do not bold or add heavier weights to marketing text unless asked.
 - Use semantic colour tokens in shared UI components. `src/index.css` owns the light/dark `marketing` and `dashboard` palettes; declare `data-theme-scope` on page layouts, with marketing as the public-page default. Keep palette choices out of individual buttons, inputs, and overlays.
 - Add directories when working code needs them. Do not keep empty scaffolding or placeholder folders.
 - Use icon libraries instead of handwritten or copied SVG paths. Prefer `lucide-react` for UI icons and `@primer/octicons-react` for GitHub icons. Keep custom product branding in `public/brand`.

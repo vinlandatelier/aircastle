@@ -152,6 +152,12 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+[data-theme-scope='marketing'] {
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-normal);
+  line-height: 1.75rem;
+}
+
 :root:has([data-theme-scope='dashboard']) {
   --background: #ffffff;
   --foreground: var(--color-neutral-800);
