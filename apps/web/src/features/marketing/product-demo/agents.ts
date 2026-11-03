@@ -2,7 +2,7 @@
 export type DemoAgent = { name: string; role: string }
 
 /** The agent that takes requests and hands work to the others. */
-export const orchestrator: DemoAgent = { name: 'Aircastle', role: 'Orchestrator' }
+export const orchestrator: DemoAgent = { name: 'Air', role: 'Orchestrator' }
 
 export const thorfinn: DemoAgent = { name: 'Thorfinn', role: 'Writing Agent' }
 export const canute: DemoAgent = { name: 'Canute', role: 'Research Agent' }

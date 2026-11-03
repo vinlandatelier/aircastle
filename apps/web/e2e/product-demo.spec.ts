@@ -619,9 +619,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(editor.locator('[data-demo-preview]')).toBeVisible()
 })
 
-test('the preview header has an Ask Aircastle split button with an agent menu', async ({
-  page,
-}) => {
+test('the preview header has an Ask Air split button with an agent menu', async ({ page }) => {
   await page.clock.install({ time: 0 })
   await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
@@ -635,9 +633,12 @@ test('the preview header has an Ask Aircastle split button with an agent menu', 
   const cursor = frame.locator('[data-demo-cursor]')
 
   await page.clock.runFor(500)
-  await expect(ask).toContainText('Ask Aircastle')
+  await expect(ask).toHaveText(/^Ask Air\s*⌘J$/)
   await expect(ask.getByText('⌘J', { exact: true })).toBeVisible()
-  await expect(ask.locator('svg.lucide-bot')).toHaveCount(1)
+  const mascot = ask.locator('.air-mascot')
+  await expect(mascot).toHaveCount(1)
+  await expect(mascot).toHaveCSS('mask-image', /air\.svg/)
+  await expect(ask.locator('svg.lucide-bot')).toHaveCount(0)
   await expect(ask.locator('.brand-logo')).toHaveCount(0)
   await expect(trigger.locator('svg.lucide-chevron-down')).toHaveCount(1)
   const askBox = await ask.boundingBox()
@@ -660,16 +661,22 @@ test('the preview header has an Ask Aircastle split button with an agent menu', 
     await expect(cursor).not.toHaveAttribute('data-target', 'ask')
   }
   const options = menu.locator('[data-demo-ask-option]')
+  const optionMascot = options.first().locator('.air-mascot')
+  await expect(optionMascot).toHaveCount(1)
+  await expect(optionMascot).not.toHaveClass(/rounded-full/)
+  const avatarBox = await options.nth(1).locator('svg').first().boundingBox()
+  const mascotBox = await optionMascot.boundingBox()
+  expect(mascotBox?.width).toBe(avatarBox?.width)
   await expect(options).toHaveCount(5)
   const expected = [
-    ['Ask Aircastle', 'Orchestrator'],
+    ['Ask Air', 'Orchestrator'],
     ['Ask Thorfinn', 'Writing Agent'],
     ['Ask Canute', 'Research Agent'],
     ['Ask Askeladd', 'SEO Agent'],
     ['Ask Bjorn', 'Review Agent'],
   ] as const
   for (const [index, [name, role]] of expected.entries()) {
-    await expect(options.nth(index)).toContainText(name)
+    await expect(options.nth(index).locator('[data-demo-ask-name]')).toHaveText(name)
     await expect(options.nth(index).locator('[data-demo-ask-role]')).toHaveText(role)
   }
 })

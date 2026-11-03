@@ -4,7 +4,6 @@ import {
   MousePointer2Icon,
   PointerIcon,
   BookOpenIcon,
-  BotIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   MoonIcon,
@@ -277,14 +276,7 @@ function WindowDots() {
 
 function AgentMark({ agent, size }: { agent: DemoAgent; size: number }) {
   if (agent === orchestrator)
-    return (
-      <span
-        style={{ width: size, height: size }}
-        className="flex shrink-0 items-center justify-center rounded-full bg-foreground text-background"
-      >
-        <BotIcon className="size-[65%]" />
-      </span>
-    )
+    return <span style={{ width: size, height: size }} className="air-mascot block shrink-0" />
   return <GeneratedAvatar name={agent.name} size={size} variant="beam" />
 }
 
@@ -305,7 +297,9 @@ function AskMenu() {
           )}
         >
           <AgentMark agent={agent} size={20} />
-          <span className="truncate">Ask {agent.name}</span>
+          <span data-demo-ask-name className="truncate">
+            Ask {agent.name}
+          </span>
           <Badge data-demo-ask-role variant="secondary" className="ml-auto">
             {agent.role}
           </Badge>
@@ -319,8 +313,8 @@ function AskButton() {
   return (
     <span className="relative flex">
       <span data-demo-ask className={cn(outlineButton, 'h-8 gap-2 rounded-r-none pr-1.5 pl-2')}>
-        <BotIcon />
-        Ask Aircastle
+        <span className="air-mascot block size-[18px] shrink-0" />
+        Ask {orchestrator.name}
         <Kbd>⌘J</Kbd>
       </span>
       <span

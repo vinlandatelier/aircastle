@@ -237,6 +237,11 @@
   background-image: url('/brand/logo-dark.png');
 }
 
+.air-mascot {
+  background-color: currentColor;
+  mask: url('/brand/air.svg') center / contain no-repeat;
+}
+
 .vinland-logo {
   background: url('/brand/vinland-light.png') center / contain no-repeat;
 }
