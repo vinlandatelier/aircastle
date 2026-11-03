@@ -273,7 +273,30 @@ function WindowDots() {
   )
 }
 
-function DemoHeader() {
+function AskButton({ agentsWorking }: { agentsWorking: boolean }) {
+  return (
+    <span data-demo-ask className={cn(outlineButton, 'h-8 gap-2 pr-1.5 pl-2')}>
+      <span className="brand-logo block size-4 shrink-0" />
+      Ask Aircastle
+      {agentsWorking && (
+        <span className="flex -space-x-1.5 transition-opacity duration-500 starting:opacity-0">
+          {agents.map((name) => (
+            <span
+              key={name}
+              data-demo-ask-agent
+              className={cn('flex rounded-full ring-2 ring-background', styles.agentAvatar)}
+            >
+              <GeneratedAvatar name={name} size={18} variant="beam" />
+            </span>
+          ))}
+        </span>
+      )}
+      <Kbd>⌘J</Kbd>
+    </span>
+  )
+}
+
+function DemoHeader({ agentsWorking }: { agentsWorking: boolean }) {
   return (
     <div data-demo-header className="flex h-14 shrink-0 items-center gap-2 border-b">
       <span className="flex h-full w-14 shrink-0 items-center justify-center border-r">
@@ -301,7 +324,11 @@ function DemoHeader() {
         </span>
       </span>
       <span className="ms-auto flex items-center gap-4 pr-5">
-        <span className="inline-flex h-8 w-60 items-center gap-2.5 rounded-lg bg-secondary pr-2.5 pl-2">
+        <AskButton agentsWorking={agentsWorking} />
+        <span
+          data-demo-search
+          className="inline-flex h-8 w-60 items-center gap-2.5 rounded-lg bg-secondary pr-2.5 pl-2"
+        >
           <SearchIcon className="size-4 text-muted-foreground" />
           <span className="text-muted-foreground">Search...</span>
           <Kbd className="ml-auto">⌘K</Kbd>
@@ -582,7 +609,7 @@ export function ProductDemo() {
           )}
         >
           <WindowDots />
-          <DemoHeader />
+          <DemoHeader agentsWorking={frame.agentRow} />
           <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />
             <div className="relative min-w-0 flex-1">

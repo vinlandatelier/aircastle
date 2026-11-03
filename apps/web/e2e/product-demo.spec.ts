@@ -598,3 +598,31 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(research).toBeHidden()
   await expect(editor.locator('[data-demo-preview]')).toBeVisible()
 })
+
+test('the preview header has an Ask Aircastle button that shows the agents at work', async ({
+  page,
+}) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const header = frame.locator('[data-demo-header]')
+  const ask = header.locator('[data-demo-ask]')
+  const working = ask.locator('[data-demo-ask-agent]')
+
+  await page.clock.runFor(500)
+  await expect(ask).toBeVisible()
+  await expect(ask).toContainText('Ask Aircastle')
+  await expect(ask.getByText('⌘J', { exact: true })).toBeVisible()
+  await expect(working).toHaveCount(0)
+  const askBox = await ask.boundingBox()
+  const searchBox = await header.locator('[data-demo-search]').boundingBox()
+  if (!askBox || !searchBox) throw new Error('Header is not laid out')
+  expect(askBox.x + askBox.width).toBeLessThanOrEqual(searchBox.x)
+
+  await page.clock.runFor(10000)
+  await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
+  await expect(working).toHaveCount(4)
+})
