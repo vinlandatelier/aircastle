@@ -1,4 +1,5 @@
 import {
+  ChevronDownIcon,
   ChevronRightIcon,
   FileTextIcon,
   SparklesIcon,
@@ -468,7 +469,10 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
         data-demo-panel-header
         className="flex h-14 shrink-0 items-center justify-between border-b px-4"
       >
-        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+        <div
+          data-demo-agent-switcher
+          className="-ml-1.5 flex min-w-0 items-center gap-2 rounded-md py-1 pr-1 pl-1.5 whitespace-nowrap"
+        >
           <span className={cn('rounded-full', styles.agentAvatar)}>
             <GeneratedAvatar name={researcher} size={22} variant="beam" />
           </span>
@@ -479,6 +483,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
           >
             {canute.role}
           </span>
+          <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
         </div>
         <XIcon className="size-4 text-muted-foreground" />
       </div>
