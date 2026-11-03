@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -707,54 +708,214 @@ function TopBar({
   )
 }
 
-const bodyDraft = [
-  { kind: 'h2', text: 'Your assistant, now inside Acme' },
-  {
-    kind: 'p',
-    text: 'Today we’re launching a remote MCP server for Acme. Connect Claude, Cursor or any MCP client, and your assistant can read and update your collections without leaving the chat.',
-  },
-  { kind: 'h2', text: 'Set it up in a minute' },
-  {
-    kind: 'p',
-    text: 'Add mcp.acme.com to your client’s config with a scoped access token. Each token only reaches the collections you choose.',
-  },
-] as const
-const draftStartsAfter = 600
-const draftWordInterval = 30
+type DraftBlock =
+  | { kind: 'h2' | 'p'; text: string }
+  | { kind: 'ul'; items: readonly string[] }
+  | { kind: 'code'; lines: readonly string[] }
 
-const bodyDraftBlocks = bodyDraft.reduce<
-  { kind: 'h2' | 'p'; text: string; words: { word: string; delay: number }[] }[]
->((blocks, block) => {
-  const before = blocks.reduce((count, { words }) => count + words.length, 0)
-  const words = block.text.split(' ').map((word, index, all) => ({
-    word: index < all.length - 1 ? `${word} ` : word,
-    delay: draftStartsAfter + (before + index) * draftWordInterval,
+const bodyDraft: readonly DraftBlock[] = [
+  {
+    kind: 'p',
+    text: 'Acme now runs a remote MCP server at mcp.acme.com. Connect Claude, Cursor or another MCP client, and your assistant can search, read and update your Acme collections from the chat.',
+  },
+  {
+    kind: 'p',
+    text: 'MCP support in Acme used to mean running a local server, and it was in beta. The remote server replaces it. There is nothing to install, and each connection reaches only the collections you allow.',
+  },
+  { kind: 'h2', text: 'What you can do' },
+  {
+    kind: 'p',
+    text: 'Ask your assistant to work with your content in plain language. For example:',
+  },
+  {
+    kind: 'ul',
+    items: [
+      'Find every draft that mentions pricing and list who owns it.',
+      "Summarise this week's changes to the Docs collection.",
+      'Turn the notes in this thread into a changelog entry.',
+    ],
+  },
+  { kind: 'p', text: 'The server gives your assistant four tools:' },
+  {
+    kind: 'ul',
+    items: [
+      '`search_entries` finds entries by text or field value.',
+      '`get_entry` reads one entry with all of its fields.',
+      '`upsert_entry` creates an entry or updates an existing one.',
+      '`list_collections` shows the collections your token can reach.',
+    ],
+  },
+  { kind: 'h2', text: 'Connect your assistant' },
+  {
+    kind: 'p',
+    text: "Create an access token in Settings under API tokens, and choose the collections it can reach. Then add the server to your client's MCP config:",
+  },
+  {
+    kind: 'code',
+    lines: [
+      '{',
+      '  "mcpServers": {',
+      '    "acme": {',
+      '      "url": "https://mcp.acme.com",',
+      '      "headers": { "Authorization": "Bearer YOUR_TOKEN" }',
+      '    }',
+      '  }',
+      '}',
+    ],
+  },
+  {
+    kind: 'p',
+    text: 'The server uses the Streamable HTTP transport from the MCP specification. Any client that supports remote MCP servers over Streamable HTTP can connect.',
+  },
+  { kind: 'h2', text: 'Security' },
+  {
+    kind: 'p',
+    text: "Every token has its own scope. A token for the Blog collection can't read or change Docs, and you can revoke a token from Settings at any time.",
+  },
+  {
+    kind: 'p',
+    text: 'Your assistant acts with the permissions of its token. Most MCP clients ask you to approve each tool call. Keep approval on for `upsert_entry`, since it writes to your content.',
+  },
+  { kind: 'h2', text: "What's next" },
+  {
+    kind: 'p',
+    text: "Configurable rate limits for MCP requests are coming in a later release. We're also adding a Connect to Acme MCP guide to the docs.",
+  },
+  {
+    kind: 'p',
+    text: 'MCP is an open standard that Anthropic introduced in November 2024. To try it now, create a token and add mcp.acme.com to your client.',
+  },
+]
+const draftStartsAfter = 600
+const draftWordInterval = 14
+const draftLineInterval = 45
+
+type DraftSegment = { text: string; delay: number }
+
+function segmentWords(text: string, start: number) {
+  return text.split(' ').map((word, index, all) => ({
+    text: index < all.length - 1 ? `${word} ` : word,
+    delay: start + index * draftWordInterval,
   }))
-  return [...blocks, { kind: block.kind, text: block.text, words }]
-}, [])
+}
+
+const bodyDraftTimed = bodyDraft.reduce<{
+  at: number
+  blocks: { block: DraftBlock; segments: DraftSegment[][] }[]
+}>(
+  (timed, block) => {
+    const groups =
+      block.kind === 'ul'
+        ? block.items
+        : block.kind === 'code'
+          ? block.lines.map((line) => [line])
+          : [block.text]
+    let at = timed.at
+    const segments = groups.map((group) => {
+      if (block.kind === 'code') {
+        const line = [{ text: String(group), delay: at }]
+        at += draftLineInterval
+        return line
+      }
+      const words = segmentWords(String(group), at)
+      at += words.length * draftWordInterval
+      return words
+    })
+    return { at, blocks: [...timed.blocks, { block, segments }] }
+  },
+  { at: draftStartsAfter, blocks: [] },
+)
+
+function DraftWords({ segments }: { segments: DraftSegment[] }) {
+  return segments.map(({ text, delay }, index) => {
+    const code = /^`([^`]+)`(.*)$/s.exec(text)
+    return (
+      <span
+        key={index}
+        data-demo-draft-word
+        className={styles.streamWord}
+        style={{ animationDelay: `${delay}ms` }}
+      >
+        {code ? (
+          <>
+            <code className="rounded-sm bg-muted px-1 font-mono text-[0.85em]">{code[1]}</code>
+            {code[2]}
+          </>
+        ) : (
+          text
+        )}
+      </span>
+    )
+  })
+}
+
+function useFollowDraft(viewport: React.RefObject<HTMLDivElement | null>) {
+  useLayoutEffect(() => {
+    const frame = viewport.current
+    const content = frame?.firstElementChild
+    if (!frame || !(content instanceof HTMLElement)) return
+    const overflow = content.scrollHeight - frame.clientHeight
+    if (overflow <= 0) return
+    const words = [...content.querySelectorAll<HTMLElement>('[data-demo-draft-word]')]
+    const delayOf = (word: HTMLElement | undefined) => parseFloat(word?.style.animationDelay ?? '0')
+    const firstHidden = words.find(
+      (word) => word.offsetTop + word.offsetHeight > frame.clientHeight - 24,
+    )
+    const startsAt = delayOf(firstHidden)
+    const endsAt = delayOf(words.at(-1)) + 200
+    const scroll = content.animate([{ translate: '0 0' }, { translate: `0 -${overflow}px` }], {
+      delay: startsAt,
+      duration: Math.max(endsAt - startsAt, 1),
+      easing: 'linear',
+      fill: 'both',
+    })
+    return () => scroll.cancel()
+  }, [viewport])
+}
 
 function BodyDraft() {
+  const viewport = useRef<HTMLDivElement>(null)
+  useFollowDraft(viewport)
   return (
-    <div data-demo-body-draft className="flex min-h-40 flex-col gap-2 px-4 py-4 leading-6">
-      {bodyDraftBlocks.map((block) => {
-        const words = block.words.map(({ word, delay }, index) => (
-          <span
-            key={index}
-            data-demo-draft-word
-            className={styles.streamWord}
-            style={{ animationDelay: `${delay}ms` }}
-          >
-            {word}
-          </span>
-        ))
-        return block.kind === 'h2' ? (
-          <h2 key={block.text} className="text-lg">
-            {words}
-          </h2>
-        ) : (
-          <p key={block.text}>{words}</p>
-        )
-      })}
+    <div data-demo-body-viewport ref={viewport} className="relative h-72 overflow-hidden">
+      <div data-demo-body-draft className="flex flex-col gap-2.5 px-4 py-4 leading-6">
+        {bodyDraftTimed.blocks.map(({ block, segments }, index) => {
+          if (block.kind === 'h2')
+            return (
+              <h2 key={index} className="pt-1 text-lg">
+                <DraftWords segments={segments[0] ?? []} />
+              </h2>
+            )
+          if (block.kind === 'ul')
+            return (
+              <ul key={index} className="flex list-disc flex-col gap-1 pl-5">
+                {segments.map((item, itemIndex) => (
+                  <li key={itemIndex}>
+                    <DraftWords segments={item} />
+                  </li>
+                ))}
+              </ul>
+            )
+          if (block.kind === 'code')
+            return (
+              <pre
+                key={index}
+                className="rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 whitespace-pre"
+              >
+                {segments.map((line, lineIndex) => (
+                  <div key={lineIndex}>
+                    <DraftWords segments={line} />
+                  </div>
+                ))}
+              </pre>
+            )
+          return (
+            <p key={index}>
+              <DraftWords segments={segments[0] ?? []} />
+            </p>
+          )
+        })}
+      </div>
     </div>
   )
 }

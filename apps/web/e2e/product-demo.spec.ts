@@ -866,12 +866,26 @@ test('Thorfinn streams a body draft once Canute’s research is done', async ({ 
   await expect(tab).toContainText('Writing…')
   await expect(body).toHaveAttribute('data-empty', 'false')
   await expect(draft.locator('h2').first()).toBeVisible()
+  await expect(draft.locator('h2')).toHaveCount(4)
+  await expect(draft.locator('li')).toHaveCount(7)
+  await expect(draft.locator('pre')).toContainText('https://mcp.acme.com')
+  await expect(draft).not.toContainText(/[\u2018\u2019\u201c\u201d\u2014]/)
   const words = draft.locator('[data-demo-draft-word]')
-  expect(await words.count()).toBeGreaterThan(40)
+  expect(await words.count()).toBeGreaterThan(250)
   const delays = await words.evaluateAll((elements) =>
     elements.map((element) => parseFloat(getComputedStyle(element).animationDelay)),
   )
   expect(delays).toEqual([...delays].sort((first, second) => first - second))
   expect(new Set(delays).size).toBe(delays.length)
-  await expect(words.last()).toHaveCSS('opacity', '1', { timeout: 8000 })
+  await expect(words.last()).toHaveCSS('opacity', '1', { timeout: 12000 })
+  await page.waitForTimeout(300)
+  const viewport = body.locator('[data-demo-body-viewport]')
+  const following = await viewport.evaluate((element) => {
+    const last = element.querySelector('[data-demo-draft-word]:last-of-type, pre')
+    const words = element.querySelectorAll('[data-demo-draft-word]')
+    const end = words[words.length - 1]?.getBoundingClientRect()
+    const box = element.getBoundingClientRect()
+    return last && end ? end.bottom <= box.bottom + 1 && end.top >= box.top : false
+  })
+  expect(following).toBe(true)
 })
