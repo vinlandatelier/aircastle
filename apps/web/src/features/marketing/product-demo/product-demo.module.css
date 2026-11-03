@@ -33,7 +33,7 @@
 
 .agentRow,
 .agentOutline,
-.agentTrigger {
+.agentNotch {
   --agent-colour: color-mix(in oklab, rgb(139 92 246) var(--agent-strength), rgb(76 29 149));
 }
 
@@ -41,9 +41,9 @@
   box-shadow: inset 0 0 0 3px var(--agent-colour);
 }
 
-.agentTrigger {
-  border-color: var(--agent-colour) !important;
-  border-width: 3px !important;
+.agentNotch {
+  border: 3px solid var(--agent-colour);
+  border-left-width: 0;
 }
 
 .agentRow {

@@ -311,7 +311,7 @@ function DemoHeader() {
   )
 }
 
-function DemoSidebar({ agentsWorking }: { agentsWorking: boolean }) {
+function DemoSidebar() {
   return (
     <div data-demo-sidebar className="relative z-30 w-14 shrink-0 border-r">
       <div className="flex flex-col items-center gap-1 py-4">
@@ -333,11 +333,9 @@ function DemoSidebar({ agentsWorking }: { agentsWorking: boolean }) {
       </div>
       <span
         data-demo-sidebar-trigger
-        data-agents-working={agentsWorking}
         className={cn(
           outlineButton,
           'absolute end-0 top-1/2 z-10 size-7 translate-x-1/2 -translate-y-1/2 rounded-md bg-card! text-muted-foreground',
-          agentsWorking && styles.agentTrigger,
         )}
       >
         <ChevronRightIcon />
@@ -569,7 +567,7 @@ export function ProductDemo() {
           <WindowDots />
           <DemoHeader />
           <div className="flex h-[calc(100%-5.5rem)]">
-            <DemoSidebar agentsWorking={frame.view === 'editor'} />
+            <DemoSidebar />
             <div className="relative min-w-0 flex-1">
               <PostsView
                 shown={frame.view === 'table'}

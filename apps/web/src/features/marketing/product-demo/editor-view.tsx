@@ -1,4 +1,5 @@
 import {
+  SaveIcon,
   BoldIcon,
   CalendarIcon,
   CodeIcon,
@@ -107,7 +108,11 @@ function TopBar() {
         <span>Introducing Acme MCP</span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="flex h-8 items-center rounded-md border bg-background px-3 dark:bg-input/30">
+        <span
+          data-demo-save
+          className="flex h-8 items-center gap-1.5 rounded-md border bg-background pr-3 pl-2.5 dark:bg-input/30"
+        >
+          <SaveIcon className="size-4" />
           Save
         </span>
         <span className="flex h-8 items-center rounded-md bg-primary px-3 text-primary-foreground">
@@ -303,7 +308,15 @@ export function EditorView({ shown }: { shown: boolean }) {
             'pointer-events-none absolute inset-0 z-20 rounded-br-[18px]',
             styles.agentOutline,
           )}
-        />
+        >
+          <div
+            data-demo-agent-notch
+            className={cn(
+              'absolute top-[calc(50%-28px)] left-0 h-10 w-5 -translate-y-1/2 rounded-r-md bg-card',
+              styles.agentNotch,
+            )}
+          />
+        </div>
       </div>
     </div>
   )

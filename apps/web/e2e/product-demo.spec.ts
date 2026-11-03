@@ -302,14 +302,23 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   const outline = editor.locator('[data-demo-agent-outline]')
   await expect(outline).toHaveCSS('box-shadow', /inset/)
   const trigger = frame.locator('[data-demo-sidebar-trigger]')
-  await expect(trigger).toHaveAttribute('data-agents-working', 'true')
+  await expect(trigger).toHaveCSS('border-top-width', '1px')
+  const notch = editor.locator('[data-demo-agent-notch]')
   const outlineColour = await outline.evaluate(
     (element) => getComputedStyle(element).boxShadow.match(/(oklab|rgb)\([^)]*\)/)?.[0],
   )
-  const triggerColour = await trigger.evaluate(
-    (element) => getComputedStyle(element).borderTopColor,
+  expect(await notch.evaluate((element) => getComputedStyle(element).borderRightColor)).toBe(
+    outlineColour,
   )
-  expect(outlineColour).toBe(triggerColour)
+  await expect(notch).toHaveCSS('border-left-width', '0px')
+  const notchBox = await notch.boundingBox()
+  const triggerBox = await trigger.boundingBox()
+  if (!notchBox || !triggerBox) throw new Error('Trigger is not laid out')
+  expect(notchBox.x).toBeGreaterThan(triggerBox.x)
+  expect(notchBox.x + notchBox.width).toBeGreaterThan(triggerBox.x + triggerBox.width)
+  expect(notchBox.y).toBeLessThan(triggerBox.y)
+  expect(notchBox.y + notchBox.height).toBeGreaterThan(triggerBox.y + triggerBox.height)
+  await expect(editor.locator('[data-demo-save] svg')).toHaveCount(1)
   const outlineBox = await outline.boundingBox()
   const railBox = await frame.locator('[data-demo-sidebar]').boundingBox()
   if (!outlineBox || !railBox) throw new Error('Editor is not laid out')
