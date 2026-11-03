@@ -26,6 +26,8 @@
 
 .agentAvatar {
   box-shadow: 0 0 0 2px var(--agent-colour);
+  opacity: calc(40% + var(--agent-strength) * 0.6);
+  scale: calc(88% + var(--agent-strength) * 0.12);
 }
 
 @media (prefers-reduced-motion: no-preference) {

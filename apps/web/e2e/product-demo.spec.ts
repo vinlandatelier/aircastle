@@ -125,10 +125,18 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
       const fill = getComputedStyle(tab).backgroundColor
       return outline.includes(fill)
     })
+  const avatarOpacities = new Set<string>()
   for (let sample = 0; sample < 4; sample++) {
     expect(await tabMatchesOutline()).toBe(true)
+    avatarOpacities.add(
+      await agents
+        .locator('> span > span')
+        .first()
+        .evaluate((avatar) => getComputedStyle(avatar).opacity),
+    )
     await page.waitForTimeout(350)
   }
+  expect(avatarOpacities.size).toBeGreaterThan(1)
   const gapToNextRow = async () => {
     const rowBox = await agentRow.boundingBox()
     const nextBox = await frame
