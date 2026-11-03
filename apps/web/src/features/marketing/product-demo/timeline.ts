@@ -18,6 +18,8 @@ const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
 const rowsLeftAfter = 980
+const firstCategoryAfterEditor = 2000
+const categoryInterval = 200
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
   const pause = character === ' ' || character === ',' ? 40 : 0
@@ -53,6 +55,7 @@ export type Frame = {
   cursorShape: CursorShape
   view: View
   agentRowHovered: boolean
+  categories: number
 }
 
 /** The still frame shown when motion is reduced. */
@@ -66,6 +69,7 @@ export const stillFrame: Frame = {
   cursorShape: 'arrow',
   view: 'table',
   agentRowHovered: false,
+  categories: 0,
 }
 
 function typedAt(elapsed: number) {
@@ -114,5 +118,11 @@ export function frameAt(elapsed: number): Frame {
               : 'still',
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
     agentRowHovered: elapsed >= cursorShownAt + agentRowReachedAfter && elapsed < editorOpensAt,
+    categories:
+      elapsed < editorOpensAt + firstCategoryAfterEditor
+        ? 0
+        : elapsed < editorOpensAt + firstCategoryAfterEditor + categoryInterval
+          ? 1
+          : 2,
   }
 }

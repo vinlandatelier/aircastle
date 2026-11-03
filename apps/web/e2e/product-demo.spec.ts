@@ -6,7 +6,7 @@ test('product preview sits below the hero without a visible label', async ({ pag
   await page.goto('/')
   const preview = page.getByRole('region', { name: 'Aircastle preview' })
   await expect(preview).toBeVisible()
-  await expect(preview.getByText('Preview', { exact: true })).toHaveCount(0)
+  await expect(preview.locator(':scope > p').filter({ hasText: /^Preview$/ })).toHaveCount(0)
   const heroBox = await page.getByRole('link', { name: 'Get started', exact: true }).boundingBox()
   const previewBox = await preview.boundingBox()
   if (!heroBox || !previewBox) throw new Error('Landing page is not laid out')
@@ -295,52 +295,71 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(table).toHaveAttribute('data-state', 'hidden')
   await expect(editor).toContainText('Introducing Acme MCP')
-  await expect(editor).toContainText('Save')
-  await expect(editor).toContainText('Publish')
-  await expect(editor).not.toContainText('Agents are drafting')
+  await expect(editor.locator('[data-demo-agent-outline]')).toHaveCount(0)
   await expect(editor.getByText('Draft', { exact: true })).toHaveCount(0)
-  const outline = editor.locator('[data-demo-agent-outline]')
-  await expect(outline).toHaveCSS('box-shadow', /inset/)
-  const trigger = frame.locator('[data-demo-sidebar-trigger]')
-  await expect(trigger).toHaveCSS('border-top-width', '1px')
-  const notch = editor.locator('[data-demo-agent-notch]')
-  const outlineColour = await outline.evaluate(
-    (element) => getComputedStyle(element).boxShadow.match(/(oklab|rgb)\([^)]*\)/)?.[0],
-  )
-  expect(await notch.evaluate((element) => getComputedStyle(element).borderRightColor)).toBe(
-    outlineColour,
-  )
-  await expect(notch).toHaveCSS('border-left-width', '0px')
-  const notchBox = await notch.boundingBox()
-  const triggerBox = await trigger.boundingBox()
-  if (!notchBox || !triggerBox) throw new Error('Trigger is not laid out')
-  expect(notchBox.x).toBeGreaterThan(triggerBox.x)
-  expect(notchBox.x + notchBox.width).toBeGreaterThan(triggerBox.x + triggerBox.width)
-  expect(notchBox.y).toBeLessThan(triggerBox.y)
-  expect(notchBox.y + notchBox.height).toBeGreaterThan(triggerBox.y + triggerBox.height)
-  await expect(editor.locator('[data-demo-save] svg')).toHaveCount(1)
-  const outlineBox = await outline.boundingBox()
-  const railBox = await frame.locator('[data-demo-sidebar]').boundingBox()
-  if (!outlineBox || !railBox) throw new Error('Editor is not laid out')
-  expect(Math.abs(outlineBox.x - (railBox.x + railBox.width))).toBeLessThan(2)
+
+  const preview = editor.locator('[data-demo-preview]')
+  const save = editor.locator('[data-demo-save]')
+  await expect(preview).toContainText('Preview')
+  await expect(preview.locator('svg')).toHaveCount(1)
+  await expect(save.locator('svg')).toHaveCount(1)
+  await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  const previewBox = await preview.boundingBox()
+  const saveBox = await save.boundingBox()
+  if (!previewBox || !saveBox) throw new Error('Top bar is not laid out')
+  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(saveBox.x)
+
+  for (const field of ['title', 'slug'])
+    await expect(editor.locator(`[data-demo-field="${field}"]`)).toHaveAttribute(
+      'data-empty',
+      'false',
+    )
   for (const field of [
-    'title',
-    'slug',
     'summary',
     'body',
-    'seo',
     'meta-title',
     'meta-description',
     'focus-keyword',
-    'indexing',
-    'authors',
+    'canonical-url',
+    'social-image',
     'categories',
+    'tags',
     'cover-image',
     'publish-date',
     'reading-time',
   ])
-    await expect(editor.locator(`[data-demo-field="${field}"]`)).toHaveCount(1)
-  await expect(editor.locator('[data-demo-field="authors"]')).not.toContainText(/Thorfinn|Canute/)
+    await expect(editor.locator(`[data-demo-field="${field}"]`)).toHaveAttribute(
+      'data-empty',
+      'true',
+    )
+
+  for (const field of ['categories', 'tags']) {
+    const box = editor.locator(`[data-demo-field="${field}"] [data-demo-multiselect]`)
+    await expect(box).toHaveAttribute('data-agent', 'Thorfinn')
+    await expect(box).toHaveCSS('box-shadow', /inset/)
+    const tab = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`)
+    await expect(tab).toContainText('Thorfinn')
+    await expect(tab).toContainText('Writer')
+  }
+  await expect(editor.locator('[data-demo-field="authors"] [data-demo-multiselect]')).toContainText(
+    'Abyan',
+  )
+
+  const categories = editor.locator('[data-demo-field="categories"] [data-demo-chip]')
+  await expect(categories).toHaveCount(0)
+  await page.clock.runFor(1600)
+  await expect(categories).toHaveCount(1)
+  await expect(categories.first()).toContainText('Product')
+  expect(
+    await categories.first().evaluate((chip) => getComputedStyle(chip).animationName),
+  ).toContain('agent-arrive')
+  await page.clock.runFor(300)
+  await expect(categories).toHaveCount(2)
+  await expect(categories.last()).toContainText('Announcements')
+  await expect(editor.locator('[data-demo-field="categories"]')).toHaveAttribute(
+    'data-empty',
+    'false',
+  )
 })
 
 test('the agents tab starts expanding as soon as the cursor enters the agent row', async ({

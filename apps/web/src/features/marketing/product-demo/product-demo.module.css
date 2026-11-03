@@ -32,18 +32,30 @@
 }
 
 .agentRow,
-.agentOutline,
-.agentNotch {
+.agentField {
   --agent-colour: color-mix(in oklab, rgb(139 92 246) var(--agent-strength), rgb(76 29 149));
 }
 
-.agentOutline {
+.agentField {
   box-shadow: inset 0 0 0 3px var(--agent-colour);
 }
 
-.agentNotch {
-  border: 3px solid var(--agent-colour);
-  border-left-width: 0;
+@media (prefers-reduced-motion: no-preference) {
+  .agentArrive {
+    animation: agent-arrive 900ms ease-out;
+  }
+}
+
+@keyframes agent-arrive {
+  from {
+    background-color: rgb(139 92 246);
+    color: white;
+  }
+
+  30% {
+    background-color: rgb(139 92 246);
+    color: white;
+  }
 }
 
 .agentRow {

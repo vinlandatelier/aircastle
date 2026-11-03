@@ -1,4 +1,5 @@
 import {
+  EyeIcon,
   SaveIcon,
   BoldIcon,
   CalendarIcon,
@@ -15,20 +16,13 @@ import {
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
 import { Badge } from '@/components/ui/badge'
+import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 
 const control = 'flex h-9 items-center rounded-md border bg-background px-3 dark:bg-input/30'
 
-const summary =
-  'Acme now ships an MCP server, so AI assistants can read and update your content through the same permissions as your team.'
+const placeholder = 'text-muted-foreground/60'
 
-const configSnippet = `{
-  "mcpServers": {
-    "acme": {
-      "url": "https://mcp.acme.com",
-      "token": "$ACME_TOKEN"
-    }
-  }
-}`
+const categories = ['Product', 'Announcements'] as const
 
 const toolbar: readonly (readonly { name: string; icon: LucideIcon }[])[] = [
   [{ name: 'heading', icon: Heading2Icon }],
@@ -47,18 +41,20 @@ const toolbar: readonly (readonly { name: string; icon: LucideIcon }[])[] = [
 function Field({
   name,
   label,
+  empty,
   aside,
   hint,
   children,
 }: {
   name: string
   label: string
+  empty: boolean
   aside?: string
   hint?: string
   children: React.ReactNode
 }) {
   return (
-    <div data-demo-field={name} className="flex flex-col gap-1.5">
+    <div data-demo-field={name} data-empty={empty} className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{label}</span>
         {aside && <span className="tabular-nums">{aside}</span>}
@@ -77,13 +73,65 @@ function Initial({ name }: { name: string }) {
   )
 }
 
-function Chip({ children }: { children: React.ReactNode }) {
+function Chip({ children, arrived }: { children: React.ReactNode; arrived?: boolean }) {
   return (
-    <Badge variant="secondary" className="h-6 gap-1.5 px-2 text-xs">
+    <Badge
+      data-demo-chip
+      variant="secondary"
+      className={cn('h-6 gap-1.5 px-2 text-xs', arrived && styles.agentArrive)}
+    >
       {children}
     </Badge>
   )
 }
+
+function AgentTab({ agent, role }: { agent: string; role: string }) {
+  return (
+    <div
+      data-demo-agent-tab
+      className={cn(
+        'absolute top-[calc(100%-3px)] left-2 z-10 flex items-center gap-1.5 rounded-b-md px-1.5 pt-[calc(0.25rem+3px)] pb-1 text-xs text-white shadow-sm',
+        styles.agentTab,
+      )}
+    >
+      <span className={cn('rounded-full', styles.agentAvatar)}>
+        <GeneratedAvatar name={agent} size={16} variant="beam" />
+      </span>
+      {agent}
+      <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none">{role}</span>
+    </div>
+  )
+}
+
+function Multiselect({
+  agent,
+  placeholderText,
+  children,
+}: {
+  agent?: { name: string; role: string }
+  placeholderText: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div
+      data-demo-multiselect
+      data-agent={agent?.name}
+      className={cn(
+        'relative flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-background p-1.5 dark:bg-input/30',
+        agent && ['mb-5', styles.agentField],
+      )}
+    >
+      {children}
+      <span className="inline-flex items-center gap-1 px-1 text-xs text-muted-foreground">
+        <PlusIcon className="size-3" />
+        {placeholderText}
+      </span>
+      {agent && <AgentTab agent={agent.name} role={agent.role} />}
+    </div>
+  )
+}
+
+const writer = { name: 'Thorfinn', role: 'Writer' } as const
 
 function MediaPlaceholder({ hint, className }: { hint: string; className?: string }) {
   return (
@@ -107,7 +155,14 @@ function TopBar() {
         <span className="text-muted-foreground">/</span>
         <span>Introducing Acme MCP</span>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <span
+          data-demo-preview
+          className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5 text-muted-foreground"
+        >
+          <EyeIcon className="size-4" />
+          Preview
+        </span>
         <span
           data-demo-save
           className="flex h-8 items-center gap-1.5 rounded-md border bg-background pr-3 pl-2.5 dark:bg-input/30"
@@ -125,7 +180,7 @@ function TopBar() {
 
 function BodyField() {
   return (
-    <Field name="body" label="Body">
+    <Field name="body" label="Body" empty>
       <div className="overflow-hidden rounded-md border bg-background dark:bg-input/30">
         <div className="flex h-10 items-center gap-1 border-b px-2 text-muted-foreground">
           {toolbar.map((group, index) => (
@@ -142,28 +197,8 @@ function BodyField() {
             </span>
           ))}
         </div>
-        <div className="flex flex-col gap-3 px-4 py-4 leading-6">
-          <h4 className="text-lg font-medium">What is MCP?</h4>
-          <p>
-            The Model Context Protocol is an open standard that lets AI assistants talk to the tools
-            you already use. Instead of copying drafts between a chat window and the CMS, an
-            assistant can list collections, read entries and propose edits directly.
-          </p>
-          <p>
-            The Acme MCP server exposes your content through the same roles and field rules as the
-            dashboard. An assistant can only see and change what its token allows, and every change
-            lands as a draft for your team to review.
-          </p>
-          <h4 className="text-lg font-medium">Getting started</h4>
-          <p>Create an access token in Settings, then add the server to your client:</p>
-          <pre className="overflow-hidden rounded-md bg-muted px-4 py-3 font-mono text-xs leading-5">
-            {configSnippet}
-          </pre>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>Works with any client that supports remote MCP servers.</li>
-            <li>Tokens can be scoped to a single collection or locale.</li>
-            <li>Every agent edit is recorded in the entry history.</li>
-          </ul>
+        <div className={cn('min-h-40 px-4 py-4 leading-6', placeholder)}>
+          Start writing, or ask agents to draft it…
         </div>
       </div>
     </Field>
@@ -179,24 +214,28 @@ function SeoGroup() {
           Control how this post appears in search results and link previews.
         </p>
       </div>
-      <Field name="meta-title" label="Meta title" aside="45 / 60">
-        <div className={control}>Introducing Acme MCP: AI access to your CMS</div>
+      <Field name="meta-title" label="Meta title" aside="0 / 60" empty>
+        <div className={cn(control, placeholder)}>Defaults to the post title</div>
       </Field>
-      <Field name="meta-description" label="Meta description" aside="132 / 160">
-        <div className="rounded-md border bg-background px-3 py-2 leading-6 dark:bg-input/30">
-          Connect AI assistants to Acme with the new MCP server. Read and update content with the
-          same permissions your team already uses.
+      <Field name="meta-description" label="Meta description" aside="0 / 160" empty>
+        <div
+          className={cn(
+            'min-h-16 rounded-md border bg-background px-3 py-2 leading-6 dark:bg-input/30',
+            placeholder,
+          )}
+        >
+          Defaults to the summary
         </div>
       </Field>
       <div className="grid grid-cols-2 gap-4">
-        <Field name="focus-keyword" label="Focus keyword">
-          <div className={control}>Acme MCP</div>
+        <Field name="focus-keyword" label="Focus keyword" empty>
+          <div className={cn(control, placeholder)}>Add a keyword</div>
         </Field>
-        <Field name="canonical-url" label="Canonical URL">
-          <div className={cn(control, 'truncate')}>https://acme.com/blog/introducing-acme-mcp</div>
+        <Field name="canonical-url" label="Canonical URL" empty>
+          <div className={cn(control, 'truncate', placeholder)}>Defaults to the post URL</div>
         </Field>
       </div>
-      <Field name="social-image" label="Social image">
+      <Field name="social-image" label="Social image" empty>
         <MediaPlaceholder hint="1200 × 630" className="h-32" />
       </Field>
       <div data-demo-field="indexing" className="flex items-center justify-between gap-4">
@@ -212,21 +251,23 @@ function SeoGroup() {
 function MainColumn() {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
-      <Field name="title" label="Title">
+      <Field name="title" label="Title" empty={false}>
         <div className={control}>Introducing Acme MCP</div>
       </Field>
-      <Field name="slug" label="Slug" hint="Generated from title">
+      <Field name="slug" label="Slug" hint="Generated from title" empty={false}>
         <div className={cn(control, 'gap-0.5')}>
           <span className="text-muted-foreground">/blog/</span>
           introducing-acme-mcp
         </div>
       </Field>
-      <Field name="summary" label="Summary">
-        <div className="flex flex-col gap-1 rounded-md border bg-background px-3 py-2 dark:bg-input/30">
-          <p className="line-clamp-2 leading-6">{summary}</p>
-          <span className="self-end text-xs text-muted-foreground tabular-nums">
-            {summary.length} / 160
-          </span>
+      <Field name="summary" label="Summary" aside="0 / 160" empty>
+        <div
+          className={cn(
+            'min-h-20 rounded-md border bg-background px-3 py-2 leading-6 dark:bg-input/30',
+            placeholder,
+          )}
+        >
+          A short description shown in listings
         </div>
       </Field>
       <BodyField />
@@ -235,58 +276,48 @@ function MainColumn() {
   )
 }
 
-function SideColumn() {
+function SideColumn({ categoriesShown }: { categoriesShown: number }) {
   return (
-    <div className="flex w-[300px] shrink-0 flex-col gap-5 rounded-lg border p-4">
-      <Field name="authors" label="Authors">
-        <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-background p-1.5 dark:bg-input/30">
-          {['Abyan'].map((author) => (
-            <Chip key={author}>
-              <Initial name={author} />
-              {author}
-            </Chip>
-          ))}
-          <span className="inline-flex items-center gap-1 px-1 text-xs text-muted-foreground">
-            <PlusIcon className="size-3" />
-            Add
-          </span>
-        </div>
+    <div className="flex w-[300px] shrink-0 flex-col gap-6 rounded-lg border p-4">
+      <Field name="authors" label="Authors" empty={false}>
+        <Multiselect placeholderText="Add">
+          <Chip>
+            <Initial name="Abyan" />
+            Abyan
+          </Chip>
+        </Multiselect>
       </Field>
-      <Field name="categories" label="Categories">
-        <div className="flex flex-wrap gap-1.5">
-          {['Product', 'Announcements'].map((category) => (
-            <Chip key={category}>
-              <Link2Icon className="text-muted-foreground" />
+      <Field name="categories" label="Categories" empty={categoriesShown === 0}>
+        <Multiselect agent={writer} placeholderText="Add">
+          {categories.slice(0, categoriesShown).map((category) => (
+            <Chip key={category} arrived>
+              <Link2Icon className="opacity-60" />
               {category}
             </Chip>
           ))}
-        </div>
+        </Multiselect>
       </Field>
-      <Field name="tags" label="Tags">
-        <div className="flex flex-wrap gap-1.5">
-          {['MCP', 'AI', 'Integrations'].map((tag) => (
-            <Chip key={tag}>{tag}</Chip>
-          ))}
-        </div>
+      <Field name="tags" label="Tags" empty>
+        <Multiselect agent={writer} placeholderText="Add" />
       </Field>
-      <Field name="cover-image" label="Cover image">
+      <Field name="cover-image" label="Cover image" empty>
         <MediaPlaceholder hint="Drop an image" className="aspect-video" />
       </Field>
-      <Field name="publish-date" label="Publish date">
+      <Field name="publish-date" label="Publish date" empty>
         <div className={cn(control, 'justify-between text-muted-foreground')}>
           Not scheduled
           <CalendarIcon className="size-4" />
         </div>
       </Field>
-      <Field name="reading-time" label="Reading time" hint="Calculated from body">
-        <span>4 min read</span>
+      <Field name="reading-time" label="Reading time" hint="Calculated from body" empty>
+        <span className="text-muted-foreground">—</span>
       </Field>
     </div>
   )
 }
 
-/** A static post editor for the product preview, opened on "Introducing Acme MCP". */
-export function EditorView({ shown }: { shown: boolean }) {
+/** A post editor for the product preview, opened on "Introducing Acme MCP" while agents fill it in. */
+export function EditorView({ shown, categories }: { shown: boolean; categories: number }) {
   return (
     <div
       data-demo-editor
@@ -297,26 +328,9 @@ export function EditorView({ shown }: { shown: boolean }) {
       )}
     >
       <TopBar />
-      <div className="relative min-h-0 flex-1">
-        <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
-          <MainColumn />
-          <SideColumn />
-        </div>
-        <div
-          data-demo-agent-outline
-          className={cn(
-            'pointer-events-none absolute inset-0 z-20 rounded-br-[18px]',
-            styles.agentOutline,
-          )}
-        >
-          <div
-            data-demo-agent-notch
-            className={cn(
-              'absolute top-[calc(50%-28px)] left-0 h-10 w-5 -translate-y-1/2 rounded-r-md bg-card',
-              styles.agentNotch,
-            )}
-          />
-        </div>
+      <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
+        <MainColumn />
+        <SideColumn categoriesShown={categories} />
       </div>
     </div>
   )
