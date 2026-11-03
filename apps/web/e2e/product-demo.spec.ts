@@ -116,7 +116,18 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
     }
   }
   await expect.poll(tabOffset).toEqual({ attached: true, left: true })
-  await expect(agents).toHaveCSS('background-color', 'rgb(139, 92, 246)')
+  const tabMatchesOutline = () =>
+    agentRow.locator('[data-demo-agent-row]').evaluate((row) => {
+      const tab = row.querySelector('[data-demo-agents]')
+      if (!tab) return false
+      const outline = getComputedStyle(row).boxShadow
+      const fill = getComputedStyle(tab).backgroundColor
+      return outline.includes(fill)
+    })
+  for (let sample = 0; sample < 4; sample++) {
+    expect(await tabMatchesOutline()).toBe(true)
+    await page.waitForTimeout(350)
+  }
   const gapToNextRow = async () => {
     const rowBox = await agentRow.boundingBox()
     const nextBox = await frame

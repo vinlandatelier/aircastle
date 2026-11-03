@@ -360,13 +360,16 @@ function AgentRow({ shown }: { shown: boolean }) {
           <span className="text-muted-foreground">Just now</span>
           <div
             data-demo-agents
-            className="absolute top-full left-3 z-10 flex items-center rounded-b-md bg-[rgb(139_92_246)] px-1.5 py-1 shadow-sm"
+            className={cn(
+              'absolute top-full left-3 z-10 flex items-center rounded-b-md px-1.5 py-1 shadow-sm',
+              styles.agentTab,
+            )}
           >
             <span className="flex -space-x-1.5">
-              <span className="rounded-full ring-2 ring-[rgb(139_92_246)]">
+              <span className={cn('rounded-full', styles.agentAvatar)}>
                 <GeneratedAvatar name="Research agent" size={18} variant="beam" />
               </span>
-              <span className="rounded-full ring-2 ring-[rgb(139_92_246)]">
+              <span className={cn('rounded-full', styles.agentAvatar)}>
                 <GeneratedAvatar name="Writer agent" size={18} variant="beam" />
               </span>
             </span>
