@@ -31,8 +31,8 @@ export function MarketingPage() {
             </span>
           </h1>
           <p className="mt-8 max-w-[46rem] text-xl leading-relaxed text-balance text-muted-foreground">
-            Aircastle is the agentic headless CMS that gets you from idea to published faster, at
-            scale.
+            Aircastle is the headless CMS that gets you from idea to published faster. Our agents
+            take on the busywork, so you can publish more than ever before.
           </p>
         </section>
       </main>

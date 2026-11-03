@@ -204,7 +204,7 @@ test('Vinland credit opens vinland.com.au in a new tab', async ({ page }) => {
 test('hero explains Aircastle below the title in regular text', async ({ page }) => {
   await page.goto('/')
   const summary = page.getByText(
-    'Aircastle is the agentic headless CMS that gets you from idea to published faster, at scale.',
+    'Aircastle is the headless CMS that gets you from idea to published faster. Our agents take on the busywork, so you can publish more than ever before.',
     { exact: true },
   )
   await expect(summary).toBeVisible()
