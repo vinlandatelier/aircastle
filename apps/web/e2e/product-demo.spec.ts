@@ -528,6 +528,25 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const panelBox = await panel.boundingBox()
   if (!tagsBox || !panelBox) throw new Error('Editor is not laid out')
   expect(tagsBox.x + tagsBox.width).toBeLessThanOrEqual(panelBox.x + 1)
+  const editorBox = await editor.boundingBox()
+  if (!editorBox) throw new Error('Editor is not laid out')
+  expect(Math.abs(panelBox.y - editorBox.y)).toBeLessThanOrEqual(1)
+  const publish = editor.locator('[data-demo-publish]')
+  await expect
+    .poll(async () => {
+      const box = await publish.boundingBox()
+      return box ? box.x + box.width : Infinity
+    })
+    .toBeLessThanOrEqual(panelBox.x)
+  await expect(research).toHaveAttribute('data-state', 'docked')
+  await expect(research).toBeHidden()
+  const breadcrumb = editor.locator('[data-demo-breadcrumb]')
+  await expect(breadcrumb).toHaveCSS('white-space', 'nowrap')
+  const crumbBox = await breadcrumb.boundingBox()
+  const crumbLine = await breadcrumb.evaluate((element) =>
+    parseFloat(getComputedStyle(element).lineHeight),
+  )
+  expect(crumbBox?.height ?? Infinity).toBeLessThanOrEqual(crumbLine + 1)
 
   const stepsNow = await panel.locator('[data-demo-research-step]').count()
   await page.clock.runFor(1500)

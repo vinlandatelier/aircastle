@@ -234,14 +234,23 @@ function sourcesReadBy(steps: number) {
   return researchLog.slice(0, steps).filter((entry) => entry.kind === 'source').length
 }
 
-function ResearchStatus({ steps, hovered }: { steps: number; hovered: boolean }) {
+function ResearchStatus({
+  steps,
+  hovered,
+  docked,
+}: {
+  steps: number
+  hovered: boolean
+  docked: boolean
+}) {
   const sourcesRead = sourcesReadBy(steps)
   const currentIndex = sourcesRead - 1
-  const done = steps >= researchLog.length
+  const state = steps >= researchLog.length ? 'done' : docked ? 'docked' : 'working'
+  const done = state !== 'working'
   return (
     <span
       data-demo-research
-      data-state={done ? 'done' : 'working'}
+      data-state={state}
       data-sources={sourcesRead}
       data-hovered={hovered}
       className={cn(
@@ -451,7 +460,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
       data-demo-research-panel
       data-state={open ? 'open' : 'closed'}
       className={cn(
-        'absolute top-14 right-0 bottom-0 z-30 flex w-[340px] flex-col border-l bg-card transition-[translate,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        'absolute top-0 right-0 bottom-0 z-30 flex w-[340px] flex-col border-l bg-card transition-[translate,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
         open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-full opacity-0',
       )}
     >
@@ -517,16 +526,24 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
   )
 }
 
-function TopBar({ steps, researchHovered }: { steps: number; researchHovered: boolean }) {
+function TopBar({
+  steps,
+  researchHovered,
+  researchDocked,
+}: {
+  steps: number
+  researchHovered: boolean
+  researchDocked: boolean
+}) {
   return (
-    <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b bg-card px-6">
-      <div className="flex items-center gap-2">
+    <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-card px-6">
+      <div data-demo-breadcrumb className="flex min-w-0 items-center gap-2 whitespace-nowrap">
         <span className="text-muted-foreground">Blog posts</span>
         <span className="text-muted-foreground">/</span>
-        <span>Introducing Acme MCP</span>
+        <span className="truncate">Introducing Acme MCP</span>
       </div>
-      <div className="flex items-center gap-2">
-        <ResearchStatus steps={steps} hovered={researchHovered} />
+      <div className="flex shrink-0 items-center gap-2">
+        <ResearchStatus steps={steps} hovered={researchHovered} docked={researchDocked} />
         <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
           <EyeIcon className="size-4" />
           Preview
@@ -538,7 +555,10 @@ function TopBar({ steps, researchHovered }: { steps: number; researchHovered: bo
           <SaveIcon className="size-4" />
           Save
         </span>
-        <span className="flex h-8 items-center rounded-md bg-primary px-3 text-primary-foreground">
+        <span
+          data-demo-publish
+          className="flex h-8 items-center rounded-md bg-primary px-3 text-primary-foreground"
+        >
           Publish
         </span>
       </div>
@@ -747,21 +767,26 @@ export function EditorView({
         shown ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0',
       )}
     >
-      <TopBar steps={researchSteps} researchHovered={researchHovered} />
       <div
-        data-demo-editor-scroll
         className={cn(
-          'flex items-start gap-6 p-6 transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
-          researchPanelOpen && 'pr-[calc(1.5rem+340px)]',
+          'flex min-h-0 flex-1 flex-col transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          researchPanelOpen && 'pr-[340px]',
         )}
       >
-        <MainColumn writerOnBody={writerOnBody} />
-        <SideColumn
-          writerOnCategories={writerOnCategories}
-          writerOnTags={writerOnTags}
-          categoriesShown={categories}
-          tagsShown={tags}
+        <TopBar
+          steps={researchSteps}
+          researchHovered={researchHovered}
+          researchDocked={researchPanelOpen}
         />
+        <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
+          <MainColumn writerOnBody={writerOnBody} />
+          <SideColumn
+            writerOnCategories={writerOnCategories}
+            writerOnTags={writerOnTags}
+            categoriesShown={categories}
+            tagsShown={tags}
+          />
+        </div>
       </div>
       <ResearchPanel open={researchPanelOpen} steps={researchSteps} />
     </div>
