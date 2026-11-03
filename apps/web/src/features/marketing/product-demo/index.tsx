@@ -142,9 +142,6 @@ export function ProductDemo() {
       <h2 id="product-demo-title" className="sr-only">
         Aircastle preview
       </h2>
-      <p className="mb-4 inline-flex rounded-full border px-3 py-1 text-sm text-muted-foreground">
-        Preview
-      </p>
       <p className="sr-only">
         A posts collection in Aircastle, listing posts with their status, author and last update.
       </p>

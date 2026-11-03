@@ -1,10 +1,10 @@
 import { test, expect } from './support'
 
-test('product preview sits below the hero and is labelled as a preview', async ({ page }) => {
+test('product preview sits below the hero without a visible label', async ({ page }) => {
   await page.goto('/')
   const preview = page.getByRole('region', { name: 'Aircastle preview' })
   await expect(preview).toBeVisible()
-  await expect(preview.getByText('Preview', { exact: true })).toBeVisible()
+  await expect(preview.getByText('Preview', { exact: true })).toHaveCount(0)
   const heroBox = await page.getByRole('link', { name: 'Get started', exact: true }).boundingBox()
   const previewBox = await preview.boundingBox()
   if (!heroBox || !previewBox) throw new Error('Landing page is not laid out')
