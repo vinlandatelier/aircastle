@@ -477,10 +477,6 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
           >
             {canute.role}
           </span>
-          <span className="text-muted-foreground">·</span>
-          <span className="truncate text-muted-foreground">
-            {done ? 'Research complete' : 'Researching'}
-          </span>
         </div>
         <XIcon className="size-4 text-muted-foreground" />
       </div>

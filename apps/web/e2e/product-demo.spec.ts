@@ -580,7 +580,8 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(artifacts.first()).toContainText('Research brief.md')
   await expect(artifacts.last()).toContainText('Docs gap.md')
   await expect(panel.locator('[data-demo-research-pending]')).toHaveCount(0)
-  await expect(panel).toContainText('Research complete')
+  await expect(panel).not.toContainText('Research complete')
+  await expect(panel).not.toContainText('Researching')
   await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toContainText(
     'Researched 11 sources',
   )
@@ -591,8 +592,8 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(request).toBeInViewport()
   await expect(panel.locator('[data-demo-research-reply]')).toContainText('Docs gap.md')
   const agentLabel = panel.locator('[data-demo-agent-label]')
-  const statusText = panel.getByText('Research complete', { exact: true })
-  const mutedColour = await statusText.evaluate((element) => getComputedStyle(element).color)
+  const mutedText = chain.locator('[data-slot="trace-line"]').first()
+  const mutedColour = await mutedText.evaluate((element) => getComputedStyle(element).color)
   await expect(agentLabel).toHaveCSS('color', mutedColour)
 
   await expect(research).toHaveAttribute('data-state', 'done')
