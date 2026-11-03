@@ -22,8 +22,13 @@ const categoriesStartAfterEditor = 1500
 const tagsStartAfterEditor = 2500
 const chipInterval = 200
 const tagCount = 3
-const writerLeavesTaxonomyAfterEditor = tagsStartAfterEditor + (tagCount - 1) * chipInterval + 1000
-const writerReachesBodyAfterEditor = writerLeavesTaxonomyAfterEditor + 300
+const categoryCount = 2
+const lingerAfterFilling = 1000
+const writerLeavesCategoriesAfterEditor =
+  categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
+const writerLeavesTagsAfterEditor =
+  tagsStartAfterEditor + (tagCount - 1) * chipInterval + lingerAfterFilling
+const writerReachesBodyAfterEditor = writerLeavesTagsAfterEditor + 300
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
   const pause = character === ' ' || character === ',' ? 40 : 0
@@ -47,7 +52,6 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
-export type WriterFocus = 'taxonomy' | 'body' | undefined
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -62,7 +66,9 @@ export type Frame = {
   agentRowHovered: boolean
   categories: number
   tags: number
-  writer: WriterFocus
+  writerOnCategories: boolean
+  writerOnTags: boolean
+  writerOnBody: boolean
 }
 
 /** The still frame shown when motion is reduced. */
@@ -78,18 +84,14 @@ export const stillFrame: Frame = {
   agentRowHovered: false,
   categories: 0,
   tags: 0,
-  writer: undefined,
+  writerOnCategories: false,
+  writerOnTags: false,
+  writerOnBody: false,
 }
 
 function chipsArrived(sinceFirst: number, total: number) {
   if (sinceFirst < 0) return 0
   return Math.min(total, Math.floor(sinceFirst / chipInterval) + 1)
-}
-
-function writerFocusAt(sinceEditor: number): WriterFocus {
-  if (sinceEditor < writerLeavesTaxonomyAfterEditor) return 'taxonomy'
-  if (sinceEditor < writerReachesBodyAfterEditor) return undefined
-  return 'body'
 }
 
 function typedAt(elapsed: number) {
@@ -138,8 +140,10 @@ export function frameAt(elapsed: number): Frame {
               : 'still',
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
     agentRowHovered: elapsed >= cursorShownAt + agentRowReachedAfter && elapsed < editorOpensAt,
-    categories: chipsArrived(elapsed - editorOpensAt - categoriesStartAfterEditor, 2),
+    categories: chipsArrived(elapsed - editorOpensAt - categoriesStartAfterEditor, categoryCount),
     tags: chipsArrived(elapsed - editorOpensAt - tagsStartAfterEditor, tagCount),
-    writer: writerFocusAt(elapsed - editorOpensAt),
+    writerOnCategories: elapsed - editorOpensAt < writerLeavesCategoriesAfterEditor,
+    writerOnTags: elapsed - editorOpensAt < writerLeavesTagsAfterEditor,
+    writerOnBody: elapsed - editorOpensAt >= writerReachesBodyAfterEditor,
   }
 }

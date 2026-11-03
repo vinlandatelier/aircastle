@@ -15,7 +15,6 @@ import {
 } from 'lucide-react'
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
-import type { WriterFocus } from './timeline'
 import { Badge } from '@/components/ui/badge'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 
@@ -306,7 +305,7 @@ function SeoGroup() {
   )
 }
 
-function MainColumn({ writer }: { writer: WriterFocus }) {
+function MainColumn({ writerOnBody }: { writerOnBody: boolean }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <Field name="title" label="Title" empty={false}>
@@ -328,18 +327,20 @@ function MainColumn({ writer }: { writer: WriterFocus }) {
           A short description shown in listings
         </div>
       </Field>
-      <BodyField writing={writer === 'body'} />
+      <BodyField writing={writerOnBody} />
       <SeoGroup />
     </div>
   )
 }
 
 function SideColumn({
-  writer,
+  writerOnCategories,
+  writerOnTags,
   categoriesShown,
   tagsShown,
 }: {
-  writer: WriterFocus
+  writerOnCategories: boolean
+  writerOnTags: boolean
   categoriesShown: number
   tagsShown: number
 }) {
@@ -356,7 +357,7 @@ function SideColumn({
       <Field name="categories" label="Categories" empty={categoriesShown === 0}>
         <Multiselect
           agent={writerAgent}
-          agentActive={writer === 'taxonomy'}
+          agentActive={writerOnCategories}
           empty={categoriesShown === 0}
           placeholderText="Add categories"
         >
@@ -371,7 +372,7 @@ function SideColumn({
       <Field name="tags" label="Tags" empty={tagsShown === 0}>
         <Multiselect
           agent={writerAgent}
-          agentActive={writer === 'taxonomy'}
+          agentActive={writerOnTags}
           empty={tagsShown === 0}
           placeholderText="Add tags"
         >
@@ -403,12 +404,16 @@ export function EditorView({
   shown,
   categories,
   tags,
-  writer,
+  writerOnCategories,
+  writerOnTags,
+  writerOnBody,
 }: {
   shown: boolean
   categories: number
   tags: number
-  writer: WriterFocus
+  writerOnCategories: boolean
+  writerOnTags: boolean
+  writerOnBody: boolean
 }) {
   return (
     <div
@@ -421,8 +426,13 @@ export function EditorView({
     >
       <TopBar />
       <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
-        <MainColumn writer={writer} />
-        <SideColumn writer={writer} categoriesShown={categories} tagsShown={tags} />
+        <MainColumn writerOnBody={writerOnBody} />
+        <SideColumn
+          writerOnCategories={writerOnCategories}
+          writerOnTags={writerOnTags}
+          categoriesShown={categories}
+          tagsShown={tags}
+        />
       </div>
     </div>
   )

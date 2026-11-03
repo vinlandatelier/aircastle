@@ -377,6 +377,12 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(tags).toHaveCount(3)
   await expect(tags.last()).toContainText('Integrations')
   await expect(editor.locator('[data-demo-field="tags"]')).toHaveAttribute('data-empty', 'false')
+  await expect(
+    editor.locator('[data-demo-field="categories"] [data-demo-agent-outline]'),
+  ).toHaveAttribute('data-active', 'false')
+  await expect(
+    editor.locator('[data-demo-field="tags"] [data-demo-agent-outline]'),
+  ).toHaveAttribute('data-active', 'true')
 
   await page.clock.runFor(1100)
   for (const field of ['categories', 'tags']) {

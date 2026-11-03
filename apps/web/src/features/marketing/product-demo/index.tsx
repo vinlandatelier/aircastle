@@ -49,7 +49,9 @@ function sameFrame(left: Frame, right: Frame) {
     left.agentRowHovered === right.agentRowHovered &&
     left.categories === right.categories &&
     left.tags === right.tags &&
-    left.writer === right.writer
+    left.writerOnCategories === right.writerOnCategories &&
+    left.writerOnTags === right.writerOnTags &&
+    left.writerOnBody === right.writerOnBody
   )
 }
 
@@ -581,7 +583,9 @@ export function ProductDemo() {
                 shown={frame.view === 'editor'}
                 categories={frame.categories}
                 tags={frame.tags}
-                writer={frame.writer}
+                writerOnCategories={frame.writerOnCategories}
+                writerOnTags={frame.writerOnTags}
+                writerOnBody={frame.writerOnBody}
               />
             </div>
           </div>
