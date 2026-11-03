@@ -3,7 +3,6 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   SparklesIcon,
-  ArrowRightIcon,
   ArrowUpIcon,
   ArrowUpRightIcon,
   CheckIcon,
@@ -39,6 +38,7 @@ import {
   type ResearchEntry,
 } from './research'
 import { canute, orchestrator, thorfinn } from './agents'
+import { MentionText } from './mention'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
 import {
@@ -382,8 +382,7 @@ function ResearchEntryView({ entry, answered }: { entry: ResearchEntry; answered
           <ArrowUpRightIcon className="size-3.5" />
         </TraceIcon>
         <TraceTitle className="whitespace-normal">
-          Handed off to <span className="air-mascot mx-0.5 inline-block size-3.5 align-[-2px]" />
-          {entry.to}: {entry.task}
+          <MentionText text={`Handed off to @${entry.to}: ${entry.task}`} />
         </TraceTitle>
       </TraceLine>
     )
@@ -457,7 +456,7 @@ function ResearchChain({ steps }: { steps: number }) {
 }
 
 const replyText =
-  'Here’s what I found, with the setup steps and sources for the post. Acme’s docs don’t cover MCP yet, so I’ve handed a docs page to Air.'
+  'Here’s what I found, with the setup steps and sources for the post. Acme’s docs don’t cover MCP yet, so I’ve handed a docs page to @Air.'
 const replyWords = replyText.split(' ')
 const wordInterval = 35
 const cardsStartAfter = replyWords.length * wordInterval + 150
@@ -474,7 +473,7 @@ function ResearchReply({ artifacts }: { artifacts: readonly Artifact[] }) {
             className={styles.streamWord}
             style={{ animationDelay: `${index * wordInterval}ms` }}
           >
-            {index < replyWords.length - 1 ? `${word} ` : word}
+            <MentionText text={index < replyWords.length - 1 ? `${word} ` : word} />
           </span>
         ))}
       </p>
@@ -550,10 +549,8 @@ function SentReceipt() {
   return (
     <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 text-xs shadow-sm dark:bg-input/30">
       <GeneratedAvatar name={researcher} size={16} variant="beam" />
-      <ArrowRightIcon className="size-3 text-muted-foreground" />
-      <span className="air-mascot block size-4 shrink-0" />
       <span className="min-w-0 truncate">
-        Sent to {orchestrator.name}: draft {docsDecision.target.title}
+        <MentionText text={`Sent to @${orchestrator.name}: draft ${docsDecision.target.title}`} />
       </span>
       <CheckIcon className="ml-auto size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
     </div>
@@ -619,7 +616,9 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
             </MessageHeader>
             <Bubble align="end" variant="muted" data-demo-research-request className="max-w-[92%]">
               <BubbleContent className="flex flex-col gap-1.5">
-                <p>{researchBrief.goal}</p>
+                <p>
+                  <MentionText text={researchBrief.goal} />
+                </p>
                 <p>The post should cover:</p>
                 <ul className="list-disc pl-4">
                   {researchBrief.covers.map((point) => (

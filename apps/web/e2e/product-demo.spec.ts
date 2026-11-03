@@ -538,6 +538,9 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(request).toHaveAttribute('data-align', 'end')
   await expect(request).not.toHaveText(prompt)
   await expect(request).toContainText('so Thorfinn can write the announcement post')
+  const briefMention = request.locator('[data-demo-mention]')
+  await expect(briefMention).toHaveText('Thorfinn')
+  await expect(briefMention.locator('svg')).toHaveCount(1)
   await expect(request.locator('li')).toHaveCount(3)
   await expect(request).toContainText('mark anything you couldn’t confirm')
   const goalColour = await request
@@ -711,6 +714,10 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(panel.locator('[data-demo-research-reply]')).toContainText(
     'handed a docs page to Air',
   )
+  const mention = panel.locator('[data-demo-research-reply] [data-demo-mention]')
+  await expect(mention).toHaveText('Air')
+  await expect(mention.locator('.air-mascot')).toHaveCount(1)
+  await expect(mention).toHaveCSS('border-top-width', '1px')
   await expect(panel.locator('[data-demo-research-reply]')).toContainText('Research brief.md')
   const agentLabel = panel.locator('[data-demo-agent-label]')
   const mutedText = chain.locator('[data-slot="trace-line"]').first()
@@ -834,13 +841,15 @@ test('the cursor answers Canute’s decision and Canute hands it to Air', async 
   await expect(decision).toContainText('Sent to Air')
   await expect(decision).toContainText('Connect to Acme MCP')
   await expect(decision.locator('[data-demo-decision-option]')).toHaveCount(0)
-  await expect(decision.locator('.air-mascot')).toHaveCount(1)
+  await expect(decision.locator('[data-demo-mention] .air-mascot')).toHaveCount(1)
   await expect(marker).toContainText('You: Yes, draft it')
   await expect(marker).not.toContainText('Waiting')
   const handoff = panel.locator('[data-demo-research-chain] [data-demo-handoff]')
   await expect(handoff).toContainText('Handed off to')
   await expect(handoff).toContainText('Air')
-  await expect(handoff.locator('.air-mascot')).toHaveCount(1)
+  await expect(handoff.locator('[data-demo-mention]')).toHaveText('Air')
+  await expect(handoff.locator('[data-demo-mention] .air-mascot')).toHaveCount(1)
+  await expect(decision.locator('[data-demo-mention]')).toHaveText('Air')
   await expect(waiting).toHaveCount(0)
 
   await page.clock.runFor(1000)

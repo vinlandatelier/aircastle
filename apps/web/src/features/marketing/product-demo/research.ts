@@ -234,7 +234,7 @@ export const researchLog: readonly ResearchEntry[] = [
 
 /** The brief Air hands Canute, built from the request it was given. */
 export const researchBrief = {
-  goal: 'Research the MCP launch so Thorfinn can write the announcement post.',
+  goal: 'Research the MCP launch so @Thorfinn can write the announcement post.',
   covers: [
     'What shipped, and who it’s for',
     'How to set it up',
