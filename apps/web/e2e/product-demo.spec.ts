@@ -216,7 +216,8 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   await expect(agents).toHaveAttribute('data-expanded', 'true')
   await expect(agents).toContainText('Thorfinn')
   await expect(agents).toContainText('Canute')
-  await expect(agents).toContainText('+2 are working')
+  await expect(agents).toContainText('and 2 others are working')
+  await expect(agents).not.toContainText('+2')
   await expect(agents.getByText('Agent', { exact: true })).toHaveCount(2)
   await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(4)
   const cursorOnRow = async () => {
@@ -231,4 +232,20 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
     )
   }
   await expect.poll(cursorOnRow).toBe(true)
+})
+
+test('the preview table lists authors, with some posts written by several people', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await expect(frame.getByText('Authors', { exact: true })).toBeVisible()
+  await expect(frame.getByText('Author', { exact: true })).toHaveCount(0)
+  const authorCells = frame.locator('[data-demo-authors]')
+  const counts = await authorCells.evaluateAll((cells) =>
+    cells.map((cell) => Number(cell.getAttribute('data-demo-authors'))),
+  )
+  expect(counts.some((count) => count > 1)).toBe(true)
+  await expect(frame.locator('[data-demo-authors]').filter({ hasText: /agent/i })).toHaveCount(0)
 })

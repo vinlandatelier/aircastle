@@ -155,49 +155,49 @@ const posts: readonly {
   title: string
   body: string
   status: Status
-  author: string
+  authors: readonly string[]
   updated: string
 }[] = [
   {
     title: 'How we cut build times by 40%',
     body: 'Our CI pipeline had grown to 18 minutes. We profiled every step, cached the slowest ones and split tests across runners. Here is what changed and what it cost us.',
     status: 'Published',
-    author: 'Maya',
+    authors: ['Maya', 'Theo'],
     updated: '2d ago',
   },
   {
     title: 'Designing for offline-first',
     body: 'Users lose signal on trains, in lifts and on flights. We rebuilt sync around a local store so edits never block on the network, and conflicts resolve without prompts.',
     status: 'In review',
-    author: 'Theo',
+    authors: ['Theo'],
     updated: '3d ago',
   },
   {
     title: 'Q3 product roundup',
     body: 'Scheduled publishing, image focal points, field-level permissions and twelve smaller fixes shipped this quarter. Here is a tour of each one with links to the docs.',
     status: 'Published',
-    author: 'Priya',
+    authors: ['Priya', 'Sam', 'Maya'],
     updated: '1w ago',
   },
   {
     title: 'A field guide to content models',
     body: 'Good content models start from how editors work, not from the database. We walk through modelling articles, authors and references for a typical publication.',
     status: 'Draft',
-    author: 'Sam',
+    authors: ['Sam'],
     updated: '1w ago',
   },
   {
     title: 'Why we moved to Postgres',
     body: 'We outgrew our document store once references and uniqueness mattered. This post covers the migration plan, the dual-write period and the queries that got faster.',
     status: 'Published',
-    author: 'Maya',
+    authors: ['Maya'],
     updated: '2w ago',
   },
   {
     title: 'Shipping localisation in a week',
     body: 'Translating fields was the easy part. Locale fallbacks, right-to-left layouts and keeping slugs stable across languages took the rest of the week.',
     status: 'Published',
-    author: 'Theo',
+    authors: ['Theo', 'Priya'],
     updated: '3w ago',
   },
 ]
@@ -394,10 +394,7 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
           <span className="truncate">Introducing Acme MCP</span>
           <span className="truncate text-muted-foreground italic">Agents are drafting…</span>
           <StatusPill status="Draft" />
-          <span className="inline-flex items-center gap-2 text-muted-foreground">
-            <Initial name="Abyan" />
-            Abyan
-          </span>
+          <AuthorsCell authors={['Abyan']} />
           <span className="text-muted-foreground">Just now</span>
           <div
             data-demo-agents
@@ -435,10 +432,10 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
                   <span className="inline-flex items-center gap-1">
                     Canute
                     <span className="inline-flex items-center">
-                      <AgentLabel />,
+                      <AgentLabel />
                     </span>
                   </span>
-                  <span>+2 are working</span>
+                  <span>and 2 others are working</span>
                 </span>
               </span>
             </span>
@@ -446,6 +443,26 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function AuthorsCell({ authors }: { authors: readonly string[] }) {
+  return (
+    <span
+      data-demo-authors={authors.length}
+      className="flex min-w-0 items-center gap-2 text-muted-foreground"
+    >
+      <span className="flex shrink-0 -space-x-1.5">
+        {authors.map((author) => (
+          <span key={author} className="rounded-full ring-2 ring-card">
+            <Initial name={author} />
+          </span>
+        ))}
+      </span>
+      <span className="truncate">
+        {authors.length === 1 ? authors[0] : `${authors[0]} +${authors.length - 1}`}
+      </span>
+    </span>
   )
 }
 
@@ -469,7 +486,7 @@ function PostsView({ agentRow, hovered }: { agentRow: boolean; hovered: boolean 
           <span>Title</span>
           <span>Body</span>
           <span>Status</span>
-          <span>Author</span>
+          <span>Authors</span>
           <span>Updated</span>
         </div>
         <AgentRow shown={agentRow} expanded={hovered} />
@@ -480,10 +497,7 @@ function PostsView({ agentRow, hovered }: { agentRow: boolean; hovered: boolean 
               {post.body}
             </span>
             <StatusPill status={post.status} />
-            <span className="inline-flex items-center gap-2 text-muted-foreground">
-              <Initial name={post.author} />
-              {post.author}
-            </span>
+            <AuthorsCell authors={post.authors} />
             <span className="text-muted-foreground">{post.updated}</span>
           </div>
         ))}
