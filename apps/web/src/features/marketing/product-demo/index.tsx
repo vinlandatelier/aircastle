@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowUpIcon,
+  MousePointer2Icon,
+  PointerIcon,
   BookOpenIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -19,7 +21,15 @@ import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
-import { frameAt, loopDuration, prompt, stillFrame, type Frame, type Shortcut } from './timeline'
+import {
+  frameAt,
+  loopDuration,
+  prompt,
+  stillFrame,
+  type CursorState,
+  type Frame,
+  type Shortcut,
+} from './timeline'
 
 const frameWidth = 1120
 const frameHeight = 712
@@ -30,7 +40,8 @@ function sameFrame(left: Frame, right: Frame) {
     left.dialog === right.dialog &&
     left.typed === right.typed &&
     left.sendPressed === right.sendPressed &&
-    left.agentRow === right.agentRow
+    left.agentRow === right.agentRow &&
+    left.cursor === right.cursor
   )
 }
 
@@ -329,7 +340,41 @@ function DemoSidebar() {
 
 const rowGrid = 'grid grid-cols-[14rem_1fr_7.5rem_7rem_5.5rem] items-center gap-4 px-4'
 
-function AgentRow({ shown }: { shown: boolean }) {
+const agents = ['Thorfinn', 'Canute', 'Askeladd', 'Bjorn'] as const
+
+function AgentLabel() {
+  return (
+    <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none text-white">
+      Agent
+    </span>
+  )
+}
+
+const cursorSpots = {
+  enter: { left: 1080, top: 700 },
+  row: { left: 300, top: 214 },
+} as const
+
+function DemoCursor({ state }: { state: CursorState }) {
+  const spot = state === 'hidden' ? cursorSpots.enter : cursorSpots.row
+  const Shape = state === 'hovering' ? PointerIcon : MousePointer2Icon
+  return (
+    <span
+      data-demo-cursor
+      data-state={state}
+      data-shape={state === 'hovering' ? 'pointer' : 'arrow'}
+      style={{ left: spot.left, top: spot.top }}
+      className={cn(
+        'absolute z-40 transition-[left,top,opacity] ease-[cubic-bezier(0.65,0,0.35,1)]',
+        state === 'hidden' ? 'opacity-0 duration-300' : 'opacity-100 duration-[900ms]',
+      )}
+    >
+      <Shape className="size-6 fill-white stroke-black drop-shadow-md" />
+    </span>
+  )
+}
+
+function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
   return (
     <div
       data-demo-row="agent"
@@ -360,17 +405,45 @@ function AgentRow({ shown }: { shown: boolean }) {
           <span className="text-muted-foreground">Just now</span>
           <div
             data-demo-agents
+            data-expanded={expanded}
             className={cn(
               'absolute top-[calc(100%-3px)] left-3 z-10 flex items-center rounded-b-md px-1.5 pt-[calc(0.25rem+3px)] pb-1 shadow-sm',
               styles.agentTab,
             )}
           >
             <span className="flex -space-x-1.5">
-              <span className={cn('rounded-full', styles.agentAvatar)}>
-                <GeneratedAvatar name="Research agent" size={18} variant="beam" />
-              </span>
-              <span className={cn('rounded-full', styles.agentAvatar)}>
-                <GeneratedAvatar name="Writer agent" size={18} variant="beam" />
+              {agents.map((agent) => (
+                <span
+                  key={agent}
+                  data-demo-agent-avatar
+                  className={cn('rounded-full', styles.agentAvatar)}
+                >
+                  <GeneratedAvatar name={agent} size={18} variant="beam" />
+                </span>
+              ))}
+            </span>
+            <span
+              className={cn(
+                'grid transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                expanded ? 'grid-cols-[1fr]' : 'grid-cols-[0fr]',
+              )}
+            >
+              <span className="overflow-hidden whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5 pr-1 pl-2 text-xs text-white">
+                  <span className="inline-flex items-center gap-1">
+                    Thorfinn
+                    <span className="inline-flex items-center">
+                      <AgentLabel />,
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    Canute
+                    <span className="inline-flex items-center">
+                      <AgentLabel />,
+                    </span>
+                  </span>
+                  <span>+2 are working</span>
+                </span>
               </span>
             </span>
           </div>
@@ -380,7 +453,7 @@ function AgentRow({ shown }: { shown: boolean }) {
   )
 }
 
-function PostsView({ agentRow }: { agentRow: boolean }) {
+function PostsView({ agentRow, hovered }: { agentRow: boolean; hovered: boolean }) {
   return (
     <div className="min-w-0 flex-1 p-6">
       <div className="flex items-center justify-between pb-4">
@@ -403,7 +476,7 @@ function PostsView({ agentRow }: { agentRow: boolean }) {
           <span>Author</span>
           <span>Updated</span>
         </div>
-        <AgentRow shown={agentRow} />
+        <AgentRow shown={agentRow} expanded={hovered} />
         {posts.map((post) => (
           <div key={post.title} className={cn(rowGrid, 'border-b py-3 last:border-b-0')}>
             <span className="truncate">{post.title}</span>
@@ -453,7 +526,7 @@ export function ProductDemo() {
           <DemoHeader />
           <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />
-            <PostsView agentRow={frame.agentRow} />
+            <PostsView agentRow={frame.agentRow} hovered={frame.cursor === 'hovering'} />
           </div>
           <div
             className={cn(
@@ -463,6 +536,7 @@ export function ProductDemo() {
           />
           <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
           <ShortcutChip shortcut={frame.shortcut} />
+          <DemoCursor state={frame.cursor} />
         </div>
       </div>
     </section>

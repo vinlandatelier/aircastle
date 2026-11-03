@@ -9,7 +9,7 @@
 }
 
 .agentRow {
-  --agent-colour: color-mix(in oklab, rgb(139 92 246) var(--agent-strength), var(--card));
+  --agent-colour: color-mix(in oklab, rgb(139 92 246) var(--agent-strength), rgb(76 29 149));
   box-shadow:
     inset 0 0 0 3px var(--agent-colour),
     0 0 16px 0 color-mix(in oklab, rgb(139 92 246) calc(var(--agent-strength) - 60%), transparent);

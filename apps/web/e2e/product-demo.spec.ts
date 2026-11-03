@@ -105,7 +105,7 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(agentRow).toHaveAttribute('data-agents-working', 'true')
   await expect(frame.locator('[data-demo-count]')).toHaveText('7')
   const agents = frame.locator('[data-demo-agents]')
-  await expect(agents.locator('svg')).toHaveCount(2)
+  await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(4)
   const tabOffset = async () => {
     const rowBox = await agentRow.locator('[data-demo-agent-row]').boundingBox()
     const agentsBox = await agents.boundingBox()
@@ -171,4 +171,43 @@ test('product preview has a bordered window-dots strip above the header and no f
   const headerBox = await frame.locator('[data-demo-header]').boundingBox()
   if (!dotsBox || !headerBox) throw new Error('Preview is not laid out')
   expect(dotsBox.y + dotsBox.height).toBeLessThanOrEqual(headerBox.y + 0.5)
+})
+
+test('the cursor hovers the agent row and the agents tab expands to name them', async ({
+  page,
+}) => {
+  await page.clock.install()
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const cursor = frame.locator('[data-demo-cursor]')
+  const agents = frame.locator('[data-demo-agents]')
+  const row = frame.locator('[data-demo-agent-row]')
+
+  await page.clock.runFor(5600)
+  await expect(cursor).toHaveAttribute('data-state', 'hidden')
+  await expect(agents).toHaveAttribute('data-expanded', 'false')
+
+  await page.clock.runFor(2400)
+  await expect(cursor).toHaveAttribute('data-state', 'hovering')
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+  await expect(agents).toHaveAttribute('data-expanded', 'true')
+  await expect(agents).toContainText('Thorfinn')
+  await expect(agents).toContainText('Canute')
+  await expect(agents).toContainText('+2 are working')
+  await expect(agents.getByText('Agent', { exact: true })).toHaveCount(2)
+  await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(4)
+  const cursorOnRow = async () => {
+    const cursorBox = await cursor.boundingBox()
+    const rowBox = await row.boundingBox()
+    if (!cursorBox || !rowBox) return false
+    return (
+      cursorBox.x > rowBox.x &&
+      cursorBox.x < rowBox.x + rowBox.width &&
+      cursorBox.y > rowBox.y &&
+      cursorBox.y < rowBox.y + rowBox.height
+    )
+  }
+  await expect.poll(cursorOnRow).toBe(true)
 })

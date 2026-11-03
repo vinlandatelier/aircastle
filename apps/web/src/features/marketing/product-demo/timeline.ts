@@ -8,7 +8,10 @@ const pauseBeforeSend = 450
 const sendPressDuration = 350
 const enterChipDuration = 700
 const dialogCloseDuration = 300
-const restAfterClose = 4500
+const cursorDelayAfterRow = 1300
+const cursorTravelDuration = 900
+const hoverDuration = 3200
+const restAfterHover = 400
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
   const pause = character === ' ' || character === ',' ? 40 : 0
@@ -17,12 +20,16 @@ const keystrokeDelays = Array.from(prompt, (character, index) => {
 const typingEndsAt = keystrokeDelays.reduce((at, delay) => at + delay, typingStartsAt)
 const sendAt = typingEndsAt + pauseBeforeSend
 const dialogClosesAt = sendAt + sendPressDuration
+const cursorShownAt = dialogClosesAt + dialogCloseDuration + cursorDelayAfterRow
+const cursorArrivesAt = cursorShownAt + cursorTravelDuration
+const hoverEndsAt = cursorArrivesAt + hoverDuration
 
 /** Length of one loop of the product preview, in milliseconds. */
-export const loopDuration = dialogClosesAt + dialogCloseDuration + restAfterClose
+export const loopDuration = hoverEndsAt + restAfterHover
 
 export type DialogState = 'closed' | 'open' | 'closing'
 export type Shortcut = 'open-agents' | 'send'
+export type CursorState = 'hidden' | 'moving' | 'hovering'
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -31,6 +38,7 @@ export type Frame = {
   typed: number
   sendPressed: boolean
   agentRow: boolean
+  cursor: CursorState
 }
 
 /** The still frame shown when motion is reduced. */
@@ -40,6 +48,7 @@ export const stillFrame: Frame = {
   typed: 0,
   sendPressed: false,
   agentRow: true,
+  cursor: 'hidden',
 }
 
 function typedAt(elapsed: number) {
@@ -71,5 +80,11 @@ export function frameAt(elapsed: number): Frame {
     typed: typedAt(elapsed),
     sendPressed: elapsed >= sendAt && elapsed < dialogClosesAt,
     agentRow: elapsed >= dialogClosesAt,
+    cursor:
+      elapsed < cursorShownAt || elapsed >= hoverEndsAt
+        ? 'hidden'
+        : elapsed < cursorArrivesAt
+          ? 'moving'
+          : 'hovering',
   }
 }
