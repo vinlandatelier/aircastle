@@ -90,7 +90,7 @@ function AgentTab({ agent, role }: { agent: string; role: string }) {
     <div
       data-demo-agent-tab
       className={cn(
-        'absolute top-[calc(100%-3px)] left-2 z-10 flex items-center gap-1.5 rounded-b-md px-1.5 pt-[calc(0.25rem+3px)] pb-1 text-xs text-white shadow-sm',
+        'absolute right-2 bottom-[calc(100%-3px)] z-10 flex items-center gap-1.5 rounded-t-md px-1.5 pt-1 pb-[calc(0.25rem+3px)] text-xs text-white',
         styles.agentTab,
       )}
     >
@@ -118,7 +118,7 @@ function Multiselect({
       data-agent={agent?.name}
       className={cn(
         'relative flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-background p-1.5 dark:bg-input/30',
-        agent && ['mb-5', styles.agentField],
+        agent && ['border-transparent', styles.agentField],
       )}
     >
       {children}
@@ -131,7 +131,7 @@ function Multiselect({
   )
 }
 
-const writer = { name: 'Thorfinn', role: 'Writer' } as const
+const writer = { name: 'Thorfinn', role: 'Agent' } as const
 
 function MediaPlaceholder({ hint, className }: { hint: string; className?: string }) {
   return (

@@ -339,7 +339,14 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
     await expect(box).toHaveCSS('box-shadow', /inset/)
     const tab = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`)
     await expect(tab).toContainText('Thorfinn')
-    await expect(tab).toContainText('Writer')
+    await expect(tab).toContainText('Agent')
+    await expect(tab).not.toContainText('Writer')
+    const boxRect = await box.boundingBox()
+    const tabRect = await tab.boundingBox()
+    if (!boxRect || !tabRect) throw new Error('Agent tab is not laid out')
+    expect(tabRect.y + tabRect.height).toBeGreaterThan(boxRect.y - 1)
+    expect(tabRect.y + tabRect.height).toBeLessThan(boxRect.y + 6)
+    expect(boxRect.x + boxRect.width - (tabRect.x + tabRect.width)).toBeLessThan(boxRect.width / 4)
   }
   await expect(editor.locator('[data-demo-field="authors"] [data-demo-multiselect]')).toContainText(
     'Abyan',
