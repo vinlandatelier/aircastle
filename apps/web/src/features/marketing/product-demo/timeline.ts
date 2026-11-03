@@ -13,7 +13,7 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const editorDuration = 5500
+const editorDuration = 8000
 const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
@@ -21,6 +21,9 @@ const rowsLeftAfter = 980
 const categoriesStartAfterEditor = 1500
 const tagsStartAfterEditor = 2500
 const chipInterval = 200
+const tagCount = 3
+const writerLeavesTaxonomyAfterEditor = tagsStartAfterEditor + (tagCount - 1) * chipInterval + 1000
+const writerReachesBodyAfterEditor = writerLeavesTaxonomyAfterEditor + 300
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
   const pause = character === ' ' || character === ',' ? 40 : 0
@@ -44,6 +47,7 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
+export type WriterFocus = 'taxonomy' | 'body' | undefined
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -58,6 +62,7 @@ export type Frame = {
   agentRowHovered: boolean
   categories: number
   tags: number
+  writer: WriterFocus
 }
 
 /** The still frame shown when motion is reduced. */
@@ -73,11 +78,18 @@ export const stillFrame: Frame = {
   agentRowHovered: false,
   categories: 0,
   tags: 0,
+  writer: undefined,
 }
 
 function chipsArrived(sinceFirst: number, total: number) {
   if (sinceFirst < 0) return 0
   return Math.min(total, Math.floor(sinceFirst / chipInterval) + 1)
+}
+
+function writerFocusAt(sinceEditor: number): WriterFocus {
+  if (sinceEditor < writerLeavesTaxonomyAfterEditor) return 'taxonomy'
+  if (sinceEditor < writerReachesBodyAfterEditor) return undefined
+  return 'body'
 }
 
 function typedAt(elapsed: number) {
@@ -127,6 +139,7 @@ export function frameAt(elapsed: number): Frame {
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
     agentRowHovered: elapsed >= cursorShownAt + agentRowReachedAfter && elapsed < editorOpensAt,
     categories: chipsArrived(elapsed - editorOpensAt - categoriesStartAfterEditor, 2),
-    tags: chipsArrived(elapsed - editorOpensAt - tagsStartAfterEditor, 3),
+    tags: chipsArrived(elapsed - editorOpensAt - tagsStartAfterEditor, tagCount),
+    writer: writerFocusAt(elapsed - editorOpensAt),
   }
 }

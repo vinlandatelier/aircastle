@@ -31,8 +31,7 @@
   animation: send-press 350ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-.agentRow,
-.agentField {
+.agentPulse {
   --agent-colour: color-mix(in oklab, rgb(139 92 246) var(--agent-strength), rgb(76 29 149));
 }
 

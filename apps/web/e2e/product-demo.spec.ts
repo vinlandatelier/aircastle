@@ -295,7 +295,9 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(table).toHaveAttribute('data-state', 'hidden')
   await expect(editor).toContainText('Introducing Acme MCP')
-  await expect(editor.locator('[data-demo-agent-outline]')).toHaveCount(0)
+  await expect(editor.locator('[data-demo-agent-outline]')).toHaveCount(
+    await editor.locator('[data-demo-field] [data-demo-agent-outline]').count(),
+  )
   await expect(editor.getByText('Draft', { exact: true })).toHaveCount(0)
 
   const preview = editor.locator('[data-demo-preview]')
@@ -336,7 +338,9 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   for (const field of ['categories', 'tags']) {
     const box = editor.locator(`[data-demo-field="${field}"] [data-demo-multiselect]`)
     await expect(box).toHaveAttribute('data-agent', 'Thorfinn')
-    await expect(box).toHaveCSS('box-shadow', /inset/)
+    const fieldOutline = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-outline]`)
+    await expect(fieldOutline).toHaveCSS('box-shadow', /inset/)
+    await expect(fieldOutline).toHaveAttribute('data-active', 'true')
     const tab = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`)
     await expect(tab).toContainText('Thorfinn')
     await expect(tab).toContainText('Agent')
@@ -373,6 +377,25 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(tags).toHaveCount(3)
   await expect(tags.last()).toContainText('Integrations')
   await expect(editor.locator('[data-demo-field="tags"]')).toHaveAttribute('data-empty', 'false')
+
+  await page.clock.runFor(1100)
+  for (const field of ['categories', 'tags']) {
+    await expect(
+      editor.locator(`[data-demo-field="${field}"] [data-demo-agent-outline]`),
+    ).toHaveAttribute('data-active', 'false')
+    await expect(
+      editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`),
+    ).toHaveAttribute('data-active', 'false')
+  }
+  const bodyOutline = editor.locator('[data-demo-field="body"] [data-demo-agent-outline]')
+  const bodyTab = editor.locator('[data-demo-field="body"] [data-demo-agent-tab]')
+  await expect(bodyTab).toHaveAttribute('data-active', 'false')
+  await page.clock.runFor(300)
+  await expect(bodyOutline).toHaveAttribute('data-active', 'true')
+  await expect(bodyTab).toHaveAttribute('data-active', 'true')
+  await expect(bodyTab).toContainText('Thorfinn')
+  await expect(bodyTab).toContainText('Agent')
+  await expect(bodyTab).toContainText('Waiting on Canute…')
   await expect(editor.locator('[data-demo-field="categories"]')).toHaveAttribute(
     'data-empty',
     'false',

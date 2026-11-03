@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
+import type { WriterFocus } from './timeline'
 import { Badge } from '@/components/ui/badge'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 
@@ -86,13 +87,50 @@ function Chip({ children, arrived }: { children: React.ReactNode; arrived?: bool
   )
 }
 
-function AgentTab({ agent, role }: { agent: string; role: string }) {
+function AgentPresence({
+  agent,
+  active,
+  status,
+}: {
+  agent: { name: string; role: string }
+  active: boolean
+  status?: string
+}) {
+  return (
+    <>
+      <span
+        data-demo-agent-outline
+        data-active={active}
+        className={cn(
+          'pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-500',
+          styles.agentField,
+          active ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+      <AgentTab agent={agent.name} role={agent.role} active={active} status={status} />
+    </>
+  )
+}
+
+function AgentTab({
+  agent,
+  role,
+  active,
+  status,
+}: {
+  agent: string
+  role: string
+  active: boolean
+  status: string | undefined
+}) {
   return (
     <div
       data-demo-agent-tab
+      data-active={active}
       className={cn(
-        'absolute right-2 bottom-[calc(100%-3px)] z-10 flex items-center gap-1.5 rounded-t-md px-1.5 pt-1 pb-[calc(0.25rem+3px)] text-xs text-white',
+        'absolute right-2 bottom-[calc(100%-3px)] z-10 flex items-center gap-1.5 rounded-t-md px-1.5 pt-1 pb-[calc(0.25rem+3px)] text-xs whitespace-nowrap text-white transition-[opacity,translate] duration-500',
         styles.agentTab,
+        active ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0',
       )}
     >
       <span className={cn('rounded-full', styles.agentAvatar)}>
@@ -100,17 +138,20 @@ function AgentTab({ agent, role }: { agent: string; role: string }) {
       </span>
       {agent}
       <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none">{role}</span>
+      {status && <span className="text-white/80">· {status}</span>}
     </div>
   )
 }
 
 function Multiselect({
   agent,
+  agentActive = false,
   empty,
   placeholderText,
   children,
 }: {
   agent?: { name: string; role: string }
+  agentActive?: boolean
   empty: boolean
   placeholderText: string
   children?: React.ReactNode
@@ -121,7 +162,8 @@ function Multiselect({
       data-agent={agent?.name}
       className={cn(
         'relative flex min-h-9 items-start gap-1.5 rounded-md border bg-background p-1.5 dark:bg-input/30',
-        agent && ['border-transparent', styles.agentField],
+        'transition-[border-color] duration-500',
+        agentActive && 'border-transparent',
       )}
     >
       <div className="flex min-h-6 min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -134,12 +176,12 @@ function Multiselect({
       <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground">
         <PlusIcon className="size-4" />
       </span>
-      {agent && <AgentTab agent={agent.name} role={agent.role} />}
+      {agent && <AgentPresence agent={agent} active={agentActive} />}
     </div>
   )
 }
 
-const writer = { name: 'Thorfinn', role: 'Agent' } as const
+const writerAgent = { name: 'Thorfinn', role: 'Agent' } as const
 
 function MediaPlaceholder({ hint, className }: { hint: string; className?: string }) {
   return (
@@ -183,10 +225,16 @@ function TopBar() {
   )
 }
 
-function BodyField() {
+function BodyField({ writing }: { writing: boolean }) {
   return (
     <Field name="body" label="Body" empty>
-      <div className="overflow-hidden rounded-md border bg-background dark:bg-input/30">
+      <div
+        className={cn(
+          'relative rounded-md border bg-background transition-[border-color] duration-500 dark:bg-input/30',
+          writing && 'border-transparent',
+        )}
+      >
+        <AgentPresence agent={writerAgent} active={writing} status="Waiting on Canute…" />
         <div className="flex h-10 items-center gap-1 border-b px-2 text-muted-foreground">
           {toolbar.map((group, index) => (
             <span key={group[0]?.name} className="flex items-center gap-1">
@@ -253,7 +301,7 @@ function SeoGroup() {
   )
 }
 
-function MainColumn() {
+function MainColumn({ writer }: { writer: WriterFocus }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <Field name="title" label="Title" empty={false}>
@@ -275,16 +323,18 @@ function MainColumn() {
           A short description shown in listings
         </div>
       </Field>
-      <BodyField />
+      <BodyField writing={writer === 'body'} />
       <SeoGroup />
     </div>
   )
 }
 
 function SideColumn({
+  writer,
   categoriesShown,
   tagsShown,
 }: {
+  writer: WriterFocus
   categoriesShown: number
   tagsShown: number
 }) {
@@ -299,7 +349,12 @@ function SideColumn({
         </Multiselect>
       </Field>
       <Field name="categories" label="Categories" empty={categoriesShown === 0}>
-        <Multiselect agent={writer} empty={categoriesShown === 0} placeholderText="Add categories">
+        <Multiselect
+          agent={writerAgent}
+          agentActive={writer === 'taxonomy'}
+          empty={categoriesShown === 0}
+          placeholderText="Add categories"
+        >
           {categories.slice(0, categoriesShown).map((category) => (
             <Chip key={category} arrived>
               <Link2Icon className="opacity-60" />
@@ -309,7 +364,12 @@ function SideColumn({
         </Multiselect>
       </Field>
       <Field name="tags" label="Tags" empty={tagsShown === 0}>
-        <Multiselect agent={writer} empty={tagsShown === 0} placeholderText="Add tags">
+        <Multiselect
+          agent={writerAgent}
+          agentActive={writer === 'taxonomy'}
+          empty={tagsShown === 0}
+          placeholderText="Add tags"
+        >
           {tags.slice(0, tagsShown).map((tag) => (
             <Chip key={tag} arrived>
               {tag}
@@ -338,10 +398,12 @@ export function EditorView({
   shown,
   categories,
   tags,
+  writer,
 }: {
   shown: boolean
   categories: number
   tags: number
+  writer: WriterFocus
 }) {
   return (
     <div
@@ -354,8 +416,8 @@ export function EditorView({
     >
       <TopBar />
       <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
-        <MainColumn />
-        <SideColumn categoriesShown={categories} tagsShown={tags} />
+        <MainColumn writer={writer} />
+        <SideColumn writer={writer} categoriesShown={categories} tagsShown={tags} />
       </div>
     </div>
   )
