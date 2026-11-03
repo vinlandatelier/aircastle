@@ -466,7 +466,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
       )}
     >
       <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
           <span className={cn('rounded-full', styles.agentAvatar)}>
             <GeneratedAvatar name={researcher} size={22} variant="beam" />
           </span>
@@ -478,7 +478,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
             {canute.role}
           </span>
           <span className="text-muted-foreground">·</span>
-          <span className="text-muted-foreground">
+          <span className="truncate text-muted-foreground">
             {done ? 'Research complete' : 'Researching'}
           </span>
         </div>

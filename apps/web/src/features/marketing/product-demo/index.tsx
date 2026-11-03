@@ -4,6 +4,7 @@ import {
   MousePointer2Icon,
   PointerIcon,
   BookOpenIcon,
+  BotIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   MoonIcon,
@@ -20,7 +21,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { EditorView } from './editor-view'
-import { canute, thorfinn, workingAgents } from './agents'
+import { canute, orchestrator, thorfinn, workingAgents, type DemoAgent } from './agents'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
 import {
@@ -57,7 +58,8 @@ function sameFrame(left: Frame, right: Frame) {
     left.researchSteps === right.researchSteps &&
     left.cursorTarget === right.cursorTarget &&
     left.researchHovered === right.researchHovered &&
-    left.researchPanelOpen === right.researchPanelOpen
+    left.researchPanelOpen === right.researchPanelOpen &&
+    left.askMenuOpen === right.askMenuOpen
   )
 }
 
@@ -274,32 +276,77 @@ function WindowDots() {
   )
 }
 
-function AskButton({ agentsWorking }: { agentsWorking: boolean }) {
+function AgentMark({ agent, size }: { agent: DemoAgent; size: number }) {
+  if (agent === orchestrator)
+    return (
+      <span
+        style={{ width: size, height: size }}
+        className="flex shrink-0 items-center justify-center rounded-full bg-foreground text-background"
+      >
+        <BotIcon className="size-[65%]" />
+      </span>
+    )
+  return <GeneratedAvatar name={agent.name} size={size} variant="beam" />
+}
+
+function AskMenu({ open }: { open: boolean }) {
   return (
-    <span data-demo-ask className={cn(outlineButton, 'h-8 gap-2 pr-1.5 pl-2')}>
-      <span className="brand-logo block size-4 shrink-0" />
-      Ask Aircastle
-      {agentsWorking && (
-        <span className="flex -space-x-1.5 transition-opacity duration-500 starting:opacity-0">
-          {workingAgents.map(({ name }) => (
-            <span
-              key={name}
-              data-demo-ask-agent
-              className={cn('flex rounded-full ring-2 ring-background', styles.agentAvatar)}
-            >
-              <GeneratedAvatar name={name} size={18} variant="beam" />
-            </span>
-          ))}
-        </span>
+    <span
+      data-demo-ask-menu
+      data-state={open ? 'open' : 'closed'}
+      className={cn(
+        'absolute top-[calc(100%+6px)] right-0 z-50 flex w-72 origin-top-right flex-col rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg transition-[opacity,scale] duration-150 ease-out',
+        open ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0',
       )}
-      <Kbd>⌘J</Kbd>
+    >
+      {[orchestrator, ...workingAgents].map((agent, index) => (
+        <span
+          key={agent.name}
+          data-demo-ask-option
+          className={cn(
+            'flex items-center gap-2.5 rounded-md px-2 py-1.5',
+            index === 0 && 'bg-accent text-accent-foreground',
+          )}
+        >
+          <AgentMark agent={agent} size={20} />
+          <span className="truncate">Ask {agent.name}</span>
+          <Badge data-demo-ask-role variant="secondary" className="ml-auto">
+            {agent.role}
+          </Badge>
+        </span>
+      ))}
     </span>
   )
 }
 
-function DemoHeader({ agentsWorking }: { agentsWorking: boolean }) {
+function AskButton({ menuOpen }: { menuOpen: boolean }) {
   return (
-    <div data-demo-header className="flex h-14 shrink-0 items-center gap-2 border-b">
+    <span className="relative flex">
+      <span data-demo-ask className={cn(outlineButton, 'h-8 gap-2 rounded-r-none pr-1.5 pl-2')}>
+        <BotIcon />
+        Ask Aircastle
+        <Kbd>⌘J</Kbd>
+      </span>
+      <span
+        data-demo-ask-menu-trigger
+        className={cn(
+          outlineButton,
+          'size-8 rounded-l-none border-l-0 transition-colors duration-150',
+          menuOpen && 'bg-accent! text-accent-foreground',
+        )}
+      >
+        <ChevronDownIcon
+          className={cn('transition-transform duration-150', menuOpen && 'rotate-180')}
+        />
+      </span>
+      <AskMenu open={menuOpen} />
+    </span>
+  )
+}
+
+function DemoHeader({ askMenuOpen }: { askMenuOpen: boolean }) {
+  return (
+    <div data-demo-header className="relative z-40 flex h-14 shrink-0 items-center gap-2 border-b">
       <span className="flex h-full w-14 shrink-0 items-center justify-center border-r">
         <span className="brand-logo block size-6 shrink-0" />
       </span>
@@ -325,7 +372,7 @@ function DemoHeader({ agentsWorking }: { agentsWorking: boolean }) {
         </span>
       </span>
       <span className="ms-auto flex items-center gap-4 pr-5">
-        <AskButton agentsWorking={agentsWorking} />
+        <AskButton menuOpen={askMenuOpen} />
         <span
           data-demo-search
           className="inline-flex h-8 w-60 items-center gap-2.5 rounded-lg bg-secondary pr-2.5 pl-2"
@@ -396,6 +443,7 @@ const cursorSpots = {
   rest: { left: 1010, top: 640 },
   row: { left: 320, top: 218 },
   research: { left: 700, top: 112 },
+  ask: { left: 848, top: 56 },
 } as const
 
 function DemoCursor({
@@ -414,6 +462,7 @@ function DemoCursor({
       data-demo-cursor
       data-state={state}
       data-shape={shape}
+      data-target={target}
       style={{ left: spot.left, top: spot.top }}
       className={cn(
         'absolute z-40 transition-[left,top] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.25,1)]',
@@ -608,7 +657,7 @@ export function ProductDemo() {
           )}
         >
           <WindowDots />
-          <DemoHeader agentsWorking={frame.agentRow} />
+          <DemoHeader askMenuOpen={frame.askMenuOpen} />
           <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />
             <div className="relative min-w-0 flex-1">

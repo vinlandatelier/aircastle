@@ -15,7 +15,7 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const editorDuration = 14000
+const editorDuration = 16000
 const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
@@ -31,6 +31,8 @@ const researchCursorTravel = 1400
 const researchHoverDuration = 500
 const researchClickDuration = 220
 const panelOpensAfterClick = 100
+const askCursorMovesAfterEditor = 12600
+const askCursorTravel = 1400
 const tagsStartAfterArriving = 500
 const writerLeavesCategoriesAfterEditor =
   categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
@@ -62,7 +64,7 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
-export type CursorTarget = 'rest' | 'row' | 'research'
+export type CursorTarget = 'rest' | 'row' | 'research' | 'ask'
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -84,6 +86,7 @@ export type Frame = {
   cursorTarget: CursorTarget
   researchHovered: boolean
   researchPanelOpen: boolean
+  askMenuOpen: boolean
 }
 
 /** The still frame shown when motion is reduced. */
@@ -106,6 +109,7 @@ export const stillFrame: Frame = {
   cursorTarget: 'rest',
   researchHovered: false,
   researchPanelOpen: false,
+  askMenuOpen: false,
 }
 
 function chipsArrived(sinceFirst: number, total: number) {
@@ -117,13 +121,16 @@ const researchCursorArrivesAfterEditor = researchCursorMovesAfterEditor + resear
 const researchClickAfterEditor = researchCursorArrivesAfterEditor + researchHoverDuration
 const researchClickEndsAfterEditor = researchClickAfterEditor + researchClickDuration
 const researchPanelOpensAfterEditor = researchClickAfterEditor + panelOpensAfterClick
+const askCursorArrivesAfterEditor = askCursorMovesAfterEditor + askCursorTravel
 
 function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < researchCursorMovesAfterEditor) return 'still'
   if (sinceEditor < researchCursorArrivesAfterEditor) return 'moving'
   if (sinceEditor < researchClickAfterEditor) return 'hovering'
   if (sinceEditor < researchClickEndsAfterEditor) return 'clicking'
-  return 'still'
+  if (sinceEditor < askCursorMovesAfterEditor) return 'still'
+  if (sinceEditor < askCursorArrivesAfterEditor) return 'moving'
+  return 'hovering'
 }
 
 function typedAt(elapsed: number) {
@@ -162,6 +169,7 @@ export function frameAt(elapsed: number): Frame {
       (inEditor &&
         sinceEditor >= researchCursorArrivesAfterEditor - 100 &&
         sinceEditor < researchClickEndsAfterEditor) ||
+      (inEditor && sinceEditor >= askCursorArrivesAfterEditor - 100) ||
       (elapsed >= editorClosesAt && elapsed < editorClosesAt + rowsLeftAfter)
         ? 'pointer'
         : 'arrow',
@@ -180,11 +188,14 @@ export function frameAt(elapsed: number): Frame {
     cursorTarget:
       elapsed < cursorShownAt || elapsed >= editorClosesAt
         ? 'rest'
-        : inEditor && sinceEditor >= researchCursorMovesAfterEditor
-          ? 'research'
-          : 'row',
+        : inEditor && sinceEditor >= askCursorMovesAfterEditor
+          ? 'ask'
+          : inEditor && sinceEditor >= researchCursorMovesAfterEditor
+            ? 'research'
+            : 'row',
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
+    askMenuOpen: inEditor && sinceEditor >= askCursorArrivesAfterEditor - 100,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
     agentRowHovered: elapsed >= cursorShownAt + agentRowReachedAfter && elapsed < editorOpensAt,
     categories: chipsArrived(elapsed - editorOpensAt - categoriesStartAfterEditor, categoryCount),

@@ -600,7 +600,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(editor.locator('[data-demo-preview]')).toBeVisible()
 })
 
-test('the preview header has an Ask Aircastle button that shows the agents at work', async ({
+test('the preview header has an Ask Aircastle split button with an agent menu', async ({
   page,
 }) => {
   await page.clock.install({ time: 0 })
@@ -611,19 +611,56 @@ test('the preview header has an Ask Aircastle button that shows the agents at wo
   await frame.scrollIntoViewIfNeeded()
   const header = frame.locator('[data-demo-header]')
   const ask = header.locator('[data-demo-ask]')
-  const working = ask.locator('[data-demo-ask-agent]')
+  const trigger = header.locator('[data-demo-ask-menu-trigger]')
+  const menu = header.locator('[data-demo-ask-menu]')
+  const cursor = frame.locator('[data-demo-cursor]')
 
   await page.clock.runFor(500)
-  await expect(ask).toBeVisible()
   await expect(ask).toContainText('Ask Aircastle')
   await expect(ask.getByText('⌘J', { exact: true })).toBeVisible()
-  await expect(working).toHaveCount(0)
+  await expect(ask.locator('svg.lucide-bot')).toHaveCount(1)
+  await expect(ask.locator('.brand-logo')).toHaveCount(0)
+  await expect(trigger.locator('svg.lucide-chevron-down')).toHaveCount(1)
   const askBox = await ask.boundingBox()
+  const triggerBox = await trigger.boundingBox()
   const searchBox = await header.locator('[data-demo-search]').boundingBox()
-  if (!askBox || !searchBox) throw new Error('Header is not laid out')
-  expect(askBox.x + askBox.width).toBeLessThanOrEqual(searchBox.x)
+  if (!askBox || !triggerBox || !searchBox) throw new Error('Header is not laid out')
+  expect(Math.abs(triggerBox.x - (askBox.x + askBox.width))).toBeLessThanOrEqual(1)
+  expect(Math.abs(triggerBox.height - askBox.height)).toBeLessThanOrEqual(1)
+  expect(triggerBox.width).toBeLessThanOrEqual(askBox.height + 1)
+  expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(searchBox.x)
+  await expect(menu).toHaveAttribute('data-state', 'closed')
 
   await page.clock.runFor(10000)
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
-  await expect(working).toHaveCount(4)
+  await expect(header.locator('[data-demo-ask-agent]')).toHaveCount(0)
+
+  await page.clock.runFor(11500)
+  await expect(menu).toHaveAttribute('data-state', 'closed')
+  let opened = false
+  for (let tick = 0; tick < 25 && !opened; tick += 1) {
+    await page.clock.runFor(200)
+    opened = (await menu.getAttribute('data-state')) === 'open'
+  }
+  expect(opened).toBe(true)
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+  await expect(cursor).toHaveAttribute('data-target', 'ask')
+  const options = menu.locator('[data-demo-ask-option]')
+  await expect(options).toHaveCount(5)
+  const expected = [
+    ['Ask Aircastle', 'Orchestrator'],
+    ['Ask Thorfinn', 'Writing Agent'],
+    ['Ask Canute', 'Research Agent'],
+    ['Ask Askeladd', 'SEO Agent'],
+    ['Ask Bjorn', 'Review Agent'],
+  ] as const
+  for (const [index, [name, role]] of expected.entries()) {
+    await expect(options.nth(index)).toContainText(name)
+    await expect(options.nth(index).locator('[data-demo-ask-role]')).toHaveText(role)
+  }
+  await expect(options.first().locator('svg.lucide-bot')).toHaveCount(1)
+  const menuBox = await menu.boundingBox()
+  const openTriggerBox = await trigger.boundingBox()
+  if (!menuBox || !openTriggerBox) throw new Error('Menu is not laid out')
+  expect(menuBox.y).toBeGreaterThanOrEqual(openTriggerBox.y + openTriggerBox.height)
 })
