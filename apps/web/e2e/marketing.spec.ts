@@ -2,7 +2,7 @@ import { test, expect } from './support'
 
 for (const theme of ['light', 'dark'] as const) {
   for (const width of [1440, 390]) {
-    test(`landing ${theme} at ${width}px opens Aircastle from the header`, async ({ page }) => {
+    test(`landing ${theme} at ${width}px shows the hero and opens Aircastle`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 })
       await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
       await page.goto('/')
@@ -12,6 +12,36 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(home).toHaveText('Aircastle')
       await expect(home).toHaveCSS('font-size', '22px')
       await expect(home).toHaveCSS('font-weight', '400')
+      const hero = page.getByRole('heading', {
+        level: 1,
+        name: /^Autopilot for everything you write\. /,
+      })
+      await expect(hero).toBeVisible()
+      await expect(hero).toHaveCSS('font-size', width >= 768 ? '48px' : '36px')
+      await expect(hero).toHaveCSS('font-weight', '250')
+      const headline = hero.locator(':scope > span').first()
+      const tagline = hero.getByText(
+        'Agents for your content operations, so you can focus on thought.',
+        { exact: true },
+      )
+      await expect(tagline).toBeVisible()
+      const color = (locator: typeof tagline) =>
+        locator.evaluate((element) => getComputedStyle(element).color)
+      expect(await color(tagline)).not.toBe(await color(headline))
+      if (width >= 1440) {
+        const lineWidths = await tagline.evaluate((element) => {
+          const range = document.createRange()
+          range.selectNodeContents(element)
+          const lines = new Map<number, number>()
+          for (const rect of range.getClientRects()) {
+            const top = Math.round(rect.top)
+            lines.set(top, (lines.get(top) ?? 0) + rect.width)
+          }
+          return [...lines.entries()].sort(([a], [b]) => a - b).map(([, lineWidth]) => lineWidth)
+        })
+        expect(lineWidths).toHaveLength(2)
+        expect(Math.min(...lineWidths) / Math.max(...lineWidths)).toBeGreaterThan(0.6)
+      }
       await expect(page.locator('video, canvas')).toHaveCount(0)
       await expect(header).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
       await expect(header).toHaveCSS('border-bottom-color', 'rgba(0, 0, 0, 0)')
