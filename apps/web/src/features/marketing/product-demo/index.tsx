@@ -22,7 +22,7 @@ import styles from './product-demo.module.css'
 import { frameAt, loopDuration, prompt, stillFrame, type Frame, type Shortcut } from './timeline'
 
 const frameWidth = 1120
-const frameHeight = 680
+const frameHeight = 712
 
 function sameFrame(left: Frame, right: Frame) {
   return (
@@ -74,7 +74,7 @@ function AgentDialog({
       data-demo-dialog
       data-state={state}
       className={cn(
-        'absolute top-[150px] left-1/2 z-30 w-[560px] -translate-x-1/2 rounded-xl border bg-popover p-4 text-base text-popover-foreground shadow-2xl transition-[opacity,scale,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-y-2 starting:scale-[0.97] starting:opacity-0',
+        'absolute top-[182px] left-1/2 z-30 w-[560px] -translate-x-1/2 rounded-xl border bg-popover p-4 text-base text-popover-foreground shadow-2xl transition-[opacity,scale,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-y-2 starting:scale-[0.97] starting:opacity-0',
         state === 'closing' && 'translate-y-1 scale-[0.98] opacity-0',
       )}
     >
@@ -233,6 +233,16 @@ const outlineButton =
 
 const plainIcon =
   'inline-flex size-7 items-center justify-center text-muted-foreground [&_svg]:size-4'
+
+function WindowDots() {
+  return (
+    <div data-demo-window-dots className="flex h-8 shrink-0 items-center gap-2 bg-card px-3.5">
+      <span className="size-3 rounded-full bg-muted-foreground/25" />
+      <span className="size-3 rounded-full bg-muted-foreground/25" />
+      <span className="size-3 rounded-full bg-muted-foreground/25" />
+    </div>
+  )
+}
 
 function DemoHeader() {
   return (
@@ -431,10 +441,11 @@ export function ProductDemo() {
           data-demo-frame
           aria-hidden="true"
           style={{ width: frameWidth, height: frameHeight, scale: String(scale) }}
-          className="absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-xl border bg-card text-sm text-card-foreground shadow-xl select-none"
+          className="absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-xl bg-card text-sm text-card-foreground shadow-xl select-none"
         >
+          <WindowDots />
           <DemoHeader />
-          <div className="flex h-[calc(100%-3.5rem)]">
+          <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />
             <PostsView agentRow={frame.agentRow} />
           </div>

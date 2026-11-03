@@ -127,3 +127,16 @@ test('the agent dialog stays closed with reduced motion', async ({ page }) => {
   await page.clock.runFor(8000)
   await expect(frame.locator('[data-demo-dialog]')).toHaveCount(0)
 })
+
+test('product preview has window dots above the header and no frame border', async ({ page }) => {
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await expect(frame).toHaveCSS('border-top-width', '0px')
+  const dots = frame.locator('[data-demo-window-dots]')
+  await expect(dots.locator('> *')).toHaveCount(3)
+  await expect(dots).toHaveCSS('border-bottom-width', '0px')
+  const dotsBox = await dots.boundingBox()
+  const headerBox = await frame.locator('[data-demo-header]').boundingBox()
+  if (!dotsBox || !headerBox) throw new Error('Preview is not laid out')
+  expect(dotsBox.y + dotsBox.height).toBeLessThanOrEqual(headerBox.y + 0.5)
+})
