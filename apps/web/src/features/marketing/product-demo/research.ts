@@ -24,6 +24,7 @@ export type ResearchEntry = { at: number } & (
   | { kind: 'thought'; text: string }
   | { kind: 'source'; source: Source }
   | { kind: 'decision'; question: string }
+  | { kind: 'handoff'; to: string; task: string }
   | { kind: 'synthesis'; artifacts: readonly Artifact[] }
 )
 
@@ -147,6 +148,12 @@ export const researchLog: readonly ResearchEntry[] = [
     text: 'Remote servers use HTTP. The transports page should say which one to recommend.',
   },
   {
+    at: 6450,
+    kind: 'handoff',
+    to: 'Air',
+    task: 'draft “Connect to Acme MCP” in Docs',
+  },
+  {
     at: 6600,
     kind: 'source',
     source: {
@@ -243,13 +250,20 @@ export const docsDecision = {
   reason: 'Acme’s docs have no MCP page, and readers will need setup steps after the post.',
   target: { collection: 'Docs', title: 'Connect to Acme MCP' },
   replies: ['Yes, draft it', 'Not yet', 'Something else…'],
+  chosen: 'Yes, draft it',
 } as const
 
 const docsDecisionIndex = researchLog.findIndex((entry) => entry.kind === 'decision')
+const docsHandoffIndex = researchLog.findIndex((entry) => entry.kind === 'handoff')
 
-/** Whether the docs decision has been raised once the log has reached this many steps. */
-export function docsDecisionRaised(steps: number) {
-  return steps > docsDecisionIndex
+/** When the docs decision is answered and handed to Air, timed from when the editor opens. */
+export const docsDecisionAnsweredAt = researchLog[docsHandoffIndex]?.at ?? 0
+
+/** Where the docs decision stands once the log has reached this many steps. */
+export function docsDecisionState(steps: number): 'unasked' | 'asking' | 'sent' {
+  if (steps > docsHandoffIndex) return 'sent'
+  if (steps > docsDecisionIndex) return 'asking'
+  return 'unasked'
 }
 
 /** The sources in the research log, in reading order. */

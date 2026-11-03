@@ -706,11 +706,10 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
     'false',
   )
   await expect(request).toBeInViewport()
-  await expect(decision).toBeInViewport()
-  expect(await pinnedAbovePrompt()).toBe(true)
+  await expect(decision).toBeHidden()
   await expect(marker).toBeAttached()
   await expect(panel.locator('[data-demo-research-reply]')).toContainText(
-    'asked whether to draft a docs page',
+    'handed a docs page to Air',
   )
   await expect(panel.locator('[data-demo-research-reply]')).toContainText('Research brief.md')
   const agentLabel = panel.locator('[data-demo-agent-label]')
@@ -796,4 +795,83 @@ test('the preview header has an Ask Air split button with an agent menu', async 
     await expect(options.nth(index).locator('[data-demo-ask-name]')).toHaveText(name)
     await expect(options.nth(index).locator('[data-demo-ask-role]')).toHaveText(role)
   }
+})
+
+test('the cursor answers Canute’s decision and Canute hands it to Air', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const panel = frame.locator('[data-demo-research-panel]')
+  const decision = panel.locator('[data-demo-decision]')
+  const marker = panel.locator('[data-demo-decision-marker]')
+  const cursor = frame.locator('[data-demo-cursor]')
+  const waiting = frame.locator('[data-demo-ask-count]')
+
+  await page.clock.runFor(14000)
+  await expect(decision).toHaveAttribute('data-state', 'asking')
+  await expect(waiting).toHaveText('1')
+
+  let hovering = false
+  for (let tick = 0; tick < 30 && !hovering; tick += 1) {
+    await page.clock.runFor(100)
+    hovering =
+      (await cursor.getAttribute('data-target')) === 'decision' &&
+      (await cursor.getAttribute('data-state')) === 'hovering'
+  }
+  expect(hovering).toBe(true)
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+  await expect(decision).toHaveAttribute('data-state', 'asking')
+
+  let sent = false
+  for (let tick = 0; tick < 15 && !sent; tick += 1) {
+    await page.clock.runFor(100)
+    sent = (await decision.getAttribute('data-state')) === 'sent'
+  }
+  expect(sent).toBe(true)
+  await expect(decision).toContainText('Sent to Air')
+  await expect(decision).toContainText('Connect to Acme MCP')
+  await expect(decision.locator('[data-demo-decision-option]')).toHaveCount(0)
+  await expect(decision.locator('.air-mascot')).toHaveCount(1)
+  await expect(marker).toContainText('You: Yes, draft it')
+  await expect(marker).not.toContainText('Waiting')
+  const handoff = panel.locator('[data-demo-research-chain] [data-demo-handoff]')
+  await expect(handoff).toContainText('Handed off to')
+  await expect(handoff).toContainText('Air')
+  await expect(handoff.locator('.air-mascot')).toHaveCount(1)
+  await expect(waiting).toHaveCount(0)
+
+  await page.clock.runFor(1000)
+  await expect(decision).toBeHidden()
+})
+
+test('Thorfinn streams a body draft once Canute’s research is done', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const body = frame.locator('[data-demo-field="body"]')
+  const tab = body.locator('[data-demo-agent-tab]')
+  const draft = body.locator('[data-demo-body-draft]')
+
+  await page.clock.runFor(19500)
+  await expect(tab).toContainText('Waiting on Canute…')
+  await expect(draft).toHaveCount(0)
+
+  await page.clock.runFor(2500)
+  await expect(tab).toContainText('Writing…')
+  await expect(body).toHaveAttribute('data-empty', 'false')
+  await expect(draft.locator('h2').first()).toBeVisible()
+  const words = draft.locator('[data-demo-draft-word]')
+  expect(await words.count()).toBeGreaterThan(40)
+  const delays = await words.evaluateAll((elements) =>
+    elements.map((element) => parseFloat(getComputedStyle(element).animationDelay)),
+  )
+  expect(delays).toEqual([...delays].sort((first, second) => first - second))
+  expect(new Set(delays).size).toBe(delays.length)
+  await expect(words.last()).toHaveCSS('opacity', '1', { timeout: 8000 })
 })

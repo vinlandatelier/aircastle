@@ -21,7 +21,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { EditorView } from './editor-view'
-import { docsDecisionRaised } from './research'
+import { docsDecisionState } from './research'
 import { canute, orchestrator, thorfinn, workingAgents, type DemoAgent } from './agents'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
@@ -440,6 +440,7 @@ const cursorSpots = {
   rest: { left: 1010, top: 640 },
   row: { left: 320, top: 218 },
   research: { left: 700, top: 112 },
+  decision: { left: 1045, top: 592 },
 } as const
 
 function DemoCursor({
@@ -655,7 +656,7 @@ export function ProductDemo() {
           <WindowDots />
           <DemoHeader
             decisionsWaiting={
-              frame.view === 'editor' && docsDecisionRaised(frame.researchSteps) ? 1 : 0
+              frame.view === 'editor' && docsDecisionState(frame.researchSteps) === 'asking' ? 1 : 0
             }
           />
           <div className="flex h-[calc(100%-5.5rem)]">

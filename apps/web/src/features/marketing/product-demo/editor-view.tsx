@@ -2,7 +2,10 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   SparklesIcon,
+  ArrowRightIcon,
   ArrowUpIcon,
+  ArrowUpRightIcon,
+  CheckIcon,
   BrainIcon,
   LoaderCircleIcon,
   MessageCircleQuestionIcon,
@@ -27,7 +30,7 @@ import { cn } from 'cn'
 import styles from './product-demo.module.css'
 import {
   docsDecision,
-  docsDecisionRaised,
+  docsDecisionState,
   researchBrief,
   researchLog,
   researchSources,
@@ -317,7 +320,7 @@ function ResearchStatus({
 const entering =
   'transition-[opacity,translate] duration-500 starting:translate-y-1 starting:opacity-0'
 
-function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
+function ResearchEntryView({ entry, answered }: { entry: ResearchEntry; answered: boolean }) {
   if (entry.kind === 'thought')
     return (
       <p
@@ -360,9 +363,27 @@ function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
         <TraceTitle className="whitespace-normal">
           Asked you: {entry.question.charAt(0).toLowerCase() + entry.question.slice(1)}
         </TraceTitle>
-        <span className="shrink-0 rounded-sm bg-amber-500/15 px-1 py-px text-[10px] leading-none text-amber-700 dark:text-amber-300">
-          Waiting
-        </span>
+        {answered ? (
+          <span className="shrink-0 rounded-sm bg-emerald-500/15 px-1 py-px text-[10px] leading-none text-emerald-700 dark:text-emerald-300">
+            You: {docsDecision.chosen}
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-sm bg-amber-500/15 px-1 py-px text-[10px] leading-none text-amber-700 dark:text-amber-300">
+            Waiting
+          </span>
+        )}
+      </TraceLine>
+    )
+  if (entry.kind === 'handoff')
+    return (
+      <TraceLine data-demo-handoff className={cn('text-xs text-foreground', entering)}>
+        <TraceIcon>
+          <ArrowUpRightIcon className="size-3.5" />
+        </TraceIcon>
+        <TraceTitle className="whitespace-normal">
+          Handed off to <span className="air-mascot mx-0.5 inline-block size-3.5 align-[-2px]" />
+          {entry.to}: {entry.task}
+        </TraceTitle>
       </TraceLine>
     )
   return (
@@ -377,7 +398,7 @@ function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
 
 function PendingStep({ entry }: { entry: ResearchEntry }) {
   const text =
-    entry.kind === 'thought' || entry.kind === 'decision'
+    entry.kind === 'thought' || entry.kind === 'decision' || entry.kind === 'handoff'
       ? 'Thinking…'
       : entry.kind === 'source'
         ? `${entry.source.action === 'Read' ? 'Reading' : 'Searching'} ${entry.source.url}`
@@ -385,7 +406,7 @@ function PendingStep({ entry }: { entry: ResearchEntry }) {
   return (
     <TraceLine data-demo-research-pending status="running" className="text-xs">
       <TraceIcon>
-        {entry.kind === 'thought' || entry.kind === 'decision' ? (
+        {entry.kind === 'thought' || entry.kind === 'decision' || entry.kind === 'handoff' ? (
           <BrainIcon className="size-3.5" />
         ) : (
           <LoaderCircleIcon className="size-3.5 motion-safe:animate-spin" />
@@ -420,7 +441,11 @@ function ResearchChain({ steps }: { steps: number }) {
         <TraceCollapsibleContent keepMounted>
           <Trace className="gap-3">
             {researchLog.slice(0, steps).map((entry) => (
-              <ResearchEntryView key={entry.at} entry={entry} />
+              <ResearchEntryView
+                key={entry.at}
+                entry={entry}
+                answered={docsDecisionState(steps) === 'sent'}
+              />
             ))}
             {next && <PendingStep entry={next} />}
           </Trace>
@@ -431,7 +456,7 @@ function ResearchChain({ steps }: { steps: number }) {
 }
 
 const replyText =
-  'Here’s what I found, with the setup steps and sources for the post. Acme’s docs don’t cover MCP yet, so I’ve asked whether to draft a docs page for it.'
+  'Here’s what I found, with the setup steps and sources for the post. Acme’s docs don’t cover MCP yet, so I’ve handed a docs page to Air.'
 const replyWords = replyText.split(' ')
 const wordInterval = 35
 const cardsStartAfter = replyWords.length * wordInterval + 150
@@ -478,10 +503,9 @@ function ResearchReply({ artifacts }: { artifacts: readonly Artifact[] }) {
 
 const synthesis = researchLog.find((entry) => entry.kind === 'synthesis')
 
-function DecisionCard() {
+function AskingCard() {
   return (
     <div
-      data-demo-decision
       className={cn(
         'flex items-start gap-2 rounded-lg border bg-background p-3 shadow-sm dark:bg-input/30',
         entering,
@@ -516,6 +540,34 @@ function DecisionCard() {
             </span>
           ))}
         </span>
+      </div>
+    </div>
+  )
+}
+
+function SentReceipt() {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 text-xs shadow-sm dark:bg-input/30">
+      <GeneratedAvatar name={researcher} size={16} variant="beam" />
+      <ArrowRightIcon className="size-3 text-muted-foreground" />
+      <span className="air-mascot block size-4 shrink-0" />
+      <span className="min-w-0 truncate">
+        Sent to {orchestrator.name}: draft {docsDecision.target.title}
+      </span>
+      <CheckIcon className="ml-auto size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+    </div>
+  )
+}
+
+function DecisionCard({ state }: { state: 'asking' | 'sent' }) {
+  return (
+    <div
+      data-demo-decision
+      data-state={state}
+      className={cn('grid', state === 'sent' && styles.receiptLeave)}
+    >
+      <div className="min-h-0 overflow-hidden">
+        {state === 'asking' ? <AskingCard /> : <SentReceipt />}
       </div>
     </div>
   )
@@ -588,7 +640,9 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
         </Message>
       </div>
       <div className="flex flex-col gap-2 p-3">
-        {docsDecisionRaised(steps) && <DecisionCard />}
+        {docsDecisionState(steps) !== 'unasked' && (
+          <DecisionCard state={docsDecisionState(steps) === 'sent' ? 'sent' : 'asking'} />
+        )}
         <InputGroup data-demo-research-prompt className="dark:bg-input/30">
           <InputGroupTextarea
             readOnly
@@ -653,16 +707,72 @@ function TopBar({
   )
 }
 
-function BodyField({ writing }: { writing: boolean }) {
+const bodyDraft = [
+  { kind: 'h2', text: 'Your assistant, now inside Acme' },
+  {
+    kind: 'p',
+    text: 'Today we’re launching a remote MCP server for Acme. Connect Claude, Cursor or any MCP client, and your assistant can read and update your collections without leaving the chat.',
+  },
+  { kind: 'h2', text: 'Set it up in a minute' },
+  {
+    kind: 'p',
+    text: 'Add mcp.acme.com to your client’s config with a scoped access token. Each token only reaches the collections you choose.',
+  },
+] as const
+const draftStartsAfter = 600
+const draftWordInterval = 30
+
+const bodyDraftBlocks = bodyDraft.reduce<
+  { kind: 'h2' | 'p'; text: string; words: { word: string; delay: number }[] }[]
+>((blocks, block) => {
+  const before = blocks.reduce((count, { words }) => count + words.length, 0)
+  const words = block.text.split(' ').map((word, index, all) => ({
+    word: index < all.length - 1 ? `${word} ` : word,
+    delay: draftStartsAfter + (before + index) * draftWordInterval,
+  }))
+  return [...blocks, { kind: block.kind, text: block.text, words }]
+}, [])
+
+function BodyDraft() {
   return (
-    <Field name="body" label="Body" empty>
+    <div data-demo-body-draft className="flex min-h-40 flex-col gap-2 px-4 py-4 leading-6">
+      {bodyDraftBlocks.map((block) => {
+        const words = block.words.map(({ word, delay }, index) => (
+          <span
+            key={index}
+            data-demo-draft-word
+            className={styles.streamWord}
+            style={{ animationDelay: `${delay}ms` }}
+          >
+            {word}
+          </span>
+        ))
+        return block.kind === 'h2' ? (
+          <h2 key={block.text} className="text-lg">
+            {words}
+          </h2>
+        ) : (
+          <p key={block.text}>{words}</p>
+        )
+      })}
+    </div>
+  )
+}
+
+function BodyField({ writing, drafting }: { writing: boolean; drafting: boolean }) {
+  return (
+    <Field name="body" label="Body" empty={!drafting}>
       <div
         className={cn(
           'relative rounded-md border bg-background transition-[border-color] duration-500 dark:bg-input/30',
           writing && 'border-transparent',
         )}
       >
-        <AgentPresence agent={writerAgent} active={writing} status="Waiting on Canute…" />
+        <AgentPresence
+          agent={writerAgent}
+          active={writing}
+          status={drafting ? 'Writing…' : 'Waiting on Canute…'}
+        />
         <div className="flex h-10 items-center gap-1 border-b px-2 text-muted-foreground">
           {toolbar.map((group, index) => (
             <span key={group[0]?.name} className="flex items-center gap-1">
@@ -678,9 +788,13 @@ function BodyField({ writing }: { writing: boolean }) {
             </span>
           ))}
         </div>
-        <div className={cn('min-h-40 px-4 py-4 leading-6', placeholder)}>
-          Start writing, or ask agents to draft it…
-        </div>
+        {drafting ? (
+          <BodyDraft />
+        ) : (
+          <div className={cn('min-h-40 px-4 py-4 leading-6', placeholder)}>
+            Start writing, or ask agents to draft it…
+          </div>
+        )}
       </div>
     </Field>
   )
@@ -729,7 +843,7 @@ function SeoGroup() {
   )
 }
 
-function MainColumn({ writerOnBody }: { writerOnBody: boolean }) {
+function MainColumn({ writerOnBody, drafting }: { writerOnBody: boolean; drafting: boolean }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <Field name="title" label="Title" empty={false}>
@@ -751,7 +865,7 @@ function MainColumn({ writerOnBody }: { writerOnBody: boolean }) {
           A short description shown in listings
         </div>
       </Field>
-      <BodyField writing={writerOnBody} />
+      <BodyField writing={writerOnBody} drafting={drafting} />
       <SeoGroup />
     </div>
   )
@@ -866,7 +980,7 @@ export function EditorView({
           researchDocked={researchPanelOpen}
         />
         <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
-          <MainColumn writerOnBody={writerOnBody} />
+          <MainColumn writerOnBody={writerOnBody} drafting={researchSteps >= researchLog.length} />
           <SideColumn
             writerOnCategories={writerOnCategories}
             writerOnTags={writerOnTags}

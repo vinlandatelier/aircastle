@@ -1,4 +1,4 @@
-import { researchStepsAt } from './research'
+import { docsDecisionAnsweredAt, researchStepsAt } from './research'
 
 export const prompt = "Recently shipped MCP for our app, let's announce it"
 
@@ -15,7 +15,7 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const editorDuration = 14000
+const editorDuration = 16000
 const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
@@ -31,6 +31,10 @@ const researchCursorTravel = 1400
 const researchHoverDuration = 500
 const researchClickDuration = 220
 const panelOpensAfterClick = 100
+const decisionCursorTravel = 1400
+const decisionHoverDuration = 400
+const decisionClickDuration = 220
+const decisionAnsweredAfterClick = 150
 const tagsStartAfterArriving = 500
 const writerLeavesCategoriesAfterEditor =
   categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
@@ -62,7 +66,7 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
-export type CursorTarget = 'rest' | 'row' | 'research'
+export type CursorTarget = 'rest' | 'row' | 'research' | 'decision'
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -117,12 +121,20 @@ const researchCursorArrivesAfterEditor = researchCursorMovesAfterEditor + resear
 const researchClickAfterEditor = researchCursorArrivesAfterEditor + researchHoverDuration
 const researchClickEndsAfterEditor = researchClickAfterEditor + researchClickDuration
 const researchPanelOpensAfterEditor = researchClickAfterEditor + panelOpensAfterClick
+const decisionClickAfterEditor = docsDecisionAnsweredAt - decisionAnsweredAfterClick
+const decisionCursorArrivesAfterEditor = decisionClickAfterEditor - decisionHoverDuration
+const decisionCursorMovesAfterEditor = decisionCursorArrivesAfterEditor - decisionCursorTravel
+const decisionClickEndsAfterEditor = decisionClickAfterEditor + decisionClickDuration
 
 function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < researchCursorMovesAfterEditor) return 'still'
   if (sinceEditor < researchCursorArrivesAfterEditor) return 'moving'
   if (sinceEditor < researchClickAfterEditor) return 'hovering'
   if (sinceEditor < researchClickEndsAfterEditor) return 'clicking'
+  if (sinceEditor < decisionCursorMovesAfterEditor) return 'still'
+  if (sinceEditor < decisionCursorArrivesAfterEditor) return 'moving'
+  if (sinceEditor < decisionClickAfterEditor) return 'hovering'
+  if (sinceEditor < decisionClickEndsAfterEditor) return 'clicking'
   return 'still'
 }
 
@@ -162,6 +174,9 @@ export function frameAt(elapsed: number): Frame {
       (inEditor &&
         sinceEditor >= researchCursorArrivesAfterEditor - 100 &&
         sinceEditor < researchClickEndsAfterEditor) ||
+      (inEditor &&
+        sinceEditor >= decisionCursorArrivesAfterEditor - 100 &&
+        sinceEditor < decisionClickEndsAfterEditor) ||
       (elapsed >= editorClosesAt && elapsed < editorClosesAt + rowsLeftAfter)
         ? 'pointer'
         : 'arrow',
@@ -180,9 +195,11 @@ export function frameAt(elapsed: number): Frame {
     cursorTarget:
       elapsed < cursorShownAt || elapsed >= editorClosesAt
         ? 'rest'
-        : inEditor && sinceEditor >= researchCursorMovesAfterEditor
-          ? 'research'
-          : 'row',
+        : inEditor && sinceEditor >= decisionCursorMovesAfterEditor
+          ? 'decision'
+          : inEditor && sinceEditor >= researchCursorMovesAfterEditor
+            ? 'research'
+            : 'row',
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',

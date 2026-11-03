@@ -100,3 +100,21 @@
     translate: 0 4px;
   }
 }
+
+.receiptLeave {
+  grid-template-rows: 1fr;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .receiptLeave {
+    animation: receipt-leave 450ms cubic-bezier(0.22, 1, 0.36, 1) 1600ms forwards;
+  }
+}
+
+@keyframes receipt-leave {
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    margin-bottom: -0.5rem;
+  }
+}
