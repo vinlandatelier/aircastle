@@ -14,7 +14,7 @@ test('product preview sits below the hero without a visible label', async ({ pag
 test('product preview shows the posts collection without motion', async ({ page }) => {
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await expect(frame.getByText('Posts', { exact: true }).first()).toBeVisible()
+  await expect(frame.getByText('Blog posts', { exact: true })).toBeVisible()
   await expect(frame.getByText('How we cut build times by 40%', { exact: true })).toBeVisible()
   await expect(frame.locator('[data-demo-dialog]')).toHaveCount(0)
   expect(await frame.evaluate((element) => element.getAnimations({ subtree: true }).length)).toBe(0)
@@ -37,4 +37,21 @@ test('product preview mirrors the dashboard shell with a collapsed sidebar', asy
   const frameBox = await frame.boundingBox()
   if (!railBox || !frameBox) throw new Error('Preview is not laid out')
   expect(railBox.width / frameBox.width).toBeLessThan(0.06)
+})
+
+test('product preview table shows truncated plain-text bodies and a count badge', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await expect(frame.locator('[data-demo-count]')).toHaveText('6')
+  await expect(frame.getByText('Body', { exact: true })).toBeVisible()
+  const bodies = frame.locator('[data-demo-body]')
+  await expect(bodies).toHaveCount(6)
+  const firstBody = bodies.first()
+  await expect(firstBody).toHaveCSS('text-overflow', 'ellipsis')
+  expect(await firstBody.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+    true,
+  )
+  await expect(firstBody.locator('*')).toHaveCount(0)
 })

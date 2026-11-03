@@ -21,19 +21,51 @@ const frameHeight = 680
 
 type Status = 'Published' | 'In review' | 'Draft'
 
-const posts: readonly { title: string; status: Status; author: string; updated: string }[] = [
+const posts: readonly {
+  title: string
+  body: string
+  status: Status
+  author: string
+  updated: string
+}[] = [
   {
     title: 'How we cut build times by 40%',
+    body: 'Our CI pipeline had grown to 18 minutes. We profiled every step, cached the slowest ones and split tests across runners. Here is what changed and what it cost us.',
     status: 'Published',
     author: 'Maya',
     updated: '2d ago',
   },
-  { title: 'Designing for offline-first', status: 'In review', author: 'Theo', updated: '3d ago' },
-  { title: 'Q3 product roundup', status: 'Published', author: 'Priya', updated: '1w ago' },
-  { title: 'A field guide to content models', status: 'Draft', author: 'Sam', updated: '1w ago' },
-  { title: 'Why we moved to Postgres', status: 'Published', author: 'Maya', updated: '2w ago' },
+  {
+    title: 'Designing for offline-first',
+    body: 'Users lose signal on trains, in lifts and on flights. We rebuilt sync around a local store so edits never block on the network, and conflicts resolve without prompts.',
+    status: 'In review',
+    author: 'Theo',
+    updated: '3d ago',
+  },
+  {
+    title: 'Q3 product roundup',
+    body: 'Scheduled publishing, image focal points, field-level permissions and twelve smaller fixes shipped this quarter. Here is a tour of each one with links to the docs.',
+    status: 'Published',
+    author: 'Priya',
+    updated: '1w ago',
+  },
+  {
+    title: 'A field guide to content models',
+    body: 'Good content models start from how editors work, not from the database. We walk through modelling articles, authors and references for a typical publication.',
+    status: 'Draft',
+    author: 'Sam',
+    updated: '1w ago',
+  },
+  {
+    title: 'Why we moved to Postgres',
+    body: 'We outgrew our document store once references and uniqueness mattered. This post covers the migration plan, the dual-write period and the queries that got faster.',
+    status: 'Published',
+    author: 'Maya',
+    updated: '2w ago',
+  },
   {
     title: 'Shipping localisation in a week',
+    body: 'Translating fields was the easy part. Locale fallbacks, right-to-left layouts and keeping slugs stable across languages took the rest of the week.',
     status: 'Published',
     author: 'Theo',
     updated: '3w ago',
@@ -163,15 +195,17 @@ function DemoSidebar() {
   )
 }
 
-const rowGrid = 'grid grid-cols-[1fr_9rem_8rem_6rem] items-center gap-4 px-4'
+const rowGrid = 'grid grid-cols-[14rem_1fr_7.5rem_7rem_5.5rem] items-center gap-4 px-4'
 
 function PostsView() {
   return (
     <div className="min-w-0 flex-1 p-6">
       <div className="flex items-center justify-between pb-4">
-        <div className="flex items-baseline gap-3">
-          <h3 className="text-2xl">Posts</h3>
-          <span className="text-muted-foreground">{posts.length}</span>
+        <div className="flex items-center gap-2.5">
+          <h3 className="text-2xl">Blog posts</h3>
+          <Badge data-demo-count variant="secondary">
+            {posts.length}
+          </Badge>
         </div>
         <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary pr-2.5 pl-2 text-primary-foreground">
           <PlusIcon className="size-4" />
@@ -181,6 +215,7 @@ function PostsView() {
       <div className="overflow-hidden rounded-lg border">
         <div className={cn(rowGrid, 'border-b py-2.5 text-xs text-muted-foreground uppercase')}>
           <span>Title</span>
+          <span>Body</span>
           <span>Status</span>
           <span>Author</span>
           <span>Updated</span>
@@ -188,6 +223,9 @@ function PostsView() {
         {posts.map((post) => (
           <div key={post.title} className={cn(rowGrid, 'border-b py-3 last:border-b-0')}>
             <span className="truncate">{post.title}</span>
+            <span data-demo-body className="truncate text-muted-foreground">
+              {post.body}
+            </span>
             <StatusPill status={post.status} />
             <span className="inline-flex items-center gap-2 text-muted-foreground">
               <Initial name={post.author} />
