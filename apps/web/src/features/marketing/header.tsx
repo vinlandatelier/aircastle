@@ -27,10 +27,8 @@ export function Header() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-20 w-full border-b text-foreground motion-safe:transition-colors motion-safe:duration-200',
-        scrolled
-          ? 'border-border/60 bg-background/80 backdrop-blur-md'
-          : 'border-transparent bg-transparent',
+        'sticky top-0 z-20 w-full text-foreground motion-safe:transition-colors motion-safe:duration-200',
+        scrolled ? 'bg-background' : 'bg-transparent',
       )}
     >
       <nav

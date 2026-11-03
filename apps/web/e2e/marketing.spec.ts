@@ -44,7 +44,7 @@ for (const theme of ['light', 'dark'] as const) {
       }
       await expect(page.locator('video, canvas')).toHaveCount(0)
       await expect(header).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-      await expect(header).toHaveCSS('border-bottom-color', 'rgba(0, 0, 0, 0)')
+      await expect(header).toHaveCSS('border-bottom-width', '0px')
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         width,
       )
