@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookOpenIcon, FileTextIcon, NewspaperIcon, PlusIcon, UsersIcon } from 'lucide-react'
+import {
+  BookOpenIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  MoonIcon,
+  PlugIcon,
+  PlusIcon,
+  SearchIcon,
+  SunIcon,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from 'cn'
+import { Badge } from '@/components/ui/badge'
+import { Kbd } from '@/components/ui/kbd'
+import { GeneratedAvatar } from '@/components/shell/generated-avatar'
+import { navigationGroups } from '@/features/navigation/pages'
 
 const frameWidth = 1120
 const frameHeight = 680
-
-const collections = [
-  { label: 'Posts', icon: NewspaperIcon, active: true },
-  { label: 'Pages', icon: FileTextIcon, active: false },
-  { label: 'Authors', icon: UsersIcon, active: false },
-  { label: 'Changelog', icon: BookOpenIcon, active: false },
-] as const
 
 type Status = 'Published' | 'In review' | 'Draft'
 
@@ -70,51 +77,116 @@ function Initial({ name }: { name: string }) {
   )
 }
 
-const rowGrid = 'grid grid-cols-[1fr_9rem_8rem_6rem] items-center gap-4 px-5'
+const outlineButton =
+  'inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background bg-clip-padding dark:border-input dark:bg-input/30 [&_svg]:size-4'
+
+const plainIcon =
+  'inline-flex size-7 items-center justify-center text-muted-foreground [&_svg]:size-4'
+
+function DemoHeader() {
+  return (
+    <div data-demo-header className="flex h-14 shrink-0 items-center gap-2 border-b">
+      <span className="flex h-full w-14 shrink-0 items-center justify-center border-r">
+        <span className="brand-logo block size-6 shrink-0" />
+      </span>
+      <span className="ml-1 inline-flex h-10 items-center gap-3 px-2">
+        <GeneratedAvatar size={24} name="Acme Inc" />
+        <span className="flex items-center">
+          <span className="flex items-center gap-2">
+            Acme Inc
+            <Badge variant="secondary">Pro</Badge>
+          </span>
+          <span className="px-3 text-muted-foreground">/</span>
+          Acme Platforms
+        </span>
+        <ChevronDownIcon className="size-4 text-muted-foreground" />
+      </span>
+      <span className="flex items-center gap-2">
+        <span className={cn(outlineButton, 'h-8 gap-1.5 pr-2.5 pl-2')}>
+          <PlugIcon />
+          Connect
+        </span>
+        <span className={cn(outlineButton, 'size-8')}>
+          <PlusIcon />
+        </span>
+      </span>
+      <span className="ms-auto flex items-center gap-4 pr-5">
+        <span className="inline-flex h-8 w-60 items-center gap-2.5 rounded-lg bg-secondary pr-2.5 pl-2">
+          <SearchIcon className="size-4 text-muted-foreground" />
+          <span className="text-muted-foreground">Search...</span>
+          <Kbd className="ml-auto">⌘K</Kbd>
+        </span>
+        <span className={plainIcon}>
+          <BookOpenIcon />
+        </span>
+        <span className={plainIcon}>
+          <SunIcon className="dark:hidden" />
+          <MoonIcon className="hidden dark:block" />
+        </span>
+        <span className="flex size-8 overflow-hidden rounded-full">
+          <GeneratedAvatar name="Shaban Haider" variant="beam" />
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function DemoSidebar() {
+  return (
+    <div data-demo-sidebar className="relative w-14 shrink-0 border-r">
+      <div className="flex flex-col items-center gap-1 py-4">
+        {navigationGroups
+          .flatMap<{ title: string; icon: LucideIcon }>((group) => group.items)
+          .map((item) => (
+            <span
+              key={item.title}
+              className={cn(
+                'inline-flex size-8 items-center justify-center rounded-md',
+                item.title === 'Collections'
+                  ? 'rounded-sm bg-muted text-foreground'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <item.icon className="size-4" />
+            </span>
+          ))}
+      </div>
+      <span
+        className={cn(
+          outlineButton,
+          'absolute end-0 top-1/2 z-10 size-7 translate-x-1/2 -translate-y-1/2 rounded-md bg-background! text-muted-foreground',
+        )}
+      >
+        <ChevronRightIcon />
+      </span>
+    </div>
+  )
+}
+
+const rowGrid = 'grid grid-cols-[1fr_9rem_8rem_6rem] items-center gap-4 px-4'
 
 function PostsView() {
   return (
-    <div className="flex h-full">
-      <aside className="flex w-56 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3 text-[15px]">
-        <div className="mb-3 flex items-center gap-2 px-2 py-1.5">
-          <span aria-hidden="true" className="brand-logo block size-5" />
-          <span>Acme</span>
+    <div className="min-w-0 flex-1 p-6">
+      <div className="flex items-center justify-between pb-4">
+        <div className="flex items-baseline gap-3">
+          <h3 className="text-2xl">Posts</h3>
+          <span className="text-muted-foreground">{posts.length}</span>
         </div>
-        <p className="px-2 pb-1 text-xs tracking-wide text-muted-foreground uppercase">
-          Collections
-        </p>
-        {collections.map(({ label, icon: Icon, active }) => (
-          <span
-            key={label}
-            className={cn(
-              'flex items-center gap-2.5 rounded-md px-2 py-1.5',
-              active ? 'bg-muted text-foreground' : 'text-muted-foreground',
-            )}
-          >
-            <Icon className="size-4" />
-            {label}
-          </span>
-        ))}
-      </aside>
-      <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between px-5 pt-6 pb-4">
-          <div className="flex items-baseline gap-3">
-            <h3 className="text-2xl">Posts</h3>
-            <span className="text-muted-foreground">{posts.length}</span>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[15px] text-primary-foreground">
-            <PlusIcon className="size-4" />
-            New post
-          </span>
-        </header>
-        <div className={cn(rowGrid, 'border-y py-2.5 text-[13px] text-muted-foreground uppercase')}>
+        <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary pr-2.5 pl-2 text-primary-foreground">
+          <PlusIcon className="size-4" />
+          New post
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-lg border">
+        <div className={cn(rowGrid, 'border-b py-2.5 text-xs text-muted-foreground uppercase')}>
           <span>Title</span>
           <span>Status</span>
           <span>Author</span>
           <span>Updated</span>
         </div>
         {posts.map((post) => (
-          <div key={post.title} className={cn(rowGrid, 'border-b py-3.5')}>
+          <div key={post.title} className={cn(rowGrid, 'border-b py-3 last:border-b-0')}>
             <span className="truncate">{post.title}</span>
             <StatusPill status={post.status} />
             <span className="inline-flex items-center gap-2 text-muted-foreground">
@@ -124,7 +196,7 @@ function PostsView() {
             <span className="text-muted-foreground">{post.updated}</span>
           </div>
         ))}
-      </section>
+      </div>
     </div>
   )
 }
@@ -143,21 +215,19 @@ export function ProductDemo() {
         Aircastle preview
       </h2>
       <p className="sr-only">
-        A posts collection in Aircastle, listing posts with their status, author and last update.
+        The Aircastle dashboard with its sidebar collapsed, showing a posts collection with each
+        post's status, author and last update.
       </p>
       <div ref={stage} style={{ height: frameHeight * scale }} className="relative w-full">
         <div
           data-demo-frame
           aria-hidden="true"
           style={{ width: frameWidth, height: frameHeight, scale: String(scale) }}
-          className="absolute top-0 left-0 origin-top-left overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xl select-none"
+          className="absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-xl border bg-card text-sm text-card-foreground shadow-xl select-none"
         >
-          <div className="flex h-10 items-center gap-2 border-b px-4">
-            <span className="size-3 rounded-full bg-muted-foreground/25" />
-            <span className="size-3 rounded-full bg-muted-foreground/25" />
-            <span className="size-3 rounded-full bg-muted-foreground/25" />
-          </div>
-          <div className="relative h-[calc(100%-2.5rem)]">
+          <DemoHeader />
+          <div className="flex h-[calc(100%-3.5rem)]">
+            <DemoSidebar />
             <PostsView />
           </div>
         </div>
