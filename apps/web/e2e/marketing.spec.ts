@@ -200,3 +200,17 @@ test('Vinland credit opens vinland.com.au in a new tab', async ({ page }) => {
   await expect(vinland).toHaveAttribute('target', '_blank')
   await expect(vinland).toHaveAttribute('rel', /noopener/)
 })
+
+test('hero explains Aircastle below the title in regular text', async ({ page }) => {
+  await page.goto('/')
+  const summary = page.getByText(
+    'Aircastle is the CMS designed to get you from idea to publication faster, and repeat this same recipe at scale with the help of our agents.',
+    { exact: true },
+  )
+  await expect(summary).toBeVisible()
+  await expect(summary).toHaveCSS('font-weight', '300')
+  const titleBox = await page.getByRole('heading', { level: 1 }).boundingBox()
+  const summaryBox = await summary.boundingBox()
+  if (!titleBox || !summaryBox) throw new Error('Hero is not laid out')
+  expect(summaryBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height)
+})

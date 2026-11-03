@@ -30,6 +30,10 @@ export function MarketingPage() {
               so you can focus on thought.
             </span>
           </h1>
+          <p className="mt-8 max-w-[46rem] text-xl leading-relaxed text-muted-foreground">
+            Aircastle is the CMS designed to get you from idea to publication faster, and repeat
+            this same recipe at scale with the help of our agents.
+          </p>
         </section>
       </main>
     </div>
