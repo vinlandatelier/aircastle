@@ -35,6 +35,20 @@ test('product preview mirrors the dashboard shell with a collapsed sidebar', asy
   await expect(header).toContainText('Search...')
   await expect(header).not.toContainText('Upgrade')
   await expect(header).not.toContainText('Free')
+  const bell = header.locator('[data-demo-notifications] svg.lucide-bell')
+  await expect(bell).toHaveCount(1)
+  const order = await header.evaluate((element) => {
+    const left = (selector: string) =>
+      element.querySelector(selector)?.getBoundingClientRect().left ?? -1
+    return [
+      left('svg.lucide-book-open'),
+      left('svg.lucide-sun, svg.lucide-moon'),
+      left('[data-demo-notifications]'),
+      left('[data-demo-account]'),
+    ]
+  })
+  expect(order.every((value) => value >= 0)).toBe(true)
+  expect(order).toEqual([...order].sort((first, second) => first - second))
   const rail = frame.locator('[data-demo-sidebar]')
   await expect(rail.locator('svg')).toHaveCount(8)
   const railBox = await rail.boundingBox()

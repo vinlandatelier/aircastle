@@ -3,6 +3,7 @@ import {
   ArrowUpIcon,
   MousePointer2Icon,
   PointerIcon,
+  BellIcon,
   BookOpenIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -372,7 +373,10 @@ function DemoHeader() {
           <SunIcon className="dark:hidden" />
           <MoonIcon className="hidden dark:block" />
         </span>
-        <span className="flex size-8 overflow-hidden rounded-full">
+        <span data-demo-notifications className={plainIcon}>
+          <BellIcon />
+        </span>
+        <span data-demo-account className="flex size-8 overflow-hidden rounded-full">
           <GeneratedAvatar name="Shaban Haider" variant="beam" />
         </span>
       </span>
