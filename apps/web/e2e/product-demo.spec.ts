@@ -191,11 +191,26 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   const agents = frame.locator('[data-demo-agents]')
   const row = frame.locator('[data-demo-agent-row]')
 
+  const cursorInsideFrame = async () => {
+    const cursorBox = await cursor.boundingBox()
+    const frameBox = await frame.boundingBox()
+    if (!cursorBox || !frameBox) return false
+    return (
+      cursorBox.x >= frameBox.x &&
+      cursorBox.y >= frameBox.y &&
+      cursorBox.x + cursorBox.width <= frameBox.x + frameBox.width &&
+      cursorBox.y + cursorBox.height <= frameBox.y + frameBox.height
+    )
+  }
+  await expect(cursor).toHaveAttribute('data-state', 'resting')
+  await expect(cursor).toHaveCSS('opacity', '1')
+  expect(await cursorInsideFrame()).toBe(true)
+
   await page.clock.runFor(5600)
-  await expect(cursor).toHaveAttribute('data-state', 'hidden')
+  await expect(cursor).toHaveAttribute('data-state', 'resting')
   await expect(agents).toHaveAttribute('data-expanded', 'false')
 
-  await page.clock.runFor(2400)
+  await page.clock.runFor(2900)
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
   await expect(agents).toHaveAttribute('data-expanded', 'true')

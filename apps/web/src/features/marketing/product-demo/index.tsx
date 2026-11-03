@@ -351,12 +351,12 @@ function AgentLabel() {
 }
 
 const cursorSpots = {
-  enter: { left: 1080, top: 700 },
+  rest: { left: 880, top: 560 },
   row: { left: 300, top: 214 },
 } as const
 
 function DemoCursor({ state }: { state: CursorState }) {
-  const spot = state === 'hidden' ? cursorSpots.enter : cursorSpots.row
+  const spot = state === 'resting' ? cursorSpots.rest : cursorSpots.row
   const Shape = state === 'hovering' ? PointerIcon : MousePointer2Icon
   return (
     <span
@@ -365,8 +365,7 @@ function DemoCursor({ state }: { state: CursorState }) {
       data-shape={state === 'hovering' ? 'pointer' : 'arrow'}
       style={{ left: spot.left, top: spot.top }}
       className={cn(
-        'absolute z-40 transition-[left,top,opacity] ease-[cubic-bezier(0.65,0,0.35,1)]',
-        state === 'hidden' ? 'opacity-0 duration-300' : 'opacity-100 duration-[900ms]',
+        'absolute z-40 transition-[left,top] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.25,1)]',
       )}
     >
       <Shape className="size-6 fill-white stroke-black drop-shadow-md" />

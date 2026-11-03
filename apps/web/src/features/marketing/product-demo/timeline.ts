@@ -9,9 +9,9 @@ const sendPressDuration = 350
 const enterChipDuration = 700
 const dialogCloseDuration = 300
 const cursorDelayAfterRow = 1300
-const cursorTravelDuration = 900
+const cursorTravelDuration = 1400
 const hoverDuration = 3200
-const restAfterHover = 400
+const restAfterHover = 1800
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
   const pause = character === ' ' || character === ',' ? 40 : 0
@@ -29,7 +29,7 @@ export const loopDuration = hoverEndsAt + restAfterHover
 
 export type DialogState = 'closed' | 'open' | 'closing'
 export type Shortcut = 'open-agents' | 'send'
-export type CursorState = 'hidden' | 'moving' | 'hovering'
+export type CursorState = 'resting' | 'moving' | 'hovering'
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -48,7 +48,7 @@ export const stillFrame: Frame = {
   typed: 0,
   sendPressed: false,
   agentRow: true,
-  cursor: 'hidden',
+  cursor: 'resting',
 }
 
 function typedAt(elapsed: number) {
@@ -82,7 +82,7 @@ export function frameAt(elapsed: number): Frame {
     agentRow: elapsed >= dialogClosesAt,
     cursor:
       elapsed < cursorShownAt || elapsed >= hoverEndsAt
-        ? 'hidden'
+        ? 'resting'
         : elapsed < cursorArrivesAt
           ? 'moving'
           : 'hovering',
