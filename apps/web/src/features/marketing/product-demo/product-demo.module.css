@@ -31,8 +31,22 @@
   animation: send-press 350ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-.agentRow {
+.agentRow,
+.agentOutline,
+.agentTrigger {
   --agent-colour: color-mix(in oklab, rgb(139 92 246) var(--agent-strength), rgb(76 29 149));
+}
+
+.agentOutline {
+  box-shadow: inset 0 0 0 3px var(--agent-colour);
+}
+
+.agentTrigger {
+  border-color: var(--agent-colour) !important;
+  border-width: 3px !important;
+}
+
+.agentRow {
   box-shadow:
     inset 0 0 0 3px var(--agent-colour),
     0 0 22px 2px color-mix(in oklab, rgb(139 92 246) calc(var(--agent-strength) - 30%), transparent);
@@ -54,7 +68,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .agentRow {
+  .agentPulse {
     animation: agent-pulse 2.2s ease-in-out infinite;
   }
 }

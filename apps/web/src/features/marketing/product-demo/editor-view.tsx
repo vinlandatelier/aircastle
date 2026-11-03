@@ -1,7 +1,6 @@
 import {
   BoldIcon,
   CalendarIcon,
-  ChevronDownIcon,
   CodeIcon,
   Heading2Icon,
   ImageIcon,
@@ -13,10 +12,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from 'cn'
+import styles from './product-demo.module.css'
 import { Badge } from '@/components/ui/badge'
-import { GeneratedAvatar } from '@/components/shell/generated-avatar'
-
-const agents = ['Thorfinn', 'Canute', 'Askeladd', 'Bjorn'] as const
 
 const control = 'flex h-9 items-center rounded-md border bg-background px-3 dark:bg-input/30'
 
@@ -110,19 +107,8 @@ function TopBar() {
         <span>Introducing Acme MCP</span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="flex -space-x-1">
-            {agents.map((agent) => (
-              <span key={agent} className="rounded-full ring-2 ring-card">
-                <GeneratedAvatar name={agent} size={16} variant="beam" />
-              </span>
-            ))}
-          </span>
-          Agents are drafting
-        </span>
-        <span className="flex h-8 items-center gap-2 rounded-md border bg-background pr-2 pl-3 dark:bg-input/30">
-          Draft
-          <ChevronDownIcon className="size-4 text-muted-foreground" />
+        <span className="flex h-8 items-center rounded-md border bg-background px-3 dark:bg-input/30">
+          Save
         </span>
         <span className="flex h-8 items-center rounded-md bg-primary px-3 text-primary-foreground">
           Publish
@@ -306,9 +292,18 @@ export function EditorView({ shown }: { shown: boolean }) {
       )}
     >
       <TopBar />
-      <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
-        <MainColumn />
-        <SideColumn />
+      <div className="relative min-h-0 flex-1">
+        <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
+          <MainColumn />
+          <SideColumn />
+        </div>
+        <div
+          data-demo-agent-outline
+          className={cn(
+            'pointer-events-none absolute inset-0 z-20 rounded-br-[18px]',
+            styles.agentOutline,
+          )}
+        />
       </div>
     </div>
   )

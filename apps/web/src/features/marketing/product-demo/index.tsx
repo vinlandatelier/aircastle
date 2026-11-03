@@ -311,9 +311,9 @@ function DemoHeader() {
   )
 }
 
-function DemoSidebar() {
+function DemoSidebar({ agentsWorking }: { agentsWorking: boolean }) {
   return (
-    <div data-demo-sidebar className="relative w-14 shrink-0 border-r">
+    <div data-demo-sidebar className="relative z-30 w-14 shrink-0 border-r">
       <div className="flex flex-col items-center gap-1 py-4">
         {navigationGroups
           .flatMap<{ title: string; icon: LucideIcon }>((group) => group.items)
@@ -332,9 +332,12 @@ function DemoSidebar() {
           ))}
       </div>
       <span
+        data-demo-sidebar-trigger
+        data-agents-working={agentsWorking}
         className={cn(
           outlineButton,
           'absolute end-0 top-1/2 z-10 size-7 translate-x-1/2 -translate-y-1/2 rounded-md bg-card! text-muted-foreground',
+          agentsWorking && styles.agentTrigger,
         )}
       >
         <ChevronRightIcon />
@@ -558,12 +561,15 @@ export function ProductDemo() {
           data-demo-frame
           aria-hidden="true"
           style={{ width: frameWidth, height: frameHeight, scale: String(scale) }}
-          className="absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-[18px] bg-card text-sm text-card-foreground shadow-xl select-none"
+          className={cn(
+            'absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-[18px] bg-card text-sm text-card-foreground shadow-xl select-none',
+            styles.agentPulse,
+          )}
         >
           <WindowDots />
           <DemoHeader />
           <div className="flex h-[calc(100%-5.5rem)]">
-            <DemoSidebar />
+            <DemoSidebar agentsWorking={frame.view === 'editor'} />
             <div className="relative min-w-0 flex-1">
               <PostsView
                 shown={frame.view === 'table'}

@@ -295,8 +295,25 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(table).toHaveAttribute('data-state', 'hidden')
   await expect(editor).toContainText('Introducing Acme MCP')
-  await expect(editor).toContainText('Draft')
+  await expect(editor).toContainText('Save')
   await expect(editor).toContainText('Publish')
+  await expect(editor).not.toContainText('Agents are drafting')
+  await expect(editor.getByText('Draft', { exact: true })).toHaveCount(0)
+  const outline = editor.locator('[data-demo-agent-outline]')
+  await expect(outline).toHaveCSS('box-shadow', /inset/)
+  const trigger = frame.locator('[data-demo-sidebar-trigger]')
+  await expect(trigger).toHaveAttribute('data-agents-working', 'true')
+  const outlineColour = await outline.evaluate(
+    (element) => getComputedStyle(element).boxShadow.match(/(oklab|rgb)\([^)]*\)/)?.[0],
+  )
+  const triggerColour = await trigger.evaluate(
+    (element) => getComputedStyle(element).borderTopColor,
+  )
+  expect(outlineColour).toBe(triggerColour)
+  const outlineBox = await outline.boundingBox()
+  const railBox = await frame.locator('[data-demo-sidebar]').boundingBox()
+  if (!outlineBox || !railBox) throw new Error('Editor is not laid out')
+  expect(Math.abs(outlineBox.x - (railBox.x + railBox.width))).toBeLessThan(2)
   for (const field of [
     'title',
     'slug',
