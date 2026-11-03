@@ -106,10 +106,12 @@ function AgentTab({ agent, role }: { agent: string; role: string }) {
 
 function Multiselect({
   agent,
+  empty,
   placeholderText,
   children,
 }: {
   agent?: { name: string; role: string }
+  empty: boolean
   placeholderText: string
   children?: React.ReactNode
 }) {
@@ -118,14 +120,19 @@ function Multiselect({
       data-demo-multiselect
       data-agent={agent?.name}
       className={cn(
-        'relative flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-background p-1.5 dark:bg-input/30',
+        'relative flex min-h-9 items-start gap-1.5 rounded-md border bg-background p-1.5 dark:bg-input/30',
         agent && ['border-transparent', styles.agentField],
       )}
     >
-      {children}
-      <span className="inline-flex items-center gap-1 px-1 text-xs text-muted-foreground">
-        <PlusIcon className="size-3" />
-        {placeholderText}
+      <div className="flex min-h-6 min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {empty ? (
+          <span className="px-1.5 text-muted-foreground/60">{placeholderText}</span>
+        ) : (
+          children
+        )}
+      </div>
+      <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground">
+        <PlusIcon className="size-4" />
       </span>
       {agent && <AgentTab agent={agent.name} role={agent.role} />}
     </div>
@@ -157,10 +164,7 @@ function TopBar() {
         <span>Introducing Acme MCP</span>
       </div>
       <div className="flex items-center gap-2">
-        <span
-          data-demo-preview
-          className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5 text-muted-foreground"
-        >
+        <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
           <EyeIcon className="size-4" />
           Preview
         </span>
@@ -287,7 +291,7 @@ function SideColumn({
   return (
     <div className="flex w-[300px] shrink-0 flex-col gap-6 rounded-lg border p-4">
       <Field name="authors" label="Authors" empty={false}>
-        <Multiselect placeholderText="Add">
+        <Multiselect empty={false} placeholderText="Add authors">
           <Chip>
             <Initial name="Abyan" />
             Abyan
@@ -295,7 +299,7 @@ function SideColumn({
         </Multiselect>
       </Field>
       <Field name="categories" label="Categories" empty={categoriesShown === 0}>
-        <Multiselect agent={writer} placeholderText="Add">
+        <Multiselect agent={writer} empty={categoriesShown === 0} placeholderText="Add categories">
           {categories.slice(0, categoriesShown).map((category) => (
             <Chip key={category} arrived>
               <Link2Icon className="opacity-60" />
@@ -305,7 +309,7 @@ function SideColumn({
         </Multiselect>
       </Field>
       <Field name="tags" label="Tags" empty={tagsShown === 0}>
-        <Multiselect agent={writer} placeholderText="Add">
+        <Multiselect agent={writer} empty={tagsShown === 0} placeholderText="Add tags">
           {tags.slice(0, tagsShown).map((tag) => (
             <Chip key={tag} arrived>
               {tag}
