@@ -520,7 +520,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(switcher).toContainText('Canute')
   await expect(switcher.locator('svg.lucide-chevron-down')).toHaveCount(1)
   const header = panel.locator('[data-demo-panel-header]')
-  await expect(header.locator('svg.lucide-ellipsis')).toHaveCount(1)
+  await expect(header.locator('svg.lucide-ellipsis-vertical')).toHaveCount(1)
   await expect(header.locator('svg.lucide-x')).toHaveCount(0)
   const headerAvatar = switcher.locator('[data-demo-panel-avatar]')
   await expect(headerAvatar).toHaveCSS('filter', 'none')
