@@ -480,7 +480,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
           data-demo-agent-switcher
           className="-ml-1.5 flex min-w-0 items-center gap-2 rounded-md py-1 pr-1 pl-1.5 whitespace-nowrap"
         >
-          <span className={cn('rounded-full', styles.agentAvatar)}>
+          <span data-demo-panel-avatar className="flex rounded-full">
             <GeneratedAvatar name={researcher} size={22} variant="beam" />
           </span>
           <span>{researcher}</span>

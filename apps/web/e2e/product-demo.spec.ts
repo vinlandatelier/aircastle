@@ -522,6 +522,9 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const header = panel.locator('[data-demo-panel-header]')
   await expect(header.locator('svg.lucide-ellipsis')).toHaveCount(1)
   await expect(header.locator('svg.lucide-x')).toHaveCount(0)
+  const headerAvatar = switcher.locator('[data-demo-panel-avatar]')
+  await expect(headerAvatar).toHaveCSS('filter', 'none')
+  await expect(headerAvatar).toHaveCSS('scale', 'none')
   const gap = await switcher.evaluate((element) => {
     const label = element.querySelector('[data-demo-agent-label]')?.getBoundingClientRect()
     const chevron = element.querySelector('svg.lucide-chevron-down')?.getBoundingClientRect()
