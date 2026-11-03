@@ -752,6 +752,15 @@ test('the preview header has an Ask Air split button with an agent menu', async 
   await expect(waiting).toHaveCount(0)
   await page.clock.runFor(3500)
   await expect(waiting).toHaveText('1')
+  const destructive = await page.evaluate(() => {
+    const probe = document.createElement('span')
+    probe.className = 'bg-destructive'
+    document.querySelector('[data-demo-header]')?.append(probe)
+    const colour = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return colour
+  })
+  await expect(waiting).toHaveCSS('background-color', destructive)
 
   for (let tick = 0; tick < 11; tick += 1) {
     await page.clock.runFor(1000)

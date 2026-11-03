@@ -320,7 +320,7 @@ function AskButton({ waiting }: { waiting: number }) {
         {waiting > 0 && (
           <span
             data-demo-ask-count
-            className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] leading-none text-white transition-[opacity,scale] duration-300 starting:scale-50 starting:opacity-0"
+            className="flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none text-white transition-[opacity,scale] duration-300 starting:scale-50 starting:opacity-0"
           >
             {waiting}
           </span>
