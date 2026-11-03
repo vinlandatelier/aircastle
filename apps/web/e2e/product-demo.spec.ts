@@ -426,7 +426,7 @@ test('the agents tab starts expanding as soon as the cursor enters the agent row
   await expect(agents).toHaveAttribute('data-expanded', 'true')
 })
 
-test('the editor top bar shows Canute researching with a growing source count', async ({
+test('the editor top bar shows the source Canute is reading, one after another', async ({
   page,
 }) => {
   await page.clock.install({ time: 0 })
@@ -437,17 +437,19 @@ test('the editor top bar shows Canute researching with a growing source count', 
   await frame.scrollIntoViewIfNeeded()
   const editor = frame.locator('[data-demo-editor]')
   const research = editor.locator('[data-demo-research]')
+  const current = research.locator('[data-demo-source][data-state="current"]')
   await page.clock.runFor(10000)
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(research).toContainText('Canute')
-  await expect(research).toContainText('researching')
-  await expect(research.locator('svg')).not.toHaveCount(0)
-  const count = async () => Number((await research.getAttribute('data-sources')) ?? 0)
-  const early = await count()
-  await page.clock.runFor(2400)
-  const later = await count()
-  expect(later).toBeGreaterThan(early)
-  await expect(research).toContainText(`${later} sources`)
+  await expect(research).toContainText('reading')
+  await expect(research).not.toContainText(/\d+ sources?/)
+  await expect(current).toHaveText('modelcontextprotocol.io/specification')
+  await expect(current).not.toContainText('https://')
+  await expect(current).toHaveCSS('text-overflow', 'ellipsis')
+  const firstWidth = (await research.boundingBox())?.width
+  await page.clock.runFor(900)
+  await expect(current).toHaveText('github.com/acme/app/pull/482')
+  expect((await research.boundingBox())?.width).toBe(firstWidth)
   const researchBox = await research.boundingBox()
   const previewBox = await editor.locator('[data-demo-preview]').boundingBox()
   if (!researchBox || !previewBox) throw new Error('Top bar is not laid out')

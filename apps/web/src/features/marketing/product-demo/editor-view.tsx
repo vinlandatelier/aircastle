@@ -202,7 +202,17 @@ function MediaPlaceholder({ hint, className }: { hint: string; className?: strin
   )
 }
 
+const sourceUrls = [
+  'modelcontextprotocol.io/specification',
+  'github.com/acme/app/pull/482',
+  'docs.acme.com/mcp/getting-started',
+  'anthropic.com/news/model-context-protocol',
+  'acme.com/changelog',
+  'github.com/modelcontextprotocol/servers',
+] as const
+
 function ResearchStatus({ sources }: { sources: number }) {
+  const currentIndex = sources - 1
   return (
     <span
       data-demo-research
@@ -212,15 +222,29 @@ function ResearchStatus({ sources }: { sources: number }) {
       <span className={cn('rounded-full', styles.agentAvatar)}>
         <GeneratedAvatar name={researcher} size={18} variant="beam" />
       </span>
-      <span>{researcher} is researching</span>
-      {sources > 0 && (
-        <>
-          <span className="text-violet-600/50 dark:text-violet-300/50">·</span>
-          <span className="text-violet-600/70 tabular-nums dark:text-violet-300/70">
-            {sources} {sources === 1 ? 'source' : 'sources'}
+      <span>{researcher}</span>
+      <span className="text-violet-600/70 dark:text-violet-300/70">
+        {sources === 0 ? 'searching' : 'reading'}
+      </span>
+      <span className="relative h-5 w-[210px] overflow-hidden">
+        {sourceUrls.map((url, index) => (
+          <span
+            key={url}
+            data-demo-source
+            data-state={
+              index < currentIndex ? 'read' : index === currentIndex ? 'current' : 'queued'
+            }
+            className={cn(
+              'absolute inset-0 truncate leading-5 transition-[translate,opacity] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]',
+              index < currentIndex && '-translate-y-full opacity-0',
+              index === currentIndex && 'translate-y-0 opacity-100',
+              index > currentIndex && 'translate-y-full opacity-0',
+            )}
+          >
+            {url}
           </span>
-        </>
-      )}
+        ))}
+      </span>
     </span>
   )
 }
