@@ -505,7 +505,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
             readOnly
             tabIndex={-1}
             rows={1}
-            placeholder="Ask Canute to dig deeper…"
+            placeholder="Ask anything, @tag documents, or / for commands"
             className="min-h-0 p-3"
           />
           <InputGroupAddon align="block-end" className="justify-end">

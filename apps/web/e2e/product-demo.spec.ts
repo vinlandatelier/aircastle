@@ -516,7 +516,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(prompter).toHaveAttribute('data-slot', 'input-group')
   await expect(prompter.locator('textarea')).toHaveAttribute(
     'placeholder',
-    'Ask Canute to dig deeper…',
+    'Ask anything, @tag documents, or / for commands',
   )
   const pending = panel.locator('[data-demo-research-pending]')
   await expect(pending).toHaveText(/Thinking…|Reading|Searching/)
