@@ -505,12 +505,47 @@ const safety =
 const fullContext =
   "Review the full base-to-head context even when prior findings are provided. Never claim omitted files were reviewed.";
 const taskData = (job: Job) => `Task data:\n${JSON.stringify(job)}`;
-export function reviewPrompt(job: Job, repositoryInstructions: string, pass: ReviewPass): string {
+/**
+ * The instructions that govern a change: the root AGENTS.md, then the AGENTS.md of every
+ * directory that contains a changed path, outermost first. Vendored skill files under `.agents/`
+ * are not repository instructions, and unsafe paths add none. `read` returns null for a file that
+ * does not exist.
+ */
+export function repositoryInstructions(
+  changedPaths: string[],
+  read: (path: string) => string | null,
+): string {
+  const directories = new Set(
+    changedPaths
+      .filter((path) => isSafePath(path) && !path.startsWith(".agents/"))
+      .flatMap((path) =>
+        path
+          .split("/")
+          .slice(0, -1)
+          .map((_, index, parts) => parts.slice(0, index + 1).join("/")),
+      ),
+  );
+  const files = [
+    "AGENTS.md",
+    ...[...directories]
+      .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))
+      .map((directory) => `${directory}/AGENTS.md`),
+  ];
+  return files
+    .flatMap((file) => {
+      const text = read(file);
+      return text === null ? [] : [`From ${file}:\n${text}`];
+    })
+    .join("\n\n");
+}
+export function reviewPrompt(job: Job, guidance: string, pass: ReviewPass): string {
   const lens = reviewLenses[pass];
   return [
     `You are an independent code reviewer. ${lens.brief} ${safety} ${fullContext}`,
     ...(lens.readsRepositoryInstructions
-      ? [`Repository instructions from AGENTS.md on the default branch:\n${repositoryInstructions}`]
+      ? [
+          `Repository instructions from the default branch's AGENTS.md files that govern the changed paths:\n${guidance}`,
+        ]
       : []),
     taskData(job),
   ].join("\n");

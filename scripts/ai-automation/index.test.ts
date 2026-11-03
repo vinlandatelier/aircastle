@@ -12,6 +12,7 @@ import {
   parseJob,
   reviewLenses,
   reviewPrompt,
+  repositoryInstructions,
   reviewSchema,
   safePath,
   validateEdits,
@@ -384,6 +385,36 @@ test("the two review prompts ask for different reviews", () => {
   expect(correctness).toMatch(/concrete failing scenario/);
   expect(correctness).not.toContain(guide);
   expect(quality).toContain(guide);
+});
+
+const instructionFiles: Record<string, string> = {
+  "AGENTS.md": "# Root rules",
+  "apps/web/AGENTS.md": "# Web rules",
+  "apps/api/AGENTS.md": "# API rules",
+  ".github/AGENTS.md": "# Automation rules",
+  ".agents/skills/vendored/AGENTS.md": "# Vendored skill rules",
+};
+const readInstructions = (path: string) => instructionFiles[path] ?? null;
+
+test("review guidance adds the AGENTS.md of every directory a change touches", () => {
+  const guidance = repositoryInstructions(
+    ["apps/web/src/App.tsx", ".github/workflows/ci.yml", "README.md"],
+    readInstructions,
+  );
+  expect(guidance).toContain("# Root rules");
+  expect(guidance).toContain("From apps/web/AGENTS.md:\n# Web rules");
+  expect(guidance).toContain("From .github/AGENTS.md:\n# Automation rules");
+  expect(guidance).not.toContain("# API rules");
+  expect(guidance.indexOf("# Root rules")).toBeLessThan(guidance.indexOf("# Web rules"));
+});
+
+test("review guidance is the root AGENTS.md alone for root, vendored skill and unsafe paths", () => {
+  expect(
+    repositoryInstructions(
+      ["README.md", ".agents/skills/vendored/rules/a.md", "apps/webapp/x.ts", "../apps/web/x.ts"],
+      readInstructions,
+    ),
+  ).toBe("From AGENTS.md:\n# Root rules");
 });
 
 test("the implementer prompt keeps the fix recipe and no review lens", () => {

@@ -1,8 +1,17 @@
+import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Coordinator } from "./github.ts";
 import { renderPatch } from "./materialize.ts";
-import { digest, integer, parseJob, requireObject, sha, workflowOutputs } from "./index.ts";
+import {
+  digest,
+  integer,
+  parseJob,
+  repositoryInstructions,
+  requireObject,
+  sha,
+  workflowOutputs,
+} from "./index.ts";
 import { boundVerification } from "./checks.ts";
 import { verify } from "./verify.ts";
 import { executeOperation, boundModelOutput, type ModelOutput } from "./operations.ts";
@@ -113,7 +122,11 @@ async function main(): Promise<void> {
     console.log(
       JSON.stringify({ operation: id, head: job.snapshot.head, selection: job.selection }),
     );
-    const model = await executeOperation(job, await readFile(resolve(root, "AGENTS.md"), "utf8"));
+    const guidance = repositoryInstructions(job.snapshot.changedPaths, (path) => {
+      const file = resolve(root, path);
+      return existsSync(file) ? readFileSync(file, "utf8") : null;
+    });
+    const model = await executeOperation(job, guidance);
     if (model.task === "fix") {
       await mkdir(`${target}/model`, { recursive: true });
       await writeFile(`${target}/model/${id}.patch`, renderPatch(model.result, job.snapshot));
