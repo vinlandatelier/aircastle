@@ -252,3 +252,17 @@ test('hero offers a dim ghost demo link beside the call to action', async ({ pag
   await demo.hover()
   await expect(arrow).not.toHaveCSS('translate', 'none')
 })
+
+test('underline beam keeps one length across every rotating word', async ({ page }) => {
+  await page.clock.install()
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const beamLength = () =>
+    shownWord(page).evaluate((element) => getComputedStyle(element, '::before').backgroundSize)
+  await expect(shownWord(page)).toHaveText('write')
+  const writeBeam = await beamLength()
+  await page.clock.runFor(4000)
+  await expect(shownWord(page)).toHaveText('research')
+  expect(await beamLength()).toBe(writeBeam)
+  expect(writeBeam.split(' ')[0]).toMatch(/px$/)
+})
