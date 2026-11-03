@@ -483,25 +483,25 @@ function DecisionCard() {
     <div
       data-demo-decision
       className={cn(
-        'flex flex-col gap-2.5 rounded-lg border bg-background p-3 shadow-sm dark:bg-input/30',
+        'flex items-start gap-2 rounded-lg border bg-background p-3 shadow-sm dark:bg-input/30',
         entering,
       )}
     >
-      <div className="flex items-start gap-2">
-        <MessageCircleQuestionIcon className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-        <div className="flex min-w-0 flex-col gap-1">
-          <span>{docsDecision.question}</span>
+      <MessageCircleQuestionIcon className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+        <div className="flex flex-col gap-1">
+          <span data-demo-decision-question>{docsDecision.question}</span>
           <span className="text-xs leading-5 text-muted-foreground">{docsDecision.reason}</span>
         </div>
-      </div>
-      <span className="flex w-fit items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs">
-        <span className="text-muted-foreground">{docsDecision.target.collection}</span>
-        <ChevronRightIcon className="size-3 text-muted-foreground" />
-        {docsDecision.target.title}
-      </span>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">{docsDecision.fallback}</span>
-        <span className="flex shrink-0 gap-1.5">
+        <span
+          data-demo-decision-target
+          className="flex w-fit items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs"
+        >
+          <span className="text-muted-foreground">{docsDecision.target.collection}</span>
+          <ChevronRightIcon className="size-3 text-muted-foreground" />
+          {docsDecision.target.title}
+        </span>
+        <span className="flex justify-end gap-1.5">
           <span
             data-demo-decision-dismiss
             className="flex h-7 items-center rounded-md border bg-background px-2.5 text-xs dark:bg-input/30"

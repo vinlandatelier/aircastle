@@ -242,7 +242,6 @@ export const docsDecision = {
   question: 'Draft a docs page for MCP?',
   reason: 'Acme’s docs have no MCP page, and readers will need setup steps after the post.',
   target: { collection: 'Docs', title: 'Connect to Acme MCP' },
-  fallback: 'If not, I’ll note the gap in the brief.',
 } as const
 
 const docsDecisionIndex = researchLog.findIndex((entry) => entry.kind === 'decision')

@@ -578,6 +578,13 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const decision = panel.locator('[data-demo-decision]')
   await expect(decision).toContainText('Draft a docs page for MCP?')
   await expect(decision).toContainText('Connect to Acme MCP')
+  await expect(decision).not.toContainText('If not')
+  const indent = await decision.evaluate((element) => {
+    const left = (selector: string) =>
+      element.querySelector(selector)?.getBoundingClientRect().left ?? Number.NaN
+    return left('[data-demo-decision-target]') - left('[data-demo-decision-question]')
+  })
+  expect(Math.abs(indent)).toBeLessThanOrEqual(0.5)
   await expect(decision.locator('[data-demo-decision-approve]')).toHaveText('Draft it')
   await expect(decision.locator('[data-demo-decision-dismiss]')).toHaveText('Not now')
   await expect(panel.locator('[data-demo-research-chain] [data-demo-decision]')).toHaveCount(0)
