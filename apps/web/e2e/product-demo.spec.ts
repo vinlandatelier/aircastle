@@ -221,7 +221,8 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   await expect(agents).toContainText('Canute')
   await expect(agents).toContainText('and 2 others are working')
   await expect(agents).not.toContainText('+2')
-  await expect(agents.getByText('Agent', { exact: true })).toHaveCount(2)
+  await expect(agents.getByText('Writing Agent', { exact: true })).toHaveCount(1)
+  await expect(agents.getByText('Research Agent', { exact: true })).toHaveCount(1)
   await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(4)
   const cursorOnRow = async () => {
     const cursorBox = await cursor.boundingBox()
@@ -343,7 +344,7 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
     await expect(fieldOutline).toHaveAttribute('data-active', String(field === 'categories'))
     const tab = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`)
     await expect(tab).toContainText('Thorfinn')
-    await expect(tab).toContainText('Agent')
+    await expect(tab).toContainText('Writing Agent')
     await expect(tab).not.toContainText('Writer')
     if (field !== 'categories') continue
     const boxRect = await box.boundingBox()
@@ -399,7 +400,7 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   const bodyTab = editor.locator('[data-demo-field="body"] [data-demo-agent-tab]')
   await expect(bodyTab).toHaveAttribute('data-active', 'true')
   await expect(bodyTab).toContainText('Thorfinn')
-  await expect(bodyTab).toContainText('Agent')
+  await expect(bodyTab).toContainText('Writing Agent')
   await expect(bodyTab).toContainText('Waiting on Canute…')
   await expect(editor.locator('[data-demo-field="categories"]')).toHaveAttribute(
     'data-empty',
@@ -442,7 +443,7 @@ test('the editor top bar shows the source Canute is reading, one after another',
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(research).toContainText('Canute')
   await expect(research).toContainText('reading')
-  await expect(research.getByText('Agent', { exact: true })).toBeVisible()
+  await expect(research.getByText('Research Agent', { exact: true })).toBeVisible()
   await expect(research).not.toContainText(/\d+ sources?/)
   await expect(current.locator('[data-demo-source-url]')).toHaveText(
     'modelcontextprotocol.io/specification',
@@ -494,7 +495,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await page.clock.runFor(600)
   await expect(panel).toHaveAttribute('data-state', 'open')
   await expect(panel).toContainText('Canute')
-  await expect(panel).toContainText('Agent')
+  await expect(panel.locator('[data-demo-agent-label]')).toHaveText('Research Agent')
   await expect(panel.locator('[data-demo-thought]').first()).toBeVisible()
   await expect(panel.locator('[data-demo-thought]').first()).toHaveCSS('-webkit-line-clamp', '2')
   await expect(panel).toContainText('No MCP page')

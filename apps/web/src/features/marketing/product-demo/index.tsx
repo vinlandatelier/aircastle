@@ -20,6 +20,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { EditorView } from './editor-view'
+import { canute, thorfinn, workingAgents } from './agents'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
 import {
@@ -280,7 +281,7 @@ function AskButton({ agentsWorking }: { agentsWorking: boolean }) {
       Ask Aircastle
       {agentsWorking && (
         <span className="flex -space-x-1.5 transition-opacity duration-500 starting:opacity-0">
-          {agents.map((name) => (
+          {workingAgents.map(({ name }) => (
             <span
               key={name}
               data-demo-ask-agent
@@ -383,12 +384,10 @@ function DemoSidebar() {
 
 const rowGrid = 'grid grid-cols-[14rem_1fr_7rem_8.5rem_5.5rem] items-center gap-4 px-4'
 
-const agents = ['Thorfinn', 'Canute', 'Askeladd', 'Bjorn'] as const
-
-function AgentLabel() {
+function AgentLabel({ role }: { role: string }) {
   return (
     <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none text-white">
-      Agent
+      {role}
     </span>
   )
 }
@@ -462,13 +461,13 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
             )}
           >
             <span className="flex -space-x-1.5">
-              {agents.map((agent) => (
+              {workingAgents.map((agent) => (
                 <span
-                  key={agent}
+                  key={agent.name}
                   data-demo-agent-avatar
                   className={cn('rounded-full', styles.agentAvatar)}
                 >
-                  <GeneratedAvatar name={agent} size={18} variant="beam" />
+                  <GeneratedAvatar name={agent.name} size={18} variant="beam" />
                 </span>
               ))}
             </span>
@@ -481,15 +480,15 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
               <span className="overflow-hidden whitespace-nowrap">
                 <span className="inline-flex items-center gap-1.5 pr-1 pl-2 text-xs text-white">
                   <span className="inline-flex items-center gap-1">
-                    Thorfinn
+                    {thorfinn.name}
                     <span className="inline-flex items-center">
-                      <AgentLabel />,
+                      <AgentLabel role={thorfinn.role} />,
                     </span>
                   </span>
                   <span className="inline-flex items-center gap-1">
-                    Canute
+                    {canute.name}
                     <span className="inline-flex items-center">
-                      <AgentLabel />
+                      <AgentLabel role={canute.role} />
                     </span>
                   </span>
                   <span>and 2 others are working</span>

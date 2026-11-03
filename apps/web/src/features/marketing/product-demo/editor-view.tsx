@@ -26,6 +26,7 @@ import { cn } from 'cn'
 import styles from './product-demo.module.css'
 import { researchLog, researchSources, type Artifact, type ResearchEntry } from './research'
 import { prompt } from './timeline'
+import { canute, thorfinn } from './agents'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent } from '@/components/ui/message'
 import {
@@ -213,8 +214,8 @@ function Multiselect({
   )
 }
 
-const writerAgent = { name: 'Thorfinn', role: 'Agent' } as const
-const researcher = 'Canute'
+const writerAgent = thorfinn
+const researcher = canute.name
 
 function MediaPlaceholder({ hint, className }: { hint: string; className?: string }) {
   return (
@@ -270,7 +271,7 @@ function ResearchStatus({
           </span>
           <span>{researcher}</span>
           <span className="rounded-sm bg-violet-500/15 px-1 py-px text-[10px] leading-none">
-            Agent
+            {canute.role}
           </span>
           <span className="text-violet-600/70 dark:text-violet-300/70">
             {sourcesRead === 0 ? 'searching' : 'reading'}
@@ -474,7 +475,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
             data-demo-agent-label
             className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none text-muted-foreground"
           >
-            Agent
+            {canute.role}
           </span>
           <span className="text-muted-foreground">·</span>
           <span className="text-muted-foreground">
