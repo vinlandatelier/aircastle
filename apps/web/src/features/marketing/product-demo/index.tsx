@@ -53,7 +53,7 @@ function sameFrame(left: Frame, right: Frame) {
     left.writerOnCategories === right.writerOnCategories &&
     left.writerOnTags === right.writerOnTags &&
     left.writerOnBody === right.writerOnBody &&
-    left.sources === right.sources &&
+    left.researchSteps === right.researchSteps &&
     left.cursorTarget === right.cursorTarget &&
     left.researchHovered === right.researchHovered &&
     left.researchPanelOpen === right.researchPanelOpen
@@ -600,7 +600,7 @@ export function ProductDemo() {
                 writerOnCategories={frame.writerOnCategories}
                 writerOnTags={frame.writerOnTags}
                 writerOnBody={frame.writerOnBody}
-                sources={frame.sources}
+                researchSteps={frame.researchSteps}
                 researchHovered={frame.researchHovered}
                 researchPanelOpen={frame.researchPanelOpen}
               />

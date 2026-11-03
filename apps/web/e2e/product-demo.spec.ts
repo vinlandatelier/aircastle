@@ -438,7 +438,7 @@ test('the editor top bar shows the source Canute is reading, one after another',
   const editor = frame.locator('[data-demo-editor]')
   const research = editor.locator('[data-demo-research]')
   const current = research.locator('[data-demo-source][data-state="current"]')
-  await page.clock.runFor(10000)
+  await page.clock.runFor(10500)
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(research).toContainText('Canute')
   await expect(research).toContainText('reading')
@@ -460,7 +460,7 @@ test('the editor top bar shows the source Canute is reading, one after another',
   await expect(current.locator('[data-demo-source-url]')).toHaveText(
     'linear.app/acme/issue/ACM-1290',
   )
-  await page.clock.runFor(1400)
+  await page.clock.runFor(900)
   await expect(current.locator('[data-demo-source-url]')).toHaveText('docs.acme.com/search?q=mcp')
   expect((await research.boundingBox())?.width).toBe(firstWidth)
   const researchBox = await research.boundingBox()
@@ -481,11 +481,12 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const panel = editor.locator('[data-demo-research-panel]')
   const cursor = frame.locator('[data-demo-cursor]')
 
-  await page.clock.runFor(15000)
+  await page.clock.runFor(12000)
   await expect(panel).toHaveAttribute('data-state', 'closed')
   await expect(research).toHaveAttribute('data-hovered', 'false')
+  await expect(cursor).toHaveAttribute('data-state', 'moving')
 
-  await page.clock.runFor(1500)
+  await page.clock.runFor(1000)
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
   await expect(research).toHaveAttribute('data-hovered', 'true')
@@ -495,9 +496,31 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(panel).toContainText('Canute')
   await expect(panel).toContainText('Agent')
   await expect(panel.locator('[data-demo-thought]').first()).toBeVisible()
+  await expect(panel.locator('[data-demo-thought]').first()).toHaveCSS('-webkit-line-clamp', '2')
   await expect(panel).toContainText('No MCP page')
   await expect(panel.locator('[data-demo-research-prompt]')).toContainText('Ask Canute')
+  await expect(panel.locator('[data-demo-research-pending]')).toHaveText(
+    /Thinking…|Reading|Searching/,
+  )
+
+  const tagsBox = await editor.locator('[data-demo-field="tags"]').boundingBox()
+  const panelBox = await panel.boundingBox()
+  if (!tagsBox || !panelBox) throw new Error('Editor is not laid out')
+  expect(tagsBox.x + tagsBox.width).toBeLessThanOrEqual(panelBox.x + 1)
+
   const stepsNow = await panel.locator('[data-demo-research-step]').count()
   await page.clock.runFor(1500)
   expect(await panel.locator('[data-demo-research-step]').count()).toBeGreaterThan(stepsNow)
+
+  await page.clock.runFor(1400)
+  await expect(panel.locator('[data-demo-research-pending]')).toContainText('Thinking…')
+
+  await page.clock.runFor(5300)
+  await expect(panel.locator('[data-demo-research-step]')).toHaveCount(11)
+  const artifacts = panel.locator('[data-demo-artifact]')
+  await expect(artifacts).toHaveCount(2)
+  await expect(artifacts.first()).toContainText('Research brief.md')
+  await expect(artifacts.last()).toContainText('Docs gap.md')
+  await expect(panel.locator('[data-demo-research-pending]')).toHaveCount(0)
+  await expect(panel).toContainText('Research complete')
 })

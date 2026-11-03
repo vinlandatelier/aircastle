@@ -1,3 +1,5 @@
+import { researchStepsAt } from './research'
+
 export const prompt = "Recently shipped MCP for our app, let's announce it"
 
 const shortcutShownAt = 1000
@@ -13,7 +15,7 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const editorDuration = 12000
+const editorDuration = 14000
 const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
@@ -24,8 +26,7 @@ const categoryCount = 2
 const tagCount = 3
 const lingerAfterFilling = 1000
 const moveBetweenFields = 300
-const sourceArrivalsAfterEditor = [400, 1500, 2200, 3700, 4600, 8300] as const
-const researchCursorMovesAfterEditor = 5400
+const researchCursorMovesAfterEditor = 1900
 const researchCursorTravel = 1400
 const researchHoverDuration = 500
 const researchClickDuration = 220
@@ -79,7 +80,7 @@ export type Frame = {
   writerOnCategories: boolean
   writerOnTags: boolean
   writerOnBody: boolean
-  sources: number
+  researchSteps: number
   cursorTarget: CursorTarget
   researchHovered: boolean
   researchPanelOpen: boolean
@@ -101,7 +102,7 @@ export const stillFrame: Frame = {
   writerOnCategories: false,
   writerOnTags: false,
   writerOnBody: false,
-  sources: 0,
+  researchSteps: 0,
   cursorTarget: 'rest',
   researchHovered: false,
   researchPanelOpen: false,
@@ -110,10 +111,6 @@ export const stillFrame: Frame = {
 function chipsArrived(sinceFirst: number, total: number) {
   if (sinceFirst < 0) return 0
   return Math.min(total, Math.floor(sinceFirst / chipInterval) + 1)
-}
-
-function sourcesRead(sinceEditor: number) {
-  return sourceArrivalsAfterEditor.filter((arrival) => sinceEditor >= arrival).length
 }
 
 const researchCursorArrivesAfterEditor = researchCursorMovesAfterEditor + researchCursorTravel
@@ -197,6 +194,6 @@ export function frameAt(elapsed: number): Frame {
       elapsed - editorOpensAt >= writerReachesTagsAfterEditor &&
       elapsed - editorOpensAt < writerLeavesTagsAfterEditor,
     writerOnBody: elapsed - editorOpensAt >= writerReachesBodyAfterEditor,
-    sources: sourcesRead(elapsed - editorOpensAt),
+    researchSteps: researchStepsAt(sinceEditor),
   }
 }

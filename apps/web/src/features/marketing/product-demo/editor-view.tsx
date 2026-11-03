@@ -1,11 +1,12 @@
 import {
+  ChevronRightIcon,
+  FileTextIcon,
+  SparklesIcon,
   ArrowUpIcon,
   BrainIcon,
   LoaderCircleIcon,
   TriangleAlertIcon,
   XIcon,
-  BookOpenIcon,
-  ScrollTextIcon,
   EyeIcon,
   SaveIcon,
   BoldIcon,
@@ -21,9 +22,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from 'cn'
-import { MarkGithubIcon } from '@primer/octicons-react'
-import { SiAnthropic, SiLinear, SiModelcontextprotocol } from '@icons-pack/react-simple-icons'
 import styles from './product-demo.module.css'
+import { researchLog, researchSources, type ResearchEntry } from './research'
 import { Badge } from '@/components/ui/badge'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 
@@ -211,56 +211,12 @@ function MediaPlaceholder({ hint, className }: { hint: string; className?: strin
   )
 }
 
-type Source = {
-  url: string
-  logo: React.ComponentType<{ className?: string }>
-  action: 'Read' | 'Searched'
-  finding: string
-  gap?: boolean
+function sourcesReadBy(steps: number) {
+  return researchLog.slice(0, steps).filter((entry) => entry.kind === 'source').length
 }
 
-const sources: readonly Source[] = [
-  {
-    url: 'modelcontextprotocol.io/specification',
-    logo: SiModelcontextprotocol,
-    action: 'Read',
-    finding:
-      'MCP lets assistants reach tools and data through servers that expose resources, tools and prompts.',
-  },
-  {
-    url: 'github.com/acme/app/pull/482',
-    logo: MarkGithubIcon,
-    action: 'Read',
-    finding: 'Adds a remote MCP server at mcp.acme.com with token-scoped access to collections.',
-  },
-  {
-    url: 'linear.app/acme/issue/ACM-1290',
-    logo: SiLinear,
-    action: 'Read',
-    finding: 'Launch is planned for this week, with a blog post and docs listed as follow-ups.',
-  },
-  {
-    url: 'docs.acme.com/search?q=mcp',
-    logo: BookOpenIcon,
-    action: 'Searched',
-    finding: 'No MCP page in Acme’s docs yet.',
-    gap: true,
-  },
-  {
-    url: 'acme.com/changelog',
-    logo: ScrollTextIcon,
-    action: 'Read',
-    finding: 'Recent release notes mention MCP in beta, but not the remote server.',
-  },
-  {
-    url: 'anthropic.com/news/model-context-protocol',
-    logo: SiAnthropic,
-    action: 'Read',
-    finding: 'Anthropic introduced MCP as an open standard in November 2024.',
-  },
-]
-
-function ResearchStatus({ sourcesRead, hovered }: { sourcesRead: number; hovered: boolean }) {
+function ResearchStatus({ steps, hovered }: { steps: number; hovered: boolean }) {
+  const sourcesRead = sourcesReadBy(steps)
   const currentIndex = sourcesRead - 1
   return (
     <span
@@ -281,7 +237,7 @@ function ResearchStatus({ sourcesRead, hovered }: { sourcesRead: number; hovered
         {sourcesRead === 0 ? 'searching' : 'reading'}
       </span>
       <span className="relative h-5 w-[230px] overflow-hidden">
-        {sources.map(({ url, logo: Logo }, index) => (
+        {researchSources.map(({ url, logo: Logo }, index) => (
           <span
             key={url}
             data-demo-source
@@ -308,14 +264,97 @@ function ResearchStatus({ sourcesRead, hovered }: { sourcesRead: number; hovered
   )
 }
 
-function ResearchPanel({ open, sourcesRead }: { open: boolean; sourcesRead: number }) {
-  const next = sources[sourcesRead]
+const entering =
+  'shrink-0 transition-[opacity,translate] duration-500 starting:translate-y-1 starting:opacity-0'
+
+function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
+  if (entry.kind === 'thought')
+    return (
+      <li
+        data-demo-thought
+        className={cn(
+          'line-clamp-2 border-l-2 border-violet-500/30 pl-3 text-xs leading-5 text-muted-foreground italic',
+          entering,
+        )}
+      >
+        {entry.text}
+      </li>
+    )
+  if (entry.kind === 'source') {
+    const { url, logo: Logo, action, finding, gap } = entry.source
+    return (
+      <li data-demo-research-step className={cn('flex flex-col gap-1', entering)}>
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Logo className="size-3.5 shrink-0" />
+          <span className="shrink-0">{action}</span>
+          <span className="truncate">{url}</span>
+        </span>
+        <span
+          className={cn('flex gap-1.5 pl-5 leading-5', gap && 'text-amber-600 dark:text-amber-400')}
+        >
+          {gap && <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />}
+          {finding}
+        </span>
+      </li>
+    )
+  }
+  return (
+    <li className={cn('flex flex-col gap-2', entering)}>
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <SparklesIcon className="size-3.5" />
+        Synthesised findings
+      </span>
+      {entry.artifacts.map((artifact) => (
+        <span
+          key={artifact.name}
+          data-demo-artifact
+          className="flex items-center gap-3 rounded-md border bg-background px-3 py-2.5 dark:bg-input/30"
+        >
+          <FileTextIcon className="size-5 shrink-0 text-violet-600 dark:text-violet-400" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span>{artifact.name}</span>
+            <span className="truncate text-xs text-muted-foreground">{artifact.summary}</span>
+          </span>
+          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+        </span>
+      ))}
+    </li>
+  )
+}
+
+function PendingStep({ entry }: { entry: ResearchEntry }) {
+  const text =
+    entry.kind === 'thought'
+      ? 'Thinking…'
+      : entry.kind === 'source'
+        ? `${entry.source.action === 'Read' ? 'Reading' : 'Searching'} ${entry.source.url}`
+        : 'Synthesising findings…'
+  return (
+    <li
+      data-demo-research-pending
+      className={cn(
+        'flex min-w-0 shrink-0 items-center gap-1.5 text-xs text-muted-foreground',
+        entry.kind === 'thought' && 'motion-safe:animate-pulse',
+      )}
+    >
+      {entry.kind === 'thought' ? (
+        <BrainIcon className="size-3.5 shrink-0" />
+      ) : (
+        <LoaderCircleIcon className="size-3.5 shrink-0 motion-safe:animate-spin" />
+      )}
+      <span className="truncate">{text}</span>
+    </li>
+  )
+}
+
+function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
+  const next = researchLog[steps]
   return (
     <div
       data-demo-research-panel
       data-state={open ? 'open' : 'closed'}
       className={cn(
-        'absolute top-14 right-0 bottom-0 z-30 flex w-[380px] flex-col border-l bg-card shadow-2xl transition-[translate,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        'absolute top-14 right-0 bottom-0 z-30 flex w-[340px] flex-col border-l bg-card transition-[translate,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
         open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-full opacity-0',
       )}
     >
@@ -335,52 +374,12 @@ function ResearchPanel({ open, sourcesRead }: { open: boolean; sourcesRead: numb
         </div>
         <XIcon className="size-4 text-muted-foreground" />
       </div>
-      <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
-        <div
-          data-demo-thought
-          className="flex gap-2 rounded-md bg-muted/50 px-3 py-2.5 text-xs leading-5 text-muted-foreground"
-        >
-          <BrainIcon className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            Plan: confirm what MCP is, what Acme shipped and how to set it up, then check whether
-            the docs already cover it.
-          </span>
-        </div>
-        <ol className="flex flex-col gap-3">
-          {sources.slice(0, sourcesRead).map(({ url, logo: Logo, action, finding, gap }) => (
-            <li
-              key={url}
-              data-demo-research-step
-              className="flex flex-col gap-1 transition-[opacity,translate] duration-500 starting:translate-y-1 starting:opacity-0"
-            >
-              <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                <Logo className="size-3.5 shrink-0" />
-                <span className="shrink-0">{action}</span>
-                <span className="truncate">{url}</span>
-              </span>
-              <span
-                className={cn(
-                  'flex gap-1.5 pl-5 leading-5',
-                  gap && 'text-amber-600 dark:text-amber-400',
-                )}
-              >
-                {gap && <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />}
-                {finding}
-              </span>
-            </li>
-          ))}
-          {next && (
-            <li
-              data-demo-research-pending
-              className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
-            >
-              <LoaderCircleIcon className="size-3.5 shrink-0 motion-safe:animate-spin" />
-              <span className="shrink-0">{next.action === 'Read' ? 'Reading' : 'Searching'}</span>
-              <span className="truncate">{next.url}</span>
-            </li>
-          )}
-        </ol>
-      </div>
+      <ol className="flex min-h-0 flex-1 flex-col justify-end gap-3.5 overflow-hidden p-4">
+        {researchLog.slice(0, steps).map((entry) => (
+          <ResearchEntryView key={entry.at} entry={entry} />
+        ))}
+        {next && <PendingStep entry={next} />}
+      </ol>
       <div className="border-t p-3">
         <div
           data-demo-research-prompt
@@ -398,7 +397,7 @@ function ResearchPanel({ open, sourcesRead }: { open: boolean; sourcesRead: numb
   )
 }
 
-function TopBar({ sources, researchHovered }: { sources: number; researchHovered: boolean }) {
+function TopBar({ steps, researchHovered }: { steps: number; researchHovered: boolean }) {
   return (
     <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b bg-card px-6">
       <div className="flex items-center gap-2">
@@ -407,7 +406,7 @@ function TopBar({ sources, researchHovered }: { sources: number; researchHovered
         <span>Introducing Acme MCP</span>
       </div>
       <div className="flex items-center gap-2">
-        <ResearchStatus sourcesRead={sources} hovered={researchHovered} />
+        <ResearchStatus steps={steps} hovered={researchHovered} />
         <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
           <EyeIcon className="size-4" />
           Preview
@@ -605,7 +604,7 @@ export function EditorView({
   writerOnCategories,
   writerOnTags,
   writerOnBody,
-  sources,
+  researchSteps,
   researchHovered,
   researchPanelOpen,
 }: {
@@ -615,7 +614,7 @@ export function EditorView({
   writerOnCategories: boolean
   writerOnTags: boolean
   writerOnBody: boolean
-  sources: number
+  researchSteps: number
   researchHovered: boolean
   researchPanelOpen: boolean
 }) {
@@ -628,8 +627,14 @@ export function EditorView({
         shown ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0',
       )}
     >
-      <TopBar sources={sources} researchHovered={researchHovered} />
-      <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
+      <TopBar steps={researchSteps} researchHovered={researchHovered} />
+      <div
+        data-demo-editor-scroll
+        className={cn(
+          'flex items-start gap-6 p-6 transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          researchPanelOpen && 'pr-[calc(1.5rem+340px)]',
+        )}
+      >
         <MainColumn writerOnBody={writerOnBody} />
         <SideColumn
           writerOnCategories={writerOnCategories}
@@ -638,7 +643,7 @@ export function EditorView({
           tagsShown={tags}
         />
       </div>
-      <ResearchPanel open={researchPanelOpen} sourcesRead={sources} />
+      <ResearchPanel open={researchPanelOpen} steps={researchSteps} />
     </div>
   )
 }

@@ -1,0 +1,216 @@
+import { BookOpenIcon, ScrollTextIcon } from 'lucide-react'
+import { MarkGithubIcon } from '@primer/octicons-react'
+import {
+  SiAnthropic,
+  SiLinear,
+  SiModelcontextprotocol,
+  SiNotion,
+} from '@icons-pack/react-simple-icons'
+
+/** A page or search Canute reads, with the logo shown beside it. */
+export type Source = {
+  url: string
+  logo: React.ComponentType<{ className?: string }>
+  action: 'Read' | 'Searched'
+  finding: string
+  gap?: boolean
+}
+
+/** A Markdown document Canute writes up from his research. */
+export type Artifact = { name: string; summary: string }
+
+/** One step in Canute's research log, timed from when the editor opens. */
+export type ResearchEntry = { at: number } & (
+  | { kind: 'thought'; text: string }
+  | { kind: 'source'; source: Source }
+  | { kind: 'synthesis'; artifacts: readonly Artifact[] }
+)
+
+/** Canute's research for "Introducing Acme MCP", in the order it happens. */
+export const researchLog: readonly ResearchEntry[] = [
+  {
+    at: 250,
+    kind: 'thought',
+    text: 'Starting with the spec so the post explains MCP accurately before anything Acme-specific.',
+  },
+  {
+    at: 900,
+    kind: 'source',
+    source: {
+      url: 'modelcontextprotocol.io/specification',
+      logo: SiModelcontextprotocol,
+      action: 'Read',
+      finding:
+        'MCP lets assistants reach tools and data through servers that expose resources, tools and prompts.',
+    },
+  },
+  {
+    at: 1300,
+    kind: 'thought',
+    text: 'The spec covers resources, tools and prompts. PR #482 should say what Acme actually shipped, so checking its scope and auth next.',
+  },
+  {
+    at: 1900,
+    kind: 'source',
+    source: {
+      url: 'github.com/acme/app/pull/482',
+      logo: MarkGithubIcon,
+      action: 'Read',
+      finding: 'Adds a remote MCP server at mcp.acme.com with token-scoped access to collections.',
+    },
+  },
+  {
+    at: 2300,
+    kind: 'thought',
+    text: 'A remote server with token scopes. The Linear issue may list the launch goals and who the post is for.',
+  },
+  {
+    at: 2800,
+    kind: 'source',
+    source: {
+      url: 'linear.app/acme/issue/ACM-1290',
+      logo: SiLinear,
+      action: 'Read',
+      finding: 'Launch is planned for this week, with a blog post and docs listed as follow-ups.',
+    },
+  },
+  {
+    at: 3200,
+    kind: 'thought',
+    text: 'The blog post and docs are both follow-ups. If the docs already cover MCP, the post should link there.',
+  },
+  {
+    at: 3700,
+    kind: 'source',
+    source: {
+      url: 'docs.acme.com/search?q=mcp',
+      logo: BookOpenIcon,
+      action: 'Searched',
+      finding: 'No MCP page in Acme’s docs yet.',
+      gap: true,
+    },
+  },
+  {
+    at: 4100,
+    kind: 'thought',
+    text: 'Nothing in the docs. Worth flagging, since readers will need a setup guide to follow from the post.',
+  },
+  {
+    at: 4600,
+    kind: 'source',
+    source: {
+      url: 'acme.com/changelog',
+      logo: ScrollTextIcon,
+      action: 'Read',
+      finding: 'Recent release notes mention MCP in beta, but not the remote server.',
+    },
+  },
+  {
+    at: 5200,
+    kind: 'thought',
+    text: 'The changelog still says beta while the PR ships the remote server. Checking the reference servers to describe the transport correctly.',
+  },
+  {
+    at: 5900,
+    kind: 'source',
+    source: {
+      url: 'github.com/modelcontextprotocol/servers',
+      logo: MarkGithubIcon,
+      action: 'Read',
+      finding: 'Reference servers run remotely over HTTP and authenticate each request.',
+    },
+  },
+  {
+    at: 6200,
+    kind: 'thought',
+    text: 'Remote servers use HTTP. The transports page should say which one to recommend.',
+  },
+  {
+    at: 6600,
+    kind: 'source',
+    source: {
+      url: 'modelcontextprotocol.io/docs/concepts/transports',
+      logo: SiModelcontextprotocol,
+      action: 'Read',
+      finding: 'Streamable HTTP is the recommended transport for remote servers.',
+    },
+  },
+  {
+    at: 7300,
+    kind: 'thought',
+    text: 'Streamable HTTP it is. Acme’s README should have the exact setup steps for the post.',
+  },
+  {
+    at: 7900,
+    kind: 'source',
+    source: {
+      url: 'github.com/acme/app/blob/main/mcp/README.md',
+      logo: MarkGithubIcon,
+      action: 'Read',
+      finding: 'Setup adds the server URL and a scoped access token to the assistant’s config.',
+    },
+  },
+  {
+    at: 8200,
+    kind: 'thought',
+    text: 'Setup needs a scoped token. Checking the launch plan for tone and audience.',
+  },
+  {
+    at: 8500,
+    kind: 'source',
+    source: {
+      url: 'notion.so/acme/mcp-launch-plan',
+      logo: SiNotion,
+      action: 'Read',
+      finding: 'The team wants the post to lead with what users can do, not with the protocol.',
+    },
+  },
+  {
+    at: 9100,
+    kind: 'thought',
+    text: 'Lead with outcomes, not protocol. One open question from the plan is rate limits.',
+  },
+  {
+    at: 9600,
+    kind: 'source',
+    source: {
+      url: 'linear.app/acme/issue/ACM-1302',
+      logo: SiLinear,
+      action: 'Read',
+      finding: 'Rate limits for MCP requests ship in a later release.',
+    },
+  },
+  {
+    at: 10000,
+    kind: 'thought',
+    text: 'Rate limits ship later, so the post shouldn’t promise them. One last check on where MCP came from for the intro.',
+  },
+  {
+    at: 10500,
+    kind: 'source',
+    source: {
+      url: 'anthropic.com/news/model-context-protocol',
+      logo: SiAnthropic,
+      action: 'Read',
+      finding: 'Anthropic introduced MCP as an open standard in November 2024.',
+    },
+  },
+  {
+    at: 11300,
+    kind: 'synthesis',
+    artifacts: [
+      { name: 'Research brief.md', summary: 'Key facts, setup steps and sources for the post' },
+      { name: 'Docs gap.md', summary: 'Acme’s docs don’t cover MCP yet, with a suggested outline' },
+    ],
+  },
+]
+
+/** The sources in the research log, in reading order. */
+export const researchSources: readonly Source[] = researchLog.flatMap((entry) =>
+  entry.kind === 'source' ? [entry.source] : [],
+)
+
+/** How many log entries have happened by a moment since the editor opened. */
+export function researchStepsAt(sinceEditor: number) {
+  return researchLog.filter((entry) => sinceEditor >= entry.at).length
+}
