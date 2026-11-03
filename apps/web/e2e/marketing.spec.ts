@@ -54,8 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(open).toHaveCSS('font-size', '18px')
       await expect(open).toHaveCSS('font-weight', '300')
       await expect(page.getByRole('button', { name: 'Open navigation' })).toHaveCount(0)
-      await open.click()
-      await expect(page).toHaveURL(/\/sign-in$/)
+      await expect(open).toHaveAttribute('href', '/dash')
     })
   }
 }
@@ -235,6 +234,7 @@ test('hero offers a dim ghost demo link beside the call to action', async ({ pag
   const cta = main.getByRole('link', { name: 'Get started', exact: true })
   const demo = main.getByRole('link', { name: 'See Aircastle in action', exact: true })
   await expect(demo).toBeVisible()
+  await expect(demo).toHaveAttribute('href', '/demo')
   await expect(demo).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   const color = (locator: typeof demo) =>
     locator.evaluate((element) => getComputedStyle(element).color)

@@ -50,7 +50,7 @@ export function Header() {
           ))}
         </div>
         <Link
-          to="/sign-in"
+          to="/dash"
           className="group inline-flex items-center gap-1.5 justify-self-end rounded-lg px-3 py-2 text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
           Open Aircastle
