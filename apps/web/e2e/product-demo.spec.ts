@@ -44,9 +44,10 @@ test('product preview mirrors the dashboard shell with a collapsed sidebar', asy
 test('product preview table shows truncated plain-text bodies and a count badge', async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await expect(frame.locator('[data-demo-count]')).toHaveText('6')
+  await expect(frame.locator('[data-demo-count]')).toHaveText('7')
   await expect(frame.getByText('Body', { exact: true })).toBeVisible()
   const bodies = frame.locator('[data-demo-body]')
   await expect(bodies).toHaveCount(6)
@@ -95,6 +96,26 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(dialog.locator('[data-demo-send]')).toHaveAttribute('data-pressed', 'true')
   await page.clock.runFor(700)
   await expect(dialog).toHaveCount(0)
+
+  const agentRow = frame.locator('[data-demo-row="agent"]')
+  await expect(agentRow).toHaveAttribute('data-state', 'shown')
+  await expect(agentRow).toContainText('Introducing Acme MCP')
+  await expect(agentRow).toContainText('Abyan')
+  await expect(agentRow).toContainText('Drafting')
+  await expect(agentRow).toHaveAttribute('data-agents-working', 'true')
+  await expect(frame.locator('[data-demo-count]')).toHaveText('7')
+  const agents = frame.locator('[data-demo-agents]')
+  await expect(agents.locator('svg')).toHaveCount(2)
+  const tabOffset = async () => {
+    const rowBox = await agentRow.locator('[data-demo-agent-row]').boundingBox()
+    const agentsBox = await agents.boundingBox()
+    if (!rowBox || !agentsBox) throw new Error('Agent row is not laid out')
+    return {
+      attached: Math.abs(agentsBox.y - (rowBox.y + rowBox.height)) <= 1.5,
+      left: agentsBox.x < rowBox.x + rowBox.width / 4,
+    }
+  }
+  await expect.poll(tabOffset).toEqual({ attached: true, left: true })
 })
 
 test('the agent dialog stays closed with reduced motion', async ({ page }) => {

@@ -4,15 +4,15 @@ const shortcutShownAt = 1000
 const shortcutHiddenAt = 1700
 const dialogOpensAt = 1500
 const typingStartsAt = 1900
-const pauseBeforeSend = 500
-const sendPressDuration = 180
+const pauseBeforeSend = 450
+const sendPressDuration = 350
 const enterChipDuration = 700
 const dialogCloseDuration = 300
-const restAfterClose = 1200
+const restAfterClose = 4500
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
-  const pause = character === ' ' || character === ',' ? 26 : 0
-  return 24 + ((index * 37) % 19) + pause
+  const pause = character === ' ' || character === ',' ? 40 : 0
+  return 30 + ((index * 37) % 11) + pause
 })
 const typingEndsAt = keystrokeDelays.reduce((at, delay) => at + delay, typingStartsAt)
 const sendAt = typingEndsAt + pauseBeforeSend
@@ -30,6 +30,7 @@ export type Frame = {
   dialog: DialogState
   typed: number
   sendPressed: boolean
+  agentRow: boolean
 }
 
 /** The still frame shown when motion is reduced. */
@@ -38,6 +39,7 @@ export const stillFrame: Frame = {
   dialog: 'closed',
   typed: 0,
   sendPressed: false,
+  agentRow: true,
 }
 
 function typedAt(elapsed: number) {
@@ -68,5 +70,6 @@ export function frameAt(elapsed: number): Frame {
     dialog,
     typed: typedAt(elapsed),
     sendPressed: elapsed >= sendAt && elapsed < dialogClosesAt,
+    agentRow: elapsed >= dialogClosesAt,
   }
 }

@@ -18,30 +18,42 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
+import styles from './product-demo.module.css'
 import { frameAt, loopDuration, prompt, stillFrame, type Frame, type Shortcut } from './timeline'
 
 const frameWidth = 1120
 const frameHeight = 680
-const tickMs = 30
+
+function sameFrame(left: Frame, right: Frame) {
+  return (
+    left.shortcut === right.shortcut &&
+    left.dialog === right.dialog &&
+    left.typed === right.typed &&
+    left.sendPressed === right.sendPressed &&
+    left.agentRow === right.agentRow
+  )
+}
 
 function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: boolean) {
-  const [frame, setFrame] = useState<Frame>(stillFrame)
+  const [frame, setFrame] = useState<Frame>(() => frameAt(0))
   useEffect(() => {
     const element = stage.current
     if (reducedMotion || !element) return
-    let timer: number | undefined
+    let request: number | undefined
     const observer = new IntersectionObserver(([entry]) => {
-      if (!entry?.isIntersecting || timer !== undefined) return
+      if (!entry?.isIntersecting || request !== undefined) return
       const startedAt = performance.now()
-      timer = window.setInterval(
-        () => setFrame(frameAt((performance.now() - startedAt) % loopDuration)),
-        tickMs,
-      )
+      const tick = () => {
+        const next = frameAt((performance.now() - startedAt) % loopDuration)
+        setFrame((current) => (sameFrame(current, next) ? current : next))
+        request = requestAnimationFrame(tick)
+      }
+      request = requestAnimationFrame(tick)
     })
     observer.observe(element)
     return () => {
       observer.disconnect()
-      window.clearInterval(timer)
+      if (request !== undefined) cancelAnimationFrame(request)
     }
   }, [stage, reducedMotion])
   return reducedMotion ? stillFrame : frame
@@ -89,8 +101,8 @@ function AgentDialog({
           data-demo-send
           data-pressed={sendPressed}
           className={cn(
-            'inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-[scale,opacity] duration-150',
-            sendPressed && 'scale-90 opacity-80',
+            'inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground',
+            sendPressed && styles.sendPress,
           )}
         >
           <ArrowUpIcon className="size-5" />
@@ -304,14 +316,62 @@ function DemoSidebar() {
 
 const rowGrid = 'grid grid-cols-[14rem_1fr_7.5rem_7rem_5.5rem] items-center gap-4 px-4'
 
-function PostsView() {
+function AgentRow({ shown }: { shown: boolean }) {
+  return (
+    <div
+      data-demo-row="agent"
+      data-state={shown ? 'shown' : 'hidden'}
+      data-agents-working="true"
+      className={cn(
+        'relative z-10 grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        shown ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+      )}
+    >
+      <div
+        className={cn(
+          'min-h-0 pb-7 transition-[opacity,translate] duration-500 ease-out',
+          shown ? 'translate-y-0 opacity-100 delay-150' : '-translate-y-1 opacity-0',
+        )}
+      >
+        <div data-demo-agent-row className={cn(rowGrid, 'relative py-3', styles.agentRow)}>
+          <span className="truncate">Introducing Acme MCP</span>
+          <span className="truncate text-muted-foreground italic">Agents are drafting…</span>
+          <span className="inline-flex items-center gap-1.5 justify-self-start rounded-full bg-violet-500/10 px-2.5 py-0.5 text-[13px] text-violet-600 dark:text-violet-400">
+            <SparklesIcon className="size-3.5" />
+            Drafting
+          </span>
+          <span className="inline-flex items-center gap-2 text-muted-foreground">
+            <Initial name="Abyan" />
+            Abyan
+          </span>
+          <span className="text-muted-foreground">Just now</span>
+          <div
+            data-demo-agents
+            className="absolute top-full left-3 flex items-center rounded-b-md border border-t-0 border-violet-500/60 bg-card px-1.5 py-1"
+          >
+            <span className="flex -space-x-1.5">
+              <span className="rounded-full ring-2 ring-card">
+                <GeneratedAvatar name="Research agent" size={18} variant="beam" />
+              </span>
+              <span className="rounded-full ring-2 ring-card">
+                <GeneratedAvatar name="Writer agent" size={18} variant="beam" />
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PostsView({ agentRow }: { agentRow: boolean }) {
   return (
     <div className="min-w-0 flex-1 p-6">
       <div className="flex items-center justify-between pb-4">
         <div className="flex items-center gap-2.5">
           <h3 className="text-2xl">Blog posts</h3>
           <Badge data-demo-count variant="secondary">
-            {posts.length}
+            {posts.length + (agentRow ? 1 : 0)}
           </Badge>
         </div>
         <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary pr-2.5 pl-2 text-primary-foreground">
@@ -327,6 +387,7 @@ function PostsView() {
           <span>Author</span>
           <span>Updated</span>
         </div>
+        <AgentRow shown={agentRow} />
         {posts.map((post) => (
           <div key={post.title} className={cn(rowGrid, 'border-b py-3 last:border-b-0')}>
             <span className="truncate">{post.title}</span>
@@ -375,7 +436,7 @@ export function ProductDemo() {
           <DemoHeader />
           <div className="flex h-[calc(100%-3.5rem)]">
             <DemoSidebar />
-            <PostsView />
+            <PostsView agentRow={frame.agentRow} />
           </div>
           <div
             className={cn(
