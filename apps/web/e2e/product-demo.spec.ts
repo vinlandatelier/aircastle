@@ -1,5 +1,7 @@
 import { test, expect } from './support'
 
+const prompt = "Recently shipped MCP for our app, let's announce it"
+
 test('product preview sits below the hero without a visible label', async ({ page }) => {
   await page.goto('/')
   const preview = page.getByRole('region', { name: 'Aircastle preview' })
@@ -56,9 +58,7 @@ test('product preview table shows truncated plain-text bodies and a count badge'
   await expect(firstBody.locator('*')).toHaveCount(0)
 })
 
-test('a ⌘J shortcut opens the agent dialog over a blurred view for three seconds', async ({
-  page,
-}) => {
+test('a ⌘J shortcut opens the agent dialog and the idea is typed into it', async ({ page }) => {
   await page.clock.install()
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
@@ -67,6 +67,7 @@ test('a ⌘J shortcut opens the agent dialog over a blurred view for three secon
   const frame = preview.locator('[data-demo-frame]')
   const dialog = frame.locator('[data-demo-dialog]')
   const shortcut = frame.locator('[data-demo-shortcut]')
+  const typed = dialog.locator('[data-demo-prompt]')
 
   await expect(dialog).toHaveCount(0)
   await page.clock.runFor(1100)
@@ -76,9 +77,17 @@ test('a ⌘J shortcut opens the agent dialog over a blurred view for three secon
   await page.clock.runFor(500)
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText('Ask agents')
-  await page.clock.runFor(2800)
+  await expect(typed).toHaveText('')
+  await page.clock.runFor(1200)
+  const partway = (await typed.textContent()) ?? ''
+  expect(partway.length).toBeGreaterThan(0)
+  expect(prompt.startsWith(partway)).toBe(true)
+  await expect(typed).not.toHaveText(prompt)
+  await page.clock.runFor(1500)
+  await expect(typed).toHaveText(prompt)
+  await page.clock.runFor(1000)
   await expect(dialog).toBeVisible()
-  await page.clock.runFor(500)
+  await page.clock.runFor(1500)
   await expect(dialog).toHaveCount(0)
 })
 

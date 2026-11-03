@@ -18,7 +18,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
-import { frameAt, loopDuration, stillFrame, type Frame } from './timeline'
+import { frameAt, loopDuration, prompt, stillFrame, type Frame } from './timeline'
 
 const frameWidth = 1120
 const frameHeight = 680
@@ -47,7 +47,7 @@ function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: 
   return reducedMotion ? stillFrame : frame
 }
 
-function AgentDialog({ state }: { state: Frame['dialog'] }) {
+function AgentDialog({ state, typed }: { state: Frame['dialog']; typed: number }) {
   if (state === 'closed') return null
   return (
     <div
@@ -62,8 +62,19 @@ function AgentDialog({ state }: { state: Frame['dialog'] }) {
         <SparklesIcon className="size-4" />
         Ask agents
       </p>
-      <p className="min-h-20 text-lg text-muted-foreground/70">
-        Describe what you want written, researched or published…
+      <p className="relative min-h-20 text-lg">
+        <span data-demo-prompt>{prompt.slice(0, typed)}</span>
+        <span
+          className={cn(
+            'ml-px inline-block h-[1.1em] w-0.5 translate-y-[3px] bg-foreground',
+            typed > 0 && typed < prompt.length ? 'opacity-100' : 'animate-pulse',
+          )}
+        />
+        {typed === 0 && (
+          <span className="absolute inset-0 pl-1.5 text-muted-foreground/70">
+            Describe what you want written, researched or published…
+          </span>
+        )}
       </p>
       <div className="mt-3 flex items-center justify-end">
         <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -347,7 +358,7 @@ export function ProductDemo() {
               frame.dialog === 'open' ? 'opacity-100' : 'opacity-0',
             )}
           />
-          <AgentDialog state={frame.dialog} />
+          <AgentDialog state={frame.dialog} typed={frame.typed} />
           <ShortcutChip shown={frame.shortcut} />
         </div>
       </div>
