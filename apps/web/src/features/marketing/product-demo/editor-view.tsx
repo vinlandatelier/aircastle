@@ -7,7 +7,7 @@ import {
   LoaderCircleIcon,
   TriangleAlertIcon,
   CircleCheckIcon,
-  XIcon,
+  EllipsisIcon,
   EyeIcon,
   BoldIcon,
   CalendarIcon,
@@ -492,7 +492,7 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
           </span>
           <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
         </div>
-        <XIcon className="size-4 text-muted-foreground" />
+        <EllipsisIcon className="size-4 text-muted-foreground" />
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
         <Message align="end" className="shrink-0">
