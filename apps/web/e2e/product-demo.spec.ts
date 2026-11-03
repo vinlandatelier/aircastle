@@ -353,16 +353,26 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   )
 
   const categories = editor.locator('[data-demo-field="categories"] [data-demo-chip]')
+  const tags = editor.locator('[data-demo-field="tags"] [data-demo-chip]')
   await expect(categories).toHaveCount(0)
-  await page.clock.runFor(1600)
+  await expect(tags).toHaveCount(0)
+  await page.clock.runFor(1100)
   await expect(categories).toHaveCount(1)
   await expect(categories.first()).toContainText('Product')
   expect(
     await categories.first().evaluate((chip) => getComputedStyle(chip).animationName),
   ).toContain('agent-arrive')
-  await page.clock.runFor(300)
+  await page.clock.runFor(200)
   await expect(categories).toHaveCount(2)
   await expect(categories.last()).toContainText('Announcements')
+  await expect(tags).toHaveCount(0)
+  await page.clock.runFor(800)
+  await expect(tags).toHaveCount(1)
+  await expect(tags.first()).toContainText('MCP')
+  await page.clock.runFor(400)
+  await expect(tags).toHaveCount(3)
+  await expect(tags.last()).toContainText('Integrations')
+  await expect(editor.locator('[data-demo-field="tags"]')).toHaveAttribute('data-empty', 'false')
   await expect(editor.locator('[data-demo-field="categories"]')).toHaveAttribute(
     'data-empty',
     'false',

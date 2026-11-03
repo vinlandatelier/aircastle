@@ -23,6 +23,7 @@ const control = 'flex h-9 items-center rounded-md border bg-background px-3 dark
 const placeholder = 'text-muted-foreground/60'
 
 const categories = ['Product', 'Announcements'] as const
+const tags = ['MCP', 'AI', 'Integrations'] as const
 
 const toolbar: readonly (readonly { name: string; icon: LucideIcon }[])[] = [
   [{ name: 'heading', icon: Heading2Icon }],
@@ -276,7 +277,13 @@ function MainColumn() {
   )
 }
 
-function SideColumn({ categoriesShown }: { categoriesShown: number }) {
+function SideColumn({
+  categoriesShown,
+  tagsShown,
+}: {
+  categoriesShown: number
+  tagsShown: number
+}) {
   return (
     <div className="flex w-[300px] shrink-0 flex-col gap-6 rounded-lg border p-4">
       <Field name="authors" label="Authors" empty={false}>
@@ -297,8 +304,14 @@ function SideColumn({ categoriesShown }: { categoriesShown: number }) {
           ))}
         </Multiselect>
       </Field>
-      <Field name="tags" label="Tags" empty>
-        <Multiselect agent={writer} placeholderText="Add" />
+      <Field name="tags" label="Tags" empty={tagsShown === 0}>
+        <Multiselect agent={writer} placeholderText="Add">
+          {tags.slice(0, tagsShown).map((tag) => (
+            <Chip key={tag} arrived>
+              {tag}
+            </Chip>
+          ))}
+        </Multiselect>
       </Field>
       <Field name="cover-image" label="Cover image" empty>
         <MediaPlaceholder hint="Drop an image" className="aspect-video" />
@@ -317,7 +330,15 @@ function SideColumn({ categoriesShown }: { categoriesShown: number }) {
 }
 
 /** A post editor for the product preview, opened on "Introducing Acme MCP" while agents fill it in. */
-export function EditorView({ shown, categories }: { shown: boolean; categories: number }) {
+export function EditorView({
+  shown,
+  categories,
+  tags,
+}: {
+  shown: boolean
+  categories: number
+  tags: number
+}) {
   return (
     <div
       data-demo-editor
@@ -330,7 +351,7 @@ export function EditorView({ shown, categories }: { shown: boolean; categories: 
       <TopBar />
       <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
         <MainColumn />
-        <SideColumn categoriesShown={categories} />
+        <SideColumn categoriesShown={categories} tagsShown={tags} />
       </div>
     </div>
   )

@@ -47,7 +47,8 @@ function sameFrame(left: Frame, right: Frame) {
     left.cursorShape === right.cursorShape &&
     left.view === right.view &&
     left.agentRowHovered === right.agentRowHovered &&
-    left.categories === right.categories
+    left.categories === right.categories &&
+    left.tags === right.tags
   )
 }
 
@@ -575,7 +576,11 @@ export function ProductDemo() {
                 agentRow={frame.agentRow}
                 hovered={frame.agentRowHovered}
               />
-              <EditorView shown={frame.view === 'editor'} categories={frame.categories} />
+              <EditorView
+                shown={frame.view === 'editor'}
+                categories={frame.categories}
+                tags={frame.tags}
+              />
             </div>
           </div>
           <div
