@@ -77,3 +77,27 @@
     --agent-strength: 100%;
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .streamWord {
+    animation: stream-word 280ms ease-out backwards;
+  }
+
+  .streamCard {
+    animation: stream-card 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+}
+
+@keyframes stream-word {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+@keyframes stream-card {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}

@@ -398,17 +398,37 @@ function ResearchChain({ steps }: { steps: number }) {
   )
 }
 
+const replyText =
+  'Here’s what I found. Acme’s docs don’t cover MCP yet, so I drafted an outline for that too.'
+const replyWords = replyText.split(' ')
+const wordInterval = 35
+const cardsStartAfter = replyWords.length * wordInterval + 150
+const cardInterval = 120
+
 function ResearchReply({ artifacts }: { artifacts: readonly Artifact[] }) {
   return (
-    <div data-demo-research-reply className={cn('flex flex-col gap-2.5', entering)}>
+    <div data-demo-research-reply className="flex flex-col gap-2.5">
       <p className="leading-relaxed">
-        Here’s what I found. Acme’s docs don’t cover MCP yet, so I drafted an outline for that too.
+        {replyWords.map((word, index) => (
+          <span
+            key={index}
+            data-demo-reply-word
+            className={styles.streamWord}
+            style={{ animationDelay: `${index * wordInterval}ms` }}
+          >
+            {index < replyWords.length - 1 ? `${word} ` : word}
+          </span>
+        ))}
       </p>
-      {artifacts.map((artifact) => (
+      {artifacts.map((artifact, index) => (
         <span
           key={artifact.name}
           data-demo-artifact
-          className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5 dark:bg-input/30"
+          style={{ animationDelay: `${cardsStartAfter + index * cardInterval}ms` }}
+          className={cn(
+            'flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5 dark:bg-input/30',
+            styles.streamCard,
+          )}
         >
           <FileTextIcon className="size-5 shrink-0 text-violet-600 dark:text-violet-400" />
           <span className="flex min-w-0 flex-1 flex-col">

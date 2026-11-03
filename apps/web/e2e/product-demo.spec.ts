@@ -538,6 +538,23 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
 
   await page.clock.runFor(5300)
   await expect(panel.locator('[data-demo-research-step]')).toHaveCount(11)
+  const reply = panel.locator('[data-demo-research-reply]')
+  const words = reply.locator('[data-demo-reply-word]')
+  expect(await words.count()).toBeGreaterThan(10)
+  const delays = await words.evaluateAll((elements) =>
+    elements.map((element) => parseFloat(getComputedStyle(element).animationDelay)),
+  )
+  expect(delays).toEqual([...delays].sort((left, right) => left - right))
+  expect(new Set(delays).size).toBe(delays.length)
+  const lastWordDelay = delays.at(-1) ?? 0
+  const firstCardDelay = await reply
+    .locator('[data-demo-artifact]')
+    .first()
+    .evaluate((element) => parseFloat(getComputedStyle(element).animationDelay))
+  expect(firstCardDelay).toBeGreaterThan(lastWordDelay)
+  expect(lastWordDelay).toBeLessThan(1.5)
+  await expect(words.last()).toHaveCSS('opacity', '1')
+  await expect(reply.locator('.shimmer')).toHaveCount(0)
   const artifacts = panel.locator('[data-demo-artifact]')
   await expect(artifacts).toHaveCount(2)
   await expect(artifacts.first()).toContainText('Research brief.md')
@@ -559,7 +576,6 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(agentLabel).toHaveCSS('color', mutedColour)
 
   await expect(research).toHaveAttribute('data-state', 'done')
-  await page.clock.runFor(1000)
   await expect(research).toBeHidden()
   await expect(editor.locator('[data-demo-preview]')).toBeVisible()
 })
