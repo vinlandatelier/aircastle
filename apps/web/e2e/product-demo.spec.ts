@@ -501,10 +501,12 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const switcher = panel.locator('[data-demo-panel-header] [data-demo-agent-switcher]')
   await expect(switcher).toContainText('Canute')
   await expect(switcher.locator('svg.lucide-chevron-down')).toHaveCount(1)
-  const labelBox = await panel.locator('[data-demo-agent-label]').boundingBox()
-  const chevronBox = await switcher.locator('svg.lucide-chevron-down').boundingBox()
-  if (!labelBox || !chevronBox) throw new Error('Panel header is not laid out')
-  expect(chevronBox.x).toBeGreaterThanOrEqual(labelBox.x + labelBox.width)
+  const gap = await switcher.evaluate((element) => {
+    const label = element.querySelector('[data-demo-agent-label]')?.getBoundingClientRect()
+    const chevron = element.querySelector('svg.lucide-chevron-down')?.getBoundingClientRect()
+    return label && chevron ? chevron.left - label.right : -1
+  })
+  expect(gap).toBeGreaterThanOrEqual(0)
   await expect(panel.locator('[data-demo-thought]').first()).toBeVisible()
   await expect(panel.locator('[data-demo-thought]').first()).toHaveCSS('-webkit-line-clamp', '2')
   await expect(panel).toContainText('No MCP page')
