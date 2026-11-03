@@ -501,13 +501,13 @@ function DecisionCard() {
           <ChevronRightIcon className="size-3 text-muted-foreground" />
           {docsDecision.target.title}
         </span>
-        <span className="flex gap-1">
+        <span className="flex flex-col gap-1">
           {docsDecision.replies.map((reply, index) => (
             <span
               key={reply}
               data-demo-decision-option
               className={cn(
-                'flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-xs whitespace-nowrap',
+                'flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs',
                 index === docsDecision.replies.length - 1 && 'text-muted-foreground',
               )}
             >

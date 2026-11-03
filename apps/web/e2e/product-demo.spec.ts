@@ -594,10 +594,20 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const replyLayout = await replies.evaluateAll((elements) =>
     elements.map((element) => {
       const box = element.getBoundingClientRect()
-      return { top: Math.round(box.top), background: getComputedStyle(element).backgroundColor }
+      return {
+        top: Math.round(box.top),
+        left: Math.round(box.left),
+        width: Math.round(box.width),
+        background: getComputedStyle(element).backgroundColor,
+      }
     }),
   )
-  expect(new Set(replyLayout.map(({ top }) => top)).size).toBe(1)
+  expect(replyLayout.map(({ top }) => top)).toEqual(
+    replyLayout.map(({ top }) => top).sort((first, second) => first - second),
+  )
+  expect(new Set(replyLayout.map(({ top }) => top)).size).toBe(3)
+  expect(new Set(replyLayout.map(({ left }) => left)).size).toBe(1)
+  expect(new Set(replyLayout.map(({ width }) => width)).size).toBe(1)
   const primary = await page.evaluate(() => {
     const probe = document.createElement('span')
     probe.className = 'bg-primary'
