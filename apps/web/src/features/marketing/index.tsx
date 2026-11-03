@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { ArrowRightIcon } from 'lucide-react'
 import { Header } from './header'
+import { ProductDemo } from './product-demo'
 import { RotatingWord } from './rotating-word'
 
 const heroWords = ['write', 'research', 'publish', 'audit'] as const
@@ -55,6 +56,7 @@ export function MarketingPage() {
             </a>
           </div>
         </section>
+        <ProductDemo />
       </main>
     </div>
   )
