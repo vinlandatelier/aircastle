@@ -546,7 +546,10 @@ function TopBar({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <ResearchStatus steps={steps} hovered={researchHovered} docked={researchDocked} />
-        <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
+        <span
+          data-demo-preview
+          className="flex h-8 items-center gap-1.5 rounded-md border bg-background pr-3 pl-2.5 dark:bg-input/30"
+        >
           <EyeIcon className="size-4" />
           Preview
         </span>
