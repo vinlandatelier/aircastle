@@ -154,7 +154,7 @@ function DemoSidebar() {
       <span
         className={cn(
           outlineButton,
-          'absolute end-0 top-1/2 z-10 size-7 translate-x-1/2 -translate-y-1/2 rounded-md bg-background! text-muted-foreground',
+          'absolute end-0 top-1/2 z-10 size-7 translate-x-1/2 -translate-y-1/2 rounded-md bg-card! text-muted-foreground',
         )}
       >
         <ChevronRightIcon />
