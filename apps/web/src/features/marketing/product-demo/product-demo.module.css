@@ -4,29 +4,6 @@
   initial-value: 80%;
 }
 
-.clickRipple {
-  border: 2px solid rgb(139 92 246 / 0.7);
-  opacity: 0;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .clickRipple {
-    animation: click-ripple 550ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-}
-
-@keyframes click-ripple {
-  from {
-    opacity: 1;
-    scale: 0.4;
-  }
-
-  to {
-    opacity: 0;
-    scale: 1.6;
-  }
-}
-
 .sendPress {
   animation: send-press 350ms cubic-bezier(0.33, 1, 0.68, 1);
 }

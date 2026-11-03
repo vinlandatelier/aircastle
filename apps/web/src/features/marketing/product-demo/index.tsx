@@ -393,13 +393,10 @@ function DemoCursor({
         'absolute z-40 transition-[left,top] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.25,1)]',
       )}
     >
-      {(state === 'clicking' || state === 'still') && (
-        <span className={cn('absolute -top-3 -left-3 size-7 rounded-full', styles.clickRipple)} />
-      )}
       <Shape
         className={cn(
-          'relative size-6 fill-white stroke-black drop-shadow-md transition-[scale] duration-150 ease-out',
-          state === 'clicking' && 'scale-[0.82]',
+          'relative size-6 fill-white stroke-black drop-shadow-md transition-[scale] duration-100 ease-out',
+          state === 'clicking' && 'scale-90',
         )}
       />
     </span>
