@@ -80,7 +80,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .streamWord {
-    animation: stream-word 280ms ease-out backwards;
+    animation: stream-word 160ms ease-out backwards;
   }
 
   .streamCard {
@@ -91,7 +91,6 @@
 @keyframes stream-word {
   from {
     opacity: 0;
-    filter: blur(2px);
   }
 }
 
