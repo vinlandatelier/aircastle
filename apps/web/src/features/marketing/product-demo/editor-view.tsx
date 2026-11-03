@@ -1,7 +1,6 @@
 import {
   ChevronDownIcon,
   ChevronRightIcon,
-  FileTextIcon,
   SparklesIcon,
   ArrowUpIcon,
   BrainIcon,
@@ -22,6 +21,7 @@ import {
   PlusIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { SiMarkdown } from '@icons-pack/react-simple-icons'
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
 import { researchLog, researchSources, type Artifact, type ResearchEntry } from './research'
@@ -440,10 +440,12 @@ function ResearchReply({ artifacts }: { artifacts: readonly Artifact[] }) {
             styles.streamCard,
           )}
         >
-          <FileTextIcon className="size-5 shrink-0 text-violet-600 dark:text-violet-400" />
+          <SiMarkdown data-demo-artifact-icon className="size-5 shrink-0 text-muted-foreground" />
           <span className="flex min-w-0 flex-1 flex-col">
             <span>{artifact.name}</span>
-            <span className="truncate text-xs text-muted-foreground">{artifact.summary}</span>
+            <span data-demo-artifact-summary className="truncate text-xs text-muted-foreground">
+              {artifact.summary}
+            </span>
           </span>
           <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
         </span>

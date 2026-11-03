@@ -595,6 +595,13 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const artifacts = panel.locator('[data-demo-artifact]')
   await expect(artifacts).toHaveCount(1)
   await expect(artifacts.first()).toContainText('Research brief.md')
+  const artifactIcon = artifacts.first().locator('[data-demo-artifact-icon]')
+  await expect(artifactIcon.locator('title')).toHaveText('Markdown')
+  const summaryColour = await artifacts
+    .first()
+    .locator('[data-demo-artifact-summary]')
+    .evaluate((element) => getComputedStyle(element).color)
+  await expect(artifactIcon).toHaveCSS('color', summaryColour)
   await expect(panel).not.toContainText('Docs gap')
   await expect(panel).not.toContainText('drafted an outline')
   await expect(panel.locator('[data-demo-research-pending]')).toHaveCount(0)
