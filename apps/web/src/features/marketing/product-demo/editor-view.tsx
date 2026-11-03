@@ -347,7 +347,7 @@ function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
       <TraceIcon>
         <SparklesIcon className="size-3.5" />
       </TraceIcon>
-      <TraceTitle>Synthesised findings into {entry.artifacts.length} notes</TraceTitle>
+      <TraceTitle>Synthesised findings</TraceTitle>
     </TraceLine>
   )
 }
@@ -408,7 +408,7 @@ function ResearchChain({ steps }: { steps: number }) {
 }
 
 const replyText =
-  'Here’s what I found. Acme’s docs don’t cover MCP yet, so I drafted an outline for that too.'
+  'Here’s what I found, with the setup steps and sources for the post. Heads up: Acme’s docs don’t cover MCP yet.'
 const replyWords = replyText.split(' ')
 const wordInterval = 35
 const cardsStartAfter = replyWords.length * wordInterval + 150

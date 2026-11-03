@@ -200,7 +200,6 @@ export const researchLog: readonly ResearchEntry[] = [
     kind: 'synthesis',
     artifacts: [
       { name: 'Research brief.md', summary: 'Key facts, setup steps and sources for the post' },
-      { name: 'Docs gap.md', summary: 'Acme’s docs don’t cover MCP yet, with a suggested outline' },
     ],
   },
 ]
