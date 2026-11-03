@@ -5,6 +5,7 @@ import {
   ArrowUpIcon,
   BrainIcon,
   LoaderCircleIcon,
+  MessageCircleQuestionIcon,
   TriangleAlertIcon,
   CircleCheckIcon,
   EllipsisIcon,
@@ -25,6 +26,8 @@ import { SiMarkdown } from '@icons-pack/react-simple-icons'
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
 import {
+  docsDecision,
+  docsDecisionRaised,
   researchBrief,
   researchLog,
   researchSources,
@@ -348,6 +351,20 @@ function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
       </div>
     )
   }
+  if (entry.kind === 'decision')
+    return (
+      <TraceLine data-demo-decision-marker className={cn('text-xs', entering)}>
+        <TraceIcon>
+          <MessageCircleQuestionIcon className="size-3.5" />
+        </TraceIcon>
+        <TraceTitle className="whitespace-normal">
+          Asked you: {entry.question.charAt(0).toLowerCase() + entry.question.slice(1)}
+        </TraceTitle>
+        <span className="shrink-0 rounded-sm bg-amber-500/15 px-1 py-px text-[10px] leading-none text-amber-700 dark:text-amber-300">
+          Waiting
+        </span>
+      </TraceLine>
+    )
   return (
     <TraceLine className={cn('text-xs', entering)}>
       <TraceIcon>
@@ -360,7 +377,7 @@ function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
 
 function PendingStep({ entry }: { entry: ResearchEntry }) {
   const text =
-    entry.kind === 'thought'
+    entry.kind === 'thought' || entry.kind === 'decision'
       ? 'Thinking…'
       : entry.kind === 'source'
         ? `${entry.source.action === 'Read' ? 'Reading' : 'Searching'} ${entry.source.url}`
@@ -368,7 +385,7 @@ function PendingStep({ entry }: { entry: ResearchEntry }) {
   return (
     <TraceLine data-demo-research-pending status="running" className="text-xs">
       <TraceIcon>
-        {entry.kind === 'thought' ? (
+        {entry.kind === 'thought' || entry.kind === 'decision' ? (
           <BrainIcon className="size-3.5" />
         ) : (
           <LoaderCircleIcon className="size-3.5 motion-safe:animate-spin" />
@@ -414,7 +431,7 @@ function ResearchChain({ steps }: { steps: number }) {
 }
 
 const replyText =
-  'Here’s what I found, with the setup steps and sources for the post. Heads up: Acme’s docs don’t cover MCP yet.'
+  'Here’s what I found, with the setup steps and sources for the post. Acme’s docs don’t cover MCP yet, so I’ve asked whether to draft a docs page for it.'
 const replyWords = replyText.split(' ')
 const wordInterval = 35
 const cardsStartAfter = replyWords.length * wordInterval + 150
@@ -460,6 +477,48 @@ function ResearchReply({ artifacts }: { artifacts: readonly Artifact[] }) {
 }
 
 const synthesis = researchLog.find((entry) => entry.kind === 'synthesis')
+
+function DecisionCard() {
+  return (
+    <div
+      data-demo-decision
+      className={cn(
+        'flex flex-col gap-2.5 rounded-lg border bg-background p-3 shadow-sm dark:bg-input/30',
+        entering,
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <MessageCircleQuestionIcon className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="flex min-w-0 flex-col gap-1">
+          <span>{docsDecision.question}</span>
+          <span className="text-xs leading-5 text-muted-foreground">{docsDecision.reason}</span>
+        </div>
+      </div>
+      <span className="flex w-fit items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs">
+        <span className="text-muted-foreground">{docsDecision.target.collection}</span>
+        <ChevronRightIcon className="size-3 text-muted-foreground" />
+        {docsDecision.target.title}
+      </span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">{docsDecision.fallback}</span>
+        <span className="flex shrink-0 gap-1.5">
+          <span
+            data-demo-decision-dismiss
+            className="flex h-7 items-center rounded-md border bg-background px-2.5 text-xs dark:bg-input/30"
+          >
+            Not now
+          </span>
+          <span
+            data-demo-decision-approve
+            className="flex h-7 items-center rounded-md bg-primary px-2.5 text-xs text-primary-foreground"
+          >
+            Draft it
+          </span>
+        </span>
+      </div>
+    </div>
+  )
+}
 
 function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
   const done = steps >= researchLog.length
@@ -527,7 +586,8 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
           </MessageContent>
         </Message>
       </div>
-      <div className="p-3">
+      <div className="flex flex-col gap-2 p-3">
+        {docsDecisionRaised(steps) && <DecisionCard />}
         <InputGroup data-demo-research-prompt className="dark:bg-input/30">
           <InputGroupTextarea
             readOnly

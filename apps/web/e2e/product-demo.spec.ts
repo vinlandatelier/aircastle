@@ -572,6 +572,23 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
     'trace-line',
   )
   await expect(panel.locator('[data-demo-research-reply]')).toHaveCount(0)
+  const marker = panel.locator('[data-demo-research-chain] [data-demo-decision-marker]')
+  await expect(marker).toContainText('Asked you: draft a docs page for MCP?')
+  await expect(marker).toContainText('Waiting')
+  const decision = panel.locator('[data-demo-decision]')
+  await expect(decision).toContainText('Draft a docs page for MCP?')
+  await expect(decision).toContainText('Connect to Acme MCP')
+  await expect(decision.locator('[data-demo-decision-approve]')).toHaveText('Draft it')
+  await expect(decision.locator('[data-demo-decision-dismiss]')).toHaveText('Not now')
+  await expect(panel.locator('[data-demo-research-chain] [data-demo-decision]')).toHaveCount(0)
+  const pinnedAbovePrompt = async () =>
+    decision.evaluate((element) => {
+      const prompt = element.parentElement?.querySelector('[data-demo-research-prompt]')
+      return prompt
+        ? element.getBoundingClientRect().bottom <= prompt.getBoundingClientRect().top
+        : false
+    })
+  expect(await pinnedAbovePrompt()).toBe(true)
 
   const tagsBox = await editor.locator('[data-demo-field="tags"]').boundingBox()
   const panelBox = await panel.boundingBox()
@@ -652,6 +669,12 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
     'false',
   )
   await expect(request).toBeInViewport()
+  await expect(decision).toBeInViewport()
+  expect(await pinnedAbovePrompt()).toBe(true)
+  await expect(marker).toBeAttached()
+  await expect(panel.locator('[data-demo-research-reply]')).toContainText(
+    'asked whether to draft a docs page',
+  )
   await expect(panel.locator('[data-demo-research-reply]')).toContainText('Research brief.md')
   const agentLabel = panel.locator('[data-demo-agent-label]')
   const mutedText = chain.locator('[data-slot="trace-line"]').first()
@@ -698,8 +721,12 @@ test('the preview header has an Ask Air split button with an agent menu', async 
   await page.clock.runFor(10000)
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
   await expect(header.locator('[data-demo-ask-agent]')).toHaveCount(0)
+  const waiting = header.locator('[data-demo-ask-count]')
+  await expect(waiting).toHaveCount(0)
+  await page.clock.runFor(3500)
+  await expect(waiting).toHaveText('1')
 
-  for (let tick = 0; tick < 14; tick += 1) {
+  for (let tick = 0; tick < 11; tick += 1) {
     await page.clock.runFor(1000)
     await expect(menu).toHaveAttribute('data-state', 'closed')
     await expect(cursor).not.toHaveAttribute('data-target', 'ask')

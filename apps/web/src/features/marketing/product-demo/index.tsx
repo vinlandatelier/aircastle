@@ -21,6 +21,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { EditorView } from './editor-view'
+import { docsDecisionRaised } from './research'
 import { canute, orchestrator, thorfinn, workingAgents, type DemoAgent } from './agents'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
@@ -310,12 +311,20 @@ function AskMenu() {
   )
 }
 
-function AskButton() {
+function AskButton({ waiting }: { waiting: number }) {
   return (
     <span className="relative flex">
       <span data-demo-ask className={cn(outlineButton, 'h-8 gap-2 rounded-r-none pr-1.5 pl-2')}>
         <span className="air-mascot block size-[18px] shrink-0" />
         Ask {orchestrator.name}
+        {waiting > 0 && (
+          <span
+            data-demo-ask-count
+            className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] leading-none text-white transition-[opacity,scale] duration-300 starting:scale-50 starting:opacity-0"
+          >
+            {waiting}
+          </span>
+        )}
         <Kbd>⌘J</Kbd>
       </span>
       <span
@@ -329,7 +338,7 @@ function AskButton() {
   )
 }
 
-function DemoHeader() {
+function DemoHeader({ decisionsWaiting }: { decisionsWaiting: number }) {
   return (
     <div data-demo-header className="relative z-40 flex h-14 shrink-0 items-center gap-2 border-b">
       <span className="flex h-full w-14 shrink-0 items-center justify-center border-r">
@@ -357,7 +366,7 @@ function DemoHeader() {
         </span>
       </span>
       <span className="ms-auto flex items-center gap-4 pr-5">
-        <AskButton />
+        <AskButton waiting={decisionsWaiting} />
         <span
           data-demo-search
           className="inline-flex h-8 w-60 items-center gap-2.5 rounded-lg bg-secondary pr-2.5 pl-2"
@@ -644,7 +653,11 @@ export function ProductDemo() {
           )}
         >
           <WindowDots />
-          <DemoHeader />
+          <DemoHeader
+            decisionsWaiting={
+              frame.view === 'editor' && docsDecisionRaised(frame.researchSteps) ? 1 : 0
+            }
+          />
           <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />
             <div className="relative min-w-0 flex-1">

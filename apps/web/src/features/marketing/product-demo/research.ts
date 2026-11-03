@@ -23,6 +23,7 @@ export type Artifact = { name: string; summary: string }
 export type ResearchEntry = { at: number } & (
   | { kind: 'thought'; text: string }
   | { kind: 'source'; source: Source }
+  | { kind: 'decision'; question: string }
   | { kind: 'synthesis'; artifacts: readonly Artifact[] }
 )
 
@@ -104,6 +105,11 @@ export const researchLog: readonly ResearchEntry[] = [
       finding: 'No MCP page in Acme’s docs yet.',
       gap: true,
     },
+  },
+  {
+    at: 3950,
+    kind: 'decision',
+    question: 'Draft a docs page for MCP?',
   },
   {
     at: 4100,
@@ -230,6 +236,21 @@ export const researchBrief = {
   scope:
     'Dig wherever you need across GitHub, Linear, Notion and the docs. Return a brief with sources, and mark anything you couldn’t confirm.',
 } as const
+
+/** The decision Canute raises when he finds the docs gap, pinned until someone answers it. */
+export const docsDecision = {
+  question: 'Draft a docs page for MCP?',
+  reason: 'Acme’s docs have no MCP page, and readers will need setup steps after the post.',
+  target: { collection: 'Docs', title: 'Connect to Acme MCP' },
+  fallback: 'If not, I’ll note the gap in the brief.',
+} as const
+
+const docsDecisionIndex = researchLog.findIndex((entry) => entry.kind === 'decision')
+
+/** Whether the docs decision has been raised once the log has reached this many steps. */
+export function docsDecisionRaised(steps: number) {
+  return steps > docsDecisionIndex
+}
 
 /** The sources in the research log, in reading order. */
 export const researchSources: readonly Source[] = researchLog.flatMap((entry) =>
