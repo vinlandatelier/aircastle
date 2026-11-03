@@ -16,7 +16,9 @@ test('product preview sits below the hero without a visible label', async ({ pag
 test('product preview shows the posts collection without motion', async ({ page }) => {
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await expect(frame.getByText('Blog posts', { exact: true })).toBeVisible()
+  await expect(
+    frame.locator('[data-demo-table]').getByText('Blog posts', { exact: true }),
+  ).toBeVisible()
   await expect(frame.getByText('How we cut build times by 40%', { exact: true })).toBeVisible()
   await expect(frame.locator('[data-demo-dialog]')).toHaveCount(0)
   expect(await frame.evaluate((element) => element.getAnimations({ subtree: true }).length)).toBe(0)
@@ -48,7 +50,7 @@ test('product preview table shows truncated plain-text bodies and a count badge'
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
   await expect(frame.locator('[data-demo-count]')).toHaveText('7')
-  await expect(frame.getByText('Body', { exact: true })).toBeVisible()
+  await expect(frame.locator('[data-demo-table]').getByText('Body', { exact: true })).toBeVisible()
   const bodies = frame.locator('[data-demo-body]')
   await expect(bodies).toHaveCount(6)
   const firstBody = bodies.first()
@@ -104,6 +106,7 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(agentRow.getByText('Draft', { exact: true })).toHaveCSS(
     'background-color',
     await frame
+      .locator('[data-demo-table]')
       .getByText('Draft', { exact: true })
       .last()
       .evaluate((pill) => getComputedStyle(pill).backgroundColor),
@@ -240,8 +243,12 @@ test('the preview table lists authors, with some posts written by several people
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await expect(frame.getByText('Authors', { exact: true })).toBeVisible()
-  await expect(frame.getByText('Author', { exact: true })).toHaveCount(0)
+  await expect(
+    frame.locator('[data-demo-table]').getByText('Authors', { exact: true }),
+  ).toBeVisible()
+  await expect(frame.locator('[data-demo-table]').getByText('Author', { exact: true })).toHaveCount(
+    0,
+  )
   const authorCells = frame.locator('[data-demo-authors]')
   const counts = await authorCells.evaluateAll((cells) =>
     cells.map((cell) => Number(cell.getAttribute('data-demo-authors'))),
@@ -262,4 +269,69 @@ test('the cursor turns into a pointer as soon as it is over any table row', asyn
   await page.clock.runFor(6900)
   await expect(cursor).toHaveAttribute('data-state', 'moving')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+})
+
+test('clicking the agent row opens the post editor', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const cursor = frame.locator('[data-demo-cursor]')
+  const editor = frame.locator('[data-demo-editor]')
+  const table = frame.locator('[data-demo-table]')
+
+  await page.clock.runFor(8600)
+  await expect(cursor).toHaveAttribute('data-state', 'hovering')
+  await expect(editor).toHaveAttribute('data-state', 'hidden')
+  await expect(table).toHaveAttribute('data-state', 'shown')
+
+  await page.clock.runFor(800)
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+
+  await page.clock.runFor(600)
+  await expect(editor).toHaveAttribute('data-state', 'shown')
+  await expect(table).toHaveAttribute('data-state', 'hidden')
+  await expect(editor).toContainText('Introducing Acme MCP')
+  await expect(editor).toContainText('Draft')
+  await expect(editor).toContainText('Publish')
+  for (const field of [
+    'title',
+    'slug',
+    'summary',
+    'body',
+    'seo',
+    'meta-title',
+    'meta-description',
+    'focus-keyword',
+    'indexing',
+    'authors',
+    'categories',
+    'cover-image',
+    'publish-date',
+    'reading-time',
+  ])
+    await expect(editor.locator(`[data-demo-field="${field}"]`)).toHaveCount(1)
+  await expect(editor.locator('[data-demo-field="authors"]')).not.toContainText(/Thorfinn|Canute/)
+})
+
+test('the agents tab starts expanding as soon as the cursor enters the agent row', async ({
+  page,
+}) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const cursor = frame.locator('[data-demo-cursor]')
+  const agents = frame.locator('[data-demo-agents]')
+  await page.clock.runFor(7300)
+  await expect(cursor).toHaveAttribute('data-state', 'moving')
+  await expect(agents).toHaveAttribute('data-expanded', 'false')
+  await page.clock.runFor(150)
+  await expect(cursor).toHaveAttribute('data-state', 'moving')
+  await expect(agents).toHaveAttribute('data-expanded', 'true')
 })

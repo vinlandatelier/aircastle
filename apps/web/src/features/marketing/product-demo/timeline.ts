@@ -10,9 +10,13 @@ const enterChipDuration = 700
 const dialogCloseDuration = 300
 const cursorDelayAfterRow = 1300
 const cursorTravelDuration = 1400
-const hoverDuration = 3200
-const restAfterHover = 1800
+const hoverDuration = 1500
+const clickDuration = 220
+const editorOpensAfterClick = 180
+const editorDuration = 5500
+const restAfterEditor = 1800
 const rowsReachedAfter = 420
+const agentRowReachedAfter = 940
 const rowsLeftAfter = 980
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
@@ -24,14 +28,18 @@ const sendAt = typingEndsAt + pauseBeforeSend
 const dialogClosesAt = sendAt + sendPressDuration
 const cursorShownAt = dialogClosesAt + dialogCloseDuration + cursorDelayAfterRow
 const cursorArrivesAt = cursorShownAt + cursorTravelDuration
-const hoverEndsAt = cursorArrivesAt + hoverDuration
+const clickAt = cursorArrivesAt + hoverDuration
+const clickEndsAt = clickAt + clickDuration
+const editorOpensAt = clickAt + editorOpensAfterClick
+const editorClosesAt = editorOpensAt + editorDuration
 
 /** Length of one loop of the product preview, in milliseconds. */
-export const loopDuration = hoverEndsAt + restAfterHover
+export const loopDuration = editorClosesAt + restAfterEditor
 
 export type DialogState = 'closed' | 'open' | 'closing'
 export type Shortcut = 'open-agents' | 'send'
-export type CursorState = 'resting' | 'moving' | 'hovering'
+export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
+export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
 
 /** Everything the preview shows at one moment. */
@@ -43,6 +51,8 @@ export type Frame = {
   agentRow: boolean
   cursor: CursorState
   cursorShape: CursorShape
+  view: View
+  agentRowHovered: boolean
 }
 
 /** The still frame shown when motion is reduced. */
@@ -54,6 +64,8 @@ export const stillFrame: Frame = {
   agentRow: true,
   cursor: 'resting',
   cursorShape: 'arrow',
+  view: 'table',
+  agentRowHovered: false,
 }
 
 function typedAt(elapsed: number) {
@@ -86,14 +98,21 @@ export function frameAt(elapsed: number): Frame {
     sendPressed: elapsed >= sendAt && elapsed < dialogClosesAt,
     agentRow: elapsed >= dialogClosesAt,
     cursorShape:
-      elapsed >= cursorShownAt + rowsReachedAfter && elapsed < hoverEndsAt + rowsLeftAfter
+      (elapsed >= cursorShownAt + rowsReachedAfter && elapsed < clickEndsAt) ||
+      (elapsed >= editorClosesAt && elapsed < editorClosesAt + rowsLeftAfter)
         ? 'pointer'
         : 'arrow',
     cursor:
-      elapsed < cursorShownAt || elapsed >= hoverEndsAt
+      elapsed < cursorShownAt || elapsed >= editorClosesAt
         ? 'resting'
         : elapsed < cursorArrivesAt
           ? 'moving'
-          : 'hovering',
+          : elapsed < clickAt
+            ? 'hovering'
+            : elapsed < clickEndsAt
+              ? 'clicking'
+              : 'still',
+    view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
+    agentRowHovered: elapsed >= cursorShownAt + agentRowReachedAfter && elapsed < editorOpensAt,
   }
 }

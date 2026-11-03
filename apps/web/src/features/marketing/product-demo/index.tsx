@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
+import { EditorView } from './editor-view'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
 import {
@@ -43,7 +44,9 @@ function sameFrame(left: Frame, right: Frame) {
     left.sendPressed === right.sendPressed &&
     left.agentRow === right.agentRow &&
     left.cursor === right.cursor &&
-    left.cursorShape === right.cursorShape
+    left.cursorShape === right.cursorShape &&
+    left.view === right.view &&
+    left.agentRowHovered === right.agentRowHovered
   )
 }
 
@@ -340,7 +343,7 @@ function DemoSidebar() {
   )
 }
 
-const rowGrid = 'grid grid-cols-[14rem_1fr_7.5rem_7rem_5.5rem] items-center gap-4 px-4'
+const rowGrid = 'grid grid-cols-[14rem_1fr_7rem_8.5rem_5.5rem] items-center gap-4 px-4'
 
 const agents = ['Thorfinn', 'Canute', 'Askeladd', 'Bjorn'] as const
 
@@ -370,7 +373,15 @@ function DemoCursor({ state, shape }: { state: CursorState; shape: CursorShape }
         'absolute z-40 transition-[left,top] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.25,1)]',
       )}
     >
-      <Shape className="size-6 fill-white stroke-black drop-shadow-md" />
+      {(state === 'clicking' || state === 'still') && (
+        <span className={cn('absolute -top-3 -left-3 size-7 rounded-full', styles.clickRipple)} />
+      )}
+      <Shape
+        className={cn(
+          'relative size-6 fill-white stroke-black drop-shadow-md transition-[scale] duration-150 ease-out',
+          state === 'clicking' && 'scale-[0.82]',
+        )}
+      />
     </span>
   )
 }
@@ -468,9 +479,24 @@ function AuthorsCell({ authors }: { authors: readonly string[] }) {
   )
 }
 
-function PostsView({ agentRow, hovered }: { agentRow: boolean; hovered: boolean }) {
+function PostsView({
+  shown,
+  agentRow,
+  hovered,
+}: {
+  shown: boolean
+  agentRow: boolean
+  hovered: boolean
+}) {
   return (
-    <div className="min-w-0 flex-1 p-6">
+    <div
+      data-demo-table
+      data-state={shown ? 'shown' : 'hidden'}
+      className={cn(
+        'absolute inset-0 p-6 transition-[opacity,scale] duration-400 ease-out',
+        shown ? 'scale-100 opacity-100' : 'pointer-events-none scale-[0.99] opacity-0',
+      )}
+    >
       <div className="flex items-center justify-between pb-4">
         <div className="flex items-center gap-2.5">
           <h3 className="text-2xl">Blog posts</h3>
@@ -538,7 +564,14 @@ export function ProductDemo() {
           <DemoHeader />
           <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />
-            <PostsView agentRow={frame.agentRow} hovered={frame.cursor === 'hovering'} />
+            <div className="relative min-w-0 flex-1">
+              <PostsView
+                shown={frame.view === 'table'}
+                agentRow={frame.agentRow}
+                hovered={frame.agentRowHovered}
+              />
+              <EditorView shown={frame.view === 'editor'} />
+            </div>
           </div>
           <div
             className={cn(

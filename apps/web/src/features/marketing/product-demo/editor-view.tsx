@@ -249,7 +249,7 @@ function SideColumn() {
     <div className="flex w-[300px] shrink-0 flex-col gap-5 rounded-lg border p-4">
       <Field name="authors" label="Authors">
         <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-background p-1.5 dark:bg-input/30">
-          {['Abyan', 'Maya'].map((author) => (
+          {['Abyan'].map((author) => (
             <Chip key={author}>
               <Initial name={author} />
               {author}
@@ -295,9 +295,16 @@ function SideColumn() {
 }
 
 /** A static post editor for the product preview, opened on "Introducing Acme MCP". */
-export function EditorView() {
+export function EditorView({ shown }: { shown: boolean }) {
   return (
-    <div data-demo-editor className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+    <div
+      data-demo-editor
+      data-state={shown ? 'shown' : 'hidden'}
+      className={cn(
+        'absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-card transition-[opacity,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        shown ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0',
+      )}
+    >
       <TopBar />
       <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
         <MainColumn />
