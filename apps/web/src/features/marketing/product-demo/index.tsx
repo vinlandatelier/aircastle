@@ -58,8 +58,7 @@ function sameFrame(left: Frame, right: Frame) {
     left.researchSteps === right.researchSteps &&
     left.cursorTarget === right.cursorTarget &&
     left.researchHovered === right.researchHovered &&
-    left.researchPanelOpen === right.researchPanelOpen &&
-    left.askMenuOpen === right.askMenuOpen
+    left.researchPanelOpen === right.researchPanelOpen
   )
 }
 
@@ -289,15 +288,12 @@ function AgentMark({ agent, size }: { agent: DemoAgent; size: number }) {
   return <GeneratedAvatar name={agent.name} size={size} variant="beam" />
 }
 
-function AskMenu({ open }: { open: boolean }) {
+function AskMenu() {
   return (
     <span
       data-demo-ask-menu
-      data-state={open ? 'open' : 'closed'}
-      className={cn(
-        'absolute top-[calc(100%+6px)] right-0 z-50 flex w-72 origin-top-right flex-col rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg transition-[opacity,scale] duration-150 ease-out',
-        open ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0',
-      )}
+      data-state="closed"
+      className="pointer-events-none absolute top-[calc(100%+6px)] right-0 z-50 flex w-72 origin-top-right scale-95 flex-col rounded-lg border bg-popover p-1 text-popover-foreground opacity-0 shadow-lg"
     >
       {[orchestrator, ...workingAgents].map((agent, index) => (
         <span
@@ -319,7 +315,7 @@ function AskMenu({ open }: { open: boolean }) {
   )
 }
 
-function AskButton({ menuOpen }: { menuOpen: boolean }) {
+function AskButton() {
   return (
     <span className="relative flex">
       <span data-demo-ask className={cn(outlineButton, 'h-8 gap-2 rounded-r-none pr-1.5 pl-2')}>
@@ -329,22 +325,16 @@ function AskButton({ menuOpen }: { menuOpen: boolean }) {
       </span>
       <span
         data-demo-ask-menu-trigger
-        className={cn(
-          outlineButton,
-          'size-8 rounded-l-none border-l-0 transition-colors duration-150',
-          menuOpen && 'bg-accent! text-accent-foreground',
-        )}
+        className={cn(outlineButton, 'size-8 rounded-l-none border-l-0')}
       >
-        <ChevronDownIcon
-          className={cn('transition-transform duration-150', menuOpen && 'rotate-180')}
-        />
+        <ChevronDownIcon />
       </span>
-      <AskMenu open={menuOpen} />
+      <AskMenu />
     </span>
   )
 }
 
-function DemoHeader({ askMenuOpen }: { askMenuOpen: boolean }) {
+function DemoHeader() {
   return (
     <div data-demo-header className="relative z-40 flex h-14 shrink-0 items-center gap-2 border-b">
       <span className="flex h-full w-14 shrink-0 items-center justify-center border-r">
@@ -372,7 +362,7 @@ function DemoHeader({ askMenuOpen }: { askMenuOpen: boolean }) {
         </span>
       </span>
       <span className="ms-auto flex items-center gap-4 pr-5">
-        <AskButton menuOpen={askMenuOpen} />
+        <AskButton />
         <span
           data-demo-search
           className="inline-flex h-8 w-60 items-center gap-2.5 rounded-lg bg-secondary pr-2.5 pl-2"
@@ -443,7 +433,6 @@ const cursorSpots = {
   rest: { left: 1010, top: 640 },
   row: { left: 320, top: 218 },
   research: { left: 700, top: 112 },
-  ask: { left: 848, top: 56 },
 } as const
 
 function DemoCursor({
@@ -657,7 +646,7 @@ export function ProductDemo() {
           )}
         >
           <WindowDots />
-          <DemoHeader askMenuOpen={frame.askMenuOpen} />
+          <DemoHeader />
           <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />
             <div className="relative min-w-0 flex-1">

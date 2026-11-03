@@ -636,16 +636,11 @@ test('the preview header has an Ask Aircastle split button with an agent menu', 
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
   await expect(header.locator('[data-demo-ask-agent]')).toHaveCount(0)
 
-  await page.clock.runFor(11500)
-  await expect(menu).toHaveAttribute('data-state', 'closed')
-  let opened = false
-  for (let tick = 0; tick < 25 && !opened; tick += 1) {
-    await page.clock.runFor(200)
-    opened = (await menu.getAttribute('data-state')) === 'open'
+  for (let tick = 0; tick < 14; tick += 1) {
+    await page.clock.runFor(1000)
+    await expect(menu).toHaveAttribute('data-state', 'closed')
+    await expect(cursor).not.toHaveAttribute('data-target', 'ask')
   }
-  expect(opened).toBe(true)
-  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
-  await expect(cursor).toHaveAttribute('data-target', 'ask')
   const options = menu.locator('[data-demo-ask-option]')
   await expect(options).toHaveCount(5)
   const expected = [
@@ -659,9 +654,4 @@ test('the preview header has an Ask Aircastle split button with an agent menu', 
     await expect(options.nth(index)).toContainText(name)
     await expect(options.nth(index).locator('[data-demo-ask-role]')).toHaveText(role)
   }
-  await expect(options.first().locator('svg.lucide-bot')).toHaveCount(1)
-  const menuBox = await menu.boundingBox()
-  const openTriggerBox = await trigger.boundingBox()
-  if (!menuBox || !openTriggerBox) throw new Error('Menu is not laid out')
-  expect(menuBox.y).toBeGreaterThanOrEqual(openTriggerBox.y + openTriggerBox.height)
 })
