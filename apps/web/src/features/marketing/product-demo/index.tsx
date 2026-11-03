@@ -254,7 +254,7 @@ function WindowDots() {
   return (
     <div
       data-demo-window-dots
-      className="flex h-8 shrink-0 items-center gap-2 border-b bg-card px-3.5"
+      className="flex h-8 shrink-0 items-center gap-2 border-b bg-black/[0.04] px-3.5 dark:bg-black/35"
     >
       <span className="size-3 rounded-full bg-muted-foreground/25" />
       <span className="size-3 rounded-full bg-muted-foreground/25" />
