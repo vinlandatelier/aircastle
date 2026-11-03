@@ -22,6 +22,7 @@
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@fontsource-variable/outfit": "^5.3.0",
+    "@icons-pack/react-simple-icons": "13.15.1",
     "@primer/octicons-react": "^19.42.0",
     "@tanstack/react-router": "1.170.46",
     "boring-avatars": "^2.0.4",

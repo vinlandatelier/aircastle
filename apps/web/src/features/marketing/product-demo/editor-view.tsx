@@ -1,4 +1,6 @@
 import {
+  BookOpenIcon,
+  ScrollTextIcon,
   EyeIcon,
   SaveIcon,
   BoldIcon,
@@ -14,6 +16,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from 'cn'
+import { MarkGithubIcon } from '@primer/octicons-react'
+import { SiAnthropic, SiLinear, SiModelcontextprotocol } from '@icons-pack/react-simple-icons'
 import styles from './product-demo.module.css'
 import { Badge } from '@/components/ui/badge'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
@@ -202,21 +206,21 @@ function MediaPlaceholder({ hint, className }: { hint: string; className?: strin
   )
 }
 
-const sourceUrls = [
-  'modelcontextprotocol.io/specification',
-  'github.com/acme/app/pull/482',
-  'docs.acme.com/mcp/getting-started',
-  'anthropic.com/news/model-context-protocol',
-  'acme.com/changelog',
-  'github.com/modelcontextprotocol/servers',
-] as const
+const sources: readonly { url: string; logo: React.ComponentType<{ className?: string }> }[] = [
+  { url: 'modelcontextprotocol.io/specification', logo: SiModelcontextprotocol },
+  { url: 'github.com/acme/app/pull/482', logo: MarkGithubIcon },
+  { url: 'linear.app/acme/issue/ACM-1290', logo: SiLinear },
+  { url: 'docs.acme.com/search?q=mcp', logo: BookOpenIcon },
+  { url: 'acme.com/changelog', logo: ScrollTextIcon },
+  { url: 'anthropic.com/news/model-context-protocol', logo: SiAnthropic },
+]
 
-function ResearchStatus({ sources }: { sources: number }) {
-  const currentIndex = sources - 1
+function ResearchStatus({ sourcesRead }: { sourcesRead: number }) {
+  const currentIndex = sourcesRead - 1
   return (
     <span
       data-demo-research
-      data-sources={sources}
+      data-sources={sourcesRead}
       className="flex h-8 items-center gap-2 rounded-md bg-violet-500/10 pr-2.5 pl-1.5 text-violet-700 dark:text-violet-300"
     >
       <span className={cn('rounded-full', styles.agentAvatar)}>
@@ -224,10 +228,10 @@ function ResearchStatus({ sources }: { sources: number }) {
       </span>
       <span>{researcher}</span>
       <span className="text-violet-600/70 dark:text-violet-300/70">
-        {sources === 0 ? 'searching' : 'reading'}
+        {sourcesRead === 0 ? 'searching' : 'reading'}
       </span>
-      <span className="relative h-5 w-[210px] overflow-hidden">
-        {sourceUrls.map((url, index) => (
+      <span className="relative h-5 w-[230px] overflow-hidden">
+        {sources.map(({ url, logo: Logo }, index) => (
           <span
             key={url}
             data-demo-source
@@ -235,13 +239,18 @@ function ResearchStatus({ sources }: { sources: number }) {
               index < currentIndex ? 'read' : index === currentIndex ? 'current' : 'queued'
             }
             className={cn(
-              'absolute inset-0 truncate leading-5 transition-[translate,opacity] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]',
+              'absolute inset-0 flex items-center gap-1.5 leading-5 transition-[translate,opacity] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]',
               index < currentIndex && '-translate-y-full opacity-0',
               index === currentIndex && 'translate-y-0 opacity-100',
               index > currentIndex && 'translate-y-full opacity-0',
             )}
           >
-            {url}
+            <span data-demo-source-logo className="flex shrink-0">
+              <Logo className="size-3.5" />
+            </span>
+            <span data-demo-source-url className="truncate">
+              {url}
+            </span>
           </span>
         ))}
       </span>
@@ -258,7 +267,7 @@ function TopBar({ sources }: { sources: number }) {
         <span>Introducing Acme MCP</span>
       </div>
       <div className="flex items-center gap-2">
-        <ResearchStatus sources={sources} />
+        <ResearchStatus sourcesRead={sources} />
         <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
           <EyeIcon className="size-4" />
           Preview

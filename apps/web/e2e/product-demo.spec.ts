@@ -443,12 +443,24 @@ test('the editor top bar shows the source Canute is reading, one after another',
   await expect(research).toContainText('Canute')
   await expect(research).toContainText('reading')
   await expect(research).not.toContainText(/\d+ sources?/)
-  await expect(current).toHaveText('modelcontextprotocol.io/specification')
-  await expect(current).not.toContainText('https://')
-  await expect(current).toHaveCSS('text-overflow', 'ellipsis')
+  await expect(current.locator('[data-demo-source-url]')).toHaveText(
+    'modelcontextprotocol.io/specification',
+  )
+  await expect(current.locator('[data-demo-source-url]')).not.toContainText('https://')
+  await expect(current.locator('[data-demo-source-url]')).toHaveCSS('text-overflow', 'ellipsis')
+  await expect(current.locator('[data-demo-source-logo]')).toHaveCount(1)
+  await expect(
+    current.locator('[data-demo-source-logo] svg, svg[data-demo-source-logo]'),
+  ).toHaveCount(1)
   const firstWidth = (await research.boundingBox())?.width
   await page.clock.runFor(900)
-  await expect(current).toHaveText('github.com/acme/app/pull/482')
+  await expect(current.locator('[data-demo-source-url]')).toHaveText('github.com/acme/app/pull/482')
+  await page.clock.runFor(900)
+  await expect(current.locator('[data-demo-source-url]')).toHaveText(
+    'linear.app/acme/issue/ACM-1290',
+  )
+  await page.clock.runFor(900)
+  await expect(current.locator('[data-demo-source-url]')).toHaveText('docs.acme.com/search?q=mcp')
   expect((await research.boundingBox())?.width).toBe(firstWidth)
   const researchBox = await research.boundingBox()
   const previewBox = await editor.locator('[data-demo-preview]').boundingBox()

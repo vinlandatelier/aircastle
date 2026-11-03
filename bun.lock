@@ -45,6 +45,7 @@
       "dependencies": {
         "@base-ui/react": "^1.9.0",
         "@fontsource-variable/outfit": "^5.3.0",
+        "@icons-pack/react-simple-icons": "13.15.1",
         "@primer/octicons-react": "^19.42.0",
         "@tanstack/react-router": "1.170.46",
         "boring-avatars": "^2.0.4",
@@ -321,6 +322,8 @@
     "@hono/cli": ["@hono/cli@1.0.0-rc.8", "", { "dependencies": { "@bluwy/giget-core": "^0.1.7", "@inquirer/select": "^5.2.6", "commander": "^14.0.1", "esbuild": "^0.25.10", "hono": "^4.9.12 || ^5.0.0-0" }, "bin": { "hono": "dist/cli.js" } }, "sha512-qv5nA9BWdrDez6zHgHXhhPxSVTZ2PL02tH3cfeOTa+mDJIFZnLHKgr8S67VaFewtE2fEpkFo+koQ4qYgaXgv9A=="],
 
     "@hono/standard-validator": ["@hono/standard-validator@0.4.0", "", { "peerDependencies": { "@standard-schema/spec": "^1.0.0", "hono": ">=4.11.2" } }, "sha512-MxOm1asDh9j7c1D0KiWwppSbFgAQxTRO4YEhjMrJn3lF1BIcXenPdgjSGKDRfQmZdaTaMA8slQLETgVOKyJxFw=="],
+
+    "@icons-pack/react-simple-icons": ["@icons-pack/react-simple-icons@13.15.1", "", { "peerDependencies": { "react": "^16.13 || ^17 || ^18 || ^19" } }, "sha512-S35E7vJlJzMeoqjwwI7ZmQUJ2W+2KspnB6bc49KdoDGwp5mCgAy9L3sscfWMewQSMgBdPU8KWWwpSGq5DJyAFw=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.9", "", {}, "sha512-0Ywt3S8tqM6TWUcsRlBFQ1x+X3/o8kktX0ZiKAnByYb9GFDknnOhse1PVtfiD2BXPI8ar+BWx9PV9R0lQIcygw=="],
 
