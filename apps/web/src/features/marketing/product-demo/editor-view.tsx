@@ -501,19 +501,20 @@ function DecisionCard() {
           <ChevronRightIcon className="size-3 text-muted-foreground" />
           {docsDecision.target.title}
         </span>
-        <span className="flex justify-end gap-1.5">
-          <span
-            data-demo-decision-dismiss
-            className="flex h-7 items-center rounded-md border bg-background px-2.5 text-xs dark:bg-input/30"
-          >
-            Not now
-          </span>
-          <span
-            data-demo-decision-approve
-            className="flex h-7 items-center rounded-md bg-primary px-2.5 text-xs text-primary-foreground"
-          >
-            Draft it
-          </span>
+        <span className="flex gap-1">
+          {docsDecision.replies.map((reply, index) => (
+            <span
+              key={reply}
+              data-demo-decision-option
+              className={cn(
+                'flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-xs whitespace-nowrap',
+                index === docsDecision.replies.length - 1 && 'text-muted-foreground',
+              )}
+            >
+              <span className="text-[10px] text-muted-foreground tabular-nums">{index + 1}</span>
+              {reply}
+            </span>
+          ))}
         </span>
       </div>
     </div>

@@ -585,8 +585,28 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
     return left('[data-demo-decision-target]') - left('[data-demo-decision-question]')
   })
   expect(Math.abs(indent)).toBeLessThanOrEqual(0.5)
-  await expect(decision.locator('[data-demo-decision-approve]')).toHaveText('Draft it')
-  await expect(decision.locator('[data-demo-decision-dismiss]')).toHaveText('Not now')
+  const replies = decision.locator('[data-demo-decision-option]')
+  await expect(replies).toHaveCount(3)
+  await expect(replies.nth(0)).toContainText('Yes, draft it')
+  await expect(replies.nth(1)).toContainText('Not yet')
+  await expect(replies.nth(2)).toContainText('Something else…')
+  await expect(decision).not.toContainText('Draft it')
+  const replyLayout = await replies.evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect()
+      return { top: Math.round(box.top), background: getComputedStyle(element).backgroundColor }
+    }),
+  )
+  expect(new Set(replyLayout.map(({ top }) => top)).size).toBe(1)
+  const primary = await page.evaluate(() => {
+    const probe = document.createElement('span')
+    probe.className = 'bg-primary'
+    document.body.append(probe)
+    const colour = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return colour
+  })
+  expect(replyLayout.every(({ background }) => background !== primary)).toBe(true)
   await expect(panel.locator('[data-demo-research-chain] [data-demo-decision]')).toHaveCount(0)
   const pinnedAbovePrompt = async () =>
     decision.evaluate((element) => {
