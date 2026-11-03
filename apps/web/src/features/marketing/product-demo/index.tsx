@@ -34,8 +34,8 @@ import {
   type Shortcut,
 } from './timeline'
 
-const frameWidth = 1120
-const frameHeight = 712
+const frameWidth = 1280
+const frameHeight = 814
 
 function sameFrame(left: Frame, right: Frame) {
   return (
@@ -367,9 +367,9 @@ function AgentLabel() {
 }
 
 const cursorSpots = {
-  rest: { left: 880, top: 560 },
-  row: { left: 300, top: 214 },
-  research: { left: 560, top: 112 },
+  rest: { left: 1010, top: 640 },
+  row: { left: 320, top: 218 },
+  research: { left: 700, top: 112 },
 } as const
 
 function DemoCursor({
