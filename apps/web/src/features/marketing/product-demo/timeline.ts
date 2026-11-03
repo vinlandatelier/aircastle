@@ -13,7 +13,7 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const editorDuration = 8000
+const editorDuration = 12000
 const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
@@ -24,9 +24,12 @@ const categoryCount = 2
 const tagCount = 3
 const lingerAfterFilling = 1000
 const moveBetweenFields = 300
-const firstSourceAfterEditor = 400
-const sourceInterval = 900
-const sourceCount = 6
+const sourceArrivalsAfterEditor = [400, 1500, 2200, 3700, 4600, 8300] as const
+const researchCursorMovesAfterEditor = 5400
+const researchCursorTravel = 1400
+const researchHoverDuration = 500
+const researchClickDuration = 220
+const panelOpensAfterClick = 100
 const tagsStartAfterArriving = 500
 const writerLeavesCategoriesAfterEditor =
   categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
@@ -58,6 +61,7 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
+export type CursorTarget = 'rest' | 'row' | 'research'
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -76,6 +80,9 @@ export type Frame = {
   writerOnTags: boolean
   writerOnBody: boolean
   sources: number
+  cursorTarget: CursorTarget
+  researchHovered: boolean
+  researchPanelOpen: boolean
 }
 
 /** The still frame shown when motion is reduced. */
@@ -95,6 +102,9 @@ export const stillFrame: Frame = {
   writerOnTags: false,
   writerOnBody: false,
   sources: 0,
+  cursorTarget: 'rest',
+  researchHovered: false,
+  researchPanelOpen: false,
 }
 
 function chipsArrived(sinceFirst: number, total: number) {
@@ -103,11 +113,20 @@ function chipsArrived(sinceFirst: number, total: number) {
 }
 
 function sourcesRead(sinceEditor: number) {
-  if (sinceEditor < firstSourceAfterEditor) return 0
-  return Math.min(
-    sourceCount,
-    Math.floor((sinceEditor - firstSourceAfterEditor) / sourceInterval) + 1,
-  )
+  return sourceArrivalsAfterEditor.filter((arrival) => sinceEditor >= arrival).length
+}
+
+const researchCursorArrivesAfterEditor = researchCursorMovesAfterEditor + researchCursorTravel
+const researchClickAfterEditor = researchCursorArrivesAfterEditor + researchHoverDuration
+const researchClickEndsAfterEditor = researchClickAfterEditor + researchClickDuration
+const researchPanelOpensAfterEditor = researchClickAfterEditor + panelOpensAfterClick
+
+function researchCursorAt(sinceEditor: number): CursorState {
+  if (sinceEditor < researchCursorMovesAfterEditor) return 'still'
+  if (sinceEditor < researchCursorArrivesAfterEditor) return 'moving'
+  if (sinceEditor < researchClickAfterEditor) return 'hovering'
+  if (sinceEditor < researchClickEndsAfterEditor) return 'clicking'
+  return 'still'
 }
 
 function typedAt(elapsed: number) {
@@ -121,6 +140,8 @@ function typedAt(elapsed: number) {
 
 /** Maps time since the loop started to what the preview shows. */
 export function frameAt(elapsed: number): Frame {
+  const sinceEditor = elapsed - editorOpensAt
+  const inEditor = elapsed >= editorOpensAt && elapsed < editorClosesAt
   const dialog: DialogState =
     elapsed >= dialogOpensAt && elapsed < dialogClosesAt
       ? 'open'
@@ -141,6 +162,9 @@ export function frameAt(elapsed: number): Frame {
     agentRow: elapsed >= dialogClosesAt,
     cursorShape:
       (elapsed >= cursorShownAt + rowsReachedAfter && elapsed < clickEndsAt) ||
+      (inEditor &&
+        sinceEditor >= researchCursorArrivesAfterEditor - 100 &&
+        sinceEditor < researchClickEndsAfterEditor) ||
       (elapsed >= editorClosesAt && elapsed < editorClosesAt + rowsLeftAfter)
         ? 'pointer'
         : 'arrow',
@@ -153,7 +177,17 @@ export function frameAt(elapsed: number): Frame {
             ? 'hovering'
             : elapsed < clickEndsAt
               ? 'clicking'
-              : 'still',
+              : inEditor
+                ? researchCursorAt(sinceEditor)
+                : 'still',
+    cursorTarget:
+      elapsed < cursorShownAt || elapsed >= editorClosesAt
+        ? 'rest'
+        : inEditor && sinceEditor >= researchCursorMovesAfterEditor
+          ? 'research'
+          : 'row',
+    researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
+    researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
     agentRowHovered: elapsed >= cursorShownAt + agentRowReachedAfter && elapsed < editorOpensAt,
     categories: chipsArrived(elapsed - editorOpensAt - categoriesStartAfterEditor, categoryCount),

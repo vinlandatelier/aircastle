@@ -1,4 +1,9 @@
 import {
+  ArrowUpIcon,
+  BrainIcon,
+  LoaderCircleIcon,
+  TriangleAlertIcon,
+  XIcon,
   BookOpenIcon,
   ScrollTextIcon,
   EyeIcon,
@@ -206,22 +211,66 @@ function MediaPlaceholder({ hint, className }: { hint: string; className?: strin
   )
 }
 
-const sources: readonly { url: string; logo: React.ComponentType<{ className?: string }> }[] = [
-  { url: 'modelcontextprotocol.io/specification', logo: SiModelcontextprotocol },
-  { url: 'github.com/acme/app/pull/482', logo: MarkGithubIcon },
-  { url: 'linear.app/acme/issue/ACM-1290', logo: SiLinear },
-  { url: 'docs.acme.com/search?q=mcp', logo: BookOpenIcon },
-  { url: 'acme.com/changelog', logo: ScrollTextIcon },
-  { url: 'anthropic.com/news/model-context-protocol', logo: SiAnthropic },
+type Source = {
+  url: string
+  logo: React.ComponentType<{ className?: string }>
+  action: 'Read' | 'Searched'
+  finding: string
+  gap?: boolean
+}
+
+const sources: readonly Source[] = [
+  {
+    url: 'modelcontextprotocol.io/specification',
+    logo: SiModelcontextprotocol,
+    action: 'Read',
+    finding:
+      'MCP lets assistants reach tools and data through servers that expose resources, tools and prompts.',
+  },
+  {
+    url: 'github.com/acme/app/pull/482',
+    logo: MarkGithubIcon,
+    action: 'Read',
+    finding: 'Adds a remote MCP server at mcp.acme.com with token-scoped access to collections.',
+  },
+  {
+    url: 'linear.app/acme/issue/ACM-1290',
+    logo: SiLinear,
+    action: 'Read',
+    finding: 'Launch is planned for this week, with a blog post and docs listed as follow-ups.',
+  },
+  {
+    url: 'docs.acme.com/search?q=mcp',
+    logo: BookOpenIcon,
+    action: 'Searched',
+    finding: 'No MCP page in Acme’s docs yet.',
+    gap: true,
+  },
+  {
+    url: 'acme.com/changelog',
+    logo: ScrollTextIcon,
+    action: 'Read',
+    finding: 'Recent release notes mention MCP in beta, but not the remote server.',
+  },
+  {
+    url: 'anthropic.com/news/model-context-protocol',
+    logo: SiAnthropic,
+    action: 'Read',
+    finding: 'Anthropic introduced MCP as an open standard in November 2024.',
+  },
 ]
 
-function ResearchStatus({ sourcesRead }: { sourcesRead: number }) {
+function ResearchStatus({ sourcesRead, hovered }: { sourcesRead: number; hovered: boolean }) {
   const currentIndex = sourcesRead - 1
   return (
     <span
       data-demo-research
       data-sources={sourcesRead}
-      className="flex h-8 items-center gap-2 rounded-md bg-violet-500/10 pr-2.5 pl-1.5 text-violet-700 dark:text-violet-300"
+      data-hovered={hovered}
+      className={cn(
+        'flex h-8 items-center gap-2 rounded-md pr-2.5 pl-1.5 text-violet-700 transition-colors duration-200 dark:text-violet-300',
+        hovered ? 'bg-violet-500/20' : 'bg-violet-500/10',
+      )}
     >
       <span className={cn('rounded-full', styles.agentAvatar)}>
         <GeneratedAvatar name={researcher} size={18} variant="beam" />
@@ -259,7 +308,97 @@ function ResearchStatus({ sourcesRead }: { sourcesRead: number }) {
   )
 }
 
-function TopBar({ sources }: { sources: number }) {
+function ResearchPanel({ open, sourcesRead }: { open: boolean; sourcesRead: number }) {
+  const next = sources[sourcesRead]
+  return (
+    <div
+      data-demo-research-panel
+      data-state={open ? 'open' : 'closed'}
+      className={cn(
+        'absolute top-14 right-0 bottom-0 z-30 flex w-[380px] flex-col border-l bg-card shadow-2xl transition-[translate,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-full opacity-0',
+      )}
+    >
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className={cn('rounded-full', styles.agentAvatar)}>
+            <GeneratedAvatar name={researcher} size={22} variant="beam" />
+          </span>
+          <span>{researcher}</span>
+          <span className="rounded-sm bg-violet-500/15 px-1 py-px text-[10px] leading-none text-violet-700 dark:text-violet-300">
+            Agent
+          </span>
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground">
+            {next ? 'Researching' : 'Research complete'}
+          </span>
+        </div>
+        <XIcon className="size-4 text-muted-foreground" />
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
+        <div
+          data-demo-thought
+          className="flex gap-2 rounded-md bg-muted/50 px-3 py-2.5 text-xs leading-5 text-muted-foreground"
+        >
+          <BrainIcon className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Plan: confirm what MCP is, what Acme shipped and how to set it up, then check whether
+            the docs already cover it.
+          </span>
+        </div>
+        <ol className="flex flex-col gap-3">
+          {sources.slice(0, sourcesRead).map(({ url, logo: Logo, action, finding, gap }) => (
+            <li
+              key={url}
+              data-demo-research-step
+              className="flex flex-col gap-1 transition-[opacity,translate] duration-500 starting:translate-y-1 starting:opacity-0"
+            >
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <Logo className="size-3.5 shrink-0" />
+                <span className="shrink-0">{action}</span>
+                <span className="truncate">{url}</span>
+              </span>
+              <span
+                className={cn(
+                  'flex gap-1.5 pl-5 leading-5',
+                  gap && 'text-amber-600 dark:text-amber-400',
+                )}
+              >
+                {gap && <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />}
+                {finding}
+              </span>
+            </li>
+          ))}
+          {next && (
+            <li
+              data-demo-research-pending
+              className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <LoaderCircleIcon className="size-3.5 shrink-0 motion-safe:animate-spin" />
+              <span className="shrink-0">{next.action === 'Read' ? 'Reading' : 'Searching'}</span>
+              <span className="truncate">{next.url}</span>
+            </li>
+          )}
+        </ol>
+      </div>
+      <div className="border-t p-3">
+        <div
+          data-demo-research-prompt
+          className="flex items-end justify-between gap-2 rounded-md border bg-background px-3 py-2 dark:bg-input/30"
+        >
+          <span className="leading-6 text-muted-foreground/60">
+            Ask Canute to check other sources or dig deeper…
+          </span>
+          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <ArrowUpIcon className="size-4" />
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TopBar({ sources, researchHovered }: { sources: number; researchHovered: boolean }) {
   return (
     <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b bg-card px-6">
       <div className="flex items-center gap-2">
@@ -268,7 +407,7 @@ function TopBar({ sources }: { sources: number }) {
         <span>Introducing Acme MCP</span>
       </div>
       <div className="flex items-center gap-2">
-        <ResearchStatus sourcesRead={sources} />
+        <ResearchStatus sourcesRead={sources} hovered={researchHovered} />
         <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
           <EyeIcon className="size-4" />
           Preview
@@ -467,6 +606,8 @@ export function EditorView({
   writerOnTags,
   writerOnBody,
   sources,
+  researchHovered,
+  researchPanelOpen,
 }: {
   shown: boolean
   categories: number
@@ -475,6 +616,8 @@ export function EditorView({
   writerOnTags: boolean
   writerOnBody: boolean
   sources: number
+  researchHovered: boolean
+  researchPanelOpen: boolean
 }) {
   return (
     <div
@@ -485,7 +628,7 @@ export function EditorView({
         shown ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0',
       )}
     >
-      <TopBar sources={sources} />
+      <TopBar sources={sources} researchHovered={researchHovered} />
       <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
         <MainColumn writerOnBody={writerOnBody} />
         <SideColumn
@@ -495,6 +638,7 @@ export function EditorView({
           tagsShown={tags}
         />
       </div>
+      <ResearchPanel open={researchPanelOpen} sourcesRead={sources} />
     </div>
   )
 }

@@ -454,17 +454,50 @@ test('the editor top bar shows the source Canute is reading, one after another',
     current.locator('[data-demo-source-logo] svg, svg[data-demo-source-logo]'),
   ).toHaveCount(1)
   const firstWidth = (await research.boundingBox())?.width
-  await page.clock.runFor(900)
+  await page.clock.runFor(1100)
   await expect(current.locator('[data-demo-source-url]')).toHaveText('github.com/acme/app/pull/482')
   await page.clock.runFor(900)
   await expect(current.locator('[data-demo-source-url]')).toHaveText(
     'linear.app/acme/issue/ACM-1290',
   )
-  await page.clock.runFor(900)
+  await page.clock.runFor(1400)
   await expect(current.locator('[data-demo-source-url]')).toHaveText('docs.acme.com/search?q=mcp')
   expect((await research.boundingBox())?.width).toBe(firstWidth)
   const researchBox = await research.boundingBox()
   const previewBox = await editor.locator('[data-demo-preview]').boundingBox()
   if (!researchBox || !previewBox) throw new Error('Top bar is not laid out')
   expect(researchBox.x + researchBox.width).toBeLessThanOrEqual(previewBox.x)
+})
+
+test('the cursor opens Canute’s research panel from the top bar', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const editor = frame.locator('[data-demo-editor]')
+  const research = editor.locator('[data-demo-research]')
+  const panel = editor.locator('[data-demo-research-panel]')
+  const cursor = frame.locator('[data-demo-cursor]')
+
+  await page.clock.runFor(15000)
+  await expect(panel).toHaveAttribute('data-state', 'closed')
+  await expect(research).toHaveAttribute('data-hovered', 'false')
+
+  await page.clock.runFor(1500)
+  await expect(cursor).toHaveAttribute('data-state', 'hovering')
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+  await expect(research).toHaveAttribute('data-hovered', 'true')
+
+  await page.clock.runFor(600)
+  await expect(panel).toHaveAttribute('data-state', 'open')
+  await expect(panel).toContainText('Canute')
+  await expect(panel).toContainText('Agent')
+  await expect(panel.locator('[data-demo-thought]').first()).toBeVisible()
+  await expect(panel).toContainText('No MCP page')
+  await expect(panel.locator('[data-demo-research-prompt]')).toContainText('Ask Canute')
+  const stepsNow = await panel.locator('[data-demo-research-step]').count()
+  await page.clock.runFor(1500)
+  expect(await panel.locator('[data-demo-research-step]').count()).toBeGreaterThan(stepsNow)
 })

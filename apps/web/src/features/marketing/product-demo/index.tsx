@@ -28,6 +28,7 @@ import {
   prompt,
   stillFrame,
   type CursorShape,
+  type CursorTarget,
   type CursorState,
   type Frame,
   type Shortcut,
@@ -52,7 +53,10 @@ function sameFrame(left: Frame, right: Frame) {
     left.writerOnCategories === right.writerOnCategories &&
     left.writerOnTags === right.writerOnTags &&
     left.writerOnBody === right.writerOnBody &&
-    left.sources === right.sources
+    left.sources === right.sources &&
+    left.cursorTarget === right.cursorTarget &&
+    left.researchHovered === right.researchHovered &&
+    left.researchPanelOpen === right.researchPanelOpen
   )
 }
 
@@ -365,10 +369,19 @@ function AgentLabel() {
 const cursorSpots = {
   rest: { left: 880, top: 560 },
   row: { left: 300, top: 214 },
+  research: { left: 560, top: 112 },
 } as const
 
-function DemoCursor({ state, shape }: { state: CursorState; shape: CursorShape }) {
-  const spot = state === 'resting' ? cursorSpots.rest : cursorSpots.row
+function DemoCursor({
+  state,
+  shape,
+  target,
+}: {
+  state: CursorState
+  shape: CursorShape
+  target: CursorTarget
+}) {
+  const spot = cursorSpots[target]
   const Shape = shape === 'pointer' ? PointerIcon : MousePointer2Icon
   return (
     <span
@@ -588,6 +601,8 @@ export function ProductDemo() {
                 writerOnTags={frame.writerOnTags}
                 writerOnBody={frame.writerOnBody}
                 sources={frame.sources}
+                researchHovered={frame.researchHovered}
+                researchPanelOpen={frame.researchPanelOpen}
               />
             </div>
           </div>
@@ -599,7 +614,7 @@ export function ProductDemo() {
           />
           <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
           <ShortcutChip shortcut={frame.shortcut} />
-          <DemoCursor state={frame.cursor} shape={frame.cursorShape} />
+          <DemoCursor state={frame.cursor} shape={frame.cursorShape} target={frame.cursorTarget} />
         </div>
       </div>
     </section>
