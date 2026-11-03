@@ -9,7 +9,6 @@ import {
   CircleCheckIcon,
   XIcon,
   EyeIcon,
-  SaveIcon,
   BoldIcon,
   CalendarIcon,
   CodeIcon,
@@ -550,13 +549,6 @@ function TopBar({
         <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
           <EyeIcon className="size-4" />
           Preview
-        </span>
-        <span
-          data-demo-save
-          className="flex h-8 items-center gap-1.5 rounded-md border bg-background pr-3 pl-2.5 dark:bg-input/30"
-        >
-          <SaveIcon className="size-4" />
-          Save
         </span>
         <span
           data-demo-publish

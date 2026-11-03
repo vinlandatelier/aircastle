@@ -302,15 +302,16 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(editor.getByText('Draft', { exact: true })).toHaveCount(0)
 
   const preview = editor.locator('[data-demo-preview]')
-  const save = editor.locator('[data-demo-save]')
+  const publish = editor.locator('[data-demo-publish]')
   await expect(preview).toContainText('Preview')
   await expect(preview.locator('svg')).toHaveCount(1)
-  await expect(save.locator('svg')).toHaveCount(1)
+  await expect(editor.locator('[data-demo-save]')).toHaveCount(0)
+  await expect(editor.getByText('Save', { exact: true })).toHaveCount(0)
   await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   const previewBox = await preview.boundingBox()
-  const saveBox = await save.boundingBox()
-  if (!previewBox || !saveBox) throw new Error('Top bar is not laid out')
-  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(saveBox.x)
+  const publishBox = await publish.boundingBox()
+  if (!previewBox || !publishBox) throw new Error('Top bar is not laid out')
+  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(publishBox.x)
 
   for (const field of ['title', 'slug'])
     await expect(editor.locator(`[data-demo-field="${field}"]`)).toHaveAttribute(
