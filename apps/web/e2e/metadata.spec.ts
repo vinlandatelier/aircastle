@@ -21,7 +21,7 @@ test('marketing entry keeps its URL and exact metadata before and after startup'
     landingDescription,
   )
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCount(0)
-  await page.getByRole('link', { name: 'Sign in', exact: true }).click()
+  await page.getByRole('link', { name: 'Open Aircastle', exact: true }).click()
   await expect(page).toHaveTitle('Aircastle - Sign in')
   await page.goBack()
   await expect(
