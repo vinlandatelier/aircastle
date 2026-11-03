@@ -227,6 +227,7 @@ function ResearchStatus({ sourcesRead }: { sourcesRead: number }) {
         <GeneratedAvatar name={researcher} size={18} variant="beam" />
       </span>
       <span>{researcher}</span>
+      <span className="rounded-sm bg-violet-500/15 px-1 py-px text-[10px] leading-none">Agent</span>
       <span className="text-violet-600/70 dark:text-violet-300/70">
         {sourcesRead === 0 ? 'searching' : 'reading'}
       </span>

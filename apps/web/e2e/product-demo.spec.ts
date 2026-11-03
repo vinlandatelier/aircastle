@@ -442,6 +442,7 @@ test('the editor top bar shows the source Canute is reading, one after another',
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(research).toContainText('Canute')
   await expect(research).toContainText('reading')
+  await expect(research.getByText('Agent', { exact: true })).toBeVisible()
   await expect(research).not.toContainText(/\d+ sources?/)
   await expect(current.locator('[data-demo-source-url]')).toHaveText(
     'modelcontextprotocol.io/specification',
