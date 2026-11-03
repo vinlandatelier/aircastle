@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { PartyPopperIcon } from 'lucide-react'
+import { ArrowRightIcon } from 'lucide-react'
 import { Header } from './header'
 import { RotatingWord } from './rotating-word'
 
@@ -36,16 +36,24 @@ export function MarketingPage() {
             Aircastle is the headless CMS that gets you from idea to published faster. Our agents
             take on the busywork, so you can publish more than ever before.
           </p>
-          <Link
-            to="/sign-in"
-            className="group mt-10 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 font-[400] text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            Sign me up
-            <PartyPopperIcon
-              aria-hidden="true"
-              className="size-5 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-110"
-            />
-          </Link>
+          <div className="mt-10 flex flex-wrap items-center gap-2">
+            <Link
+              to="/sign-in"
+              className="inline-flex items-center rounded-lg bg-primary px-4 py-2 font-[400] text-primary-foreground transition-colors hover:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              Get started
+            </Link>
+            <a
+              href="#demo"
+              className="group inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              See Aircastle in action
+              <ArrowRightIcon
+                aria-hidden="true"
+                className="size-5 transition-transform group-hover:translate-x-0.5"
+              />
+            </a>
+          </div>
         </section>
       </main>
     </div>
