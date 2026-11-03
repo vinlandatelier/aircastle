@@ -51,7 +51,8 @@ function sameFrame(left: Frame, right: Frame) {
     left.tags === right.tags &&
     left.writerOnCategories === right.writerOnCategories &&
     left.writerOnTags === right.writerOnTags &&
-    left.writerOnBody === right.writerOnBody
+    left.writerOnBody === right.writerOnBody &&
+    left.sources === right.sources
   )
 }
 
@@ -586,6 +587,7 @@ export function ProductDemo() {
                 writerOnCategories={frame.writerOnCategories}
                 writerOnTags={frame.writerOnTags}
                 writerOnBody={frame.writerOnBody}
+                sources={frame.sources}
               />
             </div>
           </div>

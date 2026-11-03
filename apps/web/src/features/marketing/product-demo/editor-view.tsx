@@ -186,6 +186,7 @@ function Multiselect({
 }
 
 const writerAgent = { name: 'Thorfinn', role: 'Agent' } as const
+const researcher = 'Canute'
 
 function MediaPlaceholder({ hint, className }: { hint: string; className?: string }) {
   return (
@@ -201,7 +202,30 @@ function MediaPlaceholder({ hint, className }: { hint: string; className?: strin
   )
 }
 
-function TopBar() {
+function ResearchStatus({ sources }: { sources: number }) {
+  return (
+    <span
+      data-demo-research
+      data-sources={sources}
+      className="flex h-8 items-center gap-2 rounded-md bg-violet-500/10 pr-2.5 pl-1.5 text-violet-700 dark:text-violet-300"
+    >
+      <span className={cn('rounded-full', styles.agentAvatar)}>
+        <GeneratedAvatar name={researcher} size={18} variant="beam" />
+      </span>
+      <span>{researcher} is researching</span>
+      {sources > 0 && (
+        <>
+          <span className="text-violet-600/50 dark:text-violet-300/50">·</span>
+          <span className="text-violet-600/70 tabular-nums dark:text-violet-300/70">
+            {sources} {sources === 1 ? 'source' : 'sources'}
+          </span>
+        </>
+      )}
+    </span>
+  )
+}
+
+function TopBar({ sources }: { sources: number }) {
   return (
     <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b bg-card px-6">
       <div className="flex items-center gap-2">
@@ -210,6 +234,7 @@ function TopBar() {
         <span>Introducing Acme MCP</span>
       </div>
       <div className="flex items-center gap-2">
+        <ResearchStatus sources={sources} />
         <span data-demo-preview className="flex h-8 items-center gap-1.5 rounded-md pr-3 pl-2.5">
           <EyeIcon className="size-4" />
           Preview
@@ -407,6 +432,7 @@ export function EditorView({
   writerOnCategories,
   writerOnTags,
   writerOnBody,
+  sources,
 }: {
   shown: boolean
   categories: number
@@ -414,6 +440,7 @@ export function EditorView({
   writerOnCategories: boolean
   writerOnTags: boolean
   writerOnBody: boolean
+  sources: number
 }) {
   return (
     <div
@@ -424,7 +451,7 @@ export function EditorView({
         shown ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0',
       )}
     >
-      <TopBar />
+      <TopBar sources={sources} />
       <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
         <MainColumn writerOnBody={writerOnBody} />
         <SideColumn

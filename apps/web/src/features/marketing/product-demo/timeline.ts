@@ -24,6 +24,9 @@ const categoryCount = 2
 const tagCount = 3
 const lingerAfterFilling = 1000
 const moveBetweenFields = 300
+const firstSourceAfterEditor = 400
+const sourceInterval = 900
+const sourceCount = 6
 const tagsStartAfterArriving = 500
 const writerLeavesCategoriesAfterEditor =
   categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
@@ -72,6 +75,7 @@ export type Frame = {
   writerOnCategories: boolean
   writerOnTags: boolean
   writerOnBody: boolean
+  sources: number
 }
 
 /** The still frame shown when motion is reduced. */
@@ -90,11 +94,20 @@ export const stillFrame: Frame = {
   writerOnCategories: false,
   writerOnTags: false,
   writerOnBody: false,
+  sources: 0,
 }
 
 function chipsArrived(sinceFirst: number, total: number) {
   if (sinceFirst < 0) return 0
   return Math.min(total, Math.floor(sinceFirst / chipInterval) + 1)
+}
+
+function sourcesRead(sinceEditor: number) {
+  if (sinceEditor < firstSourceAfterEditor) return 0
+  return Math.min(
+    sourceCount,
+    Math.floor((sinceEditor - firstSourceAfterEditor) / sourceInterval) + 1,
+  )
 }
 
 function typedAt(elapsed: number) {
@@ -150,5 +163,6 @@ export function frameAt(elapsed: number): Frame {
       elapsed - editorOpensAt >= writerReachesTagsAfterEditor &&
       elapsed - editorOpensAt < writerLeavesTagsAfterEditor,
     writerOnBody: elapsed - editorOpensAt >= writerReachesBodyAfterEditor,
+    sources: sourcesRead(elapsed - editorOpensAt),
   }
 }
