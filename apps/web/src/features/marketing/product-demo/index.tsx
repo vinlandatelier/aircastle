@@ -339,11 +339,11 @@ function AgentRow({ shown }: { shown: boolean }) {
     >
       <div
         className={cn(
-          'min-h-0 pb-7 transition-[opacity,translate] duration-500 ease-out',
+          'min-h-0 transition-[opacity,translate] duration-500 ease-out',
           shown ? 'translate-y-0 opacity-100 delay-150' : '-translate-y-1 opacity-0',
         )}
       >
-        <div data-demo-agent-row className={cn(rowGrid, 'relative py-3', styles.agentRow)}>
+        <div data-demo-agent-row className={cn(rowGrid, 'relative border-b py-3', styles.agentRow)}>
           <span className="truncate">Introducing Acme MCP</span>
           <span className="truncate text-muted-foreground italic">Agents are drafting…</span>
           <span className="inline-flex items-center gap-1.5 justify-self-start rounded-full bg-violet-500/10 px-2.5 py-0.5 text-[13px] text-violet-600 dark:text-violet-400">
@@ -357,13 +357,13 @@ function AgentRow({ shown }: { shown: boolean }) {
           <span className="text-muted-foreground">Just now</span>
           <div
             data-demo-agents
-            className="absolute top-full left-3 flex items-center rounded-b-md border border-t-0 border-violet-500/60 bg-card px-1.5 py-1"
+            className="absolute top-full left-3 z-10 flex items-center rounded-b-md bg-[rgb(139_92_246)] px-1.5 py-1 shadow-sm"
           >
             <span className="flex -space-x-1.5">
-              <span className="rounded-full ring-2 ring-card">
+              <span className="rounded-full ring-2 ring-[rgb(139_92_246)]">
                 <GeneratedAvatar name="Research agent" size={18} variant="beam" />
               </span>
-              <span className="rounded-full ring-2 ring-card">
+              <span className="rounded-full ring-2 ring-[rgb(139_92_246)]">
                 <GeneratedAvatar name="Writer agent" size={18} variant="beam" />
               </span>
             </span>

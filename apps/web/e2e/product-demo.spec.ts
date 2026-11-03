@@ -116,6 +116,16 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
     }
   }
   await expect.poll(tabOffset).toEqual({ attached: true, left: true })
+  await expect(agents).toHaveCSS('background-color', 'rgb(139, 92, 246)')
+  const gapToNextRow = async () => {
+    const rowBox = await agentRow.boundingBox()
+    const nextBox = await frame
+      .getByText('How we cut build times by 40%', { exact: true })
+      .boundingBox()
+    if (!rowBox || !nextBox) throw new Error('Rows are not laid out')
+    return nextBox.y - (rowBox.y + rowBox.height) < 20
+  }
+  await expect.poll(gapToNextRow).toBe(true)
 })
 
 test('the agent dialog stays closed with reduced motion', async ({ page }) => {
