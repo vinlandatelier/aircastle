@@ -540,6 +540,12 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
     })
     .toBeLessThanOrEqual(panelBox.x)
   await expect(research).toHaveAttribute('data-state', 'docked')
+  const topBarBox = await editor.locator('[data-demo-top-bar]').boundingBox()
+  const panelHeaderBox = await panel.locator('[data-demo-panel-header]').boundingBox()
+  if (!topBarBox || !panelHeaderBox) throw new Error('Headers are not laid out')
+  expect(
+    Math.abs(topBarBox.y + topBarBox.height - (panelHeaderBox.y + panelHeaderBox.height)),
+  ).toBeLessThanOrEqual(0.5)
   await expect(research).toBeHidden()
   const breadcrumb = editor.locator('[data-demo-breadcrumb]')
   await expect(breadcrumb).toHaveCSS('white-space', 'nowrap')

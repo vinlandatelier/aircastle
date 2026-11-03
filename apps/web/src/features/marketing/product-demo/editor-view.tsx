@@ -465,7 +465,10 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
         open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-full opacity-0',
       )}
     >
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div
+        data-demo-panel-header
+        className="flex h-14 shrink-0 items-center justify-between border-b px-4"
+      >
         <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
           <span className={cn('rounded-full', styles.agentAvatar)}>
             <GeneratedAvatar name={researcher} size={22} variant="beam" />
@@ -533,7 +536,10 @@ function TopBar({
   researchDocked: boolean
 }) {
   return (
-    <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-card px-6">
+    <div
+      data-demo-top-bar
+      className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-card px-6"
+    >
       <div data-demo-breadcrumb className="flex min-w-0 items-center gap-2 whitespace-nowrap">
         <span className="text-muted-foreground">Blog posts</span>
         <span className="text-muted-foreground">/</span>
