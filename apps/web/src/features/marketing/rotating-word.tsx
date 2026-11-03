@@ -1,20 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import styles from './rotating-word.module.css'
+import { usePrefersReducedMotion } from './use-prefers-reduced-motion'
 
 const rotationMs = 4000
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(
-    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  )
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReduced(query.matches)
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  return reduced
-}
 
 /** Shows `words[0]` and `suffix` to assistive technology and cycles through `words` visually unless the user prefers reduced motion. */
 export function RotatingWord({
