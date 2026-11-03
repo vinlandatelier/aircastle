@@ -58,7 +58,9 @@ test('product preview table shows truncated plain-text bodies and a count badge'
   await expect(firstBody.locator('*')).toHaveCount(0)
 })
 
-test('a ⌘J shortcut opens the agent dialog and the idea is typed into it', async ({ page }) => {
+test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends it', async ({
+  page,
+}) => {
   await page.clock.install()
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
@@ -85,9 +87,13 @@ test('a ⌘J shortcut opens the agent dialog and the idea is typed into it', asy
   await expect(typed).not.toHaveText(prompt)
   await page.clock.runFor(1500)
   await expect(typed).toHaveText(prompt)
-  await page.clock.runFor(1000)
-  await expect(dialog).toBeVisible()
-  await page.clock.runFor(1500)
+  await expect(shortcut).toHaveAttribute('data-state', 'hidden')
+  await page.clock.runFor(200)
+  await expect(shortcut).toHaveAttribute('data-state', 'shown')
+  await expect(shortcut).toContainText('↵')
+  await expect(shortcut).not.toContainText('⌘')
+  await expect(dialog.locator('[data-demo-send]')).toHaveAttribute('data-pressed', 'true')
+  await page.clock.runFor(700)
   await expect(dialog).toHaveCount(0)
 })
 

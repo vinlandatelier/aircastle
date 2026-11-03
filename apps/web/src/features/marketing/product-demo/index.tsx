@@ -18,7 +18,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
-import { frameAt, loopDuration, prompt, stillFrame, type Frame } from './timeline'
+import { frameAt, loopDuration, prompt, stillFrame, type Frame, type Shortcut } from './timeline'
 
 const frameWidth = 1120
 const frameHeight = 680
@@ -47,7 +47,15 @@ function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: 
   return reducedMotion ? stillFrame : frame
 }
 
-function AgentDialog({ state, typed }: { state: Frame['dialog']; typed: number }) {
+function AgentDialog({
+  state,
+  typed,
+  sendPressed,
+}: {
+  state: Frame['dialog']
+  typed: number
+  sendPressed: boolean
+}) {
   if (state === 'closed') return null
   return (
     <div
@@ -77,7 +85,14 @@ function AgentDialog({ state, typed }: { state: Frame['dialog']; typed: number }
         )}
       </p>
       <div className="mt-3 flex items-center justify-end">
-        <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+        <span
+          data-demo-send
+          data-pressed={sendPressed}
+          className={cn(
+            'inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-[scale,opacity] duration-150',
+            sendPressed && 'scale-90 opacity-80',
+          )}
+        >
           <ArrowUpIcon className="size-5" />
         </span>
       </div>
@@ -85,18 +100,28 @@ function AgentDialog({ state, typed }: { state: Frame['dialog']; typed: number }
   )
 }
 
-function ShortcutChip({ shown }: { shown: boolean }) {
+const shortcutKeys: Record<Shortcut, readonly string[]> = {
+  'open-agents': ['⌘', 'J'],
+  send: ['↵'],
+}
+
+function ShortcutChip({ shortcut }: { shortcut: Shortcut | undefined }) {
+  const [lastShortcut, setLastShortcut] = useState<Shortcut>('open-agents')
+  if (shortcut && shortcut !== lastShortcut) setLastShortcut(shortcut)
   return (
     <div
       data-demo-shortcut
-      data-state={shown ? 'shown' : 'hidden'}
+      data-state={shortcut ? 'shown' : 'hidden'}
       className={cn(
         'absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg transition-[opacity,translate] duration-300',
-        shown ? 'opacity-100' : 'translate-y-2 opacity-0',
+        shortcut ? 'opacity-100' : 'translate-y-2 opacity-0',
       )}
     >
-      <Kbd className="h-7 min-w-7 text-sm">⌘</Kbd>
-      <Kbd className="h-7 min-w-7 text-sm">J</Kbd>
+      {shortcutKeys[shortcut ?? lastShortcut].map((key) => (
+        <Kbd key={key} className="h-7 min-w-7 text-sm">
+          {key}
+        </Kbd>
+      ))}
     </div>
   )
 }
@@ -358,8 +383,8 @@ export function ProductDemo() {
               frame.dialog === 'open' ? 'opacity-100' : 'opacity-0',
             )}
           />
-          <AgentDialog state={frame.dialog} typed={frame.typed} />
-          <ShortcutChip shown={frame.shortcut} />
+          <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
+          <ShortcutChip shortcut={frame.shortcut} />
         </div>
       </div>
     </section>
