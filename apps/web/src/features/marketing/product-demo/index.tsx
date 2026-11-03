@@ -361,7 +361,7 @@ function AgentRow({ shown }: { shown: boolean }) {
           <div
             data-demo-agents
             className={cn(
-              'absolute top-full left-3 z-10 flex items-center rounded-b-md px-1.5 py-1 shadow-sm',
+              'absolute top-[calc(100%-3px)] left-3 z-10 flex items-center rounded-b-md px-1.5 pt-[calc(0.25rem+3px)] pb-1 shadow-sm',
               styles.agentTab,
             )}
           >

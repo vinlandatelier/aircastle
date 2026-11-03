@@ -111,7 +111,8 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
     const agentsBox = await agents.boundingBox()
     if (!rowBox || !agentsBox) throw new Error('Agent row is not laid out')
     return {
-      attached: Math.abs(agentsBox.y - (rowBox.y + rowBox.height)) <= 1.5,
+      attached:
+        agentsBox.y < rowBox.y + rowBox.height && agentsBox.y > rowBox.y + rowBox.height - 6,
       left: agentsBox.x < rowBox.x + rowBox.width / 4,
     }
   }
