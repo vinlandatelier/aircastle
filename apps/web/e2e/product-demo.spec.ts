@@ -553,4 +553,13 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   )
   await expect(request).toBeInViewport()
   await expect(panel.locator('[data-demo-research-reply]')).toContainText('Docs gap.md')
+  const agentLabel = panel.locator('[data-demo-agent-label]')
+  const statusText = panel.getByText('Research complete', { exact: true })
+  const mutedColour = await statusText.evaluate((element) => getComputedStyle(element).color)
+  await expect(agentLabel).toHaveCSS('color', mutedColour)
+
+  await expect(research).toHaveAttribute('data-state', 'done')
+  await page.clock.runFor(1000)
+  await expect(research).toBeHidden()
+  await expect(editor.locator('[data-demo-preview]')).toBeVisible()
 })

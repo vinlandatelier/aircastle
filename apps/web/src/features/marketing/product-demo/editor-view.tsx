@@ -237,47 +237,60 @@ function sourcesReadBy(steps: number) {
 function ResearchStatus({ steps, hovered }: { steps: number; hovered: boolean }) {
   const sourcesRead = sourcesReadBy(steps)
   const currentIndex = sourcesRead - 1
+  const done = steps >= researchLog.length
   return (
     <span
       data-demo-research
+      data-state={done ? 'done' : 'working'}
       data-sources={sourcesRead}
       data-hovered={hovered}
       className={cn(
-        'flex h-8 items-center gap-2 rounded-md pr-2.5 pl-1.5 text-violet-700 transition-colors duration-200 dark:text-violet-300',
-        hovered ? 'bg-violet-500/20' : 'bg-violet-500/10',
+        'grid transition-[grid-template-columns,opacity,margin,scale] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        done ? '-mr-2 scale-95 grid-cols-[0fr] opacity-0' : 'grid-cols-[1fr] opacity-100',
       )}
     >
-      <span className={cn('rounded-full', styles.agentAvatar)}>
-        <GeneratedAvatar name={researcher} size={18} variant="beam" />
-      </span>
-      <span>{researcher}</span>
-      <span className="rounded-sm bg-violet-500/15 px-1 py-px text-[10px] leading-none">Agent</span>
-      <span className="text-violet-600/70 dark:text-violet-300/70">
-        {sourcesRead === 0 ? 'searching' : 'reading'}
-      </span>
-      <span className="relative h-5 w-[230px] overflow-hidden">
-        {researchSources.map(({ url, logo: Logo }, index) => (
-          <span
-            key={url}
-            data-demo-source
-            data-state={
-              index < currentIndex ? 'read' : index === currentIndex ? 'current' : 'queued'
-            }
-            className={cn(
-              'absolute inset-0 flex items-center gap-1.5 leading-5 transition-[translate,opacity] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]',
-              index < currentIndex && '-translate-y-full opacity-0',
-              index === currentIndex && 'translate-y-0 opacity-100',
-              index > currentIndex && 'translate-y-full opacity-0',
-            )}
-          >
-            <span data-demo-source-logo className="flex shrink-0">
-              <Logo className="size-3.5" />
-            </span>
-            <span data-demo-source-url className="truncate">
-              {url}
-            </span>
+      <span className="min-w-0 overflow-hidden">
+        <span
+          className={cn(
+            'flex h-8 w-max items-center gap-2 rounded-md pr-2.5 pl-1.5 text-violet-700 transition-colors duration-200 dark:text-violet-300',
+            hovered ? 'bg-violet-500/20' : 'bg-violet-500/10',
+          )}
+        >
+          <span className={cn('rounded-full', styles.agentAvatar)}>
+            <GeneratedAvatar name={researcher} size={18} variant="beam" />
           </span>
-        ))}
+          <span>{researcher}</span>
+          <span className="rounded-sm bg-violet-500/15 px-1 py-px text-[10px] leading-none">
+            Agent
+          </span>
+          <span className="text-violet-600/70 dark:text-violet-300/70">
+            {sourcesRead === 0 ? 'searching' : 'reading'}
+          </span>
+          <span className="relative h-5 w-[230px] overflow-hidden">
+            {researchSources.map(({ url, logo: Logo }, index) => (
+              <span
+                key={url}
+                data-demo-source
+                data-state={
+                  index < currentIndex ? 'read' : index === currentIndex ? 'current' : 'queued'
+                }
+                className={cn(
+                  'absolute inset-0 flex items-center gap-1.5 leading-5 transition-[translate,opacity] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                  index < currentIndex && '-translate-y-full opacity-0',
+                  index === currentIndex && 'translate-y-0 opacity-100',
+                  index > currentIndex && 'translate-y-full opacity-0',
+                )}
+              >
+                <span data-demo-source-logo className="flex shrink-0">
+                  <Logo className="size-3.5" />
+                </span>
+                <span data-demo-source-url className="truncate">
+                  {url}
+                </span>
+              </span>
+            ))}
+          </span>
+        </span>
       </span>
     </span>
   )
@@ -428,7 +441,10 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
             <GeneratedAvatar name={researcher} size={22} variant="beam" />
           </span>
           <span>{researcher}</span>
-          <span className="rounded-sm bg-violet-500/15 px-1 py-px text-[10px] leading-none text-violet-700 dark:text-violet-300">
+          <span
+            data-demo-agent-label
+            className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none text-muted-foreground"
+          >
             Agent
           </span>
           <span className="text-muted-foreground">·</span>
