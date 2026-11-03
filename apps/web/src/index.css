@@ -236,6 +236,14 @@
   background-image: url('/brand/logo-dark.png');
 }
 
+.vinland-logo {
+  background: url('/brand/vinland-light.png') center / contain no-repeat;
+}
+
+.dark .vinland-logo {
+  background-image: url('/brand/vinland-dark.png');
+}
+
 @keyframes brand-spin {
   to {
     transform: rotate(-360deg);

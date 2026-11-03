@@ -174,3 +174,29 @@ test('mobile header hides the centre links', async ({ page }) => {
   for (const [name] of centreLinks)
     await expect(nav.getByRole('link', { name, exact: true })).toBeHidden()
 })
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`${theme} hero credits Vinland above the title`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
+    await page.goto('/')
+    const credit = page.getByText('Presented by Vinland', { exact: true })
+    await expect(credit).toBeVisible()
+    const title = page.getByRole('heading', { level: 1 })
+    const creditBox = await credit.boundingBox()
+    const titleBox = await title.boundingBox()
+    if (!creditBox || !titleBox) throw new Error('Hero is not laid out')
+    expect(creditBox.y + creditBox.height).toBeLessThanOrEqual(titleBox.y)
+    await expect(credit.locator('.vinland-logo')).toHaveCSS(
+      'background-image',
+      new RegExp(`/brand/vinland-${theme}\\.png`),
+    )
+  })
+}
+
+test('Vinland credit opens vinland.com.au in a new tab', async ({ page }) => {
+  await page.goto('/')
+  const vinland = page.getByRole('link', { name: 'Vinland', exact: true })
+  await expect(vinland).toHaveAttribute('href', 'https://vinland.com.au')
+  await expect(vinland).toHaveAttribute('target', '_blank')
+  await expect(vinland).toHaveAttribute('rel', /noopener/)
+})
