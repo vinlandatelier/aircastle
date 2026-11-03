@@ -138,7 +138,12 @@ function AgentTab({
       </span>
       {agent}
       <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none">{role}</span>
-      {status && <span className="text-white/80">· {status}</span>}
+      {status && (
+        <>
+          <span className="text-white/60">·</span>
+          <span className="text-white/80">{status}</span>
+        </>
+      )}
     </div>
   )
 }
