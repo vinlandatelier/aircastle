@@ -340,11 +340,12 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
     await expect(box).toHaveAttribute('data-agent', 'Thorfinn')
     const fieldOutline = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-outline]`)
     await expect(fieldOutline).toHaveCSS('box-shadow', /inset/)
-    await expect(fieldOutline).toHaveAttribute('data-active', 'true')
+    await expect(fieldOutline).toHaveAttribute('data-active', String(field === 'categories'))
     const tab = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`)
     await expect(tab).toContainText('Thorfinn')
     await expect(tab).toContainText('Agent')
     await expect(tab).not.toContainText('Writer')
+    if (field !== 'categories') continue
     const boxRect = await box.boundingBox()
     const tabRect = await tab.boundingBox()
     if (!boxRect || !tabRect) throw new Error('Agent tab is not laid out')
@@ -358,8 +359,16 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
 
   const categories = editor.locator('[data-demo-field="categories"] [data-demo-chip]')
   const tags = editor.locator('[data-demo-field="tags"] [data-demo-chip]')
+  const presence = (field: string) =>
+    editor.locator(`[data-demo-field="${field}"] [data-demo-agent-outline]`)
+  const expectWorkingOn = async (field: string | undefined) => {
+    for (const candidate of ['categories', 'tags', 'body'])
+      await expect(presence(candidate)).toHaveAttribute('data-active', String(candidate === field))
+  }
   await expect(categories).toHaveCount(0)
   await expect(tags).toHaveCount(0)
+  await expectWorkingOn('categories')
+
   await page.clock.runFor(1100)
   await expect(categories).toHaveCount(1)
   await expect(categories.first()).toContainText('Product')
@@ -370,34 +379,24 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(categories).toHaveCount(2)
   await expect(categories.last()).toContainText('Announcements')
   await expect(tags).toHaveCount(0)
-  await page.clock.runFor(800)
+  await expectWorkingOn('categories')
+
+  await page.clock.runFor(1300)
+  await expectWorkingOn('tags')
+  await expect(tags).toHaveCount(0)
+  await page.clock.runFor(500)
   await expect(tags).toHaveCount(1)
   await expect(tags.first()).toContainText('MCP')
   await page.clock.runFor(400)
   await expect(tags).toHaveCount(3)
   await expect(tags.last()).toContainText('Integrations')
   await expect(editor.locator('[data-demo-field="tags"]')).toHaveAttribute('data-empty', 'false')
-  await expect(
-    editor.locator('[data-demo-field="categories"] [data-demo-agent-outline]'),
-  ).toHaveAttribute('data-active', 'false')
-  await expect(
-    editor.locator('[data-demo-field="tags"] [data-demo-agent-outline]'),
-  ).toHaveAttribute('data-active', 'true')
 
-  await page.clock.runFor(1100)
-  for (const field of ['categories', 'tags']) {
-    await expect(
-      editor.locator(`[data-demo-field="${field}"] [data-demo-agent-outline]`),
-    ).toHaveAttribute('data-active', 'false')
-    await expect(
-      editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`),
-    ).toHaveAttribute('data-active', 'false')
-  }
-  const bodyOutline = editor.locator('[data-demo-field="body"] [data-demo-agent-outline]')
-  const bodyTab = editor.locator('[data-demo-field="body"] [data-demo-agent-tab]')
-  await expect(bodyTab).toHaveAttribute('data-active', 'false')
+  await page.clock.runFor(1000)
+  await expectWorkingOn(undefined)
   await page.clock.runFor(300)
-  await expect(bodyOutline).toHaveAttribute('data-active', 'true')
+  await expectWorkingOn('body')
+  const bodyTab = editor.locator('[data-demo-field="body"] [data-demo-agent-tab]')
   await expect(bodyTab).toHaveAttribute('data-active', 'true')
   await expect(bodyTab).toContainText('Thorfinn')
   await expect(bodyTab).toContainText('Agent')

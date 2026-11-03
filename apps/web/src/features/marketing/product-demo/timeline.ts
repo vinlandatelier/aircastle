@@ -19,16 +19,19 @@ const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
 const rowsLeftAfter = 980
 const categoriesStartAfterEditor = 1500
-const tagsStartAfterEditor = 2500
 const chipInterval = 200
-const tagCount = 3
 const categoryCount = 2
+const tagCount = 3
 const lingerAfterFilling = 1000
+const moveBetweenFields = 300
+const tagsStartAfterArriving = 500
 const writerLeavesCategoriesAfterEditor =
   categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
+const writerReachesTagsAfterEditor = writerLeavesCategoriesAfterEditor + moveBetweenFields
+const tagsStartAfterEditor = writerReachesTagsAfterEditor + tagsStartAfterArriving
 const writerLeavesTagsAfterEditor =
   tagsStartAfterEditor + (tagCount - 1) * chipInterval + lingerAfterFilling
-const writerReachesBodyAfterEditor = writerLeavesTagsAfterEditor + 300
+const writerReachesBodyAfterEditor = writerLeavesTagsAfterEditor + moveBetweenFields
 
 const keystrokeDelays = Array.from(prompt, (character, index) => {
   const pause = character === ' ' || character === ',' ? 40 : 0
@@ -143,7 +146,9 @@ export function frameAt(elapsed: number): Frame {
     categories: chipsArrived(elapsed - editorOpensAt - categoriesStartAfterEditor, categoryCount),
     tags: chipsArrived(elapsed - editorOpensAt - tagsStartAfterEditor, tagCount),
     writerOnCategories: elapsed - editorOpensAt < writerLeavesCategoriesAfterEditor,
-    writerOnTags: elapsed - editorOpensAt < writerLeavesTagsAfterEditor,
+    writerOnTags:
+      elapsed - editorOpensAt >= writerReachesTagsAfterEditor &&
+      elapsed - editorOpensAt < writerLeavesTagsAfterEditor,
     writerOnBody: elapsed - editorOpensAt >= writerReachesBodyAfterEditor,
   }
 }
