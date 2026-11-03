@@ -6,6 +6,7 @@ import {
   BrainIcon,
   LoaderCircleIcon,
   TriangleAlertIcon,
+  CircleCheckIcon,
   XIcon,
   EyeIcon,
   SaveIcon,
@@ -23,7 +24,25 @@ import {
 } from 'lucide-react'
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
-import { researchLog, researchSources, type ResearchEntry } from './research'
+import { researchLog, researchSources, type Artifact, type ResearchEntry } from './research'
+import { prompt } from './timeline'
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
+import { Message, MessageContent } from '@/components/ui/message'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from '@/components/ui/input-group'
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from '@/components/ui/trace'
 import { Badge } from '@/components/ui/badge'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 
@@ -265,60 +284,49 @@ function ResearchStatus({ steps, hovered }: { steps: number; hovered: boolean })
 }
 
 const entering =
-  'shrink-0 transition-[opacity,translate] duration-500 starting:translate-y-1 starting:opacity-0'
+  'transition-[opacity,translate] duration-500 starting:translate-y-1 starting:opacity-0'
 
 function ResearchEntryView({ entry }: { entry: ResearchEntry }) {
   if (entry.kind === 'thought')
     return (
-      <li
+      <p
         data-demo-thought
-        className={cn(
-          'line-clamp-2 border-l-2 border-violet-500/30 pl-3 text-xs leading-5 text-muted-foreground italic',
-          entering,
-        )}
+        className={cn('line-clamp-2 text-xs leading-5 text-muted-foreground italic', entering)}
       >
         {entry.text}
-      </li>
+      </p>
     )
   if (entry.kind === 'source') {
     const { url, logo: Logo, action, finding, gap } = entry.source
     return (
-      <li data-demo-research-step className={cn('flex flex-col gap-1', entering)}>
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <Logo className="size-3.5 shrink-0" />
-          <span className="shrink-0">{action}</span>
-          <span className="truncate">{url}</span>
-        </span>
-        <span
-          className={cn('flex gap-1.5 pl-5 leading-5', gap && 'text-amber-600 dark:text-amber-400')}
+      <div className={cn('flex flex-col gap-1', entering)}>
+        <TraceLine data-demo-research-step className="text-xs">
+          <TraceIcon>
+            <Logo className="size-3.5" />
+          </TraceIcon>
+          <TraceTitle>
+            {action} {url}
+          </TraceTitle>
+        </TraceLine>
+        <p
+          className={cn(
+            'flex gap-1.5 pl-6 text-xs leading-5 text-foreground',
+            gap && 'text-amber-600 dark:text-amber-400',
+          )}
         >
           {gap && <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />}
           {finding}
-        </span>
-      </li>
+        </p>
+      </div>
     )
   }
   return (
-    <li className={cn('flex flex-col gap-2', entering)}>
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <TraceLine className={cn('text-xs', entering)}>
+      <TraceIcon>
         <SparklesIcon className="size-3.5" />
-        Synthesised findings
-      </span>
-      {entry.artifacts.map((artifact) => (
-        <span
-          key={artifact.name}
-          data-demo-artifact
-          className="flex items-center gap-3 rounded-md border bg-background px-3 py-2.5 dark:bg-input/30"
-        >
-          <FileTextIcon className="size-5 shrink-0 text-violet-600 dark:text-violet-400" />
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span>{artifact.name}</span>
-            <span className="truncate text-xs text-muted-foreground">{artifact.summary}</span>
-          </span>
-          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-        </span>
-      ))}
-    </li>
+      </TraceIcon>
+      <TraceTitle>Synthesised findings into {entry.artifacts.length} notes</TraceTitle>
+    </TraceLine>
   )
 }
 
@@ -330,25 +338,81 @@ function PendingStep({ entry }: { entry: ResearchEntry }) {
         ? `${entry.source.action === 'Read' ? 'Reading' : 'Searching'} ${entry.source.url}`
         : 'Synthesising findings…'
   return (
-    <li
-      data-demo-research-pending
-      className={cn(
-        'flex min-w-0 shrink-0 items-center gap-1.5 text-xs text-muted-foreground',
-        entry.kind === 'thought' && 'motion-safe:animate-pulse',
-      )}
-    >
-      {entry.kind === 'thought' ? (
-        <BrainIcon className="size-3.5 shrink-0" />
-      ) : (
-        <LoaderCircleIcon className="size-3.5 shrink-0 motion-safe:animate-spin" />
-      )}
-      <span className="truncate">{text}</span>
-    </li>
+    <TraceLine data-demo-research-pending status="running" className="text-xs">
+      <TraceIcon>
+        {entry.kind === 'thought' ? (
+          <BrainIcon className="size-3.5" />
+        ) : (
+          <LoaderCircleIcon className="size-3.5 motion-safe:animate-spin" />
+        )}
+      </TraceIcon>
+      <TraceTitle>{text}</TraceTitle>
+    </TraceLine>
   )
 }
 
-function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
+const keepOpenState = () => {}
+
+function ResearchChain({ steps }: { steps: number }) {
   const next = researchLog[steps]
+  return (
+    <Trace data-demo-research-chain>
+      <TraceCollapsible open={next !== undefined} onOpenChange={keepOpenState}>
+        <TraceCollapsibleTrigger>
+          <TraceLine {...(next && { status: 'running' })}>
+            <TraceIcon>
+              {next ? (
+                <LoaderCircleIcon className="motion-safe:animate-spin" />
+              ) : (
+                <CircleCheckIcon />
+              )}
+            </TraceIcon>
+            <TraceTitle>
+              {next ? 'Researching' : `Researched ${researchSources.length} sources`}
+            </TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent keepMounted>
+          <Trace className="gap-3">
+            {researchLog.slice(0, steps).map((entry) => (
+              <ResearchEntryView key={entry.at} entry={entry} />
+            ))}
+            {next && <PendingStep entry={next} />}
+          </Trace>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
+  )
+}
+
+function ResearchReply({ artifacts }: { artifacts: readonly Artifact[] }) {
+  return (
+    <div data-demo-research-reply className={cn('flex flex-col gap-2.5', entering)}>
+      <p className="leading-relaxed">
+        Here’s what I found. Acme’s docs don’t cover MCP yet, so I drafted an outline for that too.
+      </p>
+      {artifacts.map((artifact) => (
+        <span
+          key={artifact.name}
+          data-demo-artifact
+          className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5 dark:bg-input/30"
+        >
+          <FileTextIcon className="size-5 shrink-0 text-violet-600 dark:text-violet-400" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span>{artifact.name}</span>
+            <span className="truncate text-xs text-muted-foreground">{artifact.summary}</span>
+          </span>
+          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+        </span>
+      ))}
+    </div>
+  )
+}
+
+const synthesis = researchLog.find((entry) => entry.kind === 'synthesis')
+
+function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
+  const done = steps >= researchLog.length
   return (
     <div
       data-demo-research-panel
@@ -369,29 +433,49 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
           </span>
           <span className="text-muted-foreground">·</span>
           <span className="text-muted-foreground">
-            {next ? 'Researching' : 'Research complete'}
+            {done ? 'Research complete' : 'Researching'}
           </span>
         </div>
         <XIcon className="size-4 text-muted-foreground" />
       </div>
-      <ol className="flex min-h-0 flex-1 flex-col justify-end gap-3.5 overflow-hidden p-4">
-        {researchLog.slice(0, steps).map((entry) => (
-          <ResearchEntryView key={entry.at} entry={entry} />
-        ))}
-        {next && <PendingStep entry={next} />}
-      </ol>
-      <div className="border-t p-3">
-        <div
-          data-demo-research-prompt
-          className="flex items-end justify-between gap-2 rounded-md border bg-background px-3 py-2 dark:bg-input/30"
-        >
-          <span className="leading-6 text-muted-foreground/60">
-            Ask Canute to check other sources or dig deeper…
-          </span>
-          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <ArrowUpIcon className="size-4" />
-          </span>
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
+        <Message align="end" className="shrink-0">
+          <MessageContent>
+            <Bubble align="end" variant="muted" data-demo-research-request>
+              <BubbleContent>{prompt}</BubbleContent>
+            </Bubble>
+          </MessageContent>
+        </Message>
+        <Message className="shrink-0">
+          <MessageContent className="gap-4">
+            <ResearchChain steps={steps} />
+            {done && synthesis?.kind === 'synthesis' && (
+              <ResearchReply artifacts={synthesis.artifacts} />
+            )}
+          </MessageContent>
+        </Message>
+      </div>
+      <div className="p-3">
+        <InputGroup data-demo-research-prompt className="dark:bg-input/30">
+          <InputGroupTextarea
+            readOnly
+            tabIndex={-1}
+            rows={1}
+            placeholder="Ask Canute to dig deeper…"
+            className="min-h-0 p-3"
+          />
+          <InputGroupAddon align="block-end" className="justify-end">
+            <InputGroupButton
+              size="icon-xs"
+              variant="default"
+              tabIndex={-1}
+              className="rounded-full"
+              aria-label="Send"
+            >
+              <ArrowUpIcon />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
     </div>
   )

@@ -498,10 +498,31 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(panel.locator('[data-demo-thought]').first()).toBeVisible()
   await expect(panel.locator('[data-demo-thought]').first()).toHaveCSS('-webkit-line-clamp', '2')
   await expect(panel).toContainText('No MCP page')
-  await expect(panel.locator('[data-demo-research-prompt]')).toContainText('Ask Canute')
-  await expect(panel.locator('[data-demo-research-pending]')).toHaveText(
-    /Thinking…|Reading|Searching/,
+  const request = panel.locator('[data-demo-research-request]')
+  await expect(request).toHaveText(prompt)
+  await expect(request).toHaveAttribute('data-align', 'end')
+  const chain = panel.locator('[data-demo-research-chain]')
+  await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toContainText(
+    'Researching',
   )
+  await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+  const prompter = panel.locator('[data-demo-research-prompt]')
+  await expect(prompter).toHaveAttribute('data-slot', 'input-group')
+  await expect(prompter.locator('textarea')).toHaveAttribute(
+    'placeholder',
+    'Ask Canute to dig deeper…',
+  )
+  const pending = panel.locator('[data-demo-research-pending]')
+  await expect(pending).toHaveText(/Thinking…|Reading|Searching/)
+  await expect(pending).toHaveAttribute('data-status', 'running')
+  await expect(panel.locator('[data-demo-research-step]').first()).toHaveAttribute(
+    'data-slot',
+    'trace-line',
+  )
+  await expect(panel.locator('[data-demo-research-reply]')).toHaveCount(0)
 
   const tagsBox = await editor.locator('[data-demo-field="tags"]').boundingBox()
   const panelBox = await panel.boundingBox()
@@ -523,4 +544,13 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await expect(artifacts.last()).toContainText('Docs gap.md')
   await expect(panel.locator('[data-demo-research-pending]')).toHaveCount(0)
   await expect(panel).toContainText('Research complete')
+  await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toContainText(
+    'Researched 11 sources',
+  )
+  await expect(chain.locator('[data-slot="trace-collapsible-trigger"]')).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  await expect(request).toBeInViewport()
+  await expect(panel.locator('[data-demo-research-reply]')).toContainText('Docs gap.md')
 })
