@@ -39,6 +39,7 @@ import {
 } from './timeline'
 
 const frameWidth = 1280
+const playbackRate = 1.2
 const frameHeight = 740
 
 function sameFrame(left: Frame, right: Frame) {
@@ -55,7 +56,7 @@ function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: 
       if (!entry?.isIntersecting || request !== undefined) return
       const startedAt = performance.now()
       const tick = () => {
-        const next = frameAt((performance.now() - startedAt) % loopDuration)
+        const next = frameAt(((performance.now() - startedAt) * playbackRate) % loopDuration)
         setFrame((current) => (sameFrame(current, next) ? current : next))
         request = requestAnimationFrame(tick)
       }
