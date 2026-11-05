@@ -962,6 +962,15 @@ test('Einar generates the cover image with the product cover skill as the editor
   await expect(cover).toHaveAttribute('data-state', 'done')
   await expect(tab).toHaveAttribute('data-active', 'false')
   await expect(status).toHaveAttribute('data-active', 'false')
-  await expect(cover).toContainText('Acme MCP')
+  await expect(cover.locator('[data-demo-cover-title]')).toHaveText('Introducing Acme MCP')
+  await expect(cover.locator('[data-demo-cover-date]')).toHaveText('Nov 5, 2026')
+  await expect(cover).not.toContainText('Connect Acme')
+  const order = await cover.evaluate((element) =>
+    ['[data-demo-cover-acme]', '[data-demo-cover-slash]', '[data-demo-cover-mcp]'].map(
+      (selector) => element.querySelector(selector)?.getBoundingClientRect().left ?? -1,
+    ),
+  )
+  expect(order.every((left) => left >= 0)).toBe(true)
+  expect(order).toEqual([...order].sort((first, second) => first - second))
   await expect(field).toHaveAttribute('data-empty', 'false')
 })

@@ -1043,18 +1043,22 @@ function GeneratedCover({ developing }: { developing: boolean }) {
         <div className={cn('absolute inset-0', styles.coverGrid)} />
         <div className={cn('absolute inset-0', styles.coverGlow)} />
         <div className="relative flex h-full flex-col items-center justify-center gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-lg border border-white/15 bg-white/5">
+          <div className="flex items-center gap-2 text-white">
+            <span data-demo-cover-acme className="flex">
               <GeneratedAvatar name="Acme Inc" size={20} />
             </span>
-            <span className="w-6 border-t border-dashed border-white/30" />
-            <span className="flex size-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white">
-              <SiModelcontextprotocol className="size-[18px]" />
+            <span data-demo-cover-slash className="text-lg leading-none font-light text-white/30">
+              /
             </span>
+            <SiModelcontextprotocol data-demo-cover-mcp className="size-5" />
           </div>
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-sm font-medium tracking-tight text-white">Acme MCP</span>
-            <span className="text-[9px] text-white/55">Connect Acme to your AI tools</span>
+            <span data-demo-cover-title className="text-sm font-medium tracking-tight text-white">
+              Introducing Acme MCP
+            </span>
+            <span data-demo-cover-date className="text-[9px] text-white/45">
+              Nov 5, 2026
+            </span>
           </div>
         </div>
       </div>
