@@ -1040,8 +1040,8 @@ function GeneratedCover({ developing }: { developing: boolean }) {
       className="relative aspect-video overflow-hidden rounded-md bg-[#0b0b10]"
     >
       <div className={cn('absolute inset-0', styles.coverArt, developing && styles.coverDevelop)}>
-        <div className={cn('absolute inset-0', styles.coverGrid)} />
         <div className={cn('absolute inset-0', styles.coverGlow)} />
+        <div className={cn('absolute inset-0', styles.coverGrain)} />
         <div className="relative flex h-full flex-col items-center justify-center gap-2.5">
           <div className="flex items-center gap-2 text-white">
             <span data-demo-cover-acme className="flex">
