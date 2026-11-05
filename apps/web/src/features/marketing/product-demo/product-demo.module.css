@@ -121,10 +121,10 @@
 
 .coverBloom {
   background:
-    radial-gradient(60% 80% at 0% 0%, rgb(255 255 255 / 0.42), transparent 70%),
-    radial-gradient(50% 70% at 100% 0%, rgb(255 255 255 / 0.3), transparent 70%),
-    radial-gradient(60% 60% at 55% 110%, rgb(255 255 255 / 0.36), transparent 70%);
-  filter: blur(10px);
+    radial-gradient(70% 90% at 0% 0%, rgb(255 255 255 / 0.2), transparent 100%),
+    radial-gradient(60% 80% at 100% 0%, rgb(255 255 255 / 0.14), transparent 100%),
+    radial-gradient(70% 70% at 55% 115%, rgb(255 255 255 / 0.17), transparent 100%);
+  filter: blur(16px);
 }
 
 .coverGrain {

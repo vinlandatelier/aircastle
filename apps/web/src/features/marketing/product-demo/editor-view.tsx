@@ -1034,7 +1034,7 @@ function MainColumn({ writerOnBody, drafting }: { writerOnBody: boolean; draftin
 
 function CoverArt() {
   return (
-    <div className={cn('absolute inset-0 bg-[#0a0a0b]', styles.coverReveal)}>
+    <div className={cn('absolute inset-0 bg-[#141416]', styles.coverReveal)}>
       <div className={cn('absolute inset-0', styles.coverBloom)} />
       <div className={cn('absolute inset-0', styles.coverGrain)} />
       <div className="relative flex h-full flex-col items-center justify-center gap-2.5">
