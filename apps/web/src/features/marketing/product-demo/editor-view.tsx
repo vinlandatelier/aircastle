@@ -1,4 +1,3 @@
-import { useLayoutEffect, useRef } from 'react'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -849,35 +848,9 @@ function DraftWords({ segments }: { segments: DraftSegment[] }) {
   })
 }
 
-function useFollowDraft(viewport: React.RefObject<HTMLDivElement | null>) {
-  useLayoutEffect(() => {
-    const frame = viewport.current
-    const content = frame?.firstElementChild
-    if (!frame || !(content instanceof HTMLElement)) return
-    const overflow = content.scrollHeight - frame.clientHeight
-    if (overflow <= 0) return
-    const words = [...content.querySelectorAll<HTMLElement>('[data-demo-draft-word]')]
-    const delayOf = (word: HTMLElement | undefined) => parseFloat(word?.style.animationDelay ?? '0')
-    const firstHidden = words.find(
-      (word) => word.offsetTop + word.offsetHeight > frame.clientHeight - 24,
-    )
-    const startsAt = delayOf(firstHidden)
-    const endsAt = delayOf(words.at(-1)) + 200
-    const scroll = content.animate([{ translate: '0 0' }, { translate: `0 -${overflow}px` }], {
-      delay: startsAt,
-      duration: Math.max(endsAt - startsAt, 1),
-      easing: 'linear',
-      fill: 'both',
-    })
-    return () => scroll.cancel()
-  }, [viewport])
-}
-
 function BodyDraft() {
-  const viewport = useRef<HTMLDivElement>(null)
-  useFollowDraft(viewport)
   return (
-    <div data-demo-body-viewport ref={viewport} className="relative h-72 overflow-hidden">
+    <div data-demo-body-viewport className="relative h-72 overflow-hidden">
       <div data-demo-body-draft className="flex flex-col gap-2.5 px-4 py-4 leading-6">
         {bodyDraftTimed.blocks.map(({ block, segments }, index) => {
           if (block.kind === 'h2')

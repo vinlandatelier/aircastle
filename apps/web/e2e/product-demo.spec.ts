@@ -907,14 +907,18 @@ test('Thorfinn streams a body draft once Canute’s research is done', async ({ 
   await expect(words.last()).toHaveCSS('opacity', '1', { timeout: 12000 })
   await page.waitForTimeout(300)
   const viewport = body.locator('[data-demo-body-viewport]')
-  const following = await viewport.evaluate((element) => {
-    const last = element.querySelector('[data-demo-draft-word]:last-of-type, pre')
+  const layout = await viewport.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const first = element.querySelector('[data-demo-draft-word]')?.getBoundingClientRect()
     const words = element.querySelectorAll('[data-demo-draft-word]')
     const end = words[words.length - 1]?.getBoundingClientRect()
-    const box = element.getBoundingClientRect()
-    return last && end ? end.bottom <= box.bottom + 1 && end.top >= box.top : false
+    return {
+      topStays: first ? first.top >= box.top && first.top < box.top + 40 : false,
+      restClipped: end ? end.top > box.bottom : false,
+      clipped: getComputedStyle(element).overflow === 'hidden',
+    }
   })
-  expect(following).toBe(true)
+  expect(layout).toEqual({ topStays: true, restClipped: true, clipped: true })
 })
 
 test('Einar generates the cover image with the product cover skill as the editor opens', async ({
