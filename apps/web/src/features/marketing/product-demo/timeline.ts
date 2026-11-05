@@ -106,6 +106,7 @@ export type Frame = {
   bodyElapsed: number | null
   seoElapsed: number | null
   socialImage: CoverState
+  previewElapsed: number | null
 }
 
 /** The still frame shown when motion is reduced. */
@@ -135,6 +136,7 @@ export const stillFrame: Frame = {
   bodyElapsed: null,
   seoElapsed: null,
   socialImage: 'idle',
+  previewElapsed: null,
 }
 
 function chipsArrivedEvery(sinceFirst: number, interval: number, total: number) {
@@ -293,5 +295,9 @@ export function frameAt(elapsed: number): Frame {
         : null,
     seoElapsed: inEditor ? sinceEditor - seoStartsAfterEditor : null,
     socialImage: socialImageAt(sinceEditor, inEditor),
+    previewElapsed:
+      inEditor && sinceEditor >= previewClickEndsAfterEditor
+        ? sinceEditor - previewClickEndsAfterEditor
+        : null,
   }
 }

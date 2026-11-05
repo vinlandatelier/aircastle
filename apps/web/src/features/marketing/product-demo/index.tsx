@@ -667,6 +667,7 @@ export function ProductDemo() {
                 bodyElapsed={frame.bodyElapsed}
                 seoElapsed={frame.seoElapsed}
                 socialImage={frame.socialImage}
+                previewElapsed={frame.previewElapsed}
               />
             </div>
           </div>

@@ -1264,3 +1264,53 @@ test('the cursor heads for Preview once the social image is done, while SEO keep
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
   expect(await authors.boundingBox()).toEqual(settled)
 })
+
+test('clicking Preview swaps the editor for the Acme site, address bar first, then the page', async ({
+  page,
+}) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const cursor = frame.locator('[data-demo-cursor]')
+  const editor = frame.locator('[data-demo-editor]')
+  const site = editor.locator('[data-demo-site-preview]')
+  const address = site.locator('[data-demo-site-address]')
+  const sitePage = site.locator('[data-demo-site-page]')
+  const preview = editor.locator('[data-demo-preview]')
+
+  await page.clock.runFor(story(17000))
+  for (
+    let tick = 0;
+    tick < 80 && (await cursor.getAttribute('data-state')) !== 'clicking';
+    tick += 1
+  )
+    await page.clock.runFor(story(100))
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  await expect(site).toHaveCount(0)
+  await expect(preview).toContainText('Preview')
+
+  for (let tick = 0; tick < 10 && (await site.count()) === 0; tick += 1)
+    await page.clock.runFor(story(50))
+  await expect(address).toHaveText('acme.com/blog/introducing-acme-mcp')
+  await expect(site.locator('[data-demo-site-draft]')).toHaveText('Draft')
+  await expect(sitePage).toHaveAttribute('data-state', 'loading')
+  await expect(sitePage).not.toContainText('Introducing Acme MCP')
+  await expect(preview).toContainText('Edit')
+  await expect(preview).not.toContainText('Preview')
+  await expect(editor.locator('[data-demo-editor-scroll]')).toHaveAttribute('data-hidden', 'true')
+  await expect(editor.locator('[data-demo-top-bar]')).toBeVisible()
+  await expect(frame.locator('[data-demo-research-panel]')).toHaveAttribute('data-state', 'open')
+
+  await page.clock.runFor(story(800))
+  await expect(sitePage).toHaveAttribute('data-state', 'loaded')
+  await expect(sitePage.locator('h1')).toHaveText('Introducing Acme MCP')
+  await expect(sitePage.locator('[data-demo-cover-title]')).toHaveText('Introducing Acme MCP')
+  const words = sitePage.locator('[data-demo-draft-word]')
+  const early = await words.count()
+  expect(early).toBeGreaterThan(0)
+  await page.clock.runFor(story(1000))
+  expect(await words.count()).toBeGreaterThan(early)
+})

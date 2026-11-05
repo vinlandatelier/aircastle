@@ -14,6 +14,9 @@ import {
   EllipsisVerticalIcon,
   ExternalLinkIcon,
   EyeIcon,
+  GlobeLockIcon,
+  PencilIcon,
+  RotateCwIcon,
   BoldIcon,
   CalendarIcon,
   CodeIcon,
@@ -672,10 +675,12 @@ function TopBar({
   steps,
   researchHovered,
   researchDocked,
+  previewing,
 }: {
   steps: number
   researchHovered: boolean
   researchDocked: boolean
+  previewing: boolean
 }) {
   return (
     <div
@@ -694,8 +699,8 @@ function TopBar({
             data-demo-preview
             className="flex h-8 items-center gap-1.5 rounded-md rounded-r-none border bg-background pr-3 pl-2.5 dark:bg-input/30"
           >
-            <EyeIcon className="size-4" />
-            Preview
+            {previewing ? <PencilIcon className="size-4" /> : <EyeIcon className="size-4" />}
+            {previewing ? 'Edit' : 'Preview'}
           </span>
           <span
             data-demo-preview-external
@@ -737,51 +742,55 @@ function BodyDraft({ elapsed }: { elapsed: number }) {
   return (
     <div data-demo-body-viewport className="relative h-72 overflow-hidden">
       <div data-demo-body-draft className="flex flex-col gap-2.5 px-4 py-4 leading-6">
-        {bodyDraftTimed.blocks.map(({ block, segments }, index) => {
-          const visible = segments.map((group) => group.filter((word) => word.delay <= elapsed))
-          if (!visible.some((group) => group.length > 0)) return null
-          if (block.kind === 'h2')
-            return (
-              <h2 key={index} className="pt-1 text-lg">
-                <DraftWords segments={visible[0] ?? []} />
-              </h2>
-            )
-          if (block.kind === 'ul')
-            return (
-              <ul key={index} className="flex list-disc flex-col gap-1 pl-5">
-                {visible
-                  .filter((item) => item.length > 0)
-                  .map((item, itemIndex) => (
-                    <li key={itemIndex}>
-                      <DraftWords segments={item} />
-                    </li>
-                  ))}
-              </ul>
-            )
-          if (block.kind === 'code')
-            return (
-              <pre
-                key={index}
-                className="rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 whitespace-pre"
-              >
-                {visible
-                  .filter((line) => line.length > 0)
-                  .map((line, lineIndex) => (
-                    <div key={lineIndex}>
-                      <DraftWords segments={line} />
-                    </div>
-                  ))}
-              </pre>
-            )
-          return (
-            <p key={index}>
-              <DraftWords segments={visible[0] ?? []} />
-            </p>
-          )
-        })}
+        <DraftBlocks elapsed={elapsed} />
       </div>
     </div>
   )
+}
+
+function DraftBlocks({ elapsed }: { elapsed: number }) {
+  return bodyDraftTimed.blocks.map(({ block, segments }, index) => {
+    const visible = segments.map((group) => group.filter((word) => word.delay <= elapsed))
+    if (!visible.some((group) => group.length > 0)) return null
+    if (block.kind === 'h2')
+      return (
+        <h2 key={index} className="pt-1 text-lg">
+          <DraftWords segments={visible[0] ?? []} />
+        </h2>
+      )
+    if (block.kind === 'ul')
+      return (
+        <ul key={index} className="flex list-disc flex-col gap-1 pl-5">
+          {visible
+            .filter((item) => item.length > 0)
+            .map((item, itemIndex) => (
+              <li key={itemIndex}>
+                <DraftWords segments={item} />
+              </li>
+            ))}
+        </ul>
+      )
+    if (block.kind === 'code')
+      return (
+        <pre
+          key={index}
+          className="rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 whitespace-pre"
+        >
+          {visible
+            .filter((line) => line.length > 0)
+            .map((line, lineIndex) => (
+              <div key={lineIndex}>
+                <DraftWords segments={line} />
+              </div>
+            ))}
+        </pre>
+      )
+    return (
+      <p key={index}>
+        <DraftWords segments={visible[0] ?? []} />
+      </p>
+    )
+  })
 }
 
 function BodyField({ writing, elapsed }: { writing: boolean; elapsed: number | null }) {
@@ -1128,6 +1137,79 @@ function SideColumn({
   )
 }
 
+const siteLoadingDuration = 600
+const siteUrl = 'acme.com/blog/introducing-acme-mcp'
+
+function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: number | null }) {
+  const loaded = elapsed >= siteLoadingDuration
+  return (
+    <div
+      data-demo-site-preview
+      className="absolute inset-0 flex flex-col p-6 transition-opacity duration-300 starting:opacity-0"
+    >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background shadow-sm">
+        <div className="relative flex h-10 shrink-0 items-center gap-2 border-b bg-muted/40 px-3">
+          <span className="flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded-md bg-background px-2 text-xs text-muted-foreground">
+            <GlobeLockIcon className="size-3.5 shrink-0" />
+            <span data-demo-site-address className="truncate">
+              {siteUrl}
+            </span>
+            <span
+              data-demo-site-draft
+              className="ml-auto rounded-sm bg-amber-500/15 px-1 py-px text-[10px] leading-none text-amber-700 dark:text-amber-300"
+            >
+              Draft
+            </span>
+          </span>
+          <RotateCwIcon className="size-3.5 text-muted-foreground" />
+          {!loaded && (
+            <span
+              className={cn('absolute bottom-0 left-0 h-0.5 bg-foreground/70', styles.siteProgress)}
+            />
+          )}
+        </div>
+        <div
+          data-demo-site-page
+          data-state={loaded ? 'loaded' : 'loading'}
+          className="min-h-0 flex-1 overflow-hidden bg-white text-neutral-900"
+        >
+          {loaded && <SitePage bodyElapsed={bodyElapsed} />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
+  return (
+    <div className={cn('flex flex-col', styles.streamCard)}>
+      <div className="flex h-12 items-center justify-between border-b border-neutral-200 px-6 text-xs text-neutral-600">
+        <span className="flex items-center gap-2 text-sm font-medium text-neutral-900">
+          <GeneratedAvatar name="Acme Inc" size={18} />
+          Acme
+        </span>
+        <span className="flex gap-5">
+          <span>Product</span>
+          <span>Docs</span>
+          <span className="text-neutral-900">Blog</span>
+        </span>
+      </div>
+      <article className="mx-auto flex w-full max-w-[560px] flex-col gap-4 px-6 pt-8">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-neutral-500">Nov 5, 2026 · Abyan</span>
+          <h1 className="text-2xl tracking-tight">Introducing Acme MCP</h1>
+        </div>
+        <div className="relative aspect-[2/1] overflow-hidden rounded-lg">
+          <CoverArt />
+        </div>
+        <div className="flex flex-col gap-2.5 leading-6">
+          {bodyElapsed !== null && <DraftBlocks elapsed={bodyElapsed} />}
+        </div>
+      </article>
+    </div>
+  )
+}
+
 const roomForAgentTab = 40
 
 function useScrollToSeo(progress: number) {
@@ -1158,6 +1240,7 @@ export function EditorView({
   bodyElapsed,
   seoElapsed,
   socialImage,
+  previewElapsed,
 }: {
   shown: boolean
   categories: number
@@ -1173,8 +1256,10 @@ export function EditorView({
   bodyElapsed: number | null
   seoElapsed: number | null
   socialImage: CoverState
+  previewElapsed: number | null
 }) {
   const content = useScrollToSeo(scrollProgress)
+  const previewing = previewElapsed !== null
   return (
     <div
       data-demo-editor
@@ -1195,22 +1280,34 @@ export function EditorView({
           steps={researchSteps}
           researchHovered={researchHovered}
           researchDocked={researchPanelOpen}
+          previewing={previewing}
         />
-        <div data-demo-editor-scroll ref={content} className="relative flex items-start gap-6 p-6">
-          <MainColumn
-            writerOnBody={writerOnBody}
-            bodyElapsed={bodyElapsed}
-            seoElapsed={seoElapsed}
-            socialImage={socialImage}
-          />
-          <SideColumn
-            writerOnCategories={writerOnCategories}
-            writerOnTags={writerOnTags}
-            categoriesShown={categories}
-            tagsShown={tags}
-            cover={cover}
-            bodyDone={bodyElapsed !== null && bodyElapsed >= bodyDraftDuration}
-          />
+        <div className="relative min-h-0 flex-1">
+          <div
+            data-demo-editor-scroll
+            data-hidden={previewing}
+            ref={content}
+            className={cn(
+              'relative flex items-start gap-6 p-6 transition-opacity duration-300',
+              previewing && 'opacity-0',
+            )}
+          >
+            <MainColumn
+              writerOnBody={writerOnBody}
+              bodyElapsed={bodyElapsed}
+              seoElapsed={seoElapsed}
+              socialImage={socialImage}
+            />
+            <SideColumn
+              writerOnCategories={writerOnCategories}
+              writerOnTags={writerOnTags}
+              categoriesShown={categories}
+              tagsShown={tags}
+              cover={cover}
+              bodyDone={bodyElapsed !== null && bodyElapsed >= bodyDraftDuration}
+            />
+          </div>
+          {previewing && <SitePreview elapsed={previewElapsed} bodyElapsed={bodyElapsed} />}
         </div>
       </div>
       <ResearchPanel open={researchPanelOpen} steps={researchSteps} />
