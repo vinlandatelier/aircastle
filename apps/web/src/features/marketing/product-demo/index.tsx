@@ -416,7 +416,7 @@ const cursorSpots = {
   row: { left: 320, top: 218 },
   research: { left: 700, top: 112 },
   decision: { left: 1045, top: 518 },
-  editor: { left: 430, top: 430 },
+  editor: { left: 880, top: 430 },
   preview: { left: 790, top: 112 },
 } as const
 

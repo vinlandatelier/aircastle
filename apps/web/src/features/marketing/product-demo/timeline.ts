@@ -159,14 +159,10 @@ const scrollAfterEditor = decisionClickEndsAfterEditor + scrollDuringCursorTrave
 const seoStartsAfterEditor = scrollAfterEditor + seoStartsAfterScroll
 const researchDoneAfterEditor = researchLog.at(-1)?.at ?? 0
 const bodyDoneAfterEditor = researchDoneAfterEditor + bodyDraftDuration
-const seoDoneAfterEditor = seoStartsAfterEditor + seoTiming.done
 const socialImageGeneratingAfterEditor = scrollAfterEditor + 300
 const socialImageDoneAfterEditor = seoStartsAfterEditor + seoTiming.metaTitleTyped
 const previewCursorTravel = 1400
-const previewCursorMovesAfterEditor = Math.max(
-  seoDoneAfterEditor,
-  bodyDoneAfterEditor - previewCursorTravel / 2,
-)
+const previewCursorMovesAfterEditor = socialImageDoneAfterEditor
 const previewCursorArrivesAfterEditor = previewCursorMovesAfterEditor + previewCursorTravel
 const previewClickAfterEditor = previewCursorArrivesAfterEditor + 500
 const previewClickEndsAfterEditor = previewClickAfterEditor + clickDuration

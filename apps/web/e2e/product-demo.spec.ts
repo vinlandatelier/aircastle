@@ -1187,7 +1187,7 @@ test('the preview plays a little faster than its timeline, opening the editor be
   await expect(editor).toHaveAttribute('data-state', 'shown')
 })
 
-test('the cursor heads for Preview once SEO is done, as Thorfinn finishes the body', async ({
+test('the cursor heads for Preview once the social image is done, while SEO keeps typing', async ({
   page,
 }) => {
   await page.clock.install({ time: 0 })
@@ -1197,45 +1197,44 @@ test('the cursor heads for Preview once SEO is done, as Thorfinn finishes the bo
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
   await frame.scrollIntoViewIfNeeded()
   const cursor = frame.locator('[data-demo-cursor]')
+  const panel = frame.locator('[data-demo-research-panel]')
   const seo = frame.locator('[data-demo-field="seo"]')
-  const title = seo.locator('[data-demo-field="meta-title"]')
   const social = seo.locator('[data-demo-field="social-image"]')
   const authors = frame.locator('[data-demo-field="authors"]')
   const preview = frame.locator('[data-demo-preview]')
-  const complete = 'Introducing Acme MCP: connect Acme to your AI tools'
 
   await page.clock.runFor(story(16000))
   for (
     let tick = 0;
-    tick < 120 && (await title.locator('[data-demo-seo-value]').textContent()) !== complete;
-    tick += 1
-  )
-    await page.clock.runFor(story(50))
-  await expect(title.locator('[data-demo-seo-value]')).toHaveText(complete)
-  await expect(social).toHaveAttribute('data-empty', 'false')
-  await expect(social.locator('[data-demo-agent-tab]')).toHaveAttribute('data-active', 'false')
-
-  await page.waitForTimeout(1600)
-  const settled = await authors.boundingBox()
-  for (
-    let tick = 0;
-    tick < 80 && (await cursor.getAttribute('data-target')) !== 'preview';
+    tick < 120 && (await cursor.getAttribute('data-target')) !== 'editor';
     tick += 1
   )
     await page.clock.runFor(story(100))
+  await page.clock.runFor(story(1500))
+  await expect(cursor).toHaveAttribute('data-target', 'editor')
+  const restBox = await cursor.boundingBox()
+  const panelBox = await panel.boundingBox()
+  if (!restBox || !panelBox) throw new Error('Cursor or panel is not laid out')
+  expect(restBox.x).toBeLessThan(panelBox.x)
+  expect(restBox.x).toBeGreaterThan(panelBox.x - 120)
+
+  for (let tick = 0; tick < 60 && (await social.getAttribute('data-empty')) === 'true'; tick += 1)
+    await page.clock.runFor(story(50))
+  await expect(social).toHaveAttribute('data-empty', 'false')
   await expect(cursor).toHaveAttribute('data-target', 'preview')
   await expect(cursor).toHaveAttribute('data-state', 'moving')
-  await expect(seo.locator('[data-demo-agent-tab][data-active="true"]')).toHaveCount(0)
+  await expect(seo.locator('[data-demo-agent-tab][data-active="true"]')).toHaveCount(1)
+  await expect(seo.locator('[data-demo-field="focus-keyword"]')).toHaveAttribute(
+    'data-empty',
+    'true',
+  )
 
+  await page.waitForTimeout(1600)
+  const settled = await authors.boundingBox()
   for (let tick = 0; tick < 30 && (await cursor.getAttribute('data-state')) === 'moving'; tick += 1)
     await page.clock.runFor(story(100))
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
-  await expect(frame.locator('[data-demo-field="body"] [data-demo-agent-tab]')).toHaveAttribute(
-    'data-active',
-    'false',
-  )
-  await expect(frame.locator('[data-demo-field="reading-time"]')).toContainText('min read')
   const cursorBox = await cursor.boundingBox()
   const previewBox = await preview.boundingBox()
   if (!cursorBox || !previewBox) throw new Error('Cursor or Preview is not laid out')
