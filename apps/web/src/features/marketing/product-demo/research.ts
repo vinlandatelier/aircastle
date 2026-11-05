@@ -118,7 +118,7 @@ export const researchLog: readonly ResearchEntry[] = [
     text: 'Nothing in the docs. Worth flagging, since readers will need a setup guide to follow from the post.',
   },
   {
-    at: 4600,
+    at: 4300,
     kind: 'source',
     source: {
       url: 'acme.com/changelog',
@@ -128,12 +128,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 5200,
+    at: 4500,
     kind: 'thought',
     text: 'The changelog still says beta while the PR ships the remote server. Checking the reference servers to describe the transport correctly.',
   },
   {
-    at: 5900,
+    at: 4700,
     kind: 'source',
     source: {
       url: 'github.com/modelcontextprotocol/servers',
@@ -143,18 +143,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 6200,
+    at: 4900,
     kind: 'thought',
     text: 'Remote servers use HTTP. The transports page should say which one to recommend.',
   },
   {
-    at: 6450,
-    kind: 'handoff',
-    to: 'Air',
-    task: 'draft “Connect to Acme MCP” in Docs',
-  },
-  {
-    at: 6600,
+    at: 5100,
     kind: 'source',
     source: {
       url: 'modelcontextprotocol.io/docs/concepts/transports',
@@ -164,12 +158,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 7000,
+    at: 5300,
     kind: 'thought',
     text: 'Streamable HTTP it is. Acme’s README should have the exact setup steps for the post.',
   },
   {
-    at: 7350,
+    at: 5500,
     kind: 'source',
     source: {
       url: 'github.com/acme/app/blob/main/mcp/README.md',
@@ -179,12 +173,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 7550,
+    at: 5700,
     kind: 'thought',
     text: 'Setup needs a scoped token. Checking the launch plan for tone and audience.',
   },
   {
-    at: 7750,
+    at: 5900,
     kind: 'source',
     source: {
       url: 'notion.so/acme/mcp-launch-plan',
@@ -194,12 +188,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 8100,
+    at: 6100,
     kind: 'thought',
     text: 'Lead with outcomes, not protocol. One open question from the plan is rate limits.',
   },
   {
-    at: 8400,
+    at: 6300,
     kind: 'source',
     source: {
       url: 'linear.app/acme/issue/ACM-1302',
@@ -209,12 +203,18 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 8650,
+    at: 6450,
+    kind: 'handoff',
+    to: 'Air',
+    task: 'draft “Connect to Acme MCP” in Docs',
+  },
+  {
+    at: 6580,
     kind: 'thought',
     text: 'Rate limits ship later, so the post shouldn’t promise them. One last check on where MCP came from for the intro.',
   },
   {
-    at: 8900,
+    at: 6720,
     kind: 'source',
     source: {
       url: 'anthropic.com/news/model-context-protocol',
@@ -224,7 +224,7 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 9350,
+    at: 6850,
     kind: 'synthesis',
     artifacts: [
       { name: 'Research brief.md', summary: 'Key facts, setup steps and sources for the post' },

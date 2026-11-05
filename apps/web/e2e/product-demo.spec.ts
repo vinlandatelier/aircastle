@@ -130,7 +130,9 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await page.clock.runFor(story(1500))
   await expect(typed).toHaveText(prompt)
   await expect(shortcut).toHaveAttribute('data-state', 'hidden')
-  await page.clock.runFor(story(200))
+  const send = dialog.locator('[data-demo-send]')
+  for (let tick = 0; tick < 20 && (await send.getAttribute('data-pressed')) !== 'true'; tick += 1)
+    await page.clock.runFor(story(50))
   await expect(shortcut).toHaveAttribute('data-state', 'shown')
   await expect(shortcut).toContainText('↵')
   await expect(shortcut).not.toContainText('⌘')
@@ -704,11 +706,11 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const stepsNow = await panel.locator('[data-demo-research-step]').count()
   await page.clock.runFor(story(1500))
   expect(await panel.locator('[data-demo-research-step]').count()).toBeGreaterThan(stepsNow)
+  await expect(panel.locator('[data-demo-research-pending]')).toHaveText(
+    /Thinking…|Reading|Searching|Synthesising/,
+  )
 
-  await page.clock.runFor(story(1400))
-  await expect(panel.locator('[data-demo-research-pending]')).toContainText('Thinking…')
-
-  await page.clock.runFor(story(5300))
+  await page.clock.runFor(story(6700))
   await expect(panel.locator('[data-demo-research-step]')).toHaveCount(12)
   const reply = panel.locator('[data-demo-research-reply]')
   const words = reply.locator('[data-demo-reply-word]')
@@ -1361,7 +1363,28 @@ test('clicking Preview swaps the editor for the Acme site, address bar first, th
   await expect(sitePage.locator('[data-demo-cover-title]')).toHaveText('Introducing Acme MCP')
   const words = sitePage.locator('[data-demo-draft-word]')
   const early = await words.count()
-  expect(early).toBeGreaterThan(0)
+  expect(early).toBeGreaterThan(250)
   await page.clock.runFor(story(1000))
-  expect(await words.count()).toBeGreaterThan(early)
+  expect(await words.count()).toBe(early)
+})
+
+test('Thorfinn has started the body by the time the editor scrolls down', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const editor = frame.locator('[data-demo-editor]')
+  const words = frame.locator('[data-demo-field="body"] [data-demo-draft-word]')
+  await page.clock.runFor(story(14000))
+  for (
+    let tick = 0;
+    tick < 80 && (await editor.getAttribute('data-scrolled')) !== 'true';
+    tick += 1
+  )
+    await page.clock.runFor(story(50))
+  await expect(editor).toHaveAttribute('data-scrolled', 'true')
+  expect(await words.count()).toBeGreaterThan(0)
+  await expect(frame.locator('[data-demo-research-panel]')).toContainText('Researched 12 sources')
 })

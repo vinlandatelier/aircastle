@@ -76,7 +76,7 @@ const bodyDraft: readonly DraftBlock[] = [
     text: 'MCP is an open standard that Anthropic introduced in November 2024. To try it now, create a token and add mcp.acme.com to your client.',
   },
 ]
-const draftStartsAfter = 600
+const draftStartsAfter = 150
 const draftWordInterval = 10
 const draftLineInterval = 45
 
