@@ -145,7 +145,7 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(agentRow).toHaveAttribute('data-agents-working', 'true')
   await expect(frame.locator('[data-demo-count]')).toHaveText('7')
   const agents = frame.locator('[data-demo-agents]')
-  await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(4)
+  await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(5)
   const tabOffset = async () => {
     const rowBox = await agentRow.locator('[data-demo-agent-row]').boundingBox()
     const agentsBox = await agents.boundingBox()
@@ -250,11 +250,11 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   await expect(agents).toHaveAttribute('data-expanded', 'true')
   await expect(agents).toContainText('Thorfinn')
   await expect(agents).toContainText('Canute')
-  await expect(agents).toContainText('and 2 others are working')
-  await expect(agents).not.toContainText('+2')
+  await expect(agents).toContainText('and 3 others are working')
+  await expect(agents).not.toContainText('+3')
   await expect(agents.getByText('Writing Agent', { exact: true })).toHaveCount(1)
   await expect(agents.getByText('Research Agent', { exact: true })).toHaveCount(1)
-  await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(4)
+  await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(5)
   const cursorOnRow = async () => {
     const cursorBox = await cursor.boundingBox()
     const rowBox = await row.boundingBox()
@@ -807,13 +807,14 @@ test('the preview header has an Ask Air split button with an agent menu', async 
   const avatarBox = await options.nth(1).locator('svg').first().boundingBox()
   const mascotBox = await optionMascot.boundingBox()
   expect(mascotBox?.width).toBe(avatarBox?.width)
-  await expect(options).toHaveCount(5)
+  await expect(options).toHaveCount(6)
   const expected = [
     ['Ask Air', 'Orchestrator'],
     ['Ask Thorfinn', 'Writing Agent'],
     ['Ask Canute', 'Research Agent'],
     ['Ask Askeladd', 'SEO Agent'],
     ['Ask Bjorn', 'Review Agent'],
+    ['Ask Einar', 'Design Agent'],
   ] as const
   for (const [index, [name, role]] of expected.entries()) {
     await expect(options.nth(index).locator('[data-demo-ask-name]')).toHaveText(name)
@@ -914,4 +915,53 @@ test('Thorfinn streams a body draft once Canute’s research is done', async ({ 
     return last && end ? end.bottom <= box.bottom + 1 && end.top >= box.top : false
   })
   expect(following).toBe(true)
+})
+
+test('Einar generates the cover image with the product cover skill as the editor opens', async ({
+  page,
+}) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const editor = frame.locator('[data-demo-editor]')
+  for (let tick = 0; tick < 200; tick += 1) {
+    if ((await editor.getAttribute('data-state')) === 'shown') break
+    await page.clock.runFor(100)
+  }
+  await expect(editor).toHaveAttribute('data-state', 'shown')
+  const field = frame.locator('[data-demo-field="cover-image"]')
+  const tab = field.locator('[data-demo-agent-tab]')
+  const cover = field.locator('[data-demo-cover]')
+  await expect(tab).toHaveAttribute('data-active', 'true')
+  await expect(tab).toContainText('Einar')
+  await expect(tab.getByText('Design Agent', { exact: true })).toBeVisible()
+  const status = field.locator('[data-demo-cover-status]')
+  await expect(status).toHaveAttribute('data-active', 'true')
+  await expect(status).toHaveText('Using/create-default-product-cover')
+  await expect(status.locator('code')).toHaveText('/create-default-product-cover')
+  const fits = await field.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    return [...element.querySelectorAll('[data-demo-agent-tab], [data-demo-cover-status]')].every(
+      (child) => {
+        const box = child.getBoundingClientRect()
+        return box.left >= bounds.left && box.right <= bounds.right
+      },
+    )
+  })
+  expect(fits).toBe(true)
+  await expect(cover).toHaveCount(0)
+
+  await page.clock.runFor(1200)
+  await expect(cover).toHaveAttribute('data-state', 'generating')
+  await expect(tab).toHaveAttribute('data-active', 'true')
+
+  await page.clock.runFor(3500)
+  await expect(cover).toHaveAttribute('data-state', 'done')
+  await expect(tab).toHaveAttribute('data-active', 'false')
+  await expect(status).toHaveAttribute('data-active', 'false')
+  await expect(cover).toContainText('Acme MCP')
+  await expect(field).toHaveAttribute('data-empty', 'false')
 })

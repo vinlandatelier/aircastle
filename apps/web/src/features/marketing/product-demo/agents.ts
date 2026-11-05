@@ -8,9 +8,10 @@ export const thorfinn: DemoAgent = { name: 'Thorfinn', role: 'Writing Agent' }
 export const canute: DemoAgent = { name: 'Canute', role: 'Research Agent' }
 export const askeladd: DemoAgent = { name: 'Askeladd', role: 'SEO Agent' }
 export const bjorn: DemoAgent = { name: 'Bjorn', role: 'Review Agent' }
+export const einar: DemoAgent = { name: 'Einar', role: 'Design Agent' }
 
 /** The agents working on "Introducing Acme MCP", in the order they are named. */
-export const workingAgents: readonly DemoAgent[] = [thorfinn, canute, askeladd, bjorn]
+export const workingAgents: readonly DemoAgent[] = [thorfinn, canute, askeladd, bjorn, einar]
 
 /** Every agent in the preview, orchestrator first. */
 export const allAgents: readonly DemoAgent[] = [orchestrator, ...workingAgents]

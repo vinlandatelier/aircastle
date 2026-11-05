@@ -36,6 +36,8 @@ const decisionHoverDuration = 400
 const decisionClickDuration = 220
 const decisionAnsweredAfterClick = 150
 const tagsStartAfterArriving = 500
+const coverGeneratingAfterEditor = 900
+const coverDoneAfterEditor = 4200
 const writerLeavesCategoriesAfterEditor =
   categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
 const writerReachesTagsAfterEditor = writerLeavesCategoriesAfterEditor + moveBetweenFields
@@ -67,6 +69,8 @@ export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'stil
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
 export type CursorTarget = 'rest' | 'row' | 'research' | 'decision'
+/** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
+export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
 /** Everything the preview shows at one moment. */
 export type Frame = {
@@ -88,6 +92,7 @@ export type Frame = {
   cursorTarget: CursorTarget
   researchHovered: boolean
   researchPanelOpen: boolean
+  cover: CoverState
 }
 
 /** The still frame shown when motion is reduced. */
@@ -110,6 +115,7 @@ export const stillFrame: Frame = {
   cursorTarget: 'rest',
   researchHovered: false,
   researchPanelOpen: false,
+  cover: 'idle',
 }
 
 function chipsArrived(sinceFirst: number, total: number) {
@@ -136,6 +142,13 @@ function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < decisionClickAfterEditor) return 'hovering'
   if (sinceEditor < decisionClickEndsAfterEditor) return 'clicking'
   return 'still'
+}
+
+function coverAt(sinceEditor: number, inEditor: boolean): CoverState {
+  if (!inEditor) return 'idle'
+  if (sinceEditor < coverGeneratingAfterEditor) return 'starting'
+  if (sinceEditor < coverDoneAfterEditor) return 'generating'
+  return 'done'
 }
 
 function typedAt(elapsed: number) {
@@ -212,5 +225,6 @@ export function frameAt(elapsed: number): Frame {
       elapsed - editorOpensAt < writerLeavesTagsAfterEditor,
     writerOnBody: elapsed - editorOpensAt >= writerReachesBodyAfterEditor,
     researchSteps: researchStepsAt(sinceEditor),
+    cover: coverAt(sinceEditor, inEditor),
   }
 }

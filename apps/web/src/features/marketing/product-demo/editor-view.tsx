@@ -25,7 +25,7 @@ import {
   PlusIcon,
   type LucideIcon,
 } from 'lucide-react'
-import { SiMarkdown } from '@icons-pack/react-simple-icons'
+import { SiMarkdown, SiModelcontextprotocol } from '@icons-pack/react-simple-icons'
 import { cn } from 'cn'
 import styles from './product-demo.module.css'
 import {
@@ -37,8 +37,9 @@ import {
   type Artifact,
   type ResearchEntry,
 } from './research'
-import { canute, orchestrator, thorfinn } from './agents'
+import { canute, einar, orchestrator, thorfinn } from './agents'
 import { MentionText } from './mention'
+import type { CoverState } from './timeline'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
 import {
@@ -1031,16 +1032,79 @@ function MainColumn({ writerOnBody, drafting }: { writerOnBody: boolean; draftin
   )
 }
 
+function GeneratedCover({ developing }: { developing: boolean }) {
+  return (
+    <div
+      data-demo-cover
+      data-state={developing ? 'generating' : 'done'}
+      className="relative aspect-video overflow-hidden rounded-md bg-[#0b0b10]"
+    >
+      <div className={cn('absolute inset-0', styles.coverArt, developing && styles.coverDevelop)}>
+        <div className={cn('absolute inset-0', styles.coverGrid)} />
+        <div className={cn('absolute inset-0', styles.coverGlow)} />
+        <div className="relative flex h-full flex-col items-center justify-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-lg border border-white/15 bg-white/5">
+              <GeneratedAvatar name="Acme Inc" size={20} />
+            </span>
+            <span className="w-6 border-t border-dashed border-white/30" />
+            <span className="flex size-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white">
+              <SiModelcontextprotocol className="size-[18px]" />
+            </span>
+          </div>
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-sm font-medium tracking-tight text-white">Acme MCP</span>
+            <span className="text-[9px] text-white/55">Connect Acme to your AI tools</span>
+          </div>
+        </div>
+      </div>
+      {developing && <div className={cn('absolute inset-0', styles.coverSheen)} />}
+    </div>
+  )
+}
+
+function CoverField({ state }: { state: CoverState }) {
+  const working = state === 'starting' || state === 'generating'
+  return (
+    <Field name="cover-image" label="Cover image" empty={state !== 'done'}>
+      <div className="relative rounded-md">
+        {state === 'generating' || state === 'done' ? (
+          <GeneratedCover developing={state === 'generating'} />
+        ) : (
+          <MediaPlaceholder hint="Drop an image" className="aspect-video" />
+        )}
+        <span
+          data-demo-cover-status
+          data-active={working}
+          className={cn(
+            'absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] whitespace-nowrap text-white transition-[opacity,translate] duration-500',
+            styles.agentTab,
+            working ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0',
+          )}
+        >
+          Using
+          <code className="rounded-sm bg-white/15 px-1 font-mono text-[10px]">
+            /create-default-product-cover
+          </code>
+        </span>
+        <AgentPresence agent={einar} active={working} />
+      </div>
+    </Field>
+  )
+}
+
 function SideColumn({
   writerOnCategories,
   writerOnTags,
   categoriesShown,
   tagsShown,
+  cover,
 }: {
   writerOnCategories: boolean
   writerOnTags: boolean
   categoriesShown: number
   tagsShown: number
+  cover: CoverState
 }) {
   return (
     <div className="flex w-[300px] shrink-0 flex-col gap-6 rounded-lg border p-4">
@@ -1081,9 +1145,7 @@ function SideColumn({
           ))}
         </Multiselect>
       </Field>
-      <Field name="cover-image" label="Cover image" empty>
-        <MediaPlaceholder hint="Drop an image" className="aspect-video" />
-      </Field>
+      <CoverField state={cover} />
       <Field name="publish-date" label="Publish date" empty>
         <div className={cn(control, 'justify-between text-muted-foreground')}>
           Not scheduled
@@ -1108,6 +1170,7 @@ export function EditorView({
   researchSteps,
   researchHovered,
   researchPanelOpen,
+  cover,
 }: {
   shown: boolean
   categories: number
@@ -1118,6 +1181,7 @@ export function EditorView({
   researchSteps: number
   researchHovered: boolean
   researchPanelOpen: boolean
+  cover: CoverState
 }) {
   return (
     <div
@@ -1146,6 +1210,7 @@ export function EditorView({
             writerOnTags={writerOnTags}
             categoriesShown={categories}
             tagsShown={tags}
+            cover={cover}
           />
         </div>
       </div>

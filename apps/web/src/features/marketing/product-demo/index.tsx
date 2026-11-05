@@ -537,7 +537,7 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
                       <AgentLabel role={canute.role} />
                     </span>
                   </span>
-                  <span>and 2 others are working</span>
+                  <span>and {workingAgents.length - 2} others are working</span>
                 </span>
               </span>
             </span>
@@ -677,6 +677,7 @@ export function ProductDemo() {
                 researchSteps={frame.researchSteps}
                 researchHovered={frame.researchHovered}
                 researchPanelOpen={frame.researchPanelOpen}
+                cover={frame.cover}
               />
             </div>
           </div>
