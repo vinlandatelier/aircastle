@@ -1032,37 +1032,42 @@ function MainColumn({ writerOnBody, drafting }: { writerOnBody: boolean; draftin
   )
 }
 
+function CoverArt() {
+  return (
+    <div className={cn('absolute inset-0 bg-[#5f51d6]', styles.coverReveal)}>
+      <div className={cn('absolute inset-0', styles.coverBloom)} />
+      <div className={cn('absolute inset-0', styles.coverGrain)} />
+      <div className="relative flex h-full flex-col items-center justify-center gap-2.5">
+        <div className="flex items-center gap-2 text-white">
+          <span data-demo-cover-acme className="flex">
+            <GeneratedAvatar name="Acme Inc" size={20} />
+          </span>
+          <span data-demo-cover-slash className="text-lg leading-none font-light text-white/60">
+            /
+          </span>
+          <SiModelcontextprotocol data-demo-cover-mcp className="size-5" />
+        </div>
+        <div className="flex flex-col items-center gap-0.5">
+          <span data-demo-cover-title className="text-sm font-medium tracking-tight text-white">
+            Introducing Acme MCP
+          </span>
+          <span data-demo-cover-date className="text-[9px] text-white/65">
+            Nov 5, 2026
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function GeneratedCover({ developing }: { developing: boolean }) {
   return (
     <div
       data-demo-cover
       data-state={developing ? 'generating' : 'done'}
-      className="relative aspect-video overflow-hidden rounded-md bg-[#0b0b10]"
+      className="relative aspect-video overflow-hidden rounded-md bg-muted"
     >
-      <div className={cn('absolute inset-0', styles.coverArt, developing && styles.coverDevelop)}>
-        <div className={cn('absolute inset-0', styles.coverGlow)} />
-        <div className={cn('absolute inset-0', styles.coverGrain)} />
-        <div className="relative flex h-full flex-col items-center justify-center gap-2.5">
-          <div className="flex items-center gap-2 text-white">
-            <span data-demo-cover-acme className="flex">
-              <GeneratedAvatar name="Acme Inc" size={20} />
-            </span>
-            <span data-demo-cover-slash className="text-lg leading-none font-light text-white/30">
-              /
-            </span>
-            <SiModelcontextprotocol data-demo-cover-mcp className="size-5" />
-          </div>
-          <div className="flex flex-col items-center gap-0.5">
-            <span data-demo-cover-title className="text-sm font-medium tracking-tight text-white">
-              Introducing Acme MCP
-            </span>
-            <span data-demo-cover-date className="text-[9px] text-white/45">
-              Nov 5, 2026
-            </span>
-          </div>
-        </div>
-      </div>
-      {developing && <div className={cn('absolute inset-0', styles.coverSheen)} />}
+      {developing ? <div className={cn('absolute inset-0', styles.coverSheen)} /> : <CoverArt />}
     </div>
   )
 }
