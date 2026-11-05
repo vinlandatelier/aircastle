@@ -40,7 +40,8 @@ import {
 import { askeladd, canute, einar, orchestrator, thorfinn, type DemoAgent } from './agents'
 import { MentionText } from './mention'
 import { PersonAvatar } from './person'
-import type { CoverState } from './timeline'
+import { seoTiming, type CoverState } from './timeline'
+import { bodyDraftDuration, bodyDraftTimed, bodyReadingTime, type DraftSegment } from './body-draft'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
 import {
@@ -705,134 +706,11 @@ function TopBar({
   )
 }
 
-type DraftBlock =
-  | { kind: 'h2' | 'p'; text: string }
-  | { kind: 'ul'; items: readonly string[] }
-  | { kind: 'code'; lines: readonly string[] }
-
-const bodyDraft: readonly DraftBlock[] = [
-  {
-    kind: 'p',
-    text: 'Acme now runs a remote MCP server at mcp.acme.com. Connect Claude, Cursor or another MCP client, and your assistant can search, read and update your Acme collections from the chat.',
-  },
-  {
-    kind: 'p',
-    text: 'MCP support in Acme used to mean running a local server, and it was in beta. The remote server replaces it. There is nothing to install, and each connection reaches only the collections you allow.',
-  },
-  { kind: 'h2', text: 'What you can do' },
-  {
-    kind: 'p',
-    text: 'Ask your assistant to work with your content in plain language. For example:',
-  },
-  {
-    kind: 'ul',
-    items: [
-      'Find every draft that mentions pricing and list who owns it.',
-      "Summarise this week's changes to the Docs collection.",
-      'Turn the notes in this thread into a changelog entry.',
-    ],
-  },
-  { kind: 'p', text: 'The server gives your assistant four tools:' },
-  {
-    kind: 'ul',
-    items: [
-      '`search_entries` finds entries by text or field value.',
-      '`get_entry` reads one entry with all of its fields.',
-      '`upsert_entry` creates an entry or updates an existing one.',
-      '`list_collections` shows the collections your token can reach.',
-    ],
-  },
-  { kind: 'h2', text: 'Connect your assistant' },
-  {
-    kind: 'p',
-    text: "Create an access token in Settings under API tokens, and choose the collections it can reach. Then add the server to your client's MCP config:",
-  },
-  {
-    kind: 'code',
-    lines: [
-      '{',
-      '  "mcpServers": {',
-      '    "acme": {',
-      '      "url": "https://mcp.acme.com",',
-      '      "headers": { "Authorization": "Bearer YOUR_TOKEN" }',
-      '    }',
-      '  }',
-      '}',
-    ],
-  },
-  {
-    kind: 'p',
-    text: 'The server uses the Streamable HTTP transport from the MCP specification. Any client that supports remote MCP servers over Streamable HTTP can connect.',
-  },
-  { kind: 'h2', text: 'Security' },
-  {
-    kind: 'p',
-    text: "Every token has its own scope. A token for the Blog collection can't read or change Docs, and you can revoke a token from Settings at any time.",
-  },
-  {
-    kind: 'p',
-    text: 'Your assistant acts with the permissions of its token. Most MCP clients ask you to approve each tool call. Keep approval on for `upsert_entry`, since it writes to your content.',
-  },
-  { kind: 'h2', text: "What's next" },
-  {
-    kind: 'p',
-    text: "Configurable rate limits for MCP requests are coming in a later release. We're also adding a Connect to Acme MCP guide to the docs.",
-  },
-  {
-    kind: 'p',
-    text: 'MCP is an open standard that Anthropic introduced in November 2024. To try it now, create a token and add mcp.acme.com to your client.',
-  },
-]
-const draftStartsAfter = 600
-const draftWordInterval = 14
-const draftLineInterval = 45
-
-type DraftSegment = { text: string; delay: number }
-
-function segmentWords(text: string, start: number) {
-  return text.split(' ').map((word, index, all) => ({
-    text: index < all.length - 1 ? `${word} ` : word,
-    delay: start + index * draftWordInterval,
-  }))
-}
-
-const bodyDraftTimed = bodyDraft.reduce<{
-  at: number
-  blocks: { block: DraftBlock; segments: DraftSegment[][] }[]
-}>(
-  (timed, block) => {
-    const groups =
-      block.kind === 'ul'
-        ? block.items
-        : block.kind === 'code'
-          ? block.lines.map((line) => [line])
-          : [block.text]
-    let at = timed.at
-    const segments = groups.map((group) => {
-      if (block.kind === 'code') {
-        const line = [{ text: String(group), delay: at }]
-        at += draftLineInterval
-        return line
-      }
-      const words = segmentWords(String(group), at)
-      at += words.length * draftWordInterval
-      return words
-    })
-    return { at, blocks: [...timed.blocks, { block, segments }] }
-  },
-  { at: draftStartsAfter, blocks: [] },
-)
-
 function DraftWords({ segments }: { segments: DraftSegment[] }) {
-  return segments.map(({ text, delay }, index) => {
+  return segments.map(({ text }, index) => {
     const code = /^`([^`]+)`(.*)$/s.exec(text)
     return (
-      <span
-        key={index}
-        data-demo-draft-word
-        className={styles.streamWord}
-        style={{ animationDelay: `${delay}ms` }}
-      >
+      <span key={index} data-demo-draft-word className={styles.streamWord}>
         {code ? (
           <>
             <code className="rounded-sm bg-muted px-1 font-mono text-[0.85em]">{code[1]}</code>
@@ -846,25 +724,29 @@ function DraftWords({ segments }: { segments: DraftSegment[] }) {
   })
 }
 
-function BodyDraft() {
+function BodyDraft({ elapsed }: { elapsed: number }) {
   return (
     <div data-demo-body-viewport className="relative h-72 overflow-hidden">
       <div data-demo-body-draft className="flex flex-col gap-2.5 px-4 py-4 leading-6">
         {bodyDraftTimed.blocks.map(({ block, segments }, index) => {
+          const visible = segments.map((group) => group.filter((word) => word.delay <= elapsed))
+          if (!visible.some((group) => group.length > 0)) return null
           if (block.kind === 'h2')
             return (
               <h2 key={index} className="pt-1 text-lg">
-                <DraftWords segments={segments[0] ?? []} />
+                <DraftWords segments={visible[0] ?? []} />
               </h2>
             )
           if (block.kind === 'ul')
             return (
               <ul key={index} className="flex list-disc flex-col gap-1 pl-5">
-                {segments.map((item, itemIndex) => (
-                  <li key={itemIndex}>
-                    <DraftWords segments={item} />
-                  </li>
-                ))}
+                {visible
+                  .filter((item) => item.length > 0)
+                  .map((item, itemIndex) => (
+                    <li key={itemIndex}>
+                      <DraftWords segments={item} />
+                    </li>
+                  ))}
               </ul>
             )
           if (block.kind === 'code')
@@ -873,16 +755,18 @@ function BodyDraft() {
                 key={index}
                 className="rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 whitespace-pre"
               >
-                {segments.map((line, lineIndex) => (
-                  <div key={lineIndex}>
-                    <DraftWords segments={line} />
-                  </div>
-                ))}
+                {visible
+                  .filter((line) => line.length > 0)
+                  .map((line, lineIndex) => (
+                    <div key={lineIndex}>
+                      <DraftWords segments={line} />
+                    </div>
+                  ))}
               </pre>
             )
           return (
             <p key={index}>
-              <DraftWords segments={segments[0] ?? []} />
+              <DraftWords segments={visible[0] ?? []} />
             </p>
           )
         })}
@@ -891,7 +775,8 @@ function BodyDraft() {
   )
 }
 
-function BodyField({ writing, drafting }: { writing: boolean; drafting: boolean }) {
+function BodyField({ writing, elapsed }: { writing: boolean; elapsed: number | null }) {
+  const drafting = elapsed !== null
   return (
     <Field name="body" label="Body" empty={!drafting}>
       <div
@@ -921,9 +806,9 @@ function BodyField({ writing, drafting }: { writing: boolean; drafting: boolean 
           ))}
         </div>
         {drafting ? (
-          <BodyDraft />
+          <BodyDraft elapsed={elapsed} />
         ) : (
-          <div className={cn('min-h-40 px-4 py-4 leading-6', placeholder)}>
+          <div className={cn('h-72 px-4 py-4 leading-6', placeholder)}>
             Start writing, or ask agents to draft it…
           </div>
         )}
@@ -932,70 +817,116 @@ function BodyField({ writing, drafting }: { writing: boolean; drafting: boolean 
   )
 }
 
-const seoValues = {
-  metaTitle: 'Introducing Acme MCP: connect Acme to your AI tools',
-  metaDescription:
-    'Acme MCP lets Claude, Cursor and other AI tools read and update your Acme workspace. Set it up in a few minutes.',
-  focusKeyword: 'Acme MCP',
-} as const
+const seoFields = [
+  {
+    name: 'meta-title',
+    label: 'Meta title',
+    value: 'Introducing Acme MCP: connect Acme to your AI tools',
+    placeholder: 'Defaults to the post title',
+    limit: 60,
+    start: 0,
+    duration: seoTiming.metaTitleTyped,
+    leave: 1100,
+  },
+  {
+    name: 'meta-description',
+    label: 'Meta description',
+    value:
+      'Acme MCP lets Claude, Cursor and other AI tools read and update your Acme workspace. Set it up in a few minutes.',
+    placeholder: 'Defaults to the summary',
+    limit: 160,
+    start: 1100,
+    duration: 1500,
+    leave: 3000,
+  },
+  {
+    name: 'focus-keyword',
+    label: 'Focus keyword',
+    value: 'Acme MCP',
+    placeholder: 'Add a keyword',
+    start: 3000,
+    duration: 350,
+    leave: seoTiming.done,
+  },
+] as const
 
-function SeoValue({ value }: { value: string }) {
-  return <span className={styles.streamCard}>{value}</span>
+function SeoField({
+  field,
+  elapsed,
+}: {
+  field: (typeof seoFields)[number]
+  elapsed: number | null
+}) {
+  const count =
+    elapsed === null
+      ? 0
+      : Math.max(
+          0,
+          Math.min(
+            field.value.length,
+            Math.floor(((elapsed - field.start) / field.duration) * field.value.length),
+          ),
+        )
+  const active =
+    elapsed !== null && (field.start === 0 || elapsed >= field.start) && elapsed < field.leave
+  return (
+    <Field
+      name={field.name}
+      label={field.label}
+      empty={count === 0}
+      {...('limit' in field ? { aside: `${count} / ${field.limit}` } : {})}
+    >
+      <div
+        className={cn(
+          'relative transition-[border-color] duration-500',
+          field.name === 'meta-description'
+            ? 'min-h-16 rounded-md border bg-background px-3 py-2 leading-6 dark:bg-input/30'
+            : control,
+          count === 0 && placeholder,
+          active && 'border-transparent',
+        )}
+      >
+        <AgentPresence agent={askeladd} active={active} />
+        <span data-demo-seo-value>{count > 0 ? field.value.slice(0, count) : ''}</span>
+        {count === 0 && field.placeholder}
+      </div>
+    </Field>
+  )
 }
 
-function SeoGroup({ filled, agentActive }: { filled: number; agentActive: boolean }) {
+function SeoGroup({ elapsed, socialImage }: { elapsed: number | null; socialImage: CoverState }) {
+  const imageWorking = socialImage === 'starting' || socialImage === 'generating'
   return (
-    <div
-      data-demo-field="seo"
-      className={cn(
-        'relative flex flex-col gap-5 rounded-lg border p-5 transition-[border-color] duration-500',
-        agentActive && 'border-transparent',
-      )}
-    >
-      <AgentPresence agent={askeladd} active={agentActive} status="Writing metadata…" />
+    <div data-demo-field="seo" className="relative flex flex-col gap-5 rounded-lg border p-5">
       <div className="flex flex-col gap-1">
         <h4 className="font-medium">Search engine optimization</h4>
         <p className="text-xs text-muted-foreground">
           Control how this post appears in search results and link previews.
         </p>
       </div>
-      <Field
-        name="meta-title"
-        label="Meta title"
-        aside={`${filled >= 1 ? seoValues.metaTitle.length : 0} / 60`}
-        empty={filled < 1}
-      >
-        <div className={cn(control, filled < 1 && placeholder)}>
-          {filled >= 1 ? <SeoValue value={seoValues.metaTitle} /> : 'Defaults to the post title'}
-        </div>
-      </Field>
-      <Field
-        name="meta-description"
-        label="Meta description"
-        aside={`${filled >= 2 ? seoValues.metaDescription.length : 0} / 160`}
-        empty={filled < 2}
-      >
-        <div
-          className={cn(
-            'min-h-16 rounded-md border bg-background px-3 py-2 leading-6 dark:bg-input/30',
-            filled < 2 && placeholder,
-          )}
-        >
-          {filled >= 2 ? <SeoValue value={seoValues.metaDescription} /> : 'Defaults to the summary'}
-        </div>
-      </Field>
+      <SeoField field={seoFields[0]} elapsed={elapsed} />
+      <SeoField field={seoFields[1]} elapsed={elapsed} />
       <div className="grid grid-cols-2 gap-4">
-        <Field name="focus-keyword" label="Focus keyword" empty={filled < 3}>
-          <div className={cn(control, filled < 3 && placeholder)}>
-            {filled >= 3 ? <SeoValue value={seoValues.focusKeyword} /> : 'Add a keyword'}
-          </div>
-        </Field>
+        <SeoField field={seoFields[2]} elapsed={elapsed} />
         <Field name="canonical-url" label="Canonical URL" empty>
           <div className={cn(control, 'truncate', placeholder)}>Defaults to the post URL</div>
         </Field>
       </div>
-      <Field name="social-image" label="Social image" empty>
-        <MediaPlaceholder hint="1200 × 630" className="h-32" />
+      <Field name="social-image" label="Social image" empty={socialImage !== 'done'}>
+        <div className="relative rounded-md">
+          {socialImage === 'starting' || socialImage === 'idle' ? (
+            <MediaPlaceholder hint="1200 × 630" className="h-32" />
+          ) : (
+            <div className="relative h-32 overflow-hidden rounded-md bg-muted">
+              {socialImage === 'generating' ? (
+                <div className={cn('absolute inset-0', styles.coverSheen)} />
+              ) : (
+                <CoverArt />
+              )}
+            </div>
+          )}
+          <AgentPresence agent={einar} active={imageWorking} />
+        </div>
       </Field>
       <div data-demo-field="indexing" className="flex items-center justify-between gap-4">
         <span>Allow search engines to index this page</span>
@@ -1009,14 +940,14 @@ function SeoGroup({ filled, agentActive }: { filled: number; agentActive: boolea
 
 function MainColumn({
   writerOnBody,
-  drafting,
-  seoFilled,
-  seoAgentActive,
+  bodyElapsed,
+  seoElapsed,
+  socialImage,
 }: {
   writerOnBody: boolean
-  drafting: boolean
-  seoFilled: number
-  seoAgentActive: boolean
+  bodyElapsed: number | null
+  seoElapsed: number | null
+  socialImage: CoverState
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
@@ -1039,8 +970,8 @@ function MainColumn({
           A short description shown in listings
         </div>
       </Field>
-      <BodyField writing={writerOnBody} drafting={drafting} />
-      <SeoGroup filled={seoFilled} agentActive={seoAgentActive} />
+      <BodyField writing={writerOnBody} elapsed={bodyElapsed} />
+      <SeoGroup elapsed={seoElapsed} socialImage={socialImage} />
     </div>
   )
 }
@@ -1122,12 +1053,14 @@ function SideColumn({
   categoriesShown,
   tagsShown,
   cover,
+  bodyDone,
 }: {
   writerOnCategories: boolean
   writerOnTags: boolean
   categoriesShown: number
   tagsShown: number
   cover: CoverState
+  bodyDone: boolean
 }) {
   return (
     <div className="flex w-[300px] shrink-0 flex-col gap-6 rounded-lg border p-4">
@@ -1175,8 +1108,12 @@ function SideColumn({
           <CalendarIcon className="size-4" />
         </div>
       </Field>
-      <Field name="reading-time" label="Reading time" hint="Calculated from body" empty>
-        <span className="text-muted-foreground">—</span>
+      <Field name="reading-time" label="Reading time" hint="Calculated from body" empty={!bodyDone}>
+        {bodyDone ? (
+          <span className={styles.streamCard}>{bodyReadingTime}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </Field>
     </div>
   )
@@ -1184,19 +1121,16 @@ function SideColumn({
 
 const roomForAgentTab = 40
 
-function useScrollToSeo(content: React.RefObject<HTMLDivElement | null>, scrolled: boolean) {
+function useScrollToSeo(progress: number) {
+  const content = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const element = content.current
     const seo = element?.querySelector<HTMLElement>('[data-demo-field="seo"]')
-    if (!scrolled || !element || !seo) return
+    if (!element || !seo) return
     const distance = Math.max(0, seo.offsetTop - roomForAgentTab)
-    const scroll = element.animate([{ translate: '0 0' }, { translate: `0 -${distance}px` }], {
-      duration: 1400,
-      easing: 'cubic-bezier(0.45, 0, 0.25, 1)',
-      fill: 'forwards',
-    })
-    return () => scroll.cancel()
-  }, [content, scrolled])
+    element.style.translate = `0 -${distance * progress}px`
+  }, [content, progress])
+  return content
 }
 
 /** A post editor for the product preview, opened on "Introducing Acme MCP" while agents fill it in. */
@@ -1211,9 +1145,10 @@ export function EditorView({
   researchHovered,
   researchPanelOpen,
   cover,
-  scrolled,
-  seoFilled,
-  seoAgentActive,
+  scrollProgress,
+  bodyElapsed,
+  seoElapsed,
+  socialImage,
 }: {
   shown: boolean
   categories: number
@@ -1225,17 +1160,17 @@ export function EditorView({
   researchHovered: boolean
   researchPanelOpen: boolean
   cover: CoverState
-  scrolled: boolean
-  seoFilled: number
-  seoAgentActive: boolean
+  scrollProgress: number
+  bodyElapsed: number | null
+  seoElapsed: number | null
+  socialImage: CoverState
 }) {
-  const content = useRef<HTMLDivElement>(null)
-  useScrollToSeo(content, scrolled)
+  const content = useScrollToSeo(scrollProgress)
   return (
     <div
       data-demo-editor
       data-state={shown ? 'shown' : 'hidden'}
-      data-scrolled={scrolled}
+      data-scrolled={scrollProgress > 0}
       className={cn(
         'absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-card transition-[opacity,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
         shown ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0',
@@ -1255,9 +1190,9 @@ export function EditorView({
         <div data-demo-editor-scroll ref={content} className="relative flex items-start gap-6 p-6">
           <MainColumn
             writerOnBody={writerOnBody}
-            drafting={researchSteps >= researchLog.length}
-            seoFilled={seoFilled}
-            seoAgentActive={seoAgentActive}
+            bodyElapsed={bodyElapsed}
+            seoElapsed={seoElapsed}
+            socialImage={socialImage}
           />
           <SideColumn
             writerOnCategories={writerOnCategories}
@@ -1265,6 +1200,7 @@ export function EditorView({
             categoriesShown={categories}
             tagsShown={tags}
             cover={cover}
+            bodyDone={bodyElapsed !== null && bodyElapsed >= bodyDraftDuration}
           />
         </div>
       </div>

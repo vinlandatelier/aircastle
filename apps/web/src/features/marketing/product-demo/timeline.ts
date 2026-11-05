@@ -1,4 +1,5 @@
-import { docsDecisionAnsweredAt, researchStepsAt } from './research'
+import { bodyDraftDuration } from './body-draft'
+import { docsDecisionAnsweredAt, researchLog, researchStepsAt } from './research'
 
 export const prompt = "Recently shipped MCP for our app, let's announce it"
 
@@ -15,7 +16,7 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const editorDuration = 19500
+const editorDuration = 17000
 const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
@@ -37,13 +38,12 @@ const decisionClickDuration = 220
 const decisionAnsweredAfterClick = 150
 const tagsStartAfterArriving = 500
 const editorCursorTravel = 1400
-const scrollAfterCursorArrives = 200
-const seoStartsAfterScroll = 700
-const seoFirstFieldAfterStart = 500
-const seoFieldInterval = 700
-const seoFieldCount = 3
-const seoLingerAfterFilling = 1000
+const scrollDuringCursorTravel = 600
+const seoStartsAfterScroll = 900
 const coverGeneratingAfterEditor = 900
+
+/** When Askeladd's SEO fields finish typing, in milliseconds after he starts. */
+export const seoTiming = { metaTitleTyped: 700, done: 4050 } as const
 const coverDoneAfterEditor = 4200
 const writerLeavesCategoriesAfterEditor =
   categoriesStartAfterEditor + (categoryCount - 1) * chipInterval + lingerAfterFilling
@@ -75,7 +75,7 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
-export type CursorTarget = 'rest' | 'row' | 'research' | 'decision' | 'editor'
+export type CursorTarget = 'rest' | 'row' | 'research' | 'decision' | 'editor' | 'preview'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
@@ -97,12 +97,15 @@ export type Frame = {
   writerOnBody: boolean
   researchSteps: number
   cursorTarget: CursorTarget
+  cursorFrom: CursorTarget
+  cursorProgress: number
   researchHovered: boolean
   researchPanelOpen: boolean
   cover: CoverState
-  editorScrolled: boolean
-  seoFilled: number
-  seoAgentActive: boolean
+  editorScroll: number
+  bodyElapsed: number | null
+  seoElapsed: number | null
+  socialImage: CoverState
 }
 
 /** The still frame shown when motion is reduced. */
@@ -123,12 +126,15 @@ export const stillFrame: Frame = {
   writerOnBody: false,
   researchSteps: 0,
   cursorTarget: 'rest',
+  cursorFrom: 'rest',
+  cursorProgress: 1,
   researchHovered: false,
   researchPanelOpen: false,
   cover: 'idle',
-  editorScrolled: false,
-  seoFilled: 0,
-  seoAgentActive: false,
+  editorScroll: 0,
+  bodyElapsed: null,
+  seoElapsed: null,
+  socialImage: 'idle',
 }
 
 function chipsArrivedEvery(sinceFirst: number, interval: number, total: number) {
@@ -149,11 +155,35 @@ const decisionCursorArrivesAfterEditor = decisionClickAfterEditor - decisionHove
 const decisionCursorMovesAfterEditor = decisionCursorArrivesAfterEditor - decisionCursorTravel
 const decisionClickEndsAfterEditor = decisionClickAfterEditor + decisionClickDuration
 const editorCursorArrivesAfterEditor = decisionClickEndsAfterEditor + editorCursorTravel
-const scrollAfterEditor = editorCursorArrivesAfterEditor + scrollAfterCursorArrives
+const scrollAfterEditor = decisionClickEndsAfterEditor + scrollDuringCursorTravel
 const seoStartsAfterEditor = scrollAfterEditor + seoStartsAfterScroll
-const seoFirstFieldAfterEditor = seoStartsAfterEditor + seoFirstFieldAfterStart
-const seoEndsAfterEditor =
-  seoFirstFieldAfterEditor + (seoFieldCount - 1) * seoFieldInterval + seoLingerAfterFilling
+const researchDoneAfterEditor = researchLog.at(-1)?.at ?? 0
+const bodyDoneAfterEditor = researchDoneAfterEditor + bodyDraftDuration
+const seoDoneAfterEditor = seoStartsAfterEditor + seoTiming.done
+const socialImageGeneratingAfterEditor = scrollAfterEditor + 300
+const socialImageDoneAfterEditor = seoStartsAfterEditor + seoTiming.metaTitleTyped
+const previewCursorTravel = 1400
+const previewCursorMovesAfterEditor = Math.max(
+  seoDoneAfterEditor,
+  bodyDoneAfterEditor - previewCursorTravel / 2,
+)
+const previewCursorArrivesAfterEditor = previewCursorMovesAfterEditor + previewCursorTravel
+const previewClickAfterEditor = previewCursorArrivesAfterEditor + 500
+const previewClickEndsAfterEditor = previewClickAfterEditor + clickDuration
+
+const cursorMoves: readonly { at: number; from: CursorTarget; to: CursorTarget }[] = [
+  { at: cursorShownAt, from: 'rest', to: 'row' },
+  { at: editorOpensAt + researchCursorMovesAfterEditor, from: 'row', to: 'research' },
+  { at: editorOpensAt + decisionCursorMovesAfterEditor, from: 'research', to: 'decision' },
+  { at: editorOpensAt + decisionClickEndsAfterEditor, from: 'decision', to: 'editor' },
+  { at: editorOpensAt + previewCursorMovesAfterEditor, from: 'editor', to: 'preview' },
+  { at: editorClosesAt, from: 'preview', to: 'rest' },
+]
+
+function motionProgress(elapsed: number, duration: number) {
+  const t = Math.max(0, Math.min(1, elapsed / duration))
+  return t * t * t * (t * (6 * t - 15) + 10)
+}
 
 function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < researchCursorMovesAfterEditor) return 'still'
@@ -165,7 +195,18 @@ function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < decisionClickAfterEditor) return 'hovering'
   if (sinceEditor < decisionClickEndsAfterEditor) return 'clicking'
   if (sinceEditor < editorCursorArrivesAfterEditor) return 'moving'
+  if (sinceEditor < previewCursorMovesAfterEditor) return 'still'
+  if (sinceEditor < previewCursorArrivesAfterEditor) return 'moving'
+  if (sinceEditor < previewClickAfterEditor) return 'hovering'
+  if (sinceEditor < previewClickEndsAfterEditor) return 'clicking'
   return 'still'
+}
+
+function socialImageAt(sinceEditor: number, inEditor: boolean): CoverState {
+  if (!inEditor || sinceEditor < scrollAfterEditor) return 'idle'
+  if (sinceEditor < socialImageGeneratingAfterEditor) return 'starting'
+  if (sinceEditor < socialImageDoneAfterEditor) return 'generating'
+  return 'done'
 }
 
 function coverAt(sinceEditor: number, inEditor: boolean): CoverState {
@@ -188,6 +229,7 @@ function typedAt(elapsed: number) {
 export function frameAt(elapsed: number): Frame {
   const sinceEditor = elapsed - editorOpensAt
   const inEditor = elapsed >= editorOpensAt && elapsed < editorClosesAt
+  const cursorMove = cursorMoves.findLast((move) => elapsed >= move.at)
   const dialog: DialogState =
     elapsed >= dialogOpensAt && elapsed < dialogClosesAt
       ? 'open'
@@ -214,6 +256,9 @@ export function frameAt(elapsed: number): Frame {
       (inEditor &&
         sinceEditor >= decisionCursorArrivesAfterEditor - 100 &&
         sinceEditor < decisionClickEndsAfterEditor) ||
+      (inEditor &&
+        sinceEditor >= previewCursorArrivesAfterEditor - 100 &&
+        sinceEditor < previewClickEndsAfterEditor) ||
       (elapsed >= editorClosesAt && elapsed < editorClosesAt + rowsLeftAfter)
         ? 'pointer'
         : 'arrow',
@@ -229,16 +274,9 @@ export function frameAt(elapsed: number): Frame {
               : inEditor
                 ? researchCursorAt(sinceEditor)
                 : 'still',
-    cursorTarget:
-      elapsed < cursorShownAt || elapsed >= editorClosesAt
-        ? 'rest'
-        : inEditor && sinceEditor >= decisionClickEndsAfterEditor
-          ? 'editor'
-          : inEditor && sinceEditor >= decisionCursorMovesAfterEditor
-            ? 'decision'
-            : inEditor && sinceEditor >= researchCursorMovesAfterEditor
-              ? 'research'
-              : 'row',
+    cursorTarget: cursorMove?.to ?? 'rest',
+    cursorFrom: cursorMove?.from ?? 'rest',
+    cursorProgress: cursorMove ? motionProgress(elapsed - cursorMove.at, cursorTravelDuration) : 1,
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
@@ -249,14 +287,15 @@ export function frameAt(elapsed: number): Frame {
     writerOnTags:
       elapsed - editorOpensAt >= writerReachesTagsAfterEditor &&
       elapsed - editorOpensAt < writerLeavesTagsAfterEditor,
-    writerOnBody: elapsed - editorOpensAt >= writerReachesBodyAfterEditor,
+    writerOnBody: sinceEditor >= writerReachesBodyAfterEditor && sinceEditor < bodyDoneAfterEditor,
     researchSteps: researchStepsAt(sinceEditor),
     cover: coverAt(sinceEditor, inEditor),
-    editorScrolled: inEditor && sinceEditor >= scrollAfterEditor,
-    seoFilled: inEditor
-      ? chipsArrivedEvery(sinceEditor - seoFirstFieldAfterEditor, seoFieldInterval, seoFieldCount)
-      : 0,
-    seoAgentActive:
-      inEditor && sinceEditor >= seoStartsAfterEditor && sinceEditor < seoEndsAfterEditor,
+    editorScroll: inEditor ? motionProgress(sinceEditor - scrollAfterEditor, 1400) : 0,
+    bodyElapsed:
+      inEditor && sinceEditor >= researchDoneAfterEditor
+        ? sinceEditor - researchDoneAfterEditor
+        : null,
+    seoElapsed: inEditor ? sinceEditor - seoStartsAfterEditor : null,
+    socialImage: socialImageAt(sinceEditor, inEditor),
   }
 }

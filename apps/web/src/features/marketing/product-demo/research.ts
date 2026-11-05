@@ -164,12 +164,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 7300,
+    at: 7000,
     kind: 'thought',
     text: 'Streamable HTTP it is. Acme’s README should have the exact setup steps for the post.',
   },
   {
-    at: 7900,
+    at: 7350,
     kind: 'source',
     source: {
       url: 'github.com/acme/app/blob/main/mcp/README.md',
@@ -179,12 +179,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 8200,
+    at: 7550,
     kind: 'thought',
     text: 'Setup needs a scoped token. Checking the launch plan for tone and audience.',
   },
   {
-    at: 8500,
+    at: 7750,
     kind: 'source',
     source: {
       url: 'notion.so/acme/mcp-launch-plan',
@@ -194,12 +194,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 9100,
+    at: 8100,
     kind: 'thought',
     text: 'Lead with outcomes, not protocol. One open question from the plan is rate limits.',
   },
   {
-    at: 9600,
+    at: 8400,
     kind: 'source',
     source: {
       url: 'linear.app/acme/issue/ACM-1302',
@@ -209,12 +209,12 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 10000,
+    at: 8650,
     kind: 'thought',
     text: 'Rate limits ship later, so the post shouldn’t promise them. One last check on where MCP came from for the intro.',
   },
   {
-    at: 10500,
+    at: 8900,
     kind: 'source',
     source: {
       url: 'anthropic.com/news/model-context-protocol',
@@ -224,7 +224,7 @@ export const researchLog: readonly ResearchEntry[] = [
     },
   },
   {
-    at: 11300,
+    at: 9350,
     kind: 'synthesis',
     artifacts: [
       { name: 'Research brief.md', summary: 'Key facts, setup steps and sources for the post' },

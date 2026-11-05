@@ -417,18 +417,29 @@ const cursorSpots = {
   research: { left: 700, top: 112 },
   decision: { left: 1045, top: 518 },
   editor: { left: 430, top: 430 },
+  preview: { left: 790, top: 112 },
 } as const
 
 function DemoCursor({
   state,
   shape,
   target,
+  from,
+  progress,
 }: {
   state: CursorState
   shape: CursorShape
   target: CursorTarget
+  from: CursorTarget
+  progress: number
 }) {
+  const start = cursorSpots[from]
   const spot = cursorSpots[target]
+  const dx = spot.left - start.left
+  const dy = spot.top - start.top
+  const bend = Math.sin(Math.PI * progress) * 0.12
+  const left = start.left + dx * progress - dy * bend
+  const top = start.top + dy * progress + dx * bend
   const Shape = shape === 'pointer' ? PointerIcon : MousePointer2Icon
   return (
     <span
@@ -436,10 +447,8 @@ function DemoCursor({
       data-state={state}
       data-shape={shape}
       data-target={target}
-      style={{ left: spot.left, top: spot.top }}
-      className={cn(
-        'absolute z-40 transition-[left,top] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.25,1)]',
-      )}
+      style={{ transform: `translate(${left}px, ${top}px)` }}
+      className="absolute top-0 left-0 z-40"
     >
       <Shape
         className={cn(
@@ -654,9 +663,10 @@ export function ProductDemo() {
                 researchHovered={frame.researchHovered}
                 researchPanelOpen={frame.researchPanelOpen}
                 cover={frame.cover}
-                scrolled={frame.editorScrolled}
-                seoFilled={frame.seoFilled}
-                seoAgentActive={frame.seoAgentActive}
+                scrollProgress={frame.editorScroll}
+                bodyElapsed={frame.bodyElapsed}
+                seoElapsed={frame.seoElapsed}
+                socialImage={frame.socialImage}
               />
             </div>
           </div>
@@ -668,7 +678,13 @@ export function ProductDemo() {
           />
           <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
           <ShortcutChip shortcut={frame.shortcut} />
-          <DemoCursor state={frame.cursor} shape={frame.cursorShape} target={frame.cursorTarget} />
+          <DemoCursor
+            state={frame.cursor}
+            shape={frame.cursorShape}
+            target={frame.cursorTarget}
+            from={frame.cursorFrom}
+            progress={frame.cursorProgress}
+          />
         </div>
       </div>
     </section>
