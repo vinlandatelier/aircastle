@@ -1048,7 +1048,7 @@ function CoverArt() {
           <SiModelcontextprotocol data-demo-cover-mcp className="size-5" />
         </div>
         <div className="flex flex-col items-center gap-0.5">
-          <span data-demo-cover-title className="text-sm font-medium tracking-tight text-white">
+          <span data-demo-cover-title className="text-sm font-normal tracking-tight text-white">
             Introducing Acme MCP
           </span>
           <span data-demo-cover-date className="text-[9px] text-white/65">
