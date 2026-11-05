@@ -9,7 +9,18 @@
 }
 
 .agentPulse {
-  --agent-colour: color-mix(in oklab, rgb(139 92 246) var(--agent-strength), rgb(76 29 149));
+  --agent-base: rgb(139 92 246);
+}
+
+.agentField,
+.agentRow,
+.agentTab,
+.agentAvatar {
+  --agent-colour: color-mix(
+    in oklab,
+    var(--agent-base) var(--agent-strength),
+    color-mix(in oklab, var(--agent-base), black 45%)
+  );
 }
 
 .agentField {
@@ -24,12 +35,12 @@
 
 @keyframes agent-arrive {
   from {
-    background-color: rgb(139 92 246);
+    background-color: var(--agent-base);
     color: white;
   }
 
   30% {
-    background-color: rgb(139 92 246);
+    background-color: var(--agent-base);
     color: white;
   }
 }
@@ -37,10 +48,11 @@
 .agentRow {
   box-shadow:
     inset 0 0 0 3px var(--agent-colour),
-    0 0 22px 2px color-mix(in oklab, rgb(139 92 246) calc(var(--agent-strength) - 30%), transparent);
+    0 0 22px 2px
+      color-mix(in oklab, var(--agent-base) calc(var(--agent-strength) - 30%), transparent);
   background-color: color-mix(
     in oklab,
-    rgb(139 92 246) calc(var(--agent-strength) / 10),
+    var(--agent-base) calc(var(--agent-strength) / 10),
     transparent
   );
 }

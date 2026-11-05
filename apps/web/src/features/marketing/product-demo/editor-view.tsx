@@ -36,7 +36,7 @@ import {
   type Artifact,
   type ResearchEntry,
 } from './research'
-import { canute, einar, orchestrator, thorfinn } from './agents'
+import { canute, einar, orchestrator, thorfinn, type DemoAgent } from './agents'
 import { MentionText } from './mention'
 import type { CoverState } from './timeline'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
@@ -127,12 +127,16 @@ function Chip({ children, arrived }: { children: React.ReactNode; arrived?: bool
   )
 }
 
+function agentHue(agent: DemoAgent) {
+  return { '--agent-base': agent.colour } as React.CSSProperties
+}
+
 function AgentPresence({
   agent,
   active,
   status,
 }: {
-  agent: { name: string; role: string }
+  agent: DemoAgent
   active: boolean
   status?: string
 }) {
@@ -141,25 +145,24 @@ function AgentPresence({
       <span
         data-demo-agent-outline
         data-active={active}
+        style={agentHue(agent)}
         className={cn(
           'pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-500',
           styles.agentField,
           active ? 'opacity-100' : 'opacity-0',
         )}
       />
-      <AgentTab agent={agent.name} role={agent.role} active={active} status={status} />
+      <AgentTab agent={agent} active={active} status={status} />
     </>
   )
 }
 
 function AgentTab({
   agent,
-  role,
   active,
   status,
 }: {
-  agent: string
-  role: string
+  agent: DemoAgent
   active: boolean
   status: string | undefined
 }) {
@@ -167,6 +170,7 @@ function AgentTab({
     <div
       data-demo-agent-tab
       data-active={active}
+      style={agentHue(agent)}
       className={cn(
         'absolute right-2 bottom-[calc(100%-3px)] z-10 flex items-center gap-1.5 rounded-t-md px-1.5 pt-1 pb-[calc(0.25rem+3px)] text-xs whitespace-nowrap text-white transition-[opacity,translate] duration-500',
         styles.agentTab,
@@ -174,10 +178,12 @@ function AgentTab({
       )}
     >
       <span className={cn('rounded-full', styles.agentAvatar)}>
-        <GeneratedAvatar name={agent} size={16} variant="beam" />
+        <GeneratedAvatar name={agent.name} size={16} variant="beam" />
       </span>
-      {agent}
-      <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none">{role}</span>
+      {agent.name}
+      <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none">
+        {agent.role}
+      </span>
       {status && (
         <>
           <span className="text-white/60">·</span>
@@ -195,7 +201,7 @@ function Multiselect({
   placeholderText,
   children,
 }: {
-  agent?: { name: string; role: string }
+  agent?: DemoAgent
   agentActive?: boolean
   empty: boolean
   placeholderText: string
@@ -1056,6 +1062,7 @@ function CoverField({ state }: { state: CoverState }) {
         <span
           data-demo-cover-status
           data-active={working}
+          style={agentHue(einar)}
           className={cn(
             'absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] whitespace-nowrap text-white transition-[opacity,translate] duration-500',
             styles.agentTab,
