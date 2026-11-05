@@ -36,6 +36,13 @@ const decisionHoverDuration = 400
 const decisionClickDuration = 220
 const decisionAnsweredAfterClick = 150
 const tagsStartAfterArriving = 500
+const editorCursorTravel = 1400
+const scrollAfterCursorArrives = 200
+const seoStartsAfterScroll = 700
+const seoFirstFieldAfterStart = 500
+const seoFieldInterval = 700
+const seoFieldCount = 3
+const seoLingerAfterFilling = 1000
 const coverGeneratingAfterEditor = 900
 const coverDoneAfterEditor = 4200
 const writerLeavesCategoriesAfterEditor =
@@ -68,7 +75,7 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer'
-export type CursorTarget = 'rest' | 'row' | 'research' | 'decision'
+export type CursorTarget = 'rest' | 'row' | 'research' | 'decision' | 'editor'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
@@ -93,6 +100,9 @@ export type Frame = {
   researchHovered: boolean
   researchPanelOpen: boolean
   cover: CoverState
+  editorScrolled: boolean
+  seoFilled: number
+  seoAgentActive: boolean
 }
 
 /** The still frame shown when motion is reduced. */
@@ -116,11 +126,18 @@ export const stillFrame: Frame = {
   researchHovered: false,
   researchPanelOpen: false,
   cover: 'idle',
+  editorScrolled: false,
+  seoFilled: 0,
+  seoAgentActive: false,
+}
+
+function chipsArrivedEvery(sinceFirst: number, interval: number, total: number) {
+  if (sinceFirst < 0) return 0
+  return Math.min(total, Math.floor(sinceFirst / interval) + 1)
 }
 
 function chipsArrived(sinceFirst: number, total: number) {
-  if (sinceFirst < 0) return 0
-  return Math.min(total, Math.floor(sinceFirst / chipInterval) + 1)
+  return chipsArrivedEvery(sinceFirst, chipInterval, total)
 }
 
 const researchCursorArrivesAfterEditor = researchCursorMovesAfterEditor + researchCursorTravel
@@ -131,6 +148,12 @@ const decisionClickAfterEditor = docsDecisionAnsweredAt - decisionAnsweredAfterC
 const decisionCursorArrivesAfterEditor = decisionClickAfterEditor - decisionHoverDuration
 const decisionCursorMovesAfterEditor = decisionCursorArrivesAfterEditor - decisionCursorTravel
 const decisionClickEndsAfterEditor = decisionClickAfterEditor + decisionClickDuration
+const editorCursorArrivesAfterEditor = decisionClickEndsAfterEditor + editorCursorTravel
+const scrollAfterEditor = editorCursorArrivesAfterEditor + scrollAfterCursorArrives
+const seoStartsAfterEditor = scrollAfterEditor + seoStartsAfterScroll
+const seoFirstFieldAfterEditor = seoStartsAfterEditor + seoFirstFieldAfterStart
+const seoEndsAfterEditor =
+  seoFirstFieldAfterEditor + (seoFieldCount - 1) * seoFieldInterval + seoLingerAfterFilling
 
 function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < researchCursorMovesAfterEditor) return 'still'
@@ -141,6 +164,7 @@ function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < decisionCursorArrivesAfterEditor) return 'moving'
   if (sinceEditor < decisionClickAfterEditor) return 'hovering'
   if (sinceEditor < decisionClickEndsAfterEditor) return 'clicking'
+  if (sinceEditor < editorCursorArrivesAfterEditor) return 'moving'
   return 'still'
 }
 
@@ -208,11 +232,13 @@ export function frameAt(elapsed: number): Frame {
     cursorTarget:
       elapsed < cursorShownAt || elapsed >= editorClosesAt
         ? 'rest'
-        : inEditor && sinceEditor >= decisionCursorMovesAfterEditor
-          ? 'decision'
-          : inEditor && sinceEditor >= researchCursorMovesAfterEditor
-            ? 'research'
-            : 'row',
+        : inEditor && sinceEditor >= decisionClickEndsAfterEditor
+          ? 'editor'
+          : inEditor && sinceEditor >= decisionCursorMovesAfterEditor
+            ? 'decision'
+            : inEditor && sinceEditor >= researchCursorMovesAfterEditor
+              ? 'research'
+              : 'row',
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',
@@ -226,5 +252,11 @@ export function frameAt(elapsed: number): Frame {
     writerOnBody: elapsed - editorOpensAt >= writerReachesBodyAfterEditor,
     researchSteps: researchStepsAt(sinceEditor),
     cover: coverAt(sinceEditor, inEditor),
+    editorScrolled: inEditor && sinceEditor >= scrollAfterEditor,
+    seoFilled: inEditor
+      ? chipsArrivedEvery(sinceEditor - seoFirstFieldAfterEditor, seoFieldInterval, seoFieldCount)
+      : 0,
+    seoAgentActive:
+      inEditor && sinceEditor >= seoStartsAfterEditor && sinceEditor < seoEndsAfterEditor,
   }
 }

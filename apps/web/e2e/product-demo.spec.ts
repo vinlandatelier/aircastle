@@ -95,7 +95,8 @@ test('product preview table shows truncated plain-text bodies and a count badge'
 test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends it', async ({
   page,
 }) => {
-  await page.clock.install()
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const preview = page.getByRole('region', { name: 'Aircastle preview' })
@@ -1009,4 +1010,74 @@ test('Abyan’s own photo, served from the app, is the account avatar and his au
   const response = await page.request.get('/demo/abyan.jpg')
   expect(response.ok()).toBe(true)
   expect(response.headers()['content-type']).toContain('image/jpeg')
+})
+
+test('after answering Canute the cursor returns to the editor, which scrolls to Askeladd filling SEO', async ({
+  page,
+}) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const panel = frame.locator('[data-demo-research-panel]')
+  const decision = panel.locator('[data-demo-decision]')
+  const cursor = frame.locator('[data-demo-cursor]')
+  const editor = frame.locator('[data-demo-editor]')
+  const seo = frame.locator('[data-demo-field="seo"]')
+  const tab = seo.locator('[data-demo-agent-tab]')
+
+  await page.clock.runFor(15000)
+  for (let tick = 0; tick < 60; tick += 1) {
+    if ((await decision.getAttribute('data-state')) === 'sent') break
+    await page.clock.runFor(100)
+  }
+  await expect(decision).toHaveAttribute('data-state', 'sent')
+  await expect(editor).toHaveAttribute('data-scrolled', 'false')
+
+  await page.clock.runFor(1200)
+  await expect(cursor).toHaveAttribute('data-target', 'editor')
+  await expect(cursor).toHaveAttribute('data-shape', 'arrow')
+  await expect
+    .poll(async () => {
+      const cursorBox = await cursor.boundingBox()
+      const panelBox = await panel.boundingBox()
+      return cursorBox && panelBox ? cursorBox.x + cursorBox.width < panelBox.x - 100 : false
+    })
+    .toBe(true)
+
+  await page.clock.runFor(800)
+  await expect(editor).toHaveAttribute('data-scrolled', 'true')
+  await expect
+    .poll(async () => {
+      const seoBox = await seo.boundingBox()
+      const frameBox = await frame.boundingBox()
+      const bodyBox = await frame.locator('[data-demo-field="body"]').boundingBox()
+      if (!seoBox || !frameBox || !bodyBox) return false
+      return (
+        seoBox.y + seoBox.height <= frameBox.y + frameBox.height &&
+        bodyBox.y < frameBox.y + frameBox.height / 2
+      )
+    })
+    .toBe(true)
+
+  await page.clock.runFor(800)
+  await expect(tab).toHaveAttribute('data-active', 'true')
+  await expect(tab).toContainText('Askeladd')
+  await expect(tab.getByText('SEO Agent', { exact: true })).toBeVisible()
+  const hue = (element: Element) =>
+    getComputedStyle(element).getPropertyValue('--agent-base').trim()
+  const writerHue = await frame
+    .locator('[data-demo-field="body"] [data-demo-agent-tab]')
+    .evaluate(hue)
+  expect(await tab.evaluate(hue)).not.toBe(writerHue)
+
+  await page.clock.runFor(2500)
+  for (const name of ['meta-title', 'meta-description', 'focus-keyword']) {
+    await expect(seo.locator(`[data-demo-field="${name}"]`)).toHaveAttribute('data-empty', 'false')
+  }
+  await expect(seo.locator('[data-demo-field="focus-keyword"]')).toContainText('Acme MCP')
+  await page.clock.runFor(1500)
+  await expect(tab).toHaveAttribute('data-active', 'false')
 })

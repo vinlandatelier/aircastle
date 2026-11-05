@@ -42,26 +42,7 @@ const frameWidth = 1280
 const frameHeight = 740
 
 function sameFrame(left: Frame, right: Frame) {
-  return (
-    left.shortcut === right.shortcut &&
-    left.dialog === right.dialog &&
-    left.typed === right.typed &&
-    left.sendPressed === right.sendPressed &&
-    left.agentRow === right.agentRow &&
-    left.cursor === right.cursor &&
-    left.cursorShape === right.cursorShape &&
-    left.view === right.view &&
-    left.agentRowHovered === right.agentRowHovered &&
-    left.categories === right.categories &&
-    left.tags === right.tags &&
-    left.writerOnCategories === right.writerOnCategories &&
-    left.writerOnTags === right.writerOnTags &&
-    left.writerOnBody === right.writerOnBody &&
-    left.researchSteps === right.researchSteps &&
-    left.cursorTarget === right.cursorTarget &&
-    left.researchHovered === right.researchHovered &&
-    left.researchPanelOpen === right.researchPanelOpen
-  )
+  return (Object.keys(left) as (keyof Frame)[]).every((key) => left[key] === right[key])
 }
 
 function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: boolean) {
@@ -434,6 +415,7 @@ const cursorSpots = {
   row: { left: 320, top: 218 },
   research: { left: 700, top: 112 },
   decision: { left: 1045, top: 518 },
+  editor: { left: 430, top: 430 },
 } as const
 
 function DemoCursor({
@@ -671,6 +653,9 @@ export function ProductDemo() {
                 researchHovered={frame.researchHovered}
                 researchPanelOpen={frame.researchPanelOpen}
                 cover={frame.cover}
+                scrolled={frame.editorScrolled}
+                seoFilled={frame.seoFilled}
+                seoAgentActive={frame.seoAgentActive}
               />
             </div>
           </div>

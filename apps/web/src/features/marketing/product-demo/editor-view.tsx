@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -36,7 +37,7 @@ import {
   type Artifact,
   type ResearchEntry,
 } from './research'
-import { canute, einar, orchestrator, thorfinn, type DemoAgent } from './agents'
+import { askeladd, canute, einar, orchestrator, thorfinn, type DemoAgent } from './agents'
 import { MentionText } from './mention'
 import { PersonAvatar } from './person'
 import type { CoverState } from './timeline'
@@ -931,31 +932,63 @@ function BodyField({ writing, drafting }: { writing: boolean; drafting: boolean 
   )
 }
 
-function SeoGroup() {
+const seoValues = {
+  metaTitle: 'Introducing Acme MCP: connect Acme to your AI tools',
+  metaDescription:
+    'Acme MCP lets Claude, Cursor and other AI tools read and update your Acme workspace. Set it up in a few minutes.',
+  focusKeyword: 'Acme MCP',
+} as const
+
+function SeoValue({ value }: { value: string }) {
+  return <span className={styles.streamCard}>{value}</span>
+}
+
+function SeoGroup({ filled, agentActive }: { filled: number; agentActive: boolean }) {
   return (
-    <div data-demo-field="seo" className="flex flex-col gap-5 rounded-lg border p-5">
+    <div
+      data-demo-field="seo"
+      className={cn(
+        'relative flex flex-col gap-5 rounded-lg border p-5 transition-[border-color] duration-500',
+        agentActive && 'border-transparent',
+      )}
+    >
+      <AgentPresence agent={askeladd} active={agentActive} status="Writing metadata…" />
       <div className="flex flex-col gap-1">
         <h4 className="font-medium">Search engine optimization</h4>
         <p className="text-xs text-muted-foreground">
           Control how this post appears in search results and link previews.
         </p>
       </div>
-      <Field name="meta-title" label="Meta title" aside="0 / 60" empty>
-        <div className={cn(control, placeholder)}>Defaults to the post title</div>
+      <Field
+        name="meta-title"
+        label="Meta title"
+        aside={`${filled >= 1 ? seoValues.metaTitle.length : 0} / 60`}
+        empty={filled < 1}
+      >
+        <div className={cn(control, filled < 1 && placeholder)}>
+          {filled >= 1 ? <SeoValue value={seoValues.metaTitle} /> : 'Defaults to the post title'}
+        </div>
       </Field>
-      <Field name="meta-description" label="Meta description" aside="0 / 160" empty>
+      <Field
+        name="meta-description"
+        label="Meta description"
+        aside={`${filled >= 2 ? seoValues.metaDescription.length : 0} / 160`}
+        empty={filled < 2}
+      >
         <div
           className={cn(
             'min-h-16 rounded-md border bg-background px-3 py-2 leading-6 dark:bg-input/30',
-            placeholder,
+            filled < 2 && placeholder,
           )}
         >
-          Defaults to the summary
+          {filled >= 2 ? <SeoValue value={seoValues.metaDescription} /> : 'Defaults to the summary'}
         </div>
       </Field>
       <div className="grid grid-cols-2 gap-4">
-        <Field name="focus-keyword" label="Focus keyword" empty>
-          <div className={cn(control, placeholder)}>Add a keyword</div>
+        <Field name="focus-keyword" label="Focus keyword" empty={filled < 3}>
+          <div className={cn(control, filled < 3 && placeholder)}>
+            {filled >= 3 ? <SeoValue value={seoValues.focusKeyword} /> : 'Add a keyword'}
+          </div>
         </Field>
         <Field name="canonical-url" label="Canonical URL" empty>
           <div className={cn(control, 'truncate', placeholder)}>Defaults to the post URL</div>
@@ -974,7 +1007,17 @@ function SeoGroup() {
   )
 }
 
-function MainColumn({ writerOnBody, drafting }: { writerOnBody: boolean; drafting: boolean }) {
+function MainColumn({
+  writerOnBody,
+  drafting,
+  seoFilled,
+  seoAgentActive,
+}: {
+  writerOnBody: boolean
+  drafting: boolean
+  seoFilled: number
+  seoAgentActive: boolean
+}) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <Field name="title" label="Title" empty={false}>
@@ -997,7 +1040,7 @@ function MainColumn({ writerOnBody, drafting }: { writerOnBody: boolean; draftin
         </div>
       </Field>
       <BodyField writing={writerOnBody} drafting={drafting} />
-      <SeoGroup />
+      <SeoGroup filled={seoFilled} agentActive={seoAgentActive} />
     </div>
   )
 }
@@ -1139,6 +1182,23 @@ function SideColumn({
   )
 }
 
+const roomForAgentTab = 40
+
+function useScrollToSeo(content: React.RefObject<HTMLDivElement | null>, scrolled: boolean) {
+  useLayoutEffect(() => {
+    const element = content.current
+    const seo = element?.querySelector<HTMLElement>('[data-demo-field="seo"]')
+    if (!scrolled || !element || !seo) return
+    const distance = Math.max(0, seo.offsetTop - roomForAgentTab)
+    const scroll = element.animate([{ translate: '0 0' }, { translate: `0 -${distance}px` }], {
+      duration: 1400,
+      easing: 'cubic-bezier(0.45, 0, 0.25, 1)',
+      fill: 'forwards',
+    })
+    return () => scroll.cancel()
+  }, [content, scrolled])
+}
+
 /** A post editor for the product preview, opened on "Introducing Acme MCP" while agents fill it in. */
 export function EditorView({
   shown,
@@ -1151,6 +1211,9 @@ export function EditorView({
   researchHovered,
   researchPanelOpen,
   cover,
+  scrolled,
+  seoFilled,
+  seoAgentActive,
 }: {
   shown: boolean
   categories: number
@@ -1162,11 +1225,17 @@ export function EditorView({
   researchHovered: boolean
   researchPanelOpen: boolean
   cover: CoverState
+  scrolled: boolean
+  seoFilled: number
+  seoAgentActive: boolean
 }) {
+  const content = useRef<HTMLDivElement>(null)
+  useScrollToSeo(content, scrolled)
   return (
     <div
       data-demo-editor
       data-state={shown ? 'shown' : 'hidden'}
+      data-scrolled={scrolled}
       className={cn(
         'absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-card transition-[opacity,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
         shown ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0',
@@ -1183,8 +1252,13 @@ export function EditorView({
           researchHovered={researchHovered}
           researchDocked={researchPanelOpen}
         />
-        <div data-demo-editor-scroll className="flex items-start gap-6 p-6">
-          <MainColumn writerOnBody={writerOnBody} drafting={researchSteps >= researchLog.length} />
+        <div data-demo-editor-scroll ref={content} className="relative flex items-start gap-6 p-6">
+          <MainColumn
+            writerOnBody={writerOnBody}
+            drafting={researchSteps >= researchLog.length}
+            seoFilled={seoFilled}
+            seoAgentActive={seoAgentActive}
+          />
           <SideColumn
             writerOnCategories={writerOnCategories}
             writerOnTags={writerOnTags}
