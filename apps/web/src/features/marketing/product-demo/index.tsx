@@ -21,6 +21,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { GeneratedAvatar } from '@/components/shell/generated-avatar'
 import { navigationGroups } from '@/features/navigation/pages'
 import { EditorView } from './editor-view'
+import { PersonAvatar } from './person'
 import { docsDecisionState } from './research'
 import { canute, orchestrator, thorfinn, workingAgents, type DemoAgent } from './agents'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
@@ -249,14 +250,6 @@ function StatusPill({ status }: { status: Status }) {
   )
 }
 
-function Initial({ name }: { name: string }) {
-  return (
-    <span className="inline-flex size-6 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">
-      {name.slice(0, 1)}
-    </span>
-  )
-}
-
 const outlineButton =
   'inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background bg-clip-padding dark:border-input dark:bg-input/30 [&_svg]:size-4'
 
@@ -386,7 +379,7 @@ function DemoHeader({ decisionsWaiting }: { decisionsWaiting: number }) {
           <BellIcon />
         </span>
         <span data-demo-account className="flex size-8 overflow-hidden rounded-full">
-          <GeneratedAvatar name="Shaban Haider" variant="beam" />
+          <PersonAvatar name="Abyan" className="size-8" />
         </span>
       </span>
     </div>
@@ -557,7 +550,7 @@ function AuthorsCell({ authors }: { authors: readonly string[] }) {
       <span className="flex shrink-0 -space-x-1.5">
         {authors.map((author) => (
           <span key={author} className="rounded-full ring-2 ring-card">
-            <Initial name={author} />
+            <PersonAvatar name={author} className="size-6 text-xs" />
           </span>
         ))}
       </span>

@@ -38,6 +38,7 @@ import {
 } from './research'
 import { canute, einar, orchestrator, thorfinn, type DemoAgent } from './agents'
 import { MentionText } from './mention'
+import { PersonAvatar } from './person'
 import type { CoverState } from './timeline'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
@@ -104,14 +105,6 @@ function Field({
       {children}
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </div>
-  )
-}
-
-function Initial({ name }: { name: string }) {
-  return (
-    <span className="inline-flex size-5 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
-      {name.slice(0, 1)}
-    </span>
   )
 }
 
@@ -1098,7 +1091,7 @@ function SideColumn({
       <Field name="authors" label="Authors" empty={false}>
         <Multiselect empty={false} placeholderText="Add authors">
           <Chip>
-            <Initial name="Abyan" />
+            <PersonAvatar name="Abyan" className="size-5 text-[10px]" />
             Abyan
           </Chip>
         </Multiselect>

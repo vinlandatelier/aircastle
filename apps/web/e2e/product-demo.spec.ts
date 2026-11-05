@@ -991,3 +991,22 @@ test('Einar generates the cover image with the product cover skill as the editor
   expect(order).toEqual([...order].sort((first, second) => first - second))
   await expect(field).toHaveAttribute('data-empty', 'false')
 })
+
+test('Abyan’s own photo, served from the app, is the account avatar and his author avatar', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  const photos = [
+    frame.locator('[data-demo-account] img'),
+    frame.locator('[data-demo-agent-row] [data-demo-authors] img'),
+    frame.locator('[data-demo-field="authors"] img'),
+  ]
+  for (const photo of photos) {
+    await expect(photo).toHaveAttribute('src', '/demo/abyan.jpg')
+    await expect(photo).toHaveAttribute('alt', '')
+  }
+  const response = await page.request.get('/demo/abyan.jpg')
+  expect(response.ok()).toBe(true)
+  expect(response.headers()['content-type']).toContain('image/jpeg')
+})
