@@ -81,7 +81,8 @@ jobs:
             .github/gardener-settings.json > "$CLAUDE_CONFIG_DIR/settings.json"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          timeout 155m claude -p "Follow .agents/skills/gardener/SKILL.md." \
+          timeout 155m claude -p "Run the gardener audit in your system prompt." \
+            --append-system-prompt-file .agents/skills/gardener/SKILL.md \
             --model "$(jq -r .roles.implementer.model .github/ai-models.json)" \
             --effort "$(jq -r .roles.implementer.effort .github/ai-models.json)" \
             --settings "$CLAUDE_CONFIG_DIR/settings.json" --add-dir "$GARDENER_OUT" \

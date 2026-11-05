@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { expect, test } from "vite-plus/test";
 
@@ -67,6 +67,12 @@ function mergeCalls(path: string, source: string): string[] {
     .map((pattern) => `${path}: ${pattern.source}`);
 }
 
+function systemPromptFile(source: string): string | undefined {
+  const start = source.indexOf("claude -p");
+  const command = source.slice(start, source.indexOf("< /dev/null", start));
+  return /--append-system-prompt-file (\S+)/.exec(command)?.[1];
+}
+
 function claudeCodeVersion(source: string): string | undefined {
   return /npm install --global @anthropic-ai\/claude-code@(\S+)/.exec(source)?.[1];
 }
@@ -132,6 +138,12 @@ test("the audit deletes its Git directory before the checkout cleanup runs Git",
   const claude = audit.indexOf("claude -p");
   expect(claude).toBeGreaterThan(-1);
   expect(audit.lastIndexOf('rm -rf "$GITHUB_WORKSPACE/.git"')).toBeGreaterThan(claude);
+});
+
+test("the gardener skill loads into the system prompt, which compaction keeps", () => {
+  const skill = ".agents/skills/gardener/SKILL.md";
+  expect(systemPromptFile(job(gardener, "audit"))).toBe(skill);
+  expect(existsSync(join(root, skill))).toBe(true);
 });
 
 test("the publish job holds branches that change automation or its guards", () => {
