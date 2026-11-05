@@ -1388,3 +1388,25 @@ test('Thorfinn has started the body by the time the editor scrolls down', async 
   expect(await words.count()).toBeGreaterThan(0)
   await expect(frame.locator('[data-demo-research-panel]')).toContainText('Researched 12 sources')
 })
+
+test('the site cover is the same image as the editor cover, only larger', async ({ page }) => {
+  const { frame, site } = await openSitePreview(page, 'light')
+  await page.clock.runFor(story(800))
+  const proportions = (container: import('@playwright/test').Locator) =>
+    container.evaluate((element) => {
+      const title = element.querySelector<HTMLElement>('[data-demo-cover-title]')
+      if (!title) return null
+      const width = element.getBoundingClientRect().width
+      return {
+        title: title.getBoundingClientRect().width / width,
+        font: parseFloat(getComputedStyle(title).fontSize) / element.clientWidth,
+      }
+    })
+  const editorCover = await proportions(
+    frame.locator('[data-demo-field="cover-image"] [data-demo-cover]'),
+  )
+  const siteCover = await proportions(site.locator('[data-demo-site-cover]'))
+  if (!editorCover || !siteCover) throw new Error('Covers are not rendered')
+  expect(siteCover.title).toBeCloseTo(editorCover.title, 1)
+  expect(siteCover.font).toBeCloseTo(editorCover.font, 2)
+})

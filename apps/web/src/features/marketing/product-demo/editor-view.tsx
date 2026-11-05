@@ -3,7 +3,10 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   SparklesIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
   ArrowUpIcon,
+  ShareIcon,
   ArrowUpRightIcon,
   CheckIcon,
   BrainIcon,
@@ -996,24 +999,30 @@ function MainColumn({
 
 function CoverArt() {
   return (
-    <div className={cn('absolute inset-0 bg-[#141416]', styles.coverReveal)}>
+    <div className={cn('@container absolute inset-0 bg-[#141416]', styles.coverReveal)}>
       <div className={cn('absolute inset-0', styles.coverBloom)} />
       <div className={cn('absolute inset-0', styles.coverGrain)} />
-      <div className="relative flex h-full flex-col items-center justify-center gap-2.5">
-        <div className="flex items-center gap-2 text-white">
-          <span data-demo-cover-acme className="flex">
+      <div className="relative flex h-full flex-col items-center justify-center gap-[3.7cqw]">
+        <div className="flex items-center gap-[3cqw] text-white">
+          <span data-demo-cover-acme className="flex size-[7.5cqw] [&>svg]:size-full!">
             <GeneratedAvatar name="Acme Inc" size={20} />
           </span>
-          <span data-demo-cover-slash className="text-lg leading-none font-light text-white/60">
+          <span
+            data-demo-cover-slash
+            className="text-[6.7cqw] leading-none font-light text-white/60"
+          >
             /
           </span>
-          <SiModelcontextprotocol data-demo-cover-mcp className="size-5" />
+          <SiModelcontextprotocol data-demo-cover-mcp className="size-[7.5cqw]" />
         </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <span data-demo-cover-title className="text-sm font-normal tracking-tight text-white">
+        <div className="flex flex-col items-center gap-[0.75cqw]">
+          <span
+            data-demo-cover-title
+            className="text-[5.2cqw] leading-tight font-normal tracking-tight text-white"
+          >
             Introducing Acme MCP
           </span>
-          <span data-demo-cover-date className="text-[9px] text-white/65">
+          <span data-demo-cover-date className="text-[3.4cqw] leading-tight text-white/65">
             Nov 5, 2026
           </span>
         </div>
@@ -1174,7 +1183,7 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
         <div
           data-demo-site-page
           data-state={loaded ? 'loaded' : 'loading'}
-          className="min-h-0 flex-1 overflow-hidden bg-white text-neutral-900"
+          className="min-h-0 flex-1 overflow-hidden bg-[#f7f7f5] text-neutral-900"
         >
           {loaded && <SitePage bodyElapsed={bodyElapsed} />}
         </div>
@@ -1183,55 +1192,85 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
   )
 }
 
-const siteNav = ['Product', 'Customers', 'Pricing', 'Changelog', 'Blog'] as const
+const siteNav = ['Product', 'Customers', 'Changelog', 'Pricing', 'Blog'] as const
+
+function SiteNav() {
+  return (
+    <div className="flex h-16 shrink-0 items-center justify-between px-8">
+      <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-neutral-950">
+        <GeneratedAvatar name="Acme Inc" size={20} />
+        Acme
+      </span>
+      <span className="flex items-center gap-0.5 rounded-full border border-black/[0.06] bg-white/70 p-1 text-[13px] text-neutral-500 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+        {siteNav.map((item) => (
+          <span
+            key={item}
+            className={cn(
+              'rounded-full px-3 py-1',
+              item === 'Blog' && 'bg-black/[0.05] text-neutral-950',
+            )}
+          >
+            {item}
+          </span>
+        ))}
+      </span>
+      <span className="flex items-center gap-4 text-[13px]">
+        <span className="text-neutral-500">Sign in</span>
+        <span className="flex h-8 items-center gap-1 rounded-full bg-neutral-950 pr-2.5 pl-3.5 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.15)]">
+          Get started
+          <ArrowRightIcon className="size-3.5" />
+        </span>
+      </span>
+    </div>
+  )
+}
 
 function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
   return (
     <div className={cn('flex flex-col', styles.streamCard)}>
-      <div className="flex h-14 shrink-0 items-center justify-between px-8">
-        <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
-          <GeneratedAvatar name="Acme Inc" size={20} />
-          Acme
+      <SiteNav />
+      <article className="mx-auto flex w-full max-w-[600px] flex-col px-6 pt-9">
+        <span className="flex items-center gap-1 text-[13px] text-neutral-500">
+          <ArrowLeftIcon className="size-3.5" />
+          All posts
         </span>
-        <span className="flex gap-6 text-[13px] text-neutral-500">
-          {siteNav.map((item) => (
-            <span key={item} className={cn(item === 'Blog' && 'text-neutral-900')}>
-              {item}
-            </span>
-          ))}
-        </span>
-        <span className="flex items-center gap-3 text-[13px]">
-          <span className="text-neutral-500">Sign in</span>
-          <span className="rounded-full bg-neutral-900 px-3.5 py-1.5 text-white">Get started</span>
-        </span>
-      </div>
-      <article className="mx-auto flex w-full max-w-[600px] flex-col px-6 pt-10">
-        <div className="flex items-center gap-2 text-xs text-neutral-500">
-          <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-neutral-700">
-            Product
-          </span>
+        <div className="mt-6 flex items-center gap-2 text-xs text-neutral-500">
+          <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-neutral-700">Product</span>
           <span>Nov 5, 2026</span>
           <span className="text-neutral-300">·</span>
           <span>{bodyReadingTime}</span>
         </div>
-        <h1 className="mt-4 text-[34px] leading-[1.1] font-semibold tracking-[-0.02em]">
+        <h1 className="mt-4 text-[38px] leading-[1.08] font-semibold tracking-[-0.03em] text-neutral-950">
           Introducing Acme MCP
         </h1>
-        <p className="mt-3 text-[15px] leading-6 text-neutral-500">
+        <p className="mt-4 text-base leading-7 text-neutral-500">
           Connect Claude, Cursor and any MCP client to your Acme workspace, and work with your
           content from the chat.
         </p>
-        <div className="mt-5 flex items-center gap-2.5 text-[13px]">
-          <PersonAvatar name="Abyan" className="size-7" />
-          <span className="flex flex-col leading-tight">
-            <span className="font-medium">Abyan</span>
-            <span className="text-neutral-500">Engineering</span>
+        <div className="mt-6 flex items-center justify-between border-y border-black/[0.06] py-4 text-[13px]">
+          <span className="flex items-center gap-2.5">
+            <PersonAvatar name="Abyan" className="size-8" />
+            <span className="flex flex-col leading-tight">
+              <span className="font-medium text-neutral-950">Abyan</span>
+              <span className="text-neutral-500">Engineering</span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 text-neutral-500">
+            <span className="flex size-8 items-center justify-center rounded-full border border-black/[0.06] bg-white">
+              <LinkIcon className="size-3.5" />
+            </span>
+            <span className="flex size-8 items-center justify-center rounded-full border border-black/[0.06] bg-white">
+              <ShareIcon className="size-3.5" />
+            </span>
           </span>
         </div>
-        <div className="relative mt-7 aspect-[1200/630] overflow-hidden rounded-xl ring-1 ring-black/5">
+        <div
+          data-demo-site-cover
+          className="relative mt-8 aspect-[1200/630] overflow-hidden rounded-2xl shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_24px_-8px_rgb(0_0_0/0.12)]"
+        >
           <CoverArt />
         </div>
-        <div className="mt-8 flex flex-col gap-3 text-[15px] leading-7 text-neutral-700 [&_h2]:pt-3 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-neutral-900 [&_pre]:bg-neutral-100 [&_pre]:text-neutral-800">
+        <div className="mt-9 flex flex-col gap-3.5 text-[15px] leading-7 text-neutral-600 [&_code]:bg-black/[0.05] [&_h2]:pt-4 [&_h2]:text-[21px] [&_h2]:font-semibold [&_h2]:tracking-[-0.015em] [&_h2]:text-neutral-950 [&_pre]:border [&_pre]:border-black/[0.06] [&_pre]:bg-white [&_pre]:text-neutral-800">
           {bodyElapsed !== null && <DraftBlocks elapsed={bodyElapsed} />}
         </div>
       </article>
