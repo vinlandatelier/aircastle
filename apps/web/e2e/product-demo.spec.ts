@@ -13,6 +13,23 @@ test('product preview sits below the hero without a visible label', async ({ pag
   expect(previewBox.y).toBeGreaterThan(heroBox.y + heroBox.height)
 })
 
+test('landing content and preview match a Paper-sized column with a shorter frame', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  const heading = await page.getByRole('heading', { level: 1 }).boundingBox()
+  const frame = await page
+    .getByRole('region', { name: 'Aircastle preview' })
+    .locator('[data-demo-frame]')
+    .boundingBox()
+  if (!heading || !frame) throw new Error('Landing page is not laid out')
+  expect(frame.width).toBeGreaterThan(1060)
+  expect(frame.width).toBeLessThanOrEqual(1100)
+  expect(heading.x).toBeCloseTo(frame.x, 0)
+  expect(frame.height / frame.width).toBeLessThan(0.6)
+})
+
 test('product preview shows the posts collection without motion', async ({ page }) => {
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')

@@ -11,7 +11,7 @@ export function MarketingPage() {
     <div data-theme-scope="marketing" className="flex min-h-svh flex-col">
       <Header />
       <main data-theme-scope="marketing" className="flex-1">
-        <section className="mx-auto w-full max-w-[85rem] px-4 pt-24 pb-16">
+        <section className="mx-auto w-full max-w-[70rem] px-4 pt-24 pb-16">
           <p className="mb-10 inline-flex items-center gap-1.5 text-lg text-muted-foreground">
             Presented by{' '}
             <a

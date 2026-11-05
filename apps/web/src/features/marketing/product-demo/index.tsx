@@ -38,7 +38,7 @@ import {
 } from './timeline'
 
 const frameWidth = 1280
-const frameHeight = 814
+const frameHeight = 740
 
 function sameFrame(left: Frame, right: Frame) {
   return (
@@ -437,10 +437,10 @@ function AgentLabel({ role }: { role: string }) {
 }
 
 const cursorSpots = {
-  rest: { left: 1010, top: 640 },
+  rest: { left: 1010, top: 566 },
   row: { left: 320, top: 218 },
   research: { left: 700, top: 112 },
-  decision: { left: 1045, top: 592 },
+  decision: { left: 1045, top: 518 },
 } as const
 
 function DemoCursor({
@@ -633,7 +633,7 @@ export function ProductDemo() {
   return (
     <section
       aria-labelledby="product-demo-title"
-      className="mx-auto w-full max-w-[85rem] px-4 pb-24"
+      className="mx-auto w-full max-w-[70rem] px-4 pb-24"
     >
       <h2 id="product-demo-title" className="sr-only">
         Aircastle preview

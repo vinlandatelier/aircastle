@@ -33,7 +33,7 @@ export function Header() {
     >
       <nav
         aria-label="Marketing navigation"
-        className="mx-auto grid min-h-16 w-full max-w-[85rem] grid-cols-[1fr_auto_1fr] items-center gap-4 px-4"
+        className="mx-auto grid min-h-16 w-full max-w-[70rem] grid-cols-[1fr_auto_1fr] items-center gap-4 px-4"
       >
         <Link
           to="/"
