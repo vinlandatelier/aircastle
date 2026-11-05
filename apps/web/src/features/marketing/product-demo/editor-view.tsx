@@ -274,18 +274,16 @@ function ResearchStatus({
       <span className="min-w-0 overflow-hidden">
         <span
           className={cn(
-            'flex h-8 w-max items-center gap-2 rounded-md pr-2.5 pl-1.5 text-violet-700 transition-colors duration-200 dark:text-violet-300',
-            hovered ? 'bg-violet-500/20' : 'bg-violet-500/10',
+            'flex h-8 w-max items-center gap-2 rounded-md pr-2.5 pl-1.5 transition-colors duration-200',
+            hovered ? 'bg-muted' : 'bg-muted/60',
           )}
         >
-          <span className={cn('rounded-full', styles.agentAvatar)}>
-            <GeneratedAvatar name={researcher} size={18} variant="beam" />
-          </span>
+          <GeneratedAvatar name={researcher} size={18} variant="beam" />
           <span>{researcher}</span>
-          <span className="rounded-sm bg-violet-500/15 px-1 py-px text-[10px] leading-none">
+          <span className="rounded-sm bg-foreground/[0.06] px-1 py-px text-[10px] leading-none text-muted-foreground">
             {canute.role}
           </span>
-          <span className="text-violet-600/70 dark:text-violet-300/70">
+          <span className="text-muted-foreground">
             {sourcesRead === 0 ? 'searching' : 'reading'}
           </span>
           <span className="relative h-5 w-[230px] overflow-hidden">

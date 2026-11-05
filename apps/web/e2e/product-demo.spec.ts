@@ -477,6 +477,11 @@ test('the editor top bar shows the source Canute is reading, one after another',
   await expect(research).toContainText('Canute')
   await expect(research).toContainText('reading')
   await expect(research.getByText('Research Agent', { exact: true })).toBeVisible()
+  const muted = await editor
+    .locator('[data-demo-field="title"] span')
+    .first()
+    .evaluate((element) => getComputedStyle(element).color)
+  await expect(research.getByText('Research Agent', { exact: true })).toHaveCSS('color', muted)
   await expect(research).not.toContainText(/\d+ sources?/)
   await expect(current.locator('[data-demo-source-url]')).toHaveText(
     'modelcontextprotocol.io/specification',
