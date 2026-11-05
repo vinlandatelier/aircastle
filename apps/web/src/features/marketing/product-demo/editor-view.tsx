@@ -7,6 +7,7 @@ import {
   ArrowRightIcon,
   ArrowUpIcon,
   ShareIcon,
+  XIcon,
   ArrowUpRightIcon,
   CheckIcon,
   BrainIcon,
@@ -18,7 +19,6 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   GlobeLockIcon,
-  PencilIcon,
   RotateCwIcon,
   BoldIcon,
   CalendarIcon,
@@ -702,8 +702,8 @@ function TopBar({
             data-demo-preview
             className="flex h-8 items-center gap-1.5 rounded-md rounded-r-none border bg-background pr-3 pl-2.5 dark:bg-input/30"
           >
-            {previewing ? <PencilIcon className="size-4" /> : <EyeIcon className="size-4" />}
-            {previewing ? 'Edit' : 'Preview'}
+            {previewing ? <XIcon className="size-4" /> : <EyeIcon className="size-4" />}
+            {previewing ? 'Close Preview' : 'Preview'}
           </span>
           <span
             data-demo-preview-external
@@ -934,11 +934,14 @@ function SeoGroup({ elapsed, socialImage }: { elapsed: number | null; socialImag
         </Field>
       </div>
       <Field name="social-image" label="Social image" empty={socialImage !== 'done'}>
-        <div className="relative rounded-md">
+        <div className="relative w-full max-w-[240px] rounded-md">
           {socialImage === 'starting' || socialImage === 'idle' ? (
-            <MediaPlaceholder hint="1200 × 630" className="h-32" />
+            <MediaPlaceholder hint="1200 × 630" className="aspect-[1200/630]" />
           ) : (
-            <div className="relative h-32 overflow-hidden rounded-md bg-muted">
+            <div
+              data-demo-social-cover
+              className="relative aspect-[1200/630] overflow-hidden rounded-md bg-muted"
+            >
               {socialImage === 'generating' ? (
                 <div className={cn('absolute inset-0', styles.coverSheen)} />
               ) : (
@@ -1171,6 +1174,9 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
             </span>
           </span>
           <RotateCwIcon className="size-3.5 text-muted-foreground" />
+          <span data-demo-site-close className="flex text-muted-foreground">
+            <XIcon className="size-4" />
+          </span>
           {!loaded && (
             <span
               className={cn(
@@ -1183,7 +1189,7 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
         <div
           data-demo-site-page
           data-state={loaded ? 'loaded' : 'loading'}
-          className="min-h-0 flex-1 overflow-hidden bg-[#f7f7f5] text-neutral-900"
+          className="min-h-0 flex-1 overflow-hidden bg-[#f7f7f5] dark:bg-[#0f0f11] text-neutral-900 dark:text-neutral-100"
         >
           {loaded && <SitePage bodyElapsed={bodyElapsed} />}
         </div>
@@ -1197,17 +1203,18 @@ const siteNav = ['Product', 'Customers', 'Changelog', 'Pricing', 'Blog'] as cons
 function SiteNav() {
   return (
     <div className="flex h-16 shrink-0 items-center justify-between px-8">
-      <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-neutral-950">
+      <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-neutral-950 dark:text-white">
         <GeneratedAvatar name="Acme Inc" size={20} />
         Acme
       </span>
-      <span className="flex items-center gap-0.5 rounded-full border border-black/[0.06] bg-white/70 p-1 text-[13px] text-neutral-500 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+      <span className="flex items-center gap-0.5 rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/70 dark:bg-white/[0.04] p-1 text-[13px] text-neutral-500 dark:text-neutral-400 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
         {siteNav.map((item) => (
           <span
             key={item}
             className={cn(
               'rounded-full px-3 py-1',
-              item === 'Blog' && 'bg-black/[0.05] text-neutral-950',
+              item === 'Blog' &&
+                'bg-black/[0.05] dark:bg-white/[0.08] text-neutral-950 dark:text-white',
             )}
           >
             {item}
@@ -1215,8 +1222,8 @@ function SiteNav() {
         ))}
       </span>
       <span className="flex items-center gap-4 text-[13px]">
-        <span className="text-neutral-500">Sign in</span>
-        <span className="flex h-8 items-center gap-1 rounded-full bg-neutral-950 pr-2.5 pl-3.5 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.15)]">
+        <span className="text-neutral-500 dark:text-neutral-400">Sign in</span>
+        <span className="flex h-8 items-center gap-1 rounded-full bg-neutral-950 pr-2.5 pl-3.5 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.15)] dark:bg-white dark:text-neutral-950">
           Get started
           <ArrowRightIcon className="size-3.5" />
         </span>
@@ -1230,36 +1237,38 @@ function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
     <div className={cn('flex flex-col', styles.streamCard)}>
       <SiteNav />
       <article className="mx-auto flex w-full max-w-[600px] flex-col px-6 pt-9">
-        <span className="flex items-center gap-1 text-[13px] text-neutral-500">
+        <span className="flex items-center gap-1 text-[13px] text-neutral-500 dark:text-neutral-400">
           <ArrowLeftIcon className="size-3.5" />
           All posts
         </span>
-        <div className="mt-6 flex items-center gap-2 text-xs text-neutral-500">
-          <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-neutral-700">Product</span>
+        <div className="mt-6 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="rounded-full bg-black/[0.04] dark:bg-white/[0.06] px-2 py-0.5 text-neutral-700 dark:text-neutral-300">
+            Product
+          </span>
           <span>Nov 5, 2026</span>
-          <span className="text-neutral-300">·</span>
+          <span className="text-neutral-300 dark:text-neutral-600">·</span>
           <span>{bodyReadingTime}</span>
         </div>
-        <h1 className="mt-4 text-[38px] leading-[1.08] font-semibold tracking-[-0.03em] text-neutral-950">
+        <h1 className="mt-4 text-[38px] leading-[1.08] font-semibold tracking-[-0.03em] text-neutral-950 dark:text-white">
           Introducing Acme MCP
         </h1>
-        <p className="mt-4 text-base leading-7 text-neutral-500">
+        <p className="mt-4 text-base leading-7 text-neutral-500 dark:text-neutral-400">
           Connect Claude, Cursor and any MCP client to your Acme workspace, and work with your
           content from the chat.
         </p>
-        <div className="mt-6 flex items-center justify-between border-y border-black/[0.06] py-4 text-[13px]">
+        <div className="mt-6 flex items-center justify-between border-y border-black/[0.06] dark:border-white/[0.08] py-4 text-[13px]">
           <span className="flex items-center gap-2.5">
             <PersonAvatar name="Abyan" className="size-8" />
             <span className="flex flex-col leading-tight">
-              <span className="font-medium text-neutral-950">Abyan</span>
-              <span className="text-neutral-500">Engineering</span>
+              <span className="font-medium text-neutral-950 dark:text-white">Abyan</span>
+              <span className="text-neutral-500 dark:text-neutral-400">Engineering</span>
             </span>
           </span>
-          <span className="flex items-center gap-1.5 text-neutral-500">
-            <span className="flex size-8 items-center justify-center rounded-full border border-black/[0.06] bg-white">
+          <span className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
+            <span className="flex size-8 items-center justify-center rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white dark:bg-white/[0.04]">
               <LinkIcon className="size-3.5" />
             </span>
-            <span className="flex size-8 items-center justify-center rounded-full border border-black/[0.06] bg-white">
+            <span className="flex size-8 items-center justify-center rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white dark:bg-white/[0.04]">
               <ShareIcon className="size-3.5" />
             </span>
           </span>
@@ -1270,7 +1279,7 @@ function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
         >
           <CoverArt />
         </div>
-        <div className="mt-9 flex flex-col gap-3.5 text-[15px] leading-7 text-neutral-600 [&_code]:bg-black/[0.05] [&_h2]:pt-4 [&_h2]:text-[21px] [&_h2]:font-semibold [&_h2]:tracking-[-0.015em] [&_h2]:text-neutral-950 [&_pre]:border [&_pre]:border-black/[0.06] [&_pre]:bg-white [&_pre]:text-neutral-800">
+        <div className="mt-9 flex flex-col gap-3.5 text-[15px] leading-7 text-neutral-600 dark:text-neutral-400 [&_code]:bg-black/[0.05] dark:[&_code]:bg-white/[0.08] [&_h2]:pt-4 [&_h2]:text-[21px] [&_h2]:font-semibold [&_h2]:tracking-[-0.015em] [&_h2]:text-neutral-950 dark:[&_h2]:text-white [&_pre]:border [&_pre]:border-black/[0.06] dark:[&_pre]:border-white/[0.08] [&_pre]:bg-white dark:[&_pre]:bg-white/[0.04] [&_pre]:text-neutral-800 dark:[&_pre]:text-neutral-200">
           {bodyElapsed !== null && <DraftBlocks elapsed={bodyElapsed} />}
         </div>
       </article>

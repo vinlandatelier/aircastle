@@ -1315,6 +1315,21 @@ for (const theme of ['light', 'dark'] as const) {
     )
     if (theme === 'dark') expect(field).toBeGreaterThan(bar)
     else expect(field).toBeLessThan(bar)
+    await page.clock.runFor(story(800))
+    const sitePage = site.locator('[data-demo-site-page]')
+    const pageLightness = lightness(
+      await sitePage.evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    const titleLightness = lightness(
+      await sitePage.locator('h1').evaluate((element) => getComputedStyle(element).color),
+    )
+    if (theme === 'dark') {
+      expect(pageLightness).toBeLessThan(0.3)
+      expect(titleLightness).toBeGreaterThan(0.8)
+    } else {
+      expect(pageLightness).toBeGreaterThan(0.9)
+      expect(titleLightness).toBeLessThan(0.3)
+    }
   })
 }
 
@@ -1351,8 +1366,13 @@ test('clicking Preview swaps the editor for the Acme site, address bar first, th
   await expect(site).not.toContainText('Draft')
   await expect(sitePage).toHaveAttribute('data-state', 'loading')
   await expect(sitePage).not.toContainText('Introducing Acme MCP')
-  await expect(preview).toContainText('Edit')
-  await expect(preview).not.toContainText('Preview')
+  await expect(preview).toHaveText('Close Preview')
+  await expect(preview.locator('svg.lucide-x')).toHaveCount(1)
+  await expect(site.locator('[data-demo-site-close] svg.lucide-x')).toHaveCount(1)
+  const refresh = await site.locator('svg.lucide-rotate-cw').boundingBox()
+  const close = await site.locator('[data-demo-site-close]').boundingBox()
+  if (!refresh || !close) throw new Error('Browser bar is not laid out')
+  expect(close.x).toBeGreaterThan(refresh.x + refresh.width)
   await expect(editor.locator('[data-demo-editor-scroll]')).toHaveAttribute('data-hidden', 'true')
   await expect(editor.locator('[data-demo-top-bar]')).toBeVisible()
   await expect(frame.locator('[data-demo-research-panel]')).toHaveAttribute('data-state', 'open')
@@ -1409,4 +1429,13 @@ test('the site cover is the same image as the editor cover, only larger', async 
   if (!editorCover || !siteCover) throw new Error('Covers are not rendered')
   expect(siteCover.title).toBeCloseTo(editorCover.title, 1)
   expect(siteCover.font).toBeCloseTo(editorCover.font, 2)
+  const socialCover = await proportions(
+    frame.locator('[data-demo-field="social-image"] [data-demo-social-cover]'),
+  )
+  if (!socialCover) throw new Error('Social image is not rendered')
+  expect(socialCover.title).toBeCloseTo(editorCover.title, 1)
+  const socialBox = await frame
+    .locator('[data-demo-field="social-image"] [data-demo-social-cover]')
+    .evaluate((element) => element.clientWidth / element.clientHeight)
+  expect(socialBox).toBeCloseTo(1200 / 630, 1)
 })
