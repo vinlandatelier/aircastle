@@ -1265,6 +1265,57 @@ test('the cursor heads for Preview once the social image is done, while SEO keep
   expect(await authors.boundingBox()).toEqual(settled)
 })
 
+async function openSitePreview(page: import('@playwright/test').Page, theme: 'light' | 'dark') {
+  await page.addInitScript((value) => localStorage.setItem('aircastle-theme', value), theme)
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
+  await frame.scrollIntoViewIfNeeded()
+  const site = frame.locator('[data-demo-site-preview]')
+  await page.clock.runFor(story(17000))
+  for (let tick = 0; tick < 120 && (await site.count()) === 0; tick += 1)
+    await page.clock.runFor(story(100))
+  await expect(site).toHaveCount(1)
+  await page.waitForTimeout(400)
+  return { frame, site }
+}
+
+function lightness(colour: string) {
+  const match = /oklch\(([\d.]+)/.exec(colour) ?? /oklab\(([\d.]+)/.exec(colour)
+  if (match?.[1]) return Number(match[1])
+  const rgb = /rgba?\((\d+), (\d+), (\d+)/.exec(colour)
+  if (!rgb) throw new Error(`Unreadable colour ${colour}`)
+  return (Number(rgb[1]) + Number(rgb[2]) + Number(rgb[3])) / 765
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`the site preview sits flush in the shell with a ${theme} browser bar`, async ({ page }) => {
+    const { frame, site } = await openSitePreview(page, theme)
+    const topBar = await frame.locator('[data-demo-top-bar]').boundingBox()
+    const chrome = site.locator('[data-demo-site-chrome]')
+    const siteBox = await site.locator('[data-demo-site-window]').boundingBox()
+    const panel = await frame.locator('[data-demo-research-panel]').boundingBox()
+    const sidebar = await frame.locator('[data-demo-sidebar]').boundingBox()
+    if (!topBar || !siteBox || !panel || !sidebar) throw new Error('Preview is not laid out')
+    expect(Math.abs(siteBox.y - (topBar.y + topBar.height))).toBeLessThanOrEqual(1)
+    expect(Math.abs(siteBox.x - (sidebar.x + sidebar.width))).toBeLessThanOrEqual(1)
+    expect(Math.abs(siteBox.x + siteBox.width - panel.x)).toBeLessThanOrEqual(1)
+    await expect(site.locator('[data-demo-site-window]')).toHaveCSS('border-top-left-radius', '0px')
+    const bar = lightness(
+      await chrome.evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    const field = lightness(
+      await site
+        .locator('[data-demo-site-field]')
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    if (theme === 'dark') expect(field).toBeGreaterThan(bar)
+    else expect(field).toBeLessThan(bar)
+  })
+}
+
 test('clicking Preview swaps the editor for the Acme site, address bar first, then the page', async ({
   page,
 }) => {
@@ -1295,7 +1346,7 @@ test('clicking Preview swaps the editor for the Acme site, address bar first, th
   for (let tick = 0; tick < 10 && (await site.count()) === 0; tick += 1)
     await page.clock.runFor(story(50))
   await expect(address).toHaveText('acme.com/blog/introducing-acme-mcp')
-  await expect(site.locator('[data-demo-site-draft]')).toHaveText('Draft')
+  await expect(site).not.toContainText('Draft')
   await expect(sitePage).toHaveAttribute('data-state', 'loading')
   await expect(sitePage).not.toContainText('Introducing Acme MCP')
   await expect(preview).toContainText('Edit')

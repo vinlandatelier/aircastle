@@ -1145,26 +1145,29 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
   return (
     <div
       data-demo-site-preview
-      className="absolute inset-0 flex flex-col p-6 transition-opacity duration-300 starting:opacity-0"
+      className="absolute inset-0 flex flex-col transition-opacity duration-300 starting:opacity-0"
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background shadow-sm">
-        <div className="relative flex h-10 shrink-0 items-center gap-2 border-b bg-muted/40 px-3">
-          <span className="flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded-md bg-background px-2 text-xs text-muted-foreground">
+      <div data-demo-site-window className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          data-demo-site-chrome
+          className="relative flex h-11 shrink-0 items-center gap-2.5 border-b bg-background px-3"
+        >
+          <span
+            data-demo-site-field
+            className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md bg-muted/60 px-2.5 text-xs text-muted-foreground"
+          >
             <GlobeLockIcon className="size-3.5 shrink-0" />
             <span data-demo-site-address className="truncate">
               {siteUrl}
-            </span>
-            <span
-              data-demo-site-draft
-              className="ml-auto rounded-sm bg-amber-500/15 px-1 py-px text-[10px] leading-none text-amber-700 dark:text-amber-300"
-            >
-              Draft
             </span>
           </span>
           <RotateCwIcon className="size-3.5 text-muted-foreground" />
           {!loaded && (
             <span
-              className={cn('absolute bottom-0 left-0 h-0.5 bg-foreground/70', styles.siteProgress)}
+              className={cn(
+                'absolute -bottom-px left-0 h-0.5 bg-foreground/70',
+                styles.siteProgress,
+              )}
             />
           )}
         </div>
@@ -1180,29 +1183,55 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
   )
 }
 
+const siteNav = ['Product', 'Customers', 'Pricing', 'Changelog', 'Blog'] as const
+
 function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
   return (
     <div className={cn('flex flex-col', styles.streamCard)}>
-      <div className="flex h-12 items-center justify-between border-b border-neutral-200 px-6 text-xs text-neutral-600">
-        <span className="flex items-center gap-2 text-sm font-medium text-neutral-900">
-          <GeneratedAvatar name="Acme Inc" size={18} />
+      <div className="flex h-14 shrink-0 items-center justify-between px-8">
+        <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+          <GeneratedAvatar name="Acme Inc" size={20} />
           Acme
         </span>
-        <span className="flex gap-5">
-          <span>Product</span>
-          <span>Docs</span>
-          <span className="text-neutral-900">Blog</span>
+        <span className="flex gap-6 text-[13px] text-neutral-500">
+          {siteNav.map((item) => (
+            <span key={item} className={cn(item === 'Blog' && 'text-neutral-900')}>
+              {item}
+            </span>
+          ))}
+        </span>
+        <span className="flex items-center gap-3 text-[13px]">
+          <span className="text-neutral-500">Sign in</span>
+          <span className="rounded-full bg-neutral-900 px-3.5 py-1.5 text-white">Get started</span>
         </span>
       </div>
-      <article className="mx-auto flex w-full max-w-[560px] flex-col gap-4 px-6 pt-8">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs text-neutral-500">Nov 5, 2026 · Abyan</span>
-          <h1 className="text-2xl tracking-tight">Introducing Acme MCP</h1>
+      <article className="mx-auto flex w-full max-w-[600px] flex-col px-6 pt-10">
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-neutral-700">
+            Product
+          </span>
+          <span>Nov 5, 2026</span>
+          <span className="text-neutral-300">·</span>
+          <span>{bodyReadingTime}</span>
         </div>
-        <div className="relative aspect-[2/1] overflow-hidden rounded-lg">
+        <h1 className="mt-4 text-[34px] leading-[1.1] font-semibold tracking-[-0.02em]">
+          Introducing Acme MCP
+        </h1>
+        <p className="mt-3 text-[15px] leading-6 text-neutral-500">
+          Connect Claude, Cursor and any MCP client to your Acme workspace, and work with your
+          content from the chat.
+        </p>
+        <div className="mt-5 flex items-center gap-2.5 text-[13px]">
+          <PersonAvatar name="Abyan" className="size-7" />
+          <span className="flex flex-col leading-tight">
+            <span className="font-medium">Abyan</span>
+            <span className="text-neutral-500">Engineering</span>
+          </span>
+        </div>
+        <div className="relative mt-7 aspect-[1200/630] overflow-hidden rounded-xl ring-1 ring-black/5">
           <CoverArt />
         </div>
-        <div className="flex flex-col gap-2.5 leading-6">
+        <div className="mt-8 flex flex-col gap-3 text-[15px] leading-7 text-neutral-700 [&_h2]:pt-3 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-neutral-900 [&_pre]:bg-neutral-100 [&_pre]:text-neutral-800">
           {bodyElapsed !== null && <DraftBlocks elapsed={bodyElapsed} />}
         </div>
       </article>
