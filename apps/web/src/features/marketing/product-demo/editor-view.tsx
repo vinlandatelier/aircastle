@@ -12,6 +12,7 @@ import {
   TriangleAlertIcon,
   CircleCheckIcon,
   EllipsisVerticalIcon,
+  ExternalLinkIcon,
   EyeIcon,
   BoldIcon,
   CalendarIcon,
@@ -688,12 +689,20 @@ function TopBar({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <ResearchStatus steps={steps} hovered={researchHovered} docked={researchDocked} />
-        <span
-          data-demo-preview
-          className="flex h-8 items-center gap-1.5 rounded-md border bg-background pr-3 pl-2.5 dark:bg-input/30"
-        >
-          <EyeIcon className="size-4" />
-          Preview
+        <span className="flex">
+          <span
+            data-demo-preview
+            className="flex h-8 items-center gap-1.5 rounded-md rounded-r-none border bg-background pr-3 pl-2.5 dark:bg-input/30"
+          >
+            <EyeIcon className="size-4" />
+            Preview
+          </span>
+          <span
+            data-demo-preview-external
+            className="flex size-8 items-center justify-center rounded-md rounded-l-none border border-l-0 bg-background dark:bg-input/30"
+          >
+            <ExternalLinkIcon className="size-4" />
+          </span>
         </span>
         <span
           data-demo-publish

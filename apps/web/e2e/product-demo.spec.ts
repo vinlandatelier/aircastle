@@ -352,6 +352,17 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   const publishBox = await publish.boundingBox()
   if (!previewBox || !publishBox) throw new Error('Top bar is not laid out')
   expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(publishBox.x)
+  const external = editor.locator('[data-demo-preview-external]')
+  await expect(external.locator('svg.lucide-external-link')).toHaveCount(1)
+  await expect(preview).toHaveCSS('border-top-right-radius', '0px')
+  await expect(external).toHaveCSS('border-top-left-radius', '0px')
+  await expect(external).toHaveCSS('border-left-width', '0px')
+  const externalBox = await external.boundingBox()
+  if (!externalBox) throw new Error('Preview split is not laid out')
+  expect(Math.abs(externalBox.x - (previewBox.x + previewBox.width))).toBeLessThanOrEqual(1)
+  expect(externalBox.height).toBeCloseTo(previewBox.height, 1)
+  expect(externalBox.width).toBeCloseTo(externalBox.height, 1)
+  expect(externalBox.x + externalBox.width).toBeLessThanOrEqual(publishBox.x)
 
   for (const field of ['title', 'slug'])
     await expect(editor.locator(`[data-demo-field="${field}"]`)).toHaveAttribute(
