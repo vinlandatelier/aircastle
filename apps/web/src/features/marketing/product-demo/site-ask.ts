@@ -67,6 +67,7 @@ export const askTiming = {
   selectEnds,
   dropdownOpens,
   typingStarts,
+  enterPressed,
   sent,
   thinkingEnds,
   reviewNoted,

@@ -352,7 +352,9 @@ export function frameAt(elapsed: number): Frame {
   const shortcut: Shortcut | undefined =
     elapsed >= shortcutShownAt && elapsed < shortcutHiddenAt
       ? 'open-agents'
-      : elapsed >= sendAt - 60 && elapsed < sendAt + enterChipDuration
+      : (elapsed >= sendAt - 60 && elapsed < sendAt + enterChipDuration) ||
+          (elapsed >= askAt + askTiming.enterPressed - 60 &&
+            elapsed < askAt + askTiming.enterPressed + enterChipDuration)
         ? 'send'
         : undefined
   return {

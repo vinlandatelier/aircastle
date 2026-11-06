@@ -1552,10 +1552,14 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
     const state = await frame.evaluate(() => ({
       cursor: document.querySelector('[data-demo-cursor]')?.getAttribute('data-state'),
       pressed: document.querySelector('[data-demo-ask-send]')?.getAttribute('data-pressed'),
+      chip: document.querySelector('[data-demo-shortcut]')?.getAttribute('data-state'),
+      keys: document.querySelector('[data-demo-shortcut]')?.textContent,
     }))
     if (state.cursor === 'clicking') clickedToSend = true
     if (state.pressed === 'true') {
       enterPressed = true
+      expect(state.chip).toBe('shown')
+      expect(state.keys).toBe('↵')
       const pressedAt = await box(cursor)
       expect(Math.abs(pressedAt.x - typedAt.x)).toBeLessThan(2)
       expect(Math.abs(pressedAt.y - typedAt.y)).toBeLessThan(2)
