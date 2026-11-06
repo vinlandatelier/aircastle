@@ -1203,7 +1203,7 @@ const siteNav = ['Product', 'Customers', 'Changelog', 'Pricing', 'Blog'] as cons
 function SiteNav() {
   return (
     <div className="flex h-16 shrink-0 items-center justify-between px-8">
-      <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-neutral-950 dark:text-white">
+      <span className="flex items-center gap-2 text-[15px] font-medium tracking-tight text-neutral-950 dark:text-white">
         <GeneratedAvatar name="Acme Inc" size={20} />
         Acme
       </span>
@@ -1249,7 +1249,7 @@ function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
           <span className="text-neutral-300 dark:text-neutral-600">·</span>
           <span>{bodyReadingTime}</span>
         </div>
-        <h1 className="mt-4 text-[38px] leading-[1.08] font-semibold tracking-[-0.03em] text-neutral-950 dark:text-white">
+        <h1 className="mt-4 text-[38px] leading-[1.08] font-medium tracking-[-0.03em] text-neutral-950 dark:text-white">
           Introducing Acme MCP
         </h1>
         <p className="mt-4 text-base leading-7 text-neutral-500 dark:text-neutral-400">

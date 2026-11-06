@@ -1439,3 +1439,14 @@ test('the site cover is the same image as the editor cover, only larger', async 
     .evaluate((element) => element.clientWidth / element.clientHeight)
   expect(socialBox).toBeCloseTo(1200 / 630, 1)
 })
+
+test('the Acme brand and the post title use a medium weight', async ({ page }) => {
+  const { site } = await openSitePreview(page, 'light')
+  const weight = (locator: import('@playwright/test').Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).fontWeight)
+  await page.clock.runFor(story(800))
+
+  await expect(site.locator('[data-demo-site-page] h1')).toHaveText('Introducing Acme MCP')
+  expect(await weight(site.locator('[data-demo-site-page] h1'))).toBe('500')
+  expect(await weight(site.getByText('Acme', { exact: true }).first())).toBe('500')
+})
