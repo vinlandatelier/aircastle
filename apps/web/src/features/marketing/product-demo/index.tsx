@@ -3,6 +3,7 @@ import {
   ArrowUpIcon,
   MousePointer2Icon,
   PointerIcon,
+  TextCursorIcon,
   BellIcon,
   BookOpenIcon,
   ChevronDownIcon,
@@ -418,7 +419,17 @@ const cursorSpots = {
   decision: { left: 1045, top: 518 },
   editor: { left: 880, top: 430 },
   preview: { left: 790, top: 112 },
+  'line-start': { left: 210, top: 299 },
+  'line-end': { left: 425, top: 327 },
+  'ask-input': { left: 262, top: 462 },
+  'ask-send': { left: 566, top: 467 },
 } as const
+
+const cursorShapes: Record<CursorShape, LucideIcon> = {
+  arrow: MousePointer2Icon,
+  pointer: PointerIcon,
+  text: TextCursorIcon,
+}
 
 function DemoCursor({
   state,
@@ -426,21 +437,23 @@ function DemoCursor({
   target,
   from,
   progress,
+  curve,
 }: {
   state: CursorState
   shape: CursorShape
   target: CursorTarget
   from: CursorTarget
   progress: number
+  curve: number
 }) {
   const start = cursorSpots[from]
   const spot = cursorSpots[target]
   const dx = spot.left - start.left
   const dy = spot.top - start.top
-  const bend = Math.sin(Math.PI * progress) * 0.12
+  const bend = Math.sin(Math.PI * progress) * curve
   const left = start.left + dx * progress - dy * bend
   const top = start.top + dy * progress + dx * bend
-  const Shape = shape === 'pointer' ? PointerIcon : MousePointer2Icon
+  const Shape = cursorShapes[shape]
   return (
     <span
       data-demo-cursor
@@ -685,6 +698,7 @@ export function ProductDemo() {
             target={frame.cursorTarget}
             from={frame.cursorFrom}
             progress={frame.cursorProgress}
+            curve={frame.cursorBend}
           />
         </div>
       </div>

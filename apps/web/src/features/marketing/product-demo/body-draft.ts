@@ -3,11 +3,20 @@ export type DraftBlock =
   | { kind: 'ul'; items: readonly string[] }
   | { kind: 'code'; lines: readonly string[] }
 
+/** The post's first sentence, which the user asks Air to rework on the live site. */
+export const openingLine =
+  'Acme MCP lets any MCP client read and act on your workspace, with the same permissions as the person using it.'
+
+/** The rest of the post's first paragraph, after the opening line. */
+export const openingRest =
+  'Connect Claude, Cursor or another client to mcp.acme.com, and your assistant can search, read and update your collections from the chat.'
+
+/** Thorfinn's rewrite of the opening line, after Thorkell's review. */
+export const rewrittenLine =
+  'Ask Claude to find every stale draft in your workspace, and it works in Acme the way you would, with your permissions.'
+
 const bodyDraft: readonly DraftBlock[] = [
-  {
-    kind: 'p',
-    text: 'Acme now runs a remote MCP server at mcp.acme.com. Connect Claude, Cursor or another MCP client, and your assistant can search, read and update your Acme collections from the chat.',
-  },
+  { kind: 'p', text: `${openingLine} ${openingRest}` },
   {
     kind: 'p',
     text: 'MCP support in Acme used to mean running a local server, and it was in beta. The remote server replaces it. There is nothing to install, and each connection reaches only the collections you allow.',

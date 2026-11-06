@@ -44,11 +44,27 @@ import {
   type Artifact,
   type ResearchEntry,
 } from './research'
-import { askeladd, canute, einar, orchestrator, thorfinn, type DemoAgent } from './agents'
+import { askeladd, canute, einar, orchestrator, thorfinn, thorkell, type DemoAgent } from './agents'
 import { MentionText } from './mention'
 import { PersonAvatar } from './person'
-import { seoTiming, type CoverState } from './timeline'
-import { bodyDraftDuration, bodyDraftTimed, bodyReadingTime, type DraftSegment } from './body-draft'
+import { prompt, seoTiming, type CoverState } from './timeline'
+import {
+  bodyDraftDuration,
+  bodyDraftTimed,
+  bodyReadingTime,
+  openingLine,
+  openingRest,
+  type DraftSegment,
+} from './body-draft'
+import {
+  askInstruction,
+  askOpenAt,
+  askTiming,
+  askTypedAt,
+  rewrittenWordsAt,
+  selectedCharsAt,
+  siteScrollAt,
+} from './site-ask'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageHeader } from '@/components/ui/message'
 import {
@@ -577,8 +593,155 @@ function DecisionCard({ state }: { state: 'asking' | 'sent' }) {
   )
 }
 
-function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
+function AgentByline({ agent }: { agent: DemoAgent }) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <GeneratedAvatar name={agent.name} size={16} variant="beam" />
+      <span className="text-foreground">{agent.name}</span>
+      <span className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none">{agent.role}</span>
+    </span>
+  )
+}
+
+function ThreadMessage({ agent, children }: { agent: DemoAgent; children: React.ReactNode }) {
+  return (
+    <div data-demo-thread-message className={cn('flex flex-col gap-1', entering)}>
+      <AgentByline agent={agent} />
+      <div className="pl-[22px] text-xs leading-5">{children}</div>
+    </div>
+  )
+}
+
+function UserMessage({ quote, children }: { quote?: string; children: React.ReactNode }) {
+  return (
+    <Message
+      data-demo-chat-message
+      data-from="user"
+      align="end"
+      className={cn('shrink-0', entering)}
+    >
+      <MessageContent className="items-end gap-1.5">
+        {quote && (
+          <span
+            data-demo-chat-quote
+            className="line-clamp-2 max-w-[92%] border-l-2 pl-2 text-xs leading-5 text-muted-foreground"
+          >
+            {quote}
+          </span>
+        )}
+        <Bubble align="end" variant="muted" className="max-w-[92%]">
+          <BubbleContent>{children}</BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
+  )
+}
+
+function AirMessage({ children }: { children: React.ReactNode }) {
+  return (
+    <Message data-demo-chat-message data-from="air" className={cn('shrink-0', entering)}>
+      <MessageContent>
+        <p className="leading-relaxed">{children}</p>
+      </MessageContent>
+    </Message>
+  )
+}
+
+const airReply = 'Thorfinn rewrote the opening line to lead with a task. Have a look.'
+
+function AirChat({ elapsed }: { elapsed: number }) {
+  const t = askTiming
+  const rewriting = elapsed >= t.rewriteStarts && elapsed < t.rewriteEnds
+  return (
+    <>
+      <UserMessage>{prompt}</UserMessage>
+      <AirMessage>
+        <MentionText text="On it. @Thorfinn is drafting the post, @Canute is researching, @Askeladd has SEO and @Einar is making the cover." />
+      </AirMessage>
+      <UserMessage quote={openingLine}>{askInstruction}</UserMessage>
+      {elapsed < t.thinkingEnds ? (
+        <TraceLine
+          data-demo-chat-thinking
+          status="running"
+          className={cn('shrink-0 text-xs', entering)}
+        >
+          <TraceIcon>
+            <BrainIcon className="size-3.5" />
+          </TraceIcon>
+          <TraceTitle>Thinking…</TraceTitle>
+        </TraceLine>
+      ) : (
+        <div className="flex shrink-0 flex-col gap-2.5">
+          <TraceLine data-demo-delegation className={cn('text-xs text-foreground', entering)}>
+            <TraceIcon>
+              <ArrowUpRightIcon className="size-3.5" />
+            </TraceIcon>
+            <TraceTitle className="whitespace-normal">
+              <MentionText text={`Asked @${thorkell.name} to review the opening line`} />
+            </TraceTitle>
+          </TraceLine>
+          <div className="ml-[7px] flex flex-col gap-2.5 border-l pl-3.5">
+            {elapsed >= t.reviewNoted && (
+              <ThreadMessage agent={thorkell}>
+                <MentionText text="It opens on how MCP works. Lead with a task a team would ask for, and keep the permissions point. @Thorfinn, over to you." />
+              </ThreadMessage>
+            )}
+            {elapsed >= t.rewriteStarts && (
+              <ThreadMessage agent={thorfinn}>
+                {rewriting ? (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <LoaderCircleIcon className="size-3.5 motion-safe:animate-spin" />
+                    Rewriting the opening line…
+                  </span>
+                ) : (
+                  'Rewrote it to open on a task.'
+                )}
+              </ThreadMessage>
+            )}
+            {elapsed >= t.approved && (
+              <ThreadMessage agent={thorkell}>Reads well. Approved.</ThreadMessage>
+            )}
+          </div>
+          {elapsed >= t.finished && (
+            <TraceLine data-demo-review-finished className={cn('text-xs', entering)}>
+              <TraceIcon>
+                <CircleCheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              </TraceIcon>
+              <TraceTitle>{thorkell.name} finished reviewing</TraceTitle>
+            </TraceLine>
+          )}
+        </div>
+      )}
+      {elapsed >= t.replied && (
+        <AirMessage>
+          {airReply.split(' ').map((word, index, words) => (
+            <span
+              key={index}
+              className={styles.streamWord}
+              style={{ animationDelay: `${index * wordInterval}ms` }}
+            >
+              {index < words.length - 1 ? `${word} ` : word}
+            </span>
+          ))}
+        </AirMessage>
+      )}
+    </>
+  )
+}
+
+function ResearchPanel({
+  open,
+  steps,
+  askElapsed,
+}: {
+  open: boolean
+  steps: number
+  askElapsed: number | null
+}) {
   const done = steps >= researchLog.length
+  const airChat = askElapsed !== null && askElapsed >= askTiming.sent
+  const chatAgent = airChat ? orchestrator : canute
+
   return (
     <div
       data-demo-research-panel
@@ -597,56 +760,74 @@ function ResearchPanel({ open, steps }: { open: boolean; steps: number }) {
           className="-ml-1.5 flex min-w-0 items-center gap-2 rounded-md py-1 pr-1 pl-1.5 whitespace-nowrap"
         >
           <span data-demo-panel-avatar className="flex rounded-full">
-            <GeneratedAvatar name={researcher} size={22} variant="beam" />
+            {airChat ? (
+              <span className="air-mascot block size-[22px]" />
+            ) : (
+              <GeneratedAvatar name={researcher} size={22} variant="beam" />
+            )}
           </span>
-          <span>{researcher}</span>
+          <span>{chatAgent.name}</span>
           <span
             data-demo-agent-label
             className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none text-muted-foreground"
           >
-            {canute.role}
+            {chatAgent.role}
           </span>
           <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
         </div>
         <EllipsisVerticalIcon className="size-4 text-muted-foreground" />
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
-        <Message align="end" className="shrink-0">
-          <MessageContent className="gap-1.5">
-            <MessageHeader data-demo-research-sender className="gap-1.5 px-0 text-muted-foreground">
-              <span className="air-mascot block size-4 shrink-0" />
-              {orchestrator.name}
-              <span className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none">
-                {orchestrator.role}
-              </span>
-            </MessageHeader>
-            <Bubble align="end" variant="muted" data-demo-research-request className="max-w-[92%]">
-              <BubbleContent className="flex flex-col gap-1.5">
-                <p>
-                  <MentionText text={researchBrief.goal} />
-                </p>
-                <p>The post should cover:</p>
-                <ul className="list-disc pl-4">
-                  {researchBrief.covers.map((point) => (
-                    <li key={point}>{point}</li>
-                  ))}
-                </ul>
-                <p>{researchBrief.scope}</p>
-              </BubbleContent>
-            </Bubble>
-          </MessageContent>
-        </Message>
-        <Message className="shrink-0">
-          <MessageContent className="gap-4">
-            <ResearchChain steps={steps} />
-            {done && synthesis?.kind === 'synthesis' && (
-              <ResearchReply artifacts={synthesis.artifacts} />
-            )}
-          </MessageContent>
-        </Message>
+        {airChat ? (
+          <AirChat elapsed={askElapsed} />
+        ) : (
+          <>
+            <Message align="end" className="shrink-0">
+              <MessageContent className="gap-1.5">
+                <MessageHeader
+                  data-demo-research-sender
+                  className="gap-1.5 px-0 text-muted-foreground"
+                >
+                  <span className="air-mascot block size-4 shrink-0" />
+                  {orchestrator.name}
+                  <span className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none">
+                    {orchestrator.role}
+                  </span>
+                </MessageHeader>
+                <Bubble
+                  align="end"
+                  variant="muted"
+                  data-demo-research-request
+                  className="max-w-[92%]"
+                >
+                  <BubbleContent className="flex flex-col gap-1.5">
+                    <p>
+                      <MentionText text={researchBrief.goal} />
+                    </p>
+                    <p>The post should cover:</p>
+                    <ul className="list-disc pl-4">
+                      {researchBrief.covers.map((point) => (
+                        <li key={point}>{point}</li>
+                      ))}
+                    </ul>
+                    <p>{researchBrief.scope}</p>
+                  </BubbleContent>
+                </Bubble>
+              </MessageContent>
+            </Message>
+            <Message className="shrink-0">
+              <MessageContent className="gap-4">
+                <ResearchChain steps={steps} />
+                {done && synthesis?.kind === 'synthesis' && (
+                  <ResearchReply artifacts={synthesis.artifacts} />
+                )}
+              </MessageContent>
+            </Message>
+          </>
+        )}
       </div>
       <div className="flex flex-col gap-2 p-3">
-        {docsDecisionState(steps) !== 'unasked' && (
+        {!airChat && docsDecisionState(steps) !== 'unasked' && (
           <DecisionCard state={docsDecisionState(steps) === 'sent' ? 'sent' : 'asking'} />
         )}
         <InputGroup data-demo-research-prompt className="dark:bg-input/30">
@@ -751,8 +932,8 @@ function BodyDraft({ elapsed }: { elapsed: number }) {
   )
 }
 
-function DraftBlocks({ elapsed }: { elapsed: number }) {
-  return bodyDraftTimed.blocks.map(({ block, segments }, index) => {
+function DraftBlocks({ elapsed, from = 0 }: { elapsed: number; from?: number }) {
+  return bodyDraftTimed.blocks.slice(from).map(({ block, segments }, index) => {
     const visible = segments.map((group) => group.filter((word) => word.delay <= elapsed))
     if (!visible.some((group) => group.length > 0)) return null
     if (block.kind === 'h2')
@@ -1191,7 +1372,7 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
           data-state={loaded ? 'loaded' : 'loading'}
           className="min-h-0 flex-1 overflow-hidden bg-[#f7f7f5] dark:bg-[#0f0f11] text-neutral-900 dark:text-neutral-100"
         >
-          {loaded && <SitePage bodyElapsed={bodyElapsed} />}
+          {loaded && <SitePage elapsed={elapsed} bodyElapsed={bodyElapsed} />}
         </div>
       </div>
     </div>
@@ -1232,9 +1413,88 @@ function SiteNav() {
   )
 }
 
-function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
+const openingAt = 110
+
+function useScrollToOpening(progress: number) {
+  const page = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const element = page.current
+    const opening = element?.querySelector<HTMLElement>('[data-demo-site-lead]')
+    if (!element || !opening) return
+    const distance = Math.max(0, opening.offsetTop - openingAt)
+    element.style.translate = `0 -${distance * progress}px`
+  }, [page, progress])
+  return page
+}
+
+function OpeningLine({ elapsed }: { elapsed: number }) {
+  const rewritten = rewrittenWordsAt(elapsed)
+  const selected = selectedCharsAt(elapsed)
   return (
-    <div className={cn('flex flex-col', styles.streamCard)}>
+    <span data-demo-site-opening>
+      {rewritten
+        ? rewritten.map((word, index) => (
+            <span key={index} className={styles.streamWord}>
+              {index < rewritten.length - 1 ? `${word} ` : word}
+            </span>
+          ))
+        : selected > 0 && (
+            <span
+              data-demo-site-selection
+              className="bg-sky-500/25 text-neutral-900 dark:bg-sky-400/30 dark:text-white"
+            >
+              {openingLine.slice(0, selected)}
+            </span>
+          )}
+      {!rewritten && openingLine.slice(selected)}
+    </span>
+  )
+}
+
+function AskAir({ elapsed }: { elapsed: number }) {
+  const typed = askInstruction.slice(0, askTypedAt(elapsed))
+  const focused = elapsed >= askTiming.inputClicked
+  return (
+    <div
+      data-demo-ask-air
+      className="absolute top-full left-0 z-10 mt-2 flex w-[380px] flex-col gap-2 rounded-xl border bg-popover p-2 text-sm leading-5 text-popover-foreground shadow-lg transition-[opacity,translate] duration-200 starting:translate-y-1 starting:opacity-0"
+    >
+      <span className="flex items-center gap-1.5 px-1 pt-0.5 text-xs text-muted-foreground">
+        <span className="air-mascot block size-4 shrink-0" />
+        <span data-demo-ask-label>Ask {orchestrator.name}</span>
+      </span>
+      <span
+        className={cn(
+          'flex items-center gap-2 rounded-lg border bg-background py-1.5 pr-1.5 pl-3 dark:bg-input/30',
+          focused && 'border-ring ring-[3px] ring-ring/20',
+        )}
+      >
+        <span className="relative flex min-w-0 flex-1 items-center">
+          <span data-demo-ask-input className="flex min-h-5 min-w-0 flex-1 items-center">
+            <span className="truncate">{typed}</span>
+            {focused && <span className="ml-px h-4 w-px shrink-0 animate-pulse bg-foreground" />}
+          </span>
+          {!focused && (
+            <span className="pointer-events-none absolute left-0 text-muted-foreground">
+              Ask for a change…
+            </span>
+          )}
+        </span>
+        <span
+          data-demo-ask-send
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+        >
+          <ArrowUpIcon className="size-4" />
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function SitePage({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: number | null }) {
+  const page = useScrollToOpening(siteScrollAt(elapsed))
+  return (
+    <div ref={page} className={cn('relative flex flex-col', styles.streamCard)}>
       <SiteNav />
       <article className="mx-auto flex w-full max-w-[600px] flex-col px-6 pt-9">
         <span className="flex items-center gap-1 text-[13px] text-neutral-500 dark:text-neutral-400">
@@ -1280,7 +1540,15 @@ function SitePage({ bodyElapsed }: { bodyElapsed: number | null }) {
           <CoverArt />
         </div>
         <div className="mt-9 flex flex-col gap-3.5 text-[15px] leading-7 text-neutral-600 dark:text-neutral-400 [&_code]:bg-black/[0.05] dark:[&_code]:bg-white/[0.08] [&_h2]:pt-4 [&_h2]:text-[21px] [&_h2]:font-semibold [&_h2]:tracking-[-0.015em] [&_h2]:text-neutral-950 dark:[&_h2]:text-white [&_pre]:border [&_pre]:border-black/[0.06] dark:[&_pre]:border-white/[0.08] [&_pre]:bg-white dark:[&_pre]:bg-white/[0.04] [&_pre]:text-neutral-800 dark:[&_pre]:text-neutral-200">
-          {bodyElapsed !== null && <DraftBlocks elapsed={bodyElapsed} />}
+          {bodyElapsed !== null && (
+            <>
+              <p data-demo-site-lead className="relative">
+                <OpeningLine elapsed={elapsed} /> {openingRest}
+                {askOpenAt(elapsed) && <AskAir elapsed={elapsed} />}
+              </p>
+              <DraftBlocks elapsed={bodyElapsed} from={1} />
+            </>
+          )}
         </div>
       </article>
     </div>
@@ -1387,7 +1655,7 @@ export function EditorView({
           {previewing && <SitePreview elapsed={previewElapsed} bodyElapsed={bodyElapsed} />}
         </div>
       </div>
-      <ResearchPanel open={researchPanelOpen} steps={researchSteps} />
+      <ResearchPanel open={researchPanelOpen} steps={researchSteps} askElapsed={previewElapsed} />
     </div>
   )
 }

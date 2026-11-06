@@ -19,11 +19,15 @@ export const canute: DemoAgent = {
   colour: 'rgb(217 119 6)',
 }
 export const askeladd: DemoAgent = { name: 'Askeladd', role: 'SEO Agent', colour: 'rgb(5 150 105)' }
-export const bjorn: DemoAgent = { name: 'Bjorn', role: 'Review Agent', colour: 'rgb(225 29 72)' }
+export const thorkell: DemoAgent = {
+  name: 'Thorkell',
+  role: 'Review Agent',
+  colour: 'rgb(225 29 72)',
+}
 export const einar: DemoAgent = { name: 'Einar', role: 'Design Agent', colour: 'rgb(2 132 199)' }
 
 /** The agents working on "Introducing Acme MCP", in the order they are named. */
-export const workingAgents: readonly DemoAgent[] = [thorfinn, canute, askeladd, bjorn, einar]
+export const workingAgents: readonly DemoAgent[] = [thorfinn, canute, askeladd, thorkell, einar]
 
 /** Every agent in the preview, orchestrator first. */
 export const allAgents: readonly DemoAgent[] = [orchestrator, ...workingAgents]

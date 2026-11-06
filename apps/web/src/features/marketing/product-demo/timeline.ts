@@ -1,5 +1,6 @@
 import { bodyDraftDuration } from './body-draft'
 import { docsDecisionAnsweredAt, researchLog, researchStepsAt } from './research'
+import { askCursorPressed, askTiming } from './site-ask'
 
 export const prompt = "Recently shipped MCP for our app, let's announce it"
 
@@ -16,7 +17,6 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const editorDuration = 17000
 const restAfterEditor = 1800
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
@@ -65,17 +65,23 @@ const cursorArrivesAt = cursorShownAt + cursorTravelDuration
 const clickAt = cursorArrivesAt + hoverDuration
 const clickEndsAt = clickAt + clickDuration
 const editorOpensAt = clickAt + editorOpensAfterClick
-const editorClosesAt = editorOpensAt + editorDuration
-
-/** Length of one loop of the product preview, in milliseconds. */
-export const loopDuration = editorClosesAt + restAfterEditor
 
 export type DialogState = 'closed' | 'open' | 'closing'
 export type Shortcut = 'open-agents' | 'send'
-export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'still'
+export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'dragging' | 'still'
 export type View = 'table' | 'editor'
-export type CursorShape = 'arrow' | 'pointer'
-export type CursorTarget = 'rest' | 'row' | 'research' | 'decision' | 'editor' | 'preview'
+export type CursorShape = 'arrow' | 'pointer' | 'text'
+export type CursorTarget =
+  | 'rest'
+  | 'row'
+  | 'research'
+  | 'decision'
+  | 'editor'
+  | 'preview'
+  | 'line-start'
+  | 'line-end'
+  | 'ask-input'
+  | 'ask-send'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
@@ -99,6 +105,7 @@ export type Frame = {
   cursorTarget: CursorTarget
   cursorFrom: CursorTarget
   cursorProgress: number
+  cursorBend: number
   researchHovered: boolean
   researchPanelOpen: boolean
   cover: CoverState
@@ -129,6 +136,7 @@ export const stillFrame: Frame = {
   cursorTarget: 'rest',
   cursorFrom: 'rest',
   cursorProgress: 1,
+  cursorBend: 0,
   researchHovered: false,
   researchPanelOpen: false,
   cover: 'idle',
@@ -169,13 +177,53 @@ const previewCursorArrivesAfterEditor = previewCursorMovesAfterEditor + previewC
 const previewClickAfterEditor = previewCursorArrivesAfterEditor + 500
 const previewClickEndsAfterEditor = previewClickAfterEditor + clickDuration
 
-const cursorMoves: readonly { at: number; from: CursorTarget; to: CursorTarget }[] = [
+const editorDuration = previewClickEndsAfterEditor + askTiming.ends
+const editorClosesAt = editorOpensAt + editorDuration
+
+/** Length of one loop of the product preview, in milliseconds. */
+export const loopDuration = editorClosesAt + restAfterEditor
+
+const askAt = editorOpensAt + previewClickEndsAfterEditor
+
+const cursorMoves: readonly {
+  at: number
+  from: CursorTarget
+  to: CursorTarget
+  duration?: number
+  bend?: number
+}[] = [
   { at: cursorShownAt, from: 'rest', to: 'row' },
   { at: editorOpensAt + researchCursorMovesAfterEditor, from: 'row', to: 'research' },
   { at: editorOpensAt + decisionCursorMovesAfterEditor, from: 'research', to: 'decision' },
   { at: editorOpensAt + decisionClickEndsAfterEditor, from: 'decision', to: 'editor' },
   { at: editorOpensAt + previewCursorMovesAfterEditor, from: 'editor', to: 'preview' },
-  { at: editorClosesAt, from: 'preview', to: 'rest' },
+  {
+    at: askAt + askTiming.lineMoveStarts,
+    from: 'preview',
+    to: 'line-start',
+    duration: askTiming.lineReached - askTiming.lineMoveStarts,
+  },
+  {
+    at: askAt + askTiming.selectStarts,
+    from: 'line-start',
+    to: 'line-end',
+    duration: askTiming.selectEnds - askTiming.selectStarts,
+    bend: 0,
+  },
+  {
+    at: askAt + askTiming.inputMoveStarts,
+    from: 'line-end',
+    to: 'ask-input',
+    duration: askTiming.inputReached - askTiming.inputMoveStarts,
+  },
+  {
+    at: askAt + askTiming.sendMoveStarts,
+    from: 'ask-input',
+    to: 'ask-send',
+    duration: askTiming.sendReached - askTiming.sendMoveStarts,
+    bend: 0.05,
+  },
+  { at: editorClosesAt, from: 'ask-send', to: 'rest' },
 ]
 
 function motionProgress(elapsed: number, duration: number) {
@@ -197,7 +245,31 @@ function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < previewCursorArrivesAfterEditor) return 'moving'
   if (sinceEditor < previewClickAfterEditor) return 'hovering'
   if (sinceEditor < previewClickEndsAfterEditor) return 'clicking'
-  return 'still'
+  return askCursorAt(sinceEditor - previewClickEndsAfterEditor)
+}
+
+function askCursorAt(sincePreview: number): CursorState {
+  const t = askTiming
+  if (askCursorPressed(sincePreview)) return 'clicking'
+  if (sincePreview >= t.selectStarts && sincePreview < t.selectEnds) return 'dragging'
+  const moving =
+    (sincePreview >= t.lineMoveStarts && sincePreview < t.lineReached) ||
+    (sincePreview >= t.inputMoveStarts && sincePreview < t.inputReached) ||
+    (sincePreview >= t.sendMoveStarts && sincePreview < t.sendReached)
+  if (moving) return 'moving'
+  const hovering =
+    (sincePreview >= t.lineReached && sincePreview < t.selectStarts) ||
+    (sincePreview >= t.inputReached && sincePreview < t.inputClicked) ||
+    (sincePreview >= t.sendReached && sincePreview < t.sendClicked)
+  return hovering ? 'hovering' : 'still'
+}
+
+function askCursorShape(sincePreview: number): CursorShape | undefined {
+  const t = askTiming
+  if (sincePreview >= t.lineReached - 150 && sincePreview < t.selectEnds + 100) return 'text'
+  if (sincePreview >= t.inputReached - 120 && sincePreview < t.sendMoveStarts + 150) return 'text'
+  if (sincePreview >= t.sendReached - 100 && sincePreview < t.sent) return 'pointer'
+  return undefined
 }
 
 function socialImageAt(sinceEditor: number, inEditor: boolean): CoverState {
@@ -228,6 +300,10 @@ export function frameAt(elapsed: number): Frame {
   const sinceEditor = elapsed - editorOpensAt
   const inEditor = elapsed >= editorOpensAt && elapsed < editorClosesAt
   const cursorMove = cursorMoves.findLast((move) => elapsed >= move.at)
+  const askShape =
+    inEditor && sinceEditor >= previewClickEndsAfterEditor
+      ? askCursorShape(sinceEditor - previewClickEndsAfterEditor)
+      : undefined
   const dialog: DialogState =
     elapsed >= dialogOpensAt && elapsed < dialogClosesAt
       ? 'open'
@@ -247,7 +323,8 @@ export function frameAt(elapsed: number): Frame {
     sendPressed: elapsed >= sendAt && elapsed < dialogClosesAt,
     agentRow: elapsed >= dialogClosesAt,
     cursorShape:
-      (elapsed >= cursorShownAt + rowsReachedAfter && elapsed < clickEndsAt) ||
+      askShape ??
+      ((elapsed >= cursorShownAt + rowsReachedAfter && elapsed < clickEndsAt) ||
       (inEditor &&
         sinceEditor >= researchCursorArrivesAfterEditor - 100 &&
         sinceEditor < researchClickEndsAfterEditor) ||
@@ -259,7 +336,7 @@ export function frameAt(elapsed: number): Frame {
         sinceEditor < previewClickEndsAfterEditor) ||
       (elapsed >= editorClosesAt && elapsed < editorClosesAt + rowsLeftAfter)
         ? 'pointer'
-        : 'arrow',
+        : 'arrow'),
     cursor:
       elapsed < cursorShownAt || elapsed >= editorClosesAt
         ? 'resting'
@@ -274,7 +351,10 @@ export function frameAt(elapsed: number): Frame {
                 : 'still',
     cursorTarget: cursorMove?.to ?? 'rest',
     cursorFrom: cursorMove?.from ?? 'rest',
-    cursorProgress: cursorMove ? motionProgress(elapsed - cursorMove.at, cursorTravelDuration) : 1,
+    cursorProgress: cursorMove
+      ? motionProgress(elapsed - cursorMove.at, cursorMove.duration ?? cursorTravelDuration)
+      : 1,
+    cursorBend: cursorMove?.bend ?? 0.12,
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',

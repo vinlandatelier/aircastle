@@ -839,7 +839,7 @@ test('the preview header has an Ask Air split button with an agent menu', async 
     ['Ask Thorfinn', 'Writing Agent'],
     ['Ask Canute', 'Research Agent'],
     ['Ask Askeladd', 'SEO Agent'],
-    ['Ask Bjorn', 'Review Agent'],
+    ['Ask Thorkell', 'Review Agent'],
     ['Ask Einar', 'Design Agent'],
   ] as const
   for (const [index, [name, role]] of expected.entries()) {
@@ -1449,4 +1449,124 @@ test('the Acme brand and the post title use a medium weight', async ({ page }) =
   await expect(site.locator('[data-demo-site-page] h1')).toHaveText('Introducing Acme MCP')
   expect(await weight(site.locator('[data-demo-site-page] h1'))).toBe('500')
   expect(await weight(site.getByText('Acme', { exact: true }).first())).toBe('500')
+})
+
+const openingLine =
+  'Acme MCP lets any MCP client read and act on your workspace, with the same permissions as the person using it.'
+const askInstruction = 'Lead with what a team can do with it'
+const rewrittenLine =
+  'Ask Claude to find every stale draft in your workspace, and it works in Acme the way you would, with your permissions.'
+
+test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn rewrite it in place', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  const { frame, site } = await openSitePreview(page, 'light')
+  const cursor = frame.locator('[data-demo-cursor]')
+  const sitePage = site.locator('[data-demo-site-page]')
+  const opening = sitePage.locator('[data-demo-site-opening]')
+  const selection = sitePage.locator('[data-demo-site-selection]')
+  const ask = site.locator('[data-demo-ask-air]')
+  const askInput = ask.locator('[data-demo-ask-input]')
+  const panel = frame.locator('[data-demo-research-panel]')
+  const messages = panel.locator('[data-demo-chat-message]')
+  const thread = panel.locator('[data-demo-thread-message]')
+  const until = async (done: () => Promise<boolean>) => {
+    for (let tick = 0; tick < 300 && !(await done()); tick += 1) await page.clock.runFor(story(50))
+  }
+  const box = async (locator: import('@playwright/test').Locator) => {
+    const found = await locator.boundingBox()
+    if (!found) throw new Error('Element is not laid out')
+    return found
+  }
+
+  await page.clock.runFor(story(800))
+  await expect(opening).toHaveText(openingLine)
+  const unscrolled = await box(opening)
+
+  await until(async () => (await selection.count()) > 0)
+  await expect(cursor).toHaveAttribute('data-shape', 'text')
+  await until(async () => (await selection.textContent()) === openingLine)
+  await expect(selection).toHaveText(openingLine)
+  const selected = await box(opening)
+  const pageBox = await box(sitePage)
+  expect(selected.y).toBeLessThan(unscrolled.y - 100)
+  expect(selected.y).toBeGreaterThan(pageBox.y)
+  const end = await box(cursor)
+  const lastLine = await selection.evaluate((element) => {
+    const rect = [...element.getClientRects()].at(-1)
+    if (!rect) throw new Error('Selection is not laid out')
+    return { right: rect.right, top: rect.top, bottom: rect.bottom }
+  })
+  expect(Math.abs(end.x + end.width / 2 - lastLine.right)).toBeLessThan(16)
+  expect(end.y).toBeLessThan(lastLine.bottom)
+  expect(end.y + end.height).toBeGreaterThan(lastLine.top)
+
+  await until(async () => (await ask.count()) > 0)
+  await expect(ask.locator('.air-mascot')).toHaveCount(1)
+  await expect(ask.locator('[data-demo-ask-label]')).toHaveText('Ask Air')
+  await expect(ask.locator('[data-demo-ask-send]')).toHaveCount(1)
+  const dropdown = await box(ask)
+  expect(dropdown.y).toBeGreaterThan(selected.y + selected.height - 4)
+  expect(dropdown.y + dropdown.height).toBeLessThan(pageBox.y + pageBox.height)
+  await expect(askInput).toHaveText('')
+
+  await until(async () => (await cursor.getAttribute('data-state')) === 'clicking')
+  const clickBox = await box(cursor)
+  const inputBox = await box(askInput)
+  expect(clickBox.x).toBeGreaterThan(inputBox.x)
+  expect(clickBox.y).toBeGreaterThan(inputBox.y - 4)
+  expect(clickBox.y).toBeLessThan(inputBox.y + inputBox.height)
+  await expect(askInput).toHaveText('')
+
+  await until(async () => (await askInput.textContent()) === askInstruction)
+  await expect(askInput).toHaveText(askInstruction)
+  await expect(panel.locator('[data-demo-agent-switcher]')).toContainText('Canute')
+
+  await until(async () => (await cursor.getAttribute('data-state')) === 'clicking')
+  const sendClick = await box(cursor)
+  const send = await box(ask.locator('[data-demo-ask-send]'))
+  expect(sendClick.x).toBeGreaterThan(send.x - 4)
+  expect(sendClick.x).toBeLessThan(send.x + send.width)
+  expect(sendClick.y).toBeGreaterThan(send.y - 4)
+  expect(sendClick.y).toBeLessThan(send.y + send.height)
+
+  await until(async () => (await ask.count()) === 0)
+  await expect(ask).toHaveCount(0)
+  const switcher = panel.locator('[data-demo-agent-switcher]')
+  await expect(switcher).toContainText('Air')
+  await expect(switcher.locator('[data-demo-agent-label]')).toHaveText('Orchestrator')
+  await expect(switcher.locator('.air-mascot')).toHaveCount(1)
+  expect(await messages.count()).toBeGreaterThanOrEqual(3)
+  const latest = messages.last()
+  await expect(latest).toHaveAttribute('data-from', 'user')
+  await expect(latest).toContainText(askInstruction)
+  await expect(latest.locator('[data-demo-chat-quote]')).toHaveText(openingLine)
+  await expect(messages.first()).toHaveAttribute('data-from', 'user')
+  await expect(messages.first()).toContainText(prompt)
+  await expect(selection).toHaveText(openingLine)
+
+  await until(async () => (await panel.locator('[data-demo-delegation]').count()) > 0)
+  await expect(panel.locator('[data-demo-delegation]')).toContainText('Thorkell')
+  await expect(panel.locator('[data-demo-chat-thinking]')).toHaveCount(0)
+  await until(async () => (await thread.count()) > 0)
+  await expect(thread.first()).toContainText('Thorkell')
+  await expect(thread.first()).toContainText('Review Agent')
+
+  await until(async () => (await selection.count()) === 0)
+  await expect(opening).not.toContainText('lets any MCP client')
+  await expect(thread.nth(1)).toContainText('Thorfinn')
+  await expect(thread.nth(1)).toContainText('Writing Agent')
+  await until(async () => (await opening.textContent()) === rewrittenLine)
+  await expect(opening).toHaveText(rewrittenLine)
+  await expect(site.locator('[data-demo-agent-tab]')).toHaveCount(0)
+  await expect(site.locator('[data-demo-agent-outline]')).toHaveCount(0)
+
+  await until(async () => (await panel.locator('[data-demo-review-finished]').count()) > 0)
+  await expect(thread).toHaveCount(3)
+  await expect(thread.nth(2)).toContainText('Thorkell')
+  await expect(panel.locator('[data-demo-review-finished]')).toContainText('Thorkell')
+  await until(async () => (await messages.last().textContent())?.includes('Have a look') ?? false)
+  await expect(messages.last()).toHaveAttribute('data-from', 'air')
+  await expect(messages.last()).toContainText('Have a look')
 })
