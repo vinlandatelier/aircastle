@@ -21,9 +21,8 @@ const dropdownOpens = 4900
 const typingStarts = dropdownOpens + 350
 const inkDuration = 380
 const typingEnds = typingStarts + askInstruction.length * keystroke
-const sendReached = typingEnds + 380
-const sendClicked = sendReached + 120
-const sent = sendClicked + 220
+const enterPressed = typingEnds + 350
+const sent = enterPressed + 220
 const thinkingEnds = sent + 650
 const reviewNoted = thinkingEnds + 300
 const rewriteStarts = reviewNoted + 450
@@ -59,9 +58,6 @@ export const askTiming = {
   selectEnds,
   dropdownOpens,
   typingStarts,
-  sendMoveStarts: typingEnds + 80,
-  sendReached,
-  sendClicked,
   sent,
   thinkingEnds,
   reviewNoted,
@@ -83,9 +79,14 @@ export const askTiming = {
 
 const clickDuration = 220
 
-/** Whether the cursor is pressing Ask Air's send button, the reference in Air's reply, or Publish. */
+/** Whether Enter is down to send the Ask Air prompt. */
+export function askEnterPressedAt(elapsed: number) {
+  return elapsed >= enterPressed && elapsed < sent
+}
+
+/** Whether the cursor is pressing the reference in Air's reply or Publish. */
 export function askCursorPressed(elapsed: number) {
-  return [sendClicked, referenceClicked, publishClicked].some(
+  return [referenceClicked, publishClicked].some(
     (clicked) => elapsed >= clicked && elapsed < clicked + clickDuration,
   )
 }

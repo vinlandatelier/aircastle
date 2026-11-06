@@ -81,7 +81,6 @@ export type CursorTarget =
   | 'site-page'
   | 'line-start'
   | 'line-end'
-  | 'ask-send'
   | 'site-read'
   | 'reference'
   | 'publish'
@@ -222,15 +221,8 @@ const cursorMoves: readonly {
     bend: 0,
   },
   {
-    at: askAt + askTiming.sendMoveStarts,
-    from: 'line-end',
-    to: 'ask-send',
-    duration: askTiming.sendReached - askTiming.sendMoveStarts,
-    bend: 0.05,
-  },
-  {
     at: askAt + askTiming.readMoveStarts,
-    from: 'ask-send',
+    from: 'line-end',
     to: 'site-read',
     duration: askTiming.readReached - askTiming.readMoveStarts,
   },
@@ -278,14 +270,12 @@ function askCursorAt(sincePreview: number): CursorState {
   const moving =
     (sincePreview >= t.pageMoveStarts && sincePreview < t.pageReached) ||
     (sincePreview >= t.lineMoveStarts && sincePreview < t.lineReached) ||
-    (sincePreview >= t.sendMoveStarts && sincePreview < t.sendReached) ||
     (sincePreview >= t.readMoveStarts && sincePreview < t.readReached) ||
     (sincePreview >= t.referenceMoveStarts && sincePreview < t.referenceReached) ||
     (sincePreview >= t.publishMoveStarts && sincePreview < t.publishReached)
   if (moving) return 'moving'
   const hovering =
     (sincePreview >= t.lineReached && sincePreview < t.selectStarts) ||
-    (sincePreview >= t.sendReached && sincePreview < t.sendClicked) ||
     (sincePreview >= t.referenceReached && sincePreview < t.referenceClicked) ||
     (sincePreview >= t.publishReached && sincePreview < t.publishClicked)
   return hovering ? 'hovering' : 'still'
@@ -294,7 +284,6 @@ function askCursorAt(sincePreview: number): CursorState {
 function askCursorShape(sincePreview: number): CursorShape | undefined {
   const t = askTiming
   if (sincePreview >= t.lineReached - 150 && sincePreview < t.selectEnds + 100) return 'text'
-  if (sincePreview >= t.sendReached - 100 && sincePreview < t.sent) return 'pointer'
   if (sincePreview >= t.referenceReached - 100 && sincePreview < t.referenceClicked + 300)
     return 'pointer'
   if (sincePreview >= t.publishReached - 100 && sincePreview < t.publishClicked + 300)

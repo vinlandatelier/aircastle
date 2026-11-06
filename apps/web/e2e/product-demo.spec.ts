@@ -1460,7 +1460,7 @@ const rewrittenLine =
 test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn rewrite it in place', async ({
   page,
 }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(150_000)
   const { frame, site } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const sitePage = site.locator('[data-demo-site-page]')
@@ -1545,15 +1545,25 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
   await expect(askInput).toHaveText(askInstruction)
   await expect(panel.locator('[data-demo-agent-switcher]')).toContainText('Canute')
 
-  await until(async () => (await cursor.getAttribute('data-state')) === 'clicking')
-  const sendClick = await box(cursor)
-  const send = await box(ask.locator('[data-demo-ask-send]'))
-  expect(sendClick.x).toBeGreaterThan(send.x - 4)
-  expect(sendClick.x).toBeLessThan(send.x + send.width)
-  expect(sendClick.y).toBeGreaterThan(send.y - 4)
-  expect(sendClick.y).toBeLessThan(send.y + send.height)
-
-  await until(async () => (await ask.count()) === 0)
+  const typedAt = await box(cursor)
+  let enterPressed = false
+  let clickedToSend = false
+  for (let tick = 0; tick < 60 && (await ask.count()) > 0; tick += 1) {
+    const state = await frame.evaluate(() => ({
+      cursor: document.querySelector('[data-demo-cursor]')?.getAttribute('data-state'),
+      pressed: document.querySelector('[data-demo-ask-send]')?.getAttribute('data-pressed'),
+    }))
+    if (state.cursor === 'clicking') clickedToSend = true
+    if (state.pressed === 'true') {
+      enterPressed = true
+      const pressedAt = await box(cursor)
+      expect(Math.abs(pressedAt.x - typedAt.x)).toBeLessThan(2)
+      expect(Math.abs(pressedAt.y - typedAt.y)).toBeLessThan(2)
+    }
+    await page.clock.runFor(story(50))
+  }
+  expect(clickedToSend).toBe(false)
+  expect(enterPressed).toBe(true)
   await expect(ask).toHaveCount(0)
   const switcher = panel.locator('[data-demo-agent-switcher]')
   await expect(switcher).toContainText('Air')

@@ -59,6 +59,7 @@ import {
   type DraftSegment,
 } from './body-draft'
 import {
+  askEnterPressedAt,
   askInstruction,
   askOpenAt,
   askTiming,
@@ -1525,7 +1526,11 @@ function AskAir({ elapsed }: { elapsed: number }) {
       <span className="flex justify-end">
         <span
           data-demo-ask-send
-          className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground"
+          data-pressed={askEnterPressedAt(elapsed)}
+          className={cn(
+            'flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground',
+            askEnterPressedAt(elapsed) && styles.sendPress,
+          )}
         >
           <ArrowUpIcon className="size-4" />
         </span>
