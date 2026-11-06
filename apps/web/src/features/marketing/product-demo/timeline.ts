@@ -84,6 +84,8 @@ export type CursorTarget =
   | 'site-read'
   | 'reference'
   | 'publish'
+  | 'bell'
+  | 'notification-preview'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
@@ -238,7 +240,19 @@ const cursorMoves: readonly {
     to: 'publish',
     duration: askTiming.publishReached - askTiming.publishMoveStarts,
   },
-  { at: editorClosesAt, from: 'publish', to: 'rest' },
+  {
+    at: askAt + askTiming.bellMoveStarts,
+    from: 'publish',
+    to: 'bell',
+    duration: askTiming.bellReached - askTiming.bellMoveStarts,
+  },
+  {
+    at: askAt + askTiming.notificationPreviewMoveStarts,
+    from: 'bell',
+    to: 'notification-preview',
+    duration: askTiming.notificationPreviewReached - askTiming.notificationPreviewMoveStarts,
+  },
+  { at: editorClosesAt, from: 'notification-preview', to: 'rest' },
 ]
 
 function motionProgress(elapsed: number, duration: number) {
@@ -272,12 +286,16 @@ function askCursorAt(sincePreview: number): CursorState {
     (sincePreview >= t.lineMoveStarts && sincePreview < t.lineReached) ||
     (sincePreview >= t.readMoveStarts && sincePreview < t.readReached) ||
     (sincePreview >= t.referenceMoveStarts && sincePreview < t.referenceReached) ||
-    (sincePreview >= t.publishMoveStarts && sincePreview < t.publishReached)
+    (sincePreview >= t.publishMoveStarts && sincePreview < t.publishReached) ||
+    (sincePreview >= t.bellMoveStarts && sincePreview < t.bellReached) ||
+    (sincePreview >= t.notificationPreviewMoveStarts && sincePreview < t.notificationPreviewReached)
   if (moving) return 'moving'
   const hovering =
     (sincePreview >= t.lineReached && sincePreview < t.selectStarts) ||
     (sincePreview >= t.referenceReached && sincePreview < t.referenceClicked) ||
-    (sincePreview >= t.publishReached && sincePreview < t.publishClicked)
+    (sincePreview >= t.publishReached && sincePreview < t.publishClicked) ||
+    (sincePreview >= t.bellReached && sincePreview < t.bellClicked) ||
+    (sincePreview >= t.notificationPreviewReached && sincePreview < t.notificationPreviewClicked)
   return hovering ? 'hovering' : 'still'
 }
 
@@ -287,6 +305,8 @@ function askCursorShape(sincePreview: number): CursorShape | undefined {
   if (sincePreview >= t.referenceReached - 100 && sincePreview < t.referenceClicked + 300)
     return 'pointer'
   if (sincePreview >= t.publishReached - 100 && sincePreview < t.publishClicked + 300)
+    return 'pointer'
+  if (sincePreview >= t.bellReached - 100 && sincePreview < t.notificationPreviewClicked + 300)
     return 'pointer'
   return undefined
 }

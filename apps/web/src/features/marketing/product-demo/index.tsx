@@ -4,7 +4,6 @@ import {
   MousePointer2Icon,
   PointerIcon,
   TextCursorIcon,
-  BellIcon,
   BookOpenIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -28,6 +27,12 @@ import { canute, orchestrator, thorfinn, workingAgents, type DemoAgent } from '.
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
 import { Confetti } from './confetti'
+import { NotificationsBell } from './notifications'
+import {
+  notificationPreviewPressedAt,
+  notificationsOpenAt,
+  unreadNotificationsAt,
+} from './site-ask'
 import {
   frameAt,
   loopDuration,
@@ -315,7 +320,13 @@ function AskButton({ waiting }: { waiting: number }) {
   )
 }
 
-function DemoHeader({ decisionsWaiting }: { decisionsWaiting: number }) {
+function DemoHeader({
+  decisionsWaiting,
+  askElapsed,
+}: {
+  decisionsWaiting: number
+  askElapsed: number | null
+}) {
   return (
     <div data-demo-header className="relative z-40 flex h-14 shrink-0 items-center gap-2 border-b">
       <span className="flex h-full w-14 shrink-0 items-center justify-center border-r">
@@ -359,9 +370,11 @@ function DemoHeader({ decisionsWaiting }: { decisionsWaiting: number }) {
           <SunIcon className="dark:hidden" />
           <MoonIcon className="hidden dark:block" />
         </span>
-        <span data-demo-notifications className={plainIcon}>
-          <BellIcon />
-        </span>
+        <NotificationsBell
+          unread={askElapsed === null ? 0 : unreadNotificationsAt(askElapsed)}
+          open={askElapsed !== null && notificationsOpenAt(askElapsed)}
+          previewPressed={askElapsed !== null && notificationPreviewPressedAt(askElapsed)}
+        />
         <span data-demo-account className="flex size-8 overflow-hidden rounded-full">
           <PersonAvatar name="Abyan" className="size-8" />
         </span>
@@ -426,6 +439,8 @@ const cursorSpots = {
   'site-read': { left: 600, top: 440 },
   reference: { left: 1000, top: 574 },
   publish: { left: 872, top: 108 },
+  bell: { left: 1188, top: 52 },
+  'notification-preview': { left: 1064, top: 242 },
 } as const
 
 const cursorShapes: Record<CursorShape, LucideIcon> = {
@@ -659,6 +674,7 @@ export function ProductDemo() {
             decisionsWaiting={
               frame.view === 'editor' && docsDecisionState(frame.researchSteps) === 'asking' ? 1 : 0
             }
+            askElapsed={frame.previewElapsed}
           />
           <div className="flex h-[calc(100%-5.5rem)]">
             <DemoSidebar />

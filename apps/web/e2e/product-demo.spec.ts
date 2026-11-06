@@ -1692,6 +1692,113 @@ test('once Air reports back, the cursor clicks Publish, confetti bursts from it 
   await expect(publish).toHaveText('Unpublish')
 })
 
+test('a notification says the docs page is ready, and its Preview opens the docs entry straight into its preview', async ({
+  page,
+}) => {
+  test.setTimeout(150_000)
+  const { frame, site } = await openSitePreview(page, 'light')
+  const cursor = frame.locator('[data-demo-cursor]')
+  const bell = frame.locator('[data-demo-notifications]')
+  const badge = bell.locator('[data-demo-notification-badge]')
+  const menu = frame.locator('[data-demo-notifications-menu]')
+  const status = frame.locator('[data-demo-post-status]')
+  const box = async (locator: import('@playwright/test').Locator) => {
+    const value = await locator.boundingBox()
+    if (!value) throw new Error('Element is not laid out')
+    return value
+  }
+  const expectCursorOn = async (locator: import('@playwright/test').Locator) => {
+    const pointer = await box(cursor)
+    const target = await box(locator)
+    expect(pointer.x).toBeGreaterThan(target.x)
+    expect(pointer.x).toBeLessThan(target.x + target.width)
+    expect(pointer.y).toBeGreaterThan(target.y)
+    expect(pointer.y).toBeLessThan(target.y + target.height)
+  }
+  const sample = () =>
+    frame.evaluate(() => ({
+      target: document.querySelector('[data-demo-cursor]')?.getAttribute('data-target'),
+      state: document.querySelector('[data-demo-cursor]')?.getAttribute('data-state'),
+      badge: document.querySelector('[data-demo-notification-badge]')?.textContent ?? null,
+      status: document.querySelector('[data-demo-post-status]')?.textContent,
+    }))
+
+  await page.clock.runFor(story(10800))
+  await expect(badge).toHaveCount(0)
+  let notifiedOnTheWay = false
+  for (let tick = 0; tick < 300; tick += 1) {
+    const now = await sample()
+    if (now.badge !== null) {
+      notifiedOnTheWay = now.target === 'publish' && now.status === 'Draft'
+      break
+    }
+    await page.clock.runFor(story(50))
+  }
+  expect(notifiedOnTheWay).toBe(true)
+  await expect(badge).toHaveText('1')
+  const red = await badge.evaluate((element) => {
+    const context = document.createElement('canvas').getContext('2d')
+    if (!context) throw new Error('No canvas')
+    context.fillStyle = getComputedStyle(element).backgroundColor
+    context.fillRect(0, 0, 1, 1)
+    return [...context.getImageData(0, 0, 1, 1).data]
+  })
+  expect(red[0]).toBeGreaterThan(180)
+  expect(red[1]).toBeLessThan(120)
+
+  for (let tick = 0; tick < 200; tick += 1) {
+    const now = await sample()
+    if (now.target === 'bell' && now.state === 'clicking') break
+    await page.clock.runFor(story(50))
+  }
+  await expect(status).toHaveText('Published')
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+  await expectCursorOn(bell)
+
+  await page.clock.runFor(story(300))
+  await expect(menu).toBeVisible()
+  await expect(badge).toHaveCount(0)
+  await expect(menu).toContainText('Connect to Acme MCP')
+  await expect(menu).toContainText('ready for your review')
+  await expect(menu.locator('.air-mascot')).toHaveCount(1)
+  const actions = menu.locator('[data-demo-notification-action]')
+  await expect(actions).toHaveText(['Open entry', 'Preview'])
+  const menuBox = await box(menu)
+  const bellBox = await box(bell)
+  expect(menuBox.y).toBeGreaterThan(bellBox.y + bellBox.height - 2)
+
+  for (let tick = 0; tick < 200; tick += 1) {
+    const now = await sample()
+    if (now.target === 'notification-preview' && now.state === 'clicking') break
+    await page.clock.runFor(story(50))
+  }
+  await expectCursorOn(actions.last())
+
+  await page.clock.runFor(story(400))
+  await expect(menu).toHaveCount(0)
+  const breadcrumb = frame.locator('[data-demo-breadcrumb]')
+  await expect(breadcrumb).toContainText('Docs')
+  await expect(breadcrumb).toContainText('Connect to Acme MCP')
+  await expect(status).toHaveText('Draft')
+  await expect(frame.locator('[data-demo-publish]')).toHaveText('Publish')
+  await expect(frame.locator('[data-demo-preview]')).toHaveText('Close Preview')
+  await expect(site.locator('[data-demo-site-address]')).toContainText('docs.acme.com')
+  await expect(frame.locator('[data-demo-research-panel]')).toHaveAttribute('data-state', 'closed')
+
+  await page.clock.runFor(story(800))
+  const docs = site.locator('[data-demo-docs-page]')
+  await expect(docs.locator('h1')).toHaveText('Connect to Acme MCP')
+  await expect(docs.locator('[data-demo-docs-nav] [aria-current="page"]')).toHaveText(
+    'Connect to Acme MCP',
+  )
+  await expect(docs.locator('pre')).toContainText('mcp.acme.com')
+  expect(await docs.locator('[data-demo-docs-step]').count()).toBeGreaterThanOrEqual(3)
+
+  await page.clock.runFor(story(3000))
+  await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
+  await expect(docs).toBeVisible()
+})
+
 test('after asking Air, the cursor reads to the end of the post, then a reference in Air’s reply jumps back to the revised line before Publish', async ({
   page,
 }) => {

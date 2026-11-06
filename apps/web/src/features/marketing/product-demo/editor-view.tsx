@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -46,6 +46,7 @@ import {
   type ResearchEntry,
 } from './research'
 import { askeladd, canute, einar, orchestrator, thorfinn, thorkell, type DemoAgent } from './agents'
+import { DocsPage, docsTitle, docsUrl } from './docs-preview'
 import { MentionText } from './mention'
 import { PersonAvatar } from './person'
 import { prompt, seoTiming, type CoverState } from './timeline'
@@ -64,6 +65,7 @@ import {
   askOpenAt,
   askTiming,
   askTypedAt,
+  docsPreviewAt,
   publishedAt,
   revisedFlashAt,
   rewrittenWordsAt,
@@ -884,12 +886,16 @@ function TopBar({
   researchDocked,
   previewing,
   published,
+  collection,
+  title,
 }: {
   steps: number
   researchHovered: boolean
   researchDocked: boolean
   previewing: boolean
   published: boolean
+  collection: string
+  title: string
 }) {
   return (
     <div
@@ -897,9 +903,9 @@ function TopBar({
       className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-card px-6"
     >
       <div data-demo-breadcrumb className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-        <span className="text-muted-foreground">Blog posts</span>
+        <span className="text-muted-foreground">{collection}</span>
         <span className="text-muted-foreground">/</span>
-        <span className="truncate">Introducing Acme MCP</span>
+        <span className="truncate">{title}</span>
         <span
           data-demo-post-status
           className={cn(
@@ -1374,7 +1380,15 @@ function SideColumn({
 const siteLoadingDuration = 600
 const siteUrl = 'acme.com/blog/introducing-acme-mcp'
 
-function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: number | null }) {
+function SitePreview({
+  url,
+  elapsed,
+  children,
+}: {
+  url: string
+  elapsed: number
+  children: ReactNode
+}) {
   const loaded = elapsed >= siteLoadingDuration
   return (
     <div
@@ -1392,7 +1406,7 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
           >
             <GlobeLockIcon className="size-3.5 shrink-0" />
             <span data-demo-site-address className="truncate">
-              {siteUrl}
+              {url}
             </span>
           </span>
           <RotateCwIcon className="size-3.5 text-muted-foreground" />
@@ -1413,7 +1427,7 @@ function SitePreview({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: n
           data-state={loaded ? 'loaded' : 'loading'}
           className="min-h-0 flex-1 overflow-hidden bg-[#f7f7f5] dark:bg-[#0f0f11] text-neutral-900 dark:text-neutral-100"
         >
-          {loaded && <SitePage elapsed={elapsed} bodyElapsed={bodyElapsed} />}
+          {loaded && children}
         </div>
       </div>
     </div>
@@ -1653,6 +1667,8 @@ export function EditorView({
 }) {
   const content = useScrollToSeo(scrollProgress)
   const previewing = previewElapsed !== null
+  const docsElapsed = previewElapsed === null ? null : docsPreviewAt(previewElapsed)
+  const panelOpen = researchPanelOpen && docsElapsed === null
   return (
     <div
       data-demo-editor
@@ -1666,15 +1682,17 @@ export function EditorView({
       <div
         className={cn(
           'flex min-h-0 flex-1 flex-col transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
-          researchPanelOpen && 'pr-[340px]',
+          panelOpen && 'pr-[340px]',
         )}
       >
         <TopBar
           steps={researchSteps}
           researchHovered={researchHovered}
-          researchDocked={researchPanelOpen}
+          researchDocked={panelOpen}
           previewing={previewing}
-          published={previewElapsed !== null && publishedAt(previewElapsed)}
+          published={docsElapsed === null && previewElapsed !== null && publishedAt(previewElapsed)}
+          collection={docsElapsed === null ? 'Blog posts' : 'Docs'}
+          title={docsElapsed === null ? 'Introducing Acme MCP' : docsTitle}
         />
         <div className="relative min-h-0 flex-1">
           <div
@@ -1701,10 +1719,20 @@ export function EditorView({
               bodyDone={bodyElapsed !== null && bodyElapsed >= bodyDraftDuration}
             />
           </div>
-          {previewing && <SitePreview elapsed={previewElapsed} bodyElapsed={bodyElapsed} />}
+          {docsElapsed !== null ? (
+            <SitePreview key="docs" url={docsUrl} elapsed={docsElapsed}>
+              <DocsPage />
+            </SitePreview>
+          ) : (
+            previewing && (
+              <SitePreview key="blog" url={siteUrl} elapsed={previewElapsed}>
+                <SitePage elapsed={previewElapsed} bodyElapsed={bodyElapsed} />
+              </SitePreview>
+            )
+          )}
         </div>
       </div>
-      <ResearchPanel open={researchPanelOpen} steps={researchSteps} askElapsed={previewElapsed} />
+      <ResearchPanel open={panelOpen} steps={researchSteps} askElapsed={previewElapsed} />
     </div>
   )
 }

@@ -47,6 +47,15 @@ const publishMoveStarts = jumpEnds + 700
 const publishReached = publishMoveStarts + 900
 const publishClicked = publishReached + 250
 const confettiDuration = 2000
+const notified = publishMoveStarts + 450
+const bellMoveStarts = publishClicked + 1100
+const bellReached = bellMoveStarts + 900
+const bellClicked = bellReached + 250
+const menuOpens = bellClicked + 100
+const notificationPreviewMoveStarts = menuOpens + 1200
+const notificationPreviewReached = notificationPreviewMoveStarts + 700
+const notificationPreviewClicked = notificationPreviewReached + 250
+const docsOpens = notificationPreviewClicked + 150
 
 /** When each beat of the select-to-prompt scene happens, in milliseconds after the site preview opens. */
 export const askTiming = {
@@ -74,7 +83,13 @@ export const askTiming = {
   publishMoveStarts,
   publishReached,
   publishClicked,
-  ends: publishClicked + confettiDuration + 400,
+  bellMoveStarts,
+  bellReached,
+  bellClicked,
+  notificationPreviewMoveStarts,
+  notificationPreviewReached,
+  notificationPreviewClicked,
+  ends: docsOpens + 4500,
 } as const
 
 const clickDuration = 220
@@ -84,9 +99,9 @@ export function askEnterPressedAt(elapsed: number) {
   return elapsed >= enterPressed && elapsed < sent
 }
 
-/** Whether the cursor is pressing the reference in Air's reply or Publish. */
+/** Whether the cursor is pressing the reference in Air's reply, Publish, the bell or the notification's Preview. */
 export function askCursorPressed(elapsed: number) {
-  return [referenceClicked, publishClicked].some(
+  return [referenceClicked, publishClicked, bellClicked, notificationPreviewClicked].some(
     (clicked) => elapsed >= clicked && elapsed < clicked + clickDuration,
   )
 }
@@ -94,6 +109,26 @@ export function askCursorPressed(elapsed: number) {
 /** Whether the cursor has clicked Publish. */
 export function publishedAt(elapsed: number) {
   return elapsed >= publishClicked
+}
+
+/** How many notifications are unread on the bell. */
+export function unreadNotificationsAt(elapsed: number) {
+  return elapsed >= notified && elapsed < menuOpens ? 1 : 0
+}
+
+/** Whether the notifications menu is open under the bell. */
+export function notificationsOpenAt(elapsed: number) {
+  return elapsed >= menuOpens && elapsed < docsOpens
+}
+
+/** Whether the cursor is pressing the notification's Preview button. */
+export function notificationPreviewPressedAt(elapsed: number) {
+  return elapsed >= notificationPreviewClicked && elapsed < docsOpens
+}
+
+/** Milliseconds since the docs entry opened in preview, or null before it does. */
+export function docsPreviewAt(elapsed: number) {
+  return elapsed >= docsOpens ? elapsed - docsOpens : null
 }
 
 /** Milliseconds since Publish was clicked while its confetti is in the air, or null. */
