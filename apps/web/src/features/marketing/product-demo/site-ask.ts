@@ -31,6 +31,10 @@ const rewriteEnds = rewriteStarts + rewrittenWords.length * rewriteWordInterval
 const approved = rewriteEnds + 300
 const finished = approved + 300
 const replied = finished + 250
+const publishMoveStarts = replied + 1100
+const publishReached = publishMoveStarts + 900
+const publishClicked = publishReached + 250
+const confettiDuration = 2000
 
 /** When each beat of the select-to-prompt scene happens, in milliseconds after the site preview opens. */
 export const askTiming = {
@@ -53,14 +57,25 @@ export const askTiming = {
   approved,
   finished,
   replied,
-  ends: replied + 2200,
+  publishMoveStarts,
+  publishReached,
+  publishClicked,
+  ends: publishClicked + confettiDuration + 400,
 } as const
 
 const clickDuration = 220
 
-/** Whether the cursor is pressing Ask Air's send button. */
+/** Whether the cursor is pressing Ask Air's send button or Publish. */
 export function askCursorPressed(elapsed: number) {
-  return elapsed >= sendClicked && elapsed < sendClicked + clickDuration
+  return [sendClicked, publishClicked].some(
+    (clicked) => elapsed >= clicked && elapsed < clicked + clickDuration,
+  )
+}
+
+/** Milliseconds since Publish was clicked while its confetti is in the air, or null. */
+export function confettiAt(elapsed: number) {
+  const since = elapsed - publishClicked
+  return since >= 0 && since < confettiDuration ? since : null
 }
 
 function eased(elapsed: number, duration: number) {

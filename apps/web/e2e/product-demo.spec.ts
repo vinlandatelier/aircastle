@@ -1607,3 +1607,62 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
     expect(lightness(await colourOf(part))).toBeGreaterThan(airText + 0.2)
   await expect(thread.locator('[data-demo-thread-text]')).toHaveCount(3)
 })
+
+test('once Air reports back, the cursor clicks Publish and confetti bursts from it', async ({
+  page,
+}) => {
+  test.setTimeout(60_000)
+  const { frame } = await openSitePreview(page, 'light')
+  const cursor = frame.locator('[data-demo-cursor]')
+  const publish = frame.locator('[data-demo-publish]')
+  const confetti = frame.locator('[data-demo-confetti]')
+  const reply = frame.locator('[data-demo-chat-message][data-from="air"]').last()
+
+  await page.clock.runFor(story(10800))
+  for (
+    let tick = 0;
+    tick < 200 && (await cursor.getAttribute('data-target')) !== 'publish';
+    tick += 1
+  )
+    await page.clock.runFor(story(50))
+  await expect(reply).toContainText('Have a look')
+  await expect(confetti).toHaveCount(0)
+
+  for (
+    let tick = 0;
+    tick < 60 && (await cursor.getAttribute('data-state')) !== 'clicking';
+    tick += 1
+  )
+    await page.clock.runFor(story(50))
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  await expect(cursor).toHaveAttribute('data-shape', 'pointer')
+  const pointer = await cursor.boundingBox()
+  const button = await publish.boundingBox()
+  if (!pointer || !button) throw new Error('Cursor or Publish is not laid out')
+  expect(pointer.x).toBeGreaterThan(button.x)
+  expect(pointer.x).toBeLessThan(button.x + button.width)
+  expect(pointer.y).toBeGreaterThan(button.y)
+  expect(pointer.y).toBeLessThan(button.y + button.height)
+
+  await page.clock.runFor(story(100))
+  const pieces = confetti.locator('[data-demo-confetti-piece]')
+  expect(await pieces.count()).toBeGreaterThan(30)
+  const spread = async () => {
+    const boxes = await pieces.evaluateAll((elements) =>
+      elements.map((element) => element.getBoundingClientRect()),
+    )
+    const xs = boxes.map((box) => box.x)
+    const ys = boxes.map((box) => box.y)
+    return { width: Math.max(...xs) - Math.min(...xs), top: Math.min(...ys) }
+  }
+  const early = await spread()
+  await page.clock.runFor(story(500))
+  const later = await spread()
+  expect(later.width).toBeGreaterThan(early.width + 100)
+  expect(later.top).toBeLessThan(button.y + button.height)
+
+  for (let tick = 0; tick < 80 && (await confetti.count()) > 0; tick += 1)
+    await page.clock.runFor(story(50))
+  await expect(confetti).toHaveCount(0)
+  await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
+})

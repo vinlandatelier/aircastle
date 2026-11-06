@@ -1,6 +1,6 @@
 import { bodyDraftDuration } from './body-draft'
 import { docsDecisionAnsweredAt, researchLog, researchStepsAt } from './research'
-import { askCursorPressed, askTiming } from './site-ask'
+import { askCursorPressed, askTiming, confettiAt } from './site-ask'
 
 export const prompt = "Recently shipped MCP for our app, let's announce it"
 
@@ -82,6 +82,7 @@ export type CursorTarget =
   | 'line-start'
   | 'line-end'
   | 'ask-send'
+  | 'publish'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
@@ -114,6 +115,7 @@ export type Frame = {
   seoElapsed: number | null
   socialImage: CoverState
   previewElapsed: number | null
+  confettiElapsed: number | null
 }
 
 /** The still frame shown when motion is reduced. */
@@ -145,6 +147,7 @@ export const stillFrame: Frame = {
   seoElapsed: null,
   socialImage: 'idle',
   previewElapsed: null,
+  confettiElapsed: null,
 }
 
 function chipsArrivedEvery(sinceFirst: number, interval: number, total: number) {
@@ -223,7 +226,13 @@ const cursorMoves: readonly {
     duration: askTiming.sendReached - askTiming.sendMoveStarts,
     bend: 0.05,
   },
-  { at: editorClosesAt, from: 'ask-send', to: 'rest' },
+  {
+    at: askAt + askTiming.publishMoveStarts,
+    from: 'ask-send',
+    to: 'publish',
+    duration: askTiming.publishReached - askTiming.publishMoveStarts,
+  },
+  { at: editorClosesAt, from: 'publish', to: 'rest' },
 ]
 
 function motionProgress(elapsed: number, duration: number) {
@@ -255,11 +264,13 @@ function askCursorAt(sincePreview: number): CursorState {
   const moving =
     (sincePreview >= t.pageMoveStarts && sincePreview < t.pageReached) ||
     (sincePreview >= t.lineMoveStarts && sincePreview < t.lineReached) ||
-    (sincePreview >= t.sendMoveStarts && sincePreview < t.sendReached)
+    (sincePreview >= t.sendMoveStarts && sincePreview < t.sendReached) ||
+    (sincePreview >= t.publishMoveStarts && sincePreview < t.publishReached)
   if (moving) return 'moving'
   const hovering =
     (sincePreview >= t.lineReached && sincePreview < t.selectStarts) ||
-    (sincePreview >= t.sendReached && sincePreview < t.sendClicked)
+    (sincePreview >= t.sendReached && sincePreview < t.sendClicked) ||
+    (sincePreview >= t.publishReached && sincePreview < t.publishClicked)
   return hovering ? 'hovering' : 'still'
 }
 
@@ -267,6 +278,8 @@ function askCursorShape(sincePreview: number): CursorShape | undefined {
   const t = askTiming
   if (sincePreview >= t.lineReached - 150 && sincePreview < t.selectEnds + 100) return 'text'
   if (sincePreview >= t.sendReached - 100 && sincePreview < t.sent) return 'pointer'
+  if (sincePreview >= t.publishReached - 100 && sincePreview < t.publishClicked + 300)
+    return 'pointer'
   return undefined
 }
 
@@ -373,6 +386,10 @@ export function frameAt(elapsed: number): Frame {
         : null,
     seoElapsed: inEditor ? sinceEditor - seoStartsAfterEditor : null,
     socialImage: socialImageAt(sinceEditor, inEditor),
+    confettiElapsed:
+      inEditor && sinceEditor >= previewClickEndsAfterEditor
+        ? confettiAt(sinceEditor - previewClickEndsAfterEditor)
+        : null,
     previewElapsed:
       inEditor && sinceEditor >= previewClickEndsAfterEditor
         ? sinceEditor - previewClickEndsAfterEditor

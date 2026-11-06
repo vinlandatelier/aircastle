@@ -27,6 +27,7 @@ import { docsDecisionState } from './research'
 import { canute, orchestrator, thorfinn, workingAgents, type DemoAgent } from './agents'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
+import { Confetti } from './confetti'
 import {
   frameAt,
   loopDuration,
@@ -423,6 +424,7 @@ const cursorSpots = {
   'line-start': { left: 210, top: 299 },
   'line-end': { left: 425, top: 327 },
   'ask-send': { left: 590, top: 510 },
+  publish: { left: 872, top: 108 },
 } as const
 
 const cursorShapes: Record<CursorShape, LucideIcon> = {
@@ -692,6 +694,7 @@ export function ProductDemo() {
           />
           <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
           <ShortcutChip shortcut={frame.shortcut} />
+          {frame.confettiElapsed !== null && <Confetti elapsed={frame.confettiElapsed} />}
           <DemoCursor
             state={frame.cursor}
             shape={frame.cursorShape}
