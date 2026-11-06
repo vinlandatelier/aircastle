@@ -1,6 +1,10 @@
 import { workingAgents } from './agents'
+import type { PublishedEntry } from './site-ask'
 
-const origin = { left: 882, top: 117 }
+const origins = {
+  post: { left: 882, top: 117 },
+  docs: { left: 1221, top: 117 },
+} as const satisfies Record<PublishedEntry, { left: number; top: number }>
 const drag = 0.0022
 const gravity = 0.0016
 const fadeAfter = 1400
@@ -28,8 +32,9 @@ const pieces = Array.from({ length: 64 }, (_, index) => {
   }
 })
 
-/** A burst of confetti from the Publish button, placed from the milliseconds since the click. */
-export function Confetti({ elapsed }: { elapsed: number }) {
+/** A burst of confetti from the entry's Publish button, placed from the milliseconds since the click. */
+export function Confetti({ elapsed, entry }: { elapsed: number; entry: PublishedEntry }) {
+  const origin = origins[entry]
   const travelled = (1 - Math.exp(-drag * elapsed)) / drag
   const fall = (gravity * elapsed * elapsed) / 2
   const opacity = Math.max(0, Math.min(1, 1 - (elapsed - fadeAfter) / fadeDuration))

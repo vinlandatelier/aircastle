@@ -56,6 +56,18 @@ const notificationPreviewMoveStarts = menuOpens + 1200
 const notificationPreviewReached = notificationPreviewMoveStarts + 700
 const notificationPreviewClicked = notificationPreviewReached + 250
 const docsOpens = notificationPreviewClicked + 150
+const docsReadMoveStarts = docsOpens + 700
+const docsReadReached = docsReadMoveStarts + 600
+const docsScrollBurstDuration = 420
+const docsScrollSteps = [0.4, 0.35, 0.25] as const
+const docsScrollBursts = docsScrollSteps.map((step, index) => ({
+  at: docsReadReached - 150 + index * 520,
+  step,
+}))
+const docsReadEnds = (docsScrollBursts.at(-1)?.at ?? docsReadReached) + docsScrollBurstDuration
+const docsPublishMoveStarts = docsReadEnds + 300
+const docsPublishReached = docsPublishMoveStarts + 800
+const docsPublishClicked = docsPublishReached + 250
 
 /** When each beat of the select-to-prompt scene happens, in milliseconds after the site preview opens. */
 export const askTiming = {
@@ -90,7 +102,12 @@ export const askTiming = {
   notificationPreviewMoveStarts,
   notificationPreviewReached,
   notificationPreviewClicked,
-  ends: docsOpens + 4500,
+  docsReadMoveStarts,
+  docsReadReached,
+  docsPublishMoveStarts,
+  docsPublishReached,
+  docsPublishClicked,
+  ends: docsPublishClicked + confettiDuration + 600,
 } as const
 
 const clickDuration = 220
@@ -102,9 +119,13 @@ export function askEnterPressedAt(elapsed: number) {
 
 /** Whether the cursor is pressing the reference in Air's reply, Publish, the bell or the notification's Preview. */
 export function askCursorPressed(elapsed: number) {
-  return [referenceClicked, publishClicked, bellClicked, notificationPreviewClicked].some(
-    (clicked) => elapsed >= clicked && elapsed < clicked + clickDuration,
-  )
+  return [
+    referenceClicked,
+    publishClicked,
+    bellClicked,
+    notificationPreviewClicked,
+    docsPublishClicked,
+  ].some((clicked) => elapsed >= clicked && elapsed < clicked + clickDuration)
 }
 
 /** Whether the cursor has clicked Publish. */
@@ -132,10 +153,27 @@ export function docsPreviewAt(elapsed: number) {
   return elapsed >= docsOpens ? elapsed - docsOpens : null
 }
 
-/** Milliseconds since Publish was clicked while its confetti is in the air, or null. */
+/** Which entry's Publish button a confetti burst comes from. */
+export type PublishedEntry = 'post' | 'docs'
+
+/** The confetti in the air since Publish was last clicked, or null once it has landed. */
 export function confettiAt(elapsed: number) {
-  const since = elapsed - publishClicked
-  return since >= 0 && since < confettiDuration ? since : null
+  const entry: PublishedEntry = elapsed >= docsPublishClicked ? 'docs' : 'post'
+  const since = elapsed - (entry === 'docs' ? docsPublishClicked : publishClicked)
+  return since >= 0 && since < confettiDuration ? { elapsed: since, entry } : null
+}
+
+/** Whether the cursor has clicked Publish on the docs entry. */
+export function docsPublishedAt(elapsed: number) {
+  return elapsed >= docsPublishClicked
+}
+
+/** How far down the docs page has scrolled, from 0 at the top to 1 at the bottom. */
+export function docsScrollAt(elapsed: number) {
+  return docsScrollBursts.reduce(
+    (total, { at, step }) => total + step * eased(elapsed - at, docsScrollBurstDuration),
+    0,
+  )
 }
 
 function eased(elapsed: number, duration: number) {

@@ -1,6 +1,6 @@
 import { bodyDraftDuration } from './body-draft'
 import { docsDecisionAnsweredAt, researchLog, researchStepsAt } from './research'
-import { askCursorPressed, askTiming, confettiAt } from './site-ask'
+import { askCursorPressed, askTiming, confettiAt, type PublishedEntry } from './site-ask'
 
 export const prompt = "Recently shipped MCP for our app, let's announce it"
 
@@ -86,6 +86,8 @@ export type CursorTarget =
   | 'publish'
   | 'bell'
   | 'notification-preview'
+  | 'docs-read'
+  | 'docs-publish'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
@@ -118,7 +120,7 @@ export type Frame = {
   seoElapsed: number | null
   socialImage: CoverState
   previewElapsed: number | null
-  confettiElapsed: number | null
+  confetti: { elapsed: number; entry: PublishedEntry } | null
 }
 
 /** The still frame shown when motion is reduced. */
@@ -150,7 +152,7 @@ export const stillFrame: Frame = {
   seoElapsed: null,
   socialImage: 'idle',
   previewElapsed: null,
-  confettiElapsed: null,
+  confetti: null,
 }
 
 function chipsArrivedEvery(sinceFirst: number, interval: number, total: number) {
@@ -252,7 +254,19 @@ const cursorMoves: readonly {
     to: 'notification-preview',
     duration: askTiming.notificationPreviewReached - askTiming.notificationPreviewMoveStarts,
   },
-  { at: editorClosesAt, from: 'notification-preview', to: 'rest' },
+  {
+    at: askAt + askTiming.docsReadMoveStarts,
+    from: 'notification-preview',
+    to: 'docs-read',
+    duration: askTiming.docsReadReached - askTiming.docsReadMoveStarts,
+  },
+  {
+    at: askAt + askTiming.docsPublishMoveStarts,
+    from: 'docs-read',
+    to: 'docs-publish',
+    duration: askTiming.docsPublishReached - askTiming.docsPublishMoveStarts,
+  },
+  { at: editorClosesAt, from: 'docs-publish', to: 'rest' },
 ]
 
 function motionProgress(elapsed: number, duration: number) {
@@ -288,14 +302,18 @@ function askCursorAt(sincePreview: number): CursorState {
     (sincePreview >= t.referenceMoveStarts && sincePreview < t.referenceReached) ||
     (sincePreview >= t.publishMoveStarts && sincePreview < t.publishReached) ||
     (sincePreview >= t.bellMoveStarts && sincePreview < t.bellReached) ||
-    (sincePreview >= t.notificationPreviewMoveStarts && sincePreview < t.notificationPreviewReached)
+    (sincePreview >= t.notificationPreviewMoveStarts &&
+      sincePreview < t.notificationPreviewReached) ||
+    (sincePreview >= t.docsReadMoveStarts && sincePreview < t.docsReadReached) ||
+    (sincePreview >= t.docsPublishMoveStarts && sincePreview < t.docsPublishReached)
   if (moving) return 'moving'
   const hovering =
     (sincePreview >= t.lineReached && sincePreview < t.selectStarts) ||
     (sincePreview >= t.referenceReached && sincePreview < t.referenceClicked) ||
     (sincePreview >= t.publishReached && sincePreview < t.publishClicked) ||
     (sincePreview >= t.bellReached && sincePreview < t.bellClicked) ||
-    (sincePreview >= t.notificationPreviewReached && sincePreview < t.notificationPreviewClicked)
+    (sincePreview >= t.notificationPreviewReached && sincePreview < t.notificationPreviewClicked) ||
+    (sincePreview >= t.docsPublishReached && sincePreview < t.docsPublishClicked)
   return hovering ? 'hovering' : 'still'
 }
 
@@ -307,6 +325,8 @@ function askCursorShape(sincePreview: number): CursorShape | undefined {
   if (sincePreview >= t.publishReached - 100 && sincePreview < t.publishClicked + 300)
     return 'pointer'
   if (sincePreview >= t.bellReached - 100 && sincePreview < t.notificationPreviewClicked + 300)
+    return 'pointer'
+  if (sincePreview >= t.docsPublishReached - 100 && sincePreview < t.docsPublishClicked + 300)
     return 'pointer'
   return undefined
 }
@@ -416,7 +436,7 @@ export function frameAt(elapsed: number): Frame {
         : null,
     seoElapsed: inEditor ? sinceEditor - seoStartsAfterEditor : null,
     socialImage: socialImageAt(sinceEditor, inEditor),
-    confettiElapsed:
+    confetti:
       inEditor && sinceEditor >= previewClickEndsAfterEditor
         ? confettiAt(sinceEditor - previewClickEndsAfterEditor)
         : null,

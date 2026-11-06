@@ -1696,7 +1696,7 @@ test('once Air reports back, the cursor clicks Publish, confetti bursts from it 
   await expect(publish).toHaveText('Unpublish')
 })
 
-test('a notification says the docs page is ready, and its Preview opens the docs entry straight into its preview', async ({
+test('a notification says the docs page is ready, its Preview opens the docs entry in preview, and the cursor reads it to the bottom and publishes it', async ({
   page,
 }) => {
   test.setTimeout(150_000)
@@ -1798,9 +1798,66 @@ test('a notification says the docs page is ready, and its Preview opens the docs
   await expect(docs.locator('pre')).toContainText('mcp.acme.com')
   expect(await docs.locator('[data-demo-docs-step]').count()).toBeGreaterThanOrEqual(3)
 
-  await page.clock.runFor(story(3000))
+  const sitePage = await box(site.locator('[data-demo-site-page]'))
+  const end = docs.locator('[data-demo-docs-end]')
+  expect((await box(end)).y).toBeGreaterThan(sitePage.y + sitePage.height)
+  let previousTitle = (await box(docs.locator('h1'))).y
+  let scrolledWithCursorOnDocs = false
+  let reachedEndAfter: number | null = null
+  for (let tick = 0; tick < 120 && reachedEndAfter === null; tick += 1) {
+    await page.clock.runFor(story(50))
+    const now = await frame.evaluate(() => {
+      const rect = (selector: string) => {
+        const found = document.querySelector(selector)
+        if (!found) throw new Error(`Missing ${selector}`)
+        return found.getBoundingClientRect()
+      }
+      return {
+        title: rect('[data-demo-docs-page] h1').y,
+        endBottom: rect('[data-demo-docs-end]').bottom,
+        cursorX: rect('[data-demo-cursor]').x,
+        target: document.querySelector('[data-demo-cursor]')?.getAttribute('data-target'),
+      }
+    })
+    expect(now.title).toBeLessThanOrEqual(previousTitle + 0.5)
+    if (now.title < previousTitle && now.target === 'docs-read' && now.cursorX > sitePage.x)
+      scrolledWithCursorOnDocs = true
+    previousTitle = now.title
+    if (now.endBottom <= sitePage.y + sitePage.height + 1) reachedEndAfter = (tick + 1) * 50
+  }
+  expect(scrolledWithCursorOnDocs).toBe(true)
+  expect(reachedEndAfter).not.toBeNull()
+  expect(reachedEndAfter ?? Infinity).toBeLessThan(3500)
+
+  const publish = frame.locator('[data-demo-publish]')
+  const confetti = frame.locator('[data-demo-confetti]')
+  await expect(confetti).toHaveCount(0)
+  for (let tick = 0; tick < 100; tick += 1) {
+    const now = await sample()
+    if (now.target === 'docs-publish' && now.state === 'clicking') break
+    await page.clock.runFor(story(50))
+  }
+  await expectCursorOn(publish)
+  await page.clock.runFor(story(100))
+  expect(await confetti.locator('[data-demo-confetti-piece]').count()).toBeGreaterThan(30)
+  const burstX = await confetti
+    .locator('[data-demo-confetti-piece]')
+    .evaluateAll(
+      (pieces) =>
+        pieces.reduce((sum, piece) => sum + piece.getBoundingClientRect().x, 0) / pieces.length,
+    )
+  const publishBox = await box(publish)
+  expect(Math.abs(burstX - (publishBox.x + publishBox.width / 2))).toBeLessThan(publishBox.width)
+  await expect(status).toHaveText('Published')
+  await expect(publish).toHaveText('Unpublish')
+  await expect(breadcrumb).toContainText('Connect to Acme MCP')
+
+  for (let tick = 0; tick < 80 && (await confetti.count()) > 0; tick += 1)
+    await page.clock.runFor(story(50))
+  await expect(confetti).toHaveCount(0)
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
   await expect(docs).toBeVisible()
+  await expect(status).toHaveText('Published')
 })
 
 test('after asking Air, the cursor reads to the end of the post, then a reference in Air’s reply jumps back to the revised line before Publish', async ({

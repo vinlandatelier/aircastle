@@ -66,6 +66,8 @@ import {
   askTiming,
   askTypedAt,
   docsPreviewAt,
+  docsPublishedAt,
+  docsScrollAt,
   publishedAt,
   revisedFlashAt,
   rewrittenWordsAt,
@@ -1678,6 +1680,7 @@ export function EditorView({
   const content = useScrollToSeo(scrollProgress)
   const previewing = previewElapsed !== null
   const docsElapsed = previewElapsed === null ? null : docsPreviewAt(previewElapsed)
+  const docsScroll = previewElapsed === null ? 0 : docsScrollAt(previewElapsed)
   const panelOpen = researchPanelOpen && docsElapsed === null
   return (
     <div
@@ -1700,7 +1703,10 @@ export function EditorView({
           researchHovered={researchHovered}
           researchDocked={panelOpen}
           previewing={previewing}
-          published={docsElapsed === null && previewElapsed !== null && publishedAt(previewElapsed)}
+          published={
+            previewElapsed !== null &&
+            (docsElapsed === null ? publishedAt(previewElapsed) : docsPublishedAt(previewElapsed))
+          }
           collection={docsElapsed === null ? 'Blog posts' : 'Docs'}
           title={docsElapsed === null ? 'Introducing Acme MCP' : docsTitle}
         />
@@ -1731,7 +1737,7 @@ export function EditorView({
           </div>
           {docsElapsed !== null ? (
             <SitePreview key="docs" url={docsUrl} elapsed={docsElapsed}>
-              <DocsPage />
+              <DocsPage scroll={docsScroll} />
             </SitePreview>
           ) : (
             previewing && (

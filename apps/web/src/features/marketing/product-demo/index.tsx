@@ -441,6 +441,8 @@ const cursorSpots = {
   publish: { left: 872, top: 108 },
   bell: { left: 1188, top: 52 },
   'notification-preview': { left: 1064, top: 242 },
+  'docs-read': { left: 700, top: 460 },
+  'docs-publish': { left: 1211, top: 110 },
 } as const
 
 const cursorShapes: Record<CursorShape, LucideIcon> = {
@@ -711,7 +713,7 @@ export function ProductDemo() {
           />
           <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
           <ShortcutChip shortcut={frame.shortcut} />
-          {frame.confettiElapsed !== null && <Confetti elapsed={frame.confettiElapsed} />}
+          {frame.confetti && <Confetti {...frame.confetti} />}
           <DemoCursor
             state={frame.cursor}
             shape={frame.cursorShape}
