@@ -424,6 +424,8 @@ const cursorSpots = {
   'line-start': { left: 210, top: 299 },
   'line-end': { left: 425, top: 327 },
   'ask-send': { left: 590, top: 510 },
+  'site-read': { left: 600, top: 440 },
+  reference: { left: 1000, top: 574 },
   publish: { left: 872, top: 108 },
 } as const
 

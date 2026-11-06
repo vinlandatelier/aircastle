@@ -1666,3 +1666,99 @@ test('once Air reports back, the cursor clicks Publish and confetti bursts from 
   await expect(confetti).toHaveCount(0)
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
 })
+
+test('after asking Air, the cursor reads to the end of the post, then a reference in Air’s reply jumps back to the revised line before Publish', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  const { frame, site } = await openSitePreview(page, 'light')
+  const cursor = frame.locator('[data-demo-cursor]')
+  const sitePage = site.locator('[data-demo-site-page]')
+  const opening = sitePage.locator('[data-demo-site-opening]')
+  const panel = frame.locator('[data-demo-research-panel]')
+  const reference = panel.locator('[data-demo-chat-reference]')
+  const box = async (locator: import('@playwright/test').Locator) => {
+    const found = await locator.boundingBox()
+    if (!found) throw new Error('Element is not laid out')
+    return found
+  }
+
+  await page.clock.runFor(story(7300))
+  await expect(site.locator('[data-demo-ask-air]')).toHaveCount(0)
+  const pageBox = await box(sitePage)
+  let reachedEnd = false
+  let scrolledWithCursorOnPage = false
+  let previous = (await box(opening)).y
+  for (let tick = 0; tick < 120; tick += 1) {
+    await page.clock.runFor(story(100))
+    const now = await frame.evaluate((element) => {
+      const rect = (selector: string) => {
+        const found = element.querySelector(selector)
+        if (!found) throw new Error(`Missing ${selector}`)
+        return found.getBoundingClientRect()
+      }
+      const paragraphs = [...element.querySelectorAll('[data-demo-site-page] p')]
+      const closing = paragraphs.find((paragraph) =>
+        paragraph.textContent?.startsWith('MCP is an open standard'),
+      )
+      return {
+        opening: rect('[data-demo-site-opening]').y,
+        cursorX: rect('[data-demo-cursor]').x,
+        closingBottom: closing?.getBoundingClientRect().bottom ?? Infinity,
+        target: element.querySelector('[data-demo-cursor]')?.getAttribute('data-target'),
+      }
+    })
+    if (now.target === 'reference') break
+    if (
+      now.opening < previous &&
+      now.cursorX > pageBox.x &&
+      now.cursorX < pageBox.x + pageBox.width
+    )
+      scrolledWithCursorOnPage = true
+    previous = now.opening
+    if (now.closingBottom <= pageBox.y + pageBox.height) reachedEnd = true
+  }
+  expect(scrolledWithCursorOnPage).toBe(true)
+  expect(reachedEnd).toBe(true)
+  expect((await box(opening)).y).toBeLessThan(pageBox.y)
+
+  await expect(reference).toHaveCount(1)
+  await expect(reference).toContainText('Ask Claude to find every stale draft')
+  for (
+    let tick = 0;
+    tick < 60 && (await cursor.getAttribute('data-state')) !== 'clicking';
+    tick += 1
+  )
+    await page.clock.runFor(story(50))
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  const pointer = await box(cursor)
+  const chip = await box(reference)
+  expect(pointer.x).toBeGreaterThan(chip.x)
+  expect(pointer.x).toBeLessThan(chip.x + chip.width)
+  expect(pointer.y).toBeGreaterThan(chip.y)
+  expect(pointer.y).toBeLessThan(chip.y + chip.height)
+
+  await page.clock.runFor(story(1300))
+  const revised = await box(opening)
+  expect(revised.y).toBeGreaterThan(pageBox.y)
+  expect(revised.y).toBeLessThan(pageBox.y + pageBox.height / 2)
+  await expect(opening).toHaveText(
+    'Ask Claude to find every stale draft in your workspace, and it works in Acme the way you would, with your permissions.',
+  )
+  await expect(cursor).not.toHaveAttribute('data-target', 'publish')
+
+  for (
+    let tick = 0;
+    tick < 120 && (await cursor.getAttribute('data-target')) !== 'publish';
+    tick += 1
+  )
+    await page.clock.runFor(story(50))
+  for (
+    let tick = 0;
+    tick < 60 && (await cursor.getAttribute('data-state')) !== 'clicking';
+    tick += 1
+  )
+    await page.clock.runFor(story(50))
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  expect((await box(opening)).y).toBe(revised.y)
+})

@@ -14,6 +14,7 @@ import {
   LoaderCircleIcon,
   MessageCircleQuestionIcon,
   TriangleAlertIcon,
+  TextQuoteIcon,
   CircleCheckIcon,
   EllipsisVerticalIcon,
   ExternalLinkIcon,
@@ -53,6 +54,7 @@ import {
   bodyDraftTimed,
   bodyReadingTime,
   openingLine,
+  rewrittenLine,
   openingRest,
   type DraftSegment,
 } from './body-draft'
@@ -61,6 +63,7 @@ import {
   askOpenAt,
   askTiming,
   askTypedAt,
+  revisedFlashAt,
   rewrittenWordsAt,
   selectedCharsAt,
   siteScrollAt,
@@ -729,6 +732,18 @@ function AirChat({ elapsed }: { elapsed: number }) {
               {index < words.length - 1 ? `${word} ` : word}
             </span>
           ))}
+          <span
+            data-demo-chat-reference
+            className={cn(
+              'mt-2 flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-xs dark:bg-input/30',
+              styles.streamCard,
+            )}
+            style={{ animationDelay: `${airReply.split(' ').length * wordInterval}ms` }}
+          >
+            <TextQuoteIcon className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate">{rewrittenLine}</span>
+            <ArrowUpRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
+          </span>
         </AirMessage>
       )}
     </>
@@ -1421,15 +1436,17 @@ function SiteNav() {
 
 const openingAt = 110
 
-function useScrollToOpening(progress: number) {
+function useSiteScroll({ opening, end }: { opening: number; end: number }) {
   const page = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const element = page.current
-    const opening = element?.querySelector<HTMLElement>('[data-demo-site-lead]')
-    if (!element || !opening) return
-    const distance = Math.max(0, opening.offsetTop - openingAt)
-    element.style.translate = `0 -${distance * progress}px`
-  }, [page, progress])
+    const lead = element?.querySelector<HTMLElement>('[data-demo-site-lead]')
+    const viewport = element?.parentElement
+    if (!element || !lead || !viewport) return
+    const toOpening = Math.max(0, lead.offsetTop - openingAt)
+    const toEnd = Math.max(toOpening, element.offsetHeight - viewport.clientHeight)
+    element.style.translate = `0 -${toOpening * opening + (toEnd - toOpening) * end}px`
+  }, [page, opening, end])
   return page
 }
 
@@ -1437,7 +1454,11 @@ function OpeningLine({ elapsed }: { elapsed: number }) {
   const rewritten = rewrittenWordsAt(elapsed)
   const selected = selectedCharsAt(elapsed)
   return (
-    <span data-demo-site-opening>
+    <span
+      data-demo-site-opening
+      className="rounded-sm"
+      style={{ backgroundColor: `rgb(56 189 248 / ${0.28 * revisedFlashAt(elapsed)})` }}
+    >
       {rewritten
         ? rewritten.map(({ word, ink }, index) => (
             <span key={index} data-demo-rewrite-word style={{ opacity: 0.25 + 0.75 * ink }}>
@@ -1495,7 +1516,7 @@ function AskAir({ elapsed }: { elapsed: number }) {
 }
 
 function SitePage({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: number | null }) {
-  const page = useScrollToOpening(siteScrollAt(elapsed))
+  const page = useSiteScroll(siteScrollAt(elapsed))
   return (
     <div ref={page} className={cn('relative flex flex-col', styles.streamCard)}>
       <SiteNav />

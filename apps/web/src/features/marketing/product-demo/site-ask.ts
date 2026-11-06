@@ -31,7 +31,20 @@ const rewriteEnds = rewriteStarts + rewrittenWords.length * rewriteWordInterval
 const approved = rewriteEnds + 300
 const finished = approved + 300
 const replied = finished + 250
-const publishMoveStarts = replied + 1100
+const readMoveStarts = sent + 250
+const readReached = sent + 850
+const readBurstDuration = 650
+const readSteps = [0.3, 0.25, 0.25, 0.2] as const
+const readBursts = readSteps.map((step, index) => ({ at: sent + 700 + index * 1050, step }))
+const readEnds = (readBursts.at(-1)?.at ?? sent) + readBurstDuration
+const referenceMoveStarts = readEnds + 250
+const referenceReached = referenceMoveStarts + 900
+const referenceClicked = referenceReached + 250
+const jumpStarts = referenceClicked + 120
+const jumpDuration = 900
+const jumpEnds = jumpStarts + jumpDuration
+const flashDuration = 1200
+const publishMoveStarts = jumpEnds + 700
 const publishReached = publishMoveStarts + 900
 const publishClicked = publishReached + 250
 const confettiDuration = 2000
@@ -57,6 +70,11 @@ export const askTiming = {
   approved,
   finished,
   replied,
+  readMoveStarts,
+  readReached,
+  referenceMoveStarts,
+  referenceReached,
+  referenceClicked,
   publishMoveStarts,
   publishReached,
   publishClicked,
@@ -65,9 +83,9 @@ export const askTiming = {
 
 const clickDuration = 220
 
-/** Whether the cursor is pressing Ask Air's send button or Publish. */
+/** Whether the cursor is pressing Ask Air's send button, the reference in Air's reply, or Publish. */
 export function askCursorPressed(elapsed: number) {
-  return [sendClicked, publishClicked].some(
+  return [sendClicked, referenceClicked, publishClicked].some(
     (clicked) => elapsed >= clicked && elapsed < clicked + clickDuration,
   )
 }
@@ -83,11 +101,21 @@ function eased(elapsed: number, duration: number) {
   return t * t * t * (t * (6 * t - 15) + 10)
 }
 
-/** How far the site has scrolled down to the opening line, from 0 to 1. */
+/** Where the site is scrolled: `opening` runs 0 to 1 down to the opening line, then `end` runs 0 to 1 on from there to the bottom of the post. */
 export function siteScrollAt(elapsed: number) {
   const down = eased(elapsed - scrollStarts, scrollDownDuration) * overshoot
   const back = eased(elapsed - scrollBackStarts, scrollBackDuration) * (overshoot - 1)
-  return down - back
+  const read = readBursts.reduce(
+    (total, burst) => total + eased(elapsed - burst.at, readBurstDuration) * burst.step,
+    0,
+  )
+  return { opening: down - back, end: read - eased(elapsed - jumpStarts, jumpDuration) }
+}
+
+/** How strongly the revised line is tinted after the reference jumps to it, from 1 fading to 0. */
+export function revisedFlashAt(elapsed: number) {
+  if (elapsed < jumpEnds) return 0
+  return Math.max(0, 1 - (elapsed - jumpEnds) / flashDuration)
 }
 
 /** How many characters of the opening line are selected, or 0 once the rewrite replaces it. */

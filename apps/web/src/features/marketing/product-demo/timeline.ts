@@ -82,6 +82,8 @@ export type CursorTarget =
   | 'line-start'
   | 'line-end'
   | 'ask-send'
+  | 'site-read'
+  | 'reference'
   | 'publish'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
@@ -227,8 +229,20 @@ const cursorMoves: readonly {
     bend: 0.05,
   },
   {
-    at: askAt + askTiming.publishMoveStarts,
+    at: askAt + askTiming.readMoveStarts,
     from: 'ask-send',
+    to: 'site-read',
+    duration: askTiming.readReached - askTiming.readMoveStarts,
+  },
+  {
+    at: askAt + askTiming.referenceMoveStarts,
+    from: 'site-read',
+    to: 'reference',
+    duration: askTiming.referenceReached - askTiming.referenceMoveStarts,
+  },
+  {
+    at: askAt + askTiming.publishMoveStarts,
+    from: 'reference',
     to: 'publish',
     duration: askTiming.publishReached - askTiming.publishMoveStarts,
   },
@@ -265,11 +279,14 @@ function askCursorAt(sincePreview: number): CursorState {
     (sincePreview >= t.pageMoveStarts && sincePreview < t.pageReached) ||
     (sincePreview >= t.lineMoveStarts && sincePreview < t.lineReached) ||
     (sincePreview >= t.sendMoveStarts && sincePreview < t.sendReached) ||
+    (sincePreview >= t.readMoveStarts && sincePreview < t.readReached) ||
+    (sincePreview >= t.referenceMoveStarts && sincePreview < t.referenceReached) ||
     (sincePreview >= t.publishMoveStarts && sincePreview < t.publishReached)
   if (moving) return 'moving'
   const hovering =
     (sincePreview >= t.lineReached && sincePreview < t.selectStarts) ||
     (sincePreview >= t.sendReached && sincePreview < t.sendClicked) ||
+    (sincePreview >= t.referenceReached && sincePreview < t.referenceClicked) ||
     (sincePreview >= t.publishReached && sincePreview < t.publishClicked)
   return hovering ? 'hovering' : 'still'
 }
@@ -278,6 +295,8 @@ function askCursorShape(sincePreview: number): CursorShape | undefined {
   const t = askTiming
   if (sincePreview >= t.lineReached - 150 && sincePreview < t.selectEnds + 100) return 'text'
   if (sincePreview >= t.sendReached - 100 && sincePreview < t.sent) return 'pointer'
+  if (sincePreview >= t.referenceReached - 100 && sincePreview < t.referenceClicked + 300)
+    return 'pointer'
   if (sincePreview >= t.publishReached - 100 && sincePreview < t.publishClicked + 300)
     return 'pointer'
   return undefined
