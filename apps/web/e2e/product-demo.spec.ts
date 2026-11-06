@@ -1600,7 +1600,7 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
   expect(await opacityOf(inked.last())).toBeLessThan(0.7)
   await expect(thread.nth(1)).toContainText('Thorfinn')
   await expect(thread.nth(1)).toContainText('Writing Agent')
-  await until(async () => (await opening.textContent()) === rewrittenLine)
+  await until(async () => (await opening.locator('[data-demo-rewrite-pending]').count()) === 0)
   await expect(opening).toHaveText(rewrittenLine)
   await page.clock.runFor(story(600))
   for (const word of await inked.all()) expect(await opacityOf(word)).toBe(1)
@@ -1825,8 +1825,9 @@ test('after asking Air, the cursor reads to the end of the post, then a referenc
   let reachedEnd = false
   let scrolledWithCursorOnPage = false
   let previous = (await box(opening)).y
-  for (let tick = 0; tick < 120; tick += 1) {
-    await page.clock.runFor(story(100))
+  let previousHeading = (await box(sitePage.locator('h2').first())).y
+  for (let tick = 0; tick < 240; tick += 1) {
+    await page.clock.runFor(story(50))
     const now = await frame.evaluate((element) => {
       const rect = (selector: string) => {
         const found = element.querySelector(selector)
@@ -1839,12 +1840,15 @@ test('after asking Air, the cursor reads to the end of the post, then a referenc
       )
       return {
         opening: rect('[data-demo-site-opening]').y,
+        firstHeading: rect('[data-demo-site-page] h2').y,
         cursorX: rect('[data-demo-cursor]').x,
         closingBottom: closing?.getBoundingClientRect().bottom ?? Infinity,
         target: element.querySelector('[data-demo-cursor]')?.getAttribute('data-target'),
       }
     })
     if (now.target === 'reference') break
+    expect(now.firstHeading).toBeLessThanOrEqual(previousHeading + 0.5)
+    previousHeading = now.firstHeading
     if (
       now.opening < previous &&
       now.cursorX > pageBox.x &&

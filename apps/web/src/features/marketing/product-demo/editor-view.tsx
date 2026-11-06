@@ -1484,6 +1484,8 @@ function useSiteScroll({ opening, end }: { opening: number; end: number }) {
   return page
 }
 
+const rewrittenWords = rewrittenLine.split(' ')
+
 function OpeningLine({ elapsed }: { elapsed: number }) {
   const rewritten = rewrittenWordsAt(elapsed)
   const selected = selectedCharsAt(elapsed)
@@ -1494,11 +1496,19 @@ function OpeningLine({ elapsed }: { elapsed: number }) {
       style={{ backgroundColor: `rgb(56 189 248 / ${0.28 * revisedFlashAt(elapsed)})` }}
     >
       {rewritten
-        ? rewritten.map(({ word, ink }, index) => (
-            <span key={index} data-demo-rewrite-word style={{ opacity: 0.25 + 0.75 * ink }}>
-              {index < rewritten.length - 1 ? `${word} ` : word}
-            </span>
-          ))
+        ? rewrittenWords.map((word, index) => {
+            const text = index < rewrittenWords.length - 1 ? `${word} ` : word
+            const ink = rewritten[index]?.ink
+            return ink === undefined ? (
+              <span key={index} data-demo-rewrite-pending className="invisible">
+                {text}
+              </span>
+            ) : (
+              <span key={index} data-demo-rewrite-word style={{ opacity: 0.25 + 0.75 * ink }}>
+                {text}
+              </span>
+            )
+          })
         : selected > 0 && (
             <span
               data-demo-site-selection
