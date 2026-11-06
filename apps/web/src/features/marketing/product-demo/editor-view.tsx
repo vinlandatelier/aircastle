@@ -63,6 +63,7 @@ import {
   askOpenAt,
   askTiming,
   askTypedAt,
+  publishedAt,
   revisedFlashAt,
   rewrittenWordsAt,
   selectedCharsAt,
@@ -881,11 +882,13 @@ function TopBar({
   researchHovered,
   researchDocked,
   previewing,
+  published,
 }: {
   steps: number
   researchHovered: boolean
   researchDocked: boolean
   previewing: boolean
+  published: boolean
 }) {
   return (
     <div
@@ -896,6 +899,17 @@ function TopBar({
         <span className="text-muted-foreground">Blog posts</span>
         <span className="text-muted-foreground">/</span>
         <span className="truncate">Introducing Acme MCP</span>
+        <span
+          data-demo-post-status
+          className={cn(
+            'rounded-full px-2 py-0.5 text-[13px]',
+            published
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              : 'bg-muted text-muted-foreground',
+          )}
+        >
+          {published ? 'Published' : 'Draft'}
+        </span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <ResearchStatus steps={steps} hovered={researchHovered} docked={researchDocked} />
@@ -916,9 +930,14 @@ function TopBar({
         </span>
         <span
           data-demo-publish
-          className="flex h-8 items-center rounded-md bg-primary px-3 text-primary-foreground"
+          className={cn(
+            'flex h-8 items-center rounded-md px-3',
+            published
+              ? 'border bg-background dark:bg-input/30'
+              : 'bg-primary text-primary-foreground',
+          )}
         >
-          Publish
+          {published ? 'Unpublish' : 'Publish'}
         </span>
       </div>
     </div>
@@ -1650,6 +1669,7 @@ export function EditorView({
           researchHovered={researchHovered}
           researchDocked={researchPanelOpen}
           previewing={previewing}
+          published={previewElapsed !== null && publishedAt(previewElapsed)}
         />
         <div className="relative min-h-0 flex-1">
           <div

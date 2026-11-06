@@ -90,6 +90,11 @@ export function askCursorPressed(elapsed: number) {
   )
 }
 
+/** Whether the cursor has clicked Publish. */
+export function publishedAt(elapsed: number) {
+  return elapsed >= publishClicked
+}
+
 /** Milliseconds since Publish was clicked while its confetti is in the air, or null. */
 export function confettiAt(elapsed: number) {
   const since = elapsed - publishClicked

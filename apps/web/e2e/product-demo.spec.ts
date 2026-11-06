@@ -340,7 +340,7 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(editor.locator('[data-demo-agent-outline]')).toHaveCount(
     await editor.locator('[data-demo-field] [data-demo-agent-outline]').count(),
   )
-  await expect(editor.getByText('Draft', { exact: true })).toHaveCount(0)
+  await expect(editor.locator('[data-demo-post-status]')).toHaveText('Draft')
 
   const preview = editor.locator('[data-demo-preview]')
   const publish = editor.locator('[data-demo-publish]')
@@ -1608,10 +1608,10 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
   await expect(thread.locator('[data-demo-thread-text]')).toHaveCount(3)
 })
 
-test('once Air reports back, the cursor clicks Publish and confetti bursts from it', async ({
+test('once Air reports back, the cursor clicks Publish, confetti bursts from it and the post shows as published', async ({
   page,
 }) => {
-  test.setTimeout(60_000)
+  test.setTimeout(90_000)
   const { frame } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const publish = frame.locator('[data-demo-publish]')
@@ -1627,6 +1627,13 @@ test('once Air reports back, the cursor clicks Publish and confetti bursts from 
     await page.clock.runFor(story(50))
   await expect(reply).toContainText('Have a look')
   await expect(confetti).toHaveCount(0)
+  const status = frame.locator('[data-demo-post-status]')
+  const preview = frame.locator('[data-demo-preview]')
+  const background = (locator: import('@playwright/test').Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).backgroundColor)
+  await expect(status).toHaveText('Draft')
+  await expect(publish).toHaveText('Publish')
+  expect(await background(publish)).not.toBe(await background(preview))
 
   for (
     let tick = 0;
@@ -1645,6 +1652,12 @@ test('once Air reports back, the cursor clicks Publish and confetti bursts from 
   expect(pointer.y).toBeLessThan(button.y + button.height)
 
   await page.clock.runFor(story(100))
+  await expect(status).toHaveText('Published')
+  await expect(publish).toHaveText('Unpublish')
+  expect(await background(publish)).toBe(await background(preview))
+  expect(await publish.evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe(
+    await preview.evaluate((element) => getComputedStyle(element).borderTopWidth),
+  )
   const pieces = confetti.locator('[data-demo-confetti-piece]')
   expect(await pieces.count()).toBeGreaterThan(30)
   const spread = async () => {
@@ -1665,6 +1678,8 @@ test('once Air reports back, the cursor clicks Publish and confetti bursts from 
     await page.clock.runFor(story(50))
   await expect(confetti).toHaveCount(0)
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
+  await expect(status).toHaveText('Published')
+  await expect(publish).toHaveText('Unpublish')
 })
 
 test('after asking Air, the cursor reads to the end of the post, then a reference in Air’s reply jumps back to the revised line before Publish', async ({
