@@ -78,9 +78,9 @@ export type CursorTarget =
   | 'decision'
   | 'editor'
   | 'preview'
+  | 'site-page'
   | 'line-start'
   | 'line-end'
-  | 'ask-input'
   | 'ask-send'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
@@ -198,8 +198,14 @@ const cursorMoves: readonly {
   { at: editorOpensAt + decisionClickEndsAfterEditor, from: 'decision', to: 'editor' },
   { at: editorOpensAt + previewCursorMovesAfterEditor, from: 'editor', to: 'preview' },
   {
-    at: askAt + askTiming.lineMoveStarts,
+    at: askAt + askTiming.pageMoveStarts,
     from: 'preview',
+    to: 'site-page',
+    duration: askTiming.pageReached - askTiming.pageMoveStarts,
+  },
+  {
+    at: askAt + askTiming.lineMoveStarts,
+    from: 'site-page',
     to: 'line-start',
     duration: askTiming.lineReached - askTiming.lineMoveStarts,
   },
@@ -211,14 +217,8 @@ const cursorMoves: readonly {
     bend: 0,
   },
   {
-    at: askAt + askTiming.inputMoveStarts,
-    from: 'line-end',
-    to: 'ask-input',
-    duration: askTiming.inputReached - askTiming.inputMoveStarts,
-  },
-  {
     at: askAt + askTiming.sendMoveStarts,
-    from: 'ask-input',
+    from: 'line-end',
     to: 'ask-send',
     duration: askTiming.sendReached - askTiming.sendMoveStarts,
     bend: 0.05,
@@ -253,13 +253,12 @@ function askCursorAt(sincePreview: number): CursorState {
   if (askCursorPressed(sincePreview)) return 'clicking'
   if (sincePreview >= t.selectStarts && sincePreview < t.selectEnds) return 'dragging'
   const moving =
+    (sincePreview >= t.pageMoveStarts && sincePreview < t.pageReached) ||
     (sincePreview >= t.lineMoveStarts && sincePreview < t.lineReached) ||
-    (sincePreview >= t.inputMoveStarts && sincePreview < t.inputReached) ||
     (sincePreview >= t.sendMoveStarts && sincePreview < t.sendReached)
   if (moving) return 'moving'
   const hovering =
     (sincePreview >= t.lineReached && sincePreview < t.selectStarts) ||
-    (sincePreview >= t.inputReached && sincePreview < t.inputClicked) ||
     (sincePreview >= t.sendReached && sincePreview < t.sendClicked)
   return hovering ? 'hovering' : 'still'
 }
@@ -267,7 +266,6 @@ function askCursorAt(sincePreview: number): CursorState {
 function askCursorShape(sincePreview: number): CursorShape | undefined {
   const t = askTiming
   if (sincePreview >= t.lineReached - 150 && sincePreview < t.selectEnds + 100) return 'text'
-  if (sincePreview >= t.inputReached - 120 && sincePreview < t.sendMoveStarts + 150) return 'text'
   if (sincePreview >= t.sendReached - 100 && sincePreview < t.sent) return 'pointer'
   return undefined
 }

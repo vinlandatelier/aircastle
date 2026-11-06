@@ -1453,7 +1453,7 @@ test('the Acme brand and the post title use a medium weight', async ({ page }) =
 
 const openingLine =
   'Acme MCP lets any MCP client read and act on your workspace, with the same permissions as the person using it.'
-const askInstruction = 'Lead with what a team can do with it'
+const askInstruction = 'hm maybe lead with what a team can do with it'
 const rewrittenLine =
   'Ask Claude to find every stale draft in your workspace, and it works in Acme the way you would, with your permissions.'
 
@@ -1484,7 +1484,25 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
   await expect(opening).toHaveText(openingLine)
   const unscrolled = await box(opening)
 
-  await until(async () => (await selection.count()) > 0)
+  const scrolled: number[] = []
+  let cursorOverPage = false
+  for (let tick = 0; tick < 300 && (await selection.count()) === 0; tick += 1) {
+    scrolled.push((await box(opening)).y)
+    const pointer = await box(cursor)
+    const pageNow = await box(sitePage)
+    if (
+      scrolled.length > 1 &&
+      scrolled.at(-1) !== scrolled.at(-2) &&
+      pointer.y > pageNow.y &&
+      pointer.y < pageNow.y + pageNow.height
+    )
+      cursorOverPage = true
+    await page.clock.runFor(story(50))
+  }
+  const settledAt = scrolled.at(-1) ?? 0
+  expect(Math.min(...scrolled)).toBeLessThan(settledAt - 80)
+  expect(scrolled.slice(-4).every((y) => y === settledAt)).toBe(true)
+  expect(cursorOverPage).toBe(true)
   await expect(cursor).toHaveAttribute('data-shape', 'text')
   await until(async () => (await selection.textContent()) === openingLine)
   await expect(selection).toHaveText(openingLine)
@@ -1510,15 +1528,19 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
   expect(dropdown.y).toBeGreaterThan(selected.y + selected.height - 4)
   expect(dropdown.y + dropdown.height).toBeLessThan(pageBox.y + pageBox.height)
   await expect(askInput).toHaveText('')
+  const field = await box(askInput)
+  const sendButton = await box(ask.locator('[data-demo-ask-send]'))
+  expect(field.height).toBeGreaterThan(sendButton.height * 1.4)
+  expect(sendButton.y).toBeGreaterThan(field.y + 16)
+  expect(sendButton.x + sendButton.width).toBeGreaterThan(dropdown.x + dropdown.width - 24)
 
-  await until(async () => (await cursor.getAttribute('data-state')) === 'clicking')
-  const clickBox = await box(cursor)
-  const inputBox = await box(askInput)
-  expect(clickBox.x).toBeGreaterThan(inputBox.x)
-  expect(clickBox.y).toBeGreaterThan(inputBox.y - 4)
-  expect(clickBox.y).toBeLessThan(inputBox.y + inputBox.height)
-  await expect(askInput).toHaveText('')
-
+  await expect(ask.locator('[data-demo-ask-caret]')).toHaveCount(1)
+  let clickedBeforeTyped = false
+  for (let tick = 0; tick < 300 && (await askInput.textContent()) !== askInstruction; tick += 1) {
+    if ((await cursor.getAttribute('data-state')) === 'clicking') clickedBeforeTyped = true
+    await page.clock.runFor(story(50))
+  }
+  expect(clickedBeforeTyped).toBe(false)
   await until(async () => (await askInput.textContent()) === askInstruction)
   await expect(askInput).toHaveText(askInstruction)
   await expect(panel.locator('[data-demo-agent-switcher]')).toContainText('Canute')
@@ -1555,10 +1577,19 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
 
   await until(async () => (await selection.count()) === 0)
   await expect(opening).not.toContainText('lets any MCP client')
+  await page.clock.runFor(story(450))
+  const inked = opening.locator('[data-demo-rewrite-word]')
+  const opacityOf = (locator: import('@playwright/test').Locator) =>
+    locator.evaluate((element) => Number(getComputedStyle(element).opacity))
+  expect(await inked.count()).toBeLessThan(rewrittenLine.split(' ').length)
+  expect(await opacityOf(inked.first())).toBe(1)
+  expect(await opacityOf(inked.last())).toBeLessThan(0.7)
   await expect(thread.nth(1)).toContainText('Thorfinn')
   await expect(thread.nth(1)).toContainText('Writing Agent')
   await until(async () => (await opening.textContent()) === rewrittenLine)
   await expect(opening).toHaveText(rewrittenLine)
+  await page.clock.runFor(story(600))
+  for (const word of await inked.all()) expect(await opacityOf(word)).toBe(1)
   await expect(site.locator('[data-demo-agent-tab]')).toHaveCount(0)
   await expect(site.locator('[data-demo-agent-outline]')).toHaveCount(0)
 
@@ -1569,4 +1600,10 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
   await until(async () => (await messages.last().textContent())?.includes('Have a look') ?? false)
   await expect(messages.last()).toHaveAttribute('data-from', 'air')
   await expect(messages.last()).toContainText('Have a look')
+  const colourOf = (locator: import('@playwright/test').Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).color)
+  const airText = lightness(await colourOf(messages.last().locator('p')))
+  for (const part of await thread.locator('[data-demo-thread-name], [data-demo-thread-text]').all())
+    expect(lightness(await colourOf(part))).toBeGreaterThan(airText + 0.2)
+  await expect(thread.locator('[data-demo-thread-text]')).toHaveCount(3)
 })

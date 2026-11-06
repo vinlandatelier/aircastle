@@ -1,20 +1,25 @@
 import { openingLine, rewrittenLine } from './body-draft'
 
 /** What the user types into Ask Air after selecting the opening line. */
-export const askInstruction = 'Lead with what a team can do with it'
+export const askInstruction = 'hm maybe lead with what a team can do with it'
 
 const keystroke = 26
 const rewriteWordInterval = 35
 const rewrittenWords = rewrittenLine.split(' ')
 
-const scrollStarts = 800
-const lineReached = 1800
-const selectStarts = 1950
-const selectEnds = 2650
-const dropdownOpens = 2800
-const inputReached = 3400
-const inputClicked = 3500
-const typingStarts = 3780
+const pageReached = 1300
+const scrollStarts = 1100
+const scrollDownDuration = 1200
+const overshoot = 1.6
+const scrollBackStarts = 2650
+const scrollBackDuration = 650
+const lineMoveStarts = 3300
+const lineReached = 3900
+const selectStarts = 4050
+const selectEnds = 4750
+const dropdownOpens = 4900
+const typingStarts = dropdownOpens + 350
+const inkDuration = 380
 const typingEnds = typingStarts + askInstruction.length * keystroke
 const sendReached = typingEnds + 380
 const sendClicked = sendReached + 120
@@ -29,16 +34,13 @@ const replied = finished + 250
 
 /** When each beat of the select-to-prompt scene happens, in milliseconds after the site preview opens. */
 export const askTiming = {
-  scrollStarts,
-  scrollDuration: 1000,
-  lineMoveStarts: scrollStarts + 100,
+  pageMoveStarts: 700,
+  pageReached,
+  lineMoveStarts,
   lineReached,
   selectStarts,
   selectEnds,
   dropdownOpens,
-  inputMoveStarts: dropdownOpens + 100,
-  inputReached,
-  inputClicked,
   typingStarts,
   sendMoveStarts: typingEnds + 80,
   sendReached,
@@ -56,12 +58,9 @@ export const askTiming = {
 
 const clickDuration = 220
 
-/** Whether the cursor is pressing during the scene, for the click and drag beats. */
+/** Whether the cursor is pressing Ask Air's send button. */
 export function askCursorPressed(elapsed: number) {
-  return (
-    (elapsed >= inputClicked && elapsed < inputClicked + clickDuration) ||
-    (elapsed >= sendClicked && elapsed < sendClicked + clickDuration)
-  )
+  return elapsed >= sendClicked && elapsed < sendClicked + clickDuration
 }
 
 function eased(elapsed: number, duration: number) {
@@ -71,7 +70,9 @@ function eased(elapsed: number, duration: number) {
 
 /** How far the site has scrolled down to the opening line, from 0 to 1. */
 export function siteScrollAt(elapsed: number) {
-  return eased(elapsed - scrollStarts, askTiming.scrollDuration)
+  const down = eased(elapsed - scrollStarts, scrollDownDuration) * overshoot
+  const back = eased(elapsed - scrollBackStarts, scrollBackDuration) * (overshoot - 1)
+  return down - back
 }
 
 /** How many characters of the opening line are selected, or 0 once the rewrite replaces it. */
@@ -91,14 +92,13 @@ export function askTypedAt(elapsed: number) {
   return Math.min(askInstruction.length, Math.floor((elapsed - typingStarts) / keystroke) + 1)
 }
 
-/** The rewritten opening line's words that have streamed in, or null before the rewrite starts. */
+/** The rewritten opening line's words that have streamed in, each with how far it has inked in from 0 to 1, or null before the rewrite starts. */
 export function rewrittenWordsAt(elapsed: number) {
   if (elapsed < rewriteStarts) return null
-  return rewrittenWords.slice(
-    0,
-    Math.min(
-      rewrittenWords.length,
-      Math.floor((elapsed - rewriteStarts) / rewriteWordInterval) + 1,
-    ),
-  )
+  return rewrittenWords
+    .map((word, index) => ({
+      word,
+      ink: Math.min(1, (elapsed - rewriteStarts - index * rewriteWordInterval) / inkDuration),
+    }))
+    .filter(({ ink }) => ink >= 0)
 }

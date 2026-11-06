@@ -419,10 +419,10 @@ const cursorSpots = {
   decision: { left: 1045, top: 518 },
   editor: { left: 880, top: 430 },
   preview: { left: 790, top: 112 },
+  'site-page': { left: 560, top: 470 },
   'line-start': { left: 210, top: 299 },
   'line-end': { left: 425, top: 327 },
-  'ask-input': { left: 262, top: 462 },
-  'ask-send': { left: 566, top: 467 },
+  'ask-send': { left: 590, top: 510 },
 } as const
 
 const cursorShapes: Record<CursorShape, LucideIcon> = {

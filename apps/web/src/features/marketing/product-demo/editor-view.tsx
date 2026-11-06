@@ -593,11 +593,15 @@ function DecisionCard({ state }: { state: 'asking' | 'sent' }) {
   )
 }
 
-function AgentByline({ agent }: { agent: DemoAgent }) {
+function AgentByline({ agent, dim = false }: { agent: DemoAgent; dim?: boolean }) {
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <GeneratedAvatar name={agent.name} size={16} variant="beam" />
-      <span className="text-foreground">{agent.name}</span>
+      <span className={cn('flex', dim && 'opacity-70')}>
+        <GeneratedAvatar name={agent.name} size={16} variant="beam" />
+      </span>
+      <span data-demo-thread-name className={cn(!dim && 'text-foreground')}>
+        {agent.name}
+      </span>
       <span className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none">{agent.role}</span>
     </span>
   )
@@ -606,8 +610,10 @@ function AgentByline({ agent }: { agent: DemoAgent }) {
 function ThreadMessage({ agent, children }: { agent: DemoAgent; children: React.ReactNode }) {
   return (
     <div data-demo-thread-message className={cn('flex flex-col gap-1', entering)}>
-      <AgentByline agent={agent} />
-      <div className="pl-[22px] text-xs leading-5">{children}</div>
+      <AgentByline agent={agent} dim />
+      <div data-demo-thread-text className="pl-[22px] text-xs leading-5 text-muted-foreground">
+        {children}
+      </div>
     </div>
   )
 }
@@ -1433,8 +1439,8 @@ function OpeningLine({ elapsed }: { elapsed: number }) {
   return (
     <span data-demo-site-opening>
       {rewritten
-        ? rewritten.map((word, index) => (
-            <span key={index} className={styles.streamWord}>
+        ? rewritten.map(({ word, ink }, index) => (
+            <span key={index} data-demo-rewrite-word style={{ opacity: 0.25 + 0.75 * ink }}>
               {index < rewritten.length - 1 ? `${word} ` : word}
             </span>
           ))
@@ -1453,36 +1459,33 @@ function OpeningLine({ elapsed }: { elapsed: number }) {
 
 function AskAir({ elapsed }: { elapsed: number }) {
   const typed = askInstruction.slice(0, askTypedAt(elapsed))
-  const focused = elapsed >= askTiming.inputClicked
   return (
     <div
       data-demo-ask-air
-      className="absolute top-full left-0 z-10 mt-2 flex w-[380px] flex-col gap-2 rounded-xl border bg-popover p-2 text-sm leading-5 text-popover-foreground shadow-lg transition-[opacity,translate] duration-200 starting:translate-y-1 starting:opacity-0"
+      className="absolute top-full left-0 z-10 mt-2 flex w-[400px] flex-col rounded-xl border bg-popover p-3 text-[15px] leading-6 text-popover-foreground shadow-lg transition-[opacity,translate] duration-200 starting:translate-y-1 starting:opacity-0"
     >
-      <span className="flex items-center gap-1.5 px-1 pt-0.5 text-xs text-muted-foreground">
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <span className="air-mascot block size-4 shrink-0" />
         <span data-demo-ask-label>Ask {orchestrator.name}</span>
       </span>
-      <span
-        className={cn(
-          'flex items-center gap-2 rounded-lg border bg-background py-1.5 pr-1.5 pl-3 dark:bg-input/30',
-          focused && 'border-ring ring-[3px] ring-ring/20',
-        )}
-      >
-        <span className="relative flex min-w-0 flex-1 items-center">
-          <span data-demo-ask-input className="flex min-h-5 min-w-0 flex-1 items-center">
-            <span className="truncate">{typed}</span>
-            {focused && <span className="ml-px h-4 w-px shrink-0 animate-pulse bg-foreground" />}
-          </span>
-          {!focused && (
-            <span className="pointer-events-none absolute left-0 text-muted-foreground">
-              Ask for a change…
-            </span>
-          )}
+      <span className="relative mt-2 block">
+        <span data-demo-ask-input className="block min-h-12">
+          {typed}
+          <span
+            data-demo-ask-caret
+            className="ml-px inline-block h-[1.1em] w-px translate-y-[3px] animate-pulse bg-foreground"
+          />
         </span>
+        {typed.length === 0 && (
+          <span className="pointer-events-none absolute inset-0 pl-1.5 text-muted-foreground/70">
+            Ask for a change to this line…
+          </span>
+        )}
+      </span>
+      <span className="flex justify-end">
         <span
           data-demo-ask-send
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+          className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground"
         >
           <ArrowUpIcon className="size-4" />
         </span>
