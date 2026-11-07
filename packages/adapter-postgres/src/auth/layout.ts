@@ -33,8 +33,8 @@ export async function initializeAuthLayout(sql: postgres.TransactionSql, namespa
 async function createAuthTables(sql: postgres.TransactionSql, namespace: string) {
   const table = (name: string) => identifier(sql, namespace, name);
   await sql`CREATE TABLE ${table("auth_settings")} (singleton integer PRIMARY KEY CHECK (singleton = 1), signing_secret text NOT NULL, setup_user_id text UNIQUE)`;
-  await sql`CREATE TABLE ${table("auth_users")} (id text PRIMARY KEY, name text NOT NULL, email text COLLATE "C" NOT NULL UNIQUE, email_verified boolean NOT NULL, image text, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL, onboarding_offered boolean NOT NULL DEFAULT false, last_workspace_id text)`;
-  await sql`CREATE TABLE ${table("auth_sessions")} (id text PRIMARY KEY, user_id text NOT NULL REFERENCES ${table("auth_users")}(id) ON DELETE CASCADE, token text NOT NULL UNIQUE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL, ip_address text, user_agent text)`;
+  await sql`CREATE TABLE ${table("auth_users")} (id text PRIMARY KEY, name text NOT NULL, email text COLLATE "C" NOT NULL UNIQUE, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL, onboarding_offered boolean NOT NULL DEFAULT false, last_workspace_id text)`;
+  await sql`CREATE TABLE ${table("auth_sessions")} (id text PRIMARY KEY, user_id text NOT NULL REFERENCES ${table("auth_users")}(id) ON DELETE CASCADE, token_digest text NOT NULL UNIQUE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL)`;
   await sql`CREATE INDEX ON ${table("auth_sessions")} (user_id)`;
   await sql`CREATE TABLE ${table("auth_links")} (digest text PRIMARY KEY, message_id text NOT NULL UNIQUE, email text COLLATE "C" NOT NULL, identity jsonb NOT NULL, issued_at timestamptz NOT NULL, expires_at timestamptz NOT NULL, status text NOT NULL CHECK (status IN ('active', 'superseded', 'consumed')), return_to jsonb)`;
   await sql`CREATE UNIQUE INDEX ON ${table("auth_links")} (email) WHERE status = 'active'`;
