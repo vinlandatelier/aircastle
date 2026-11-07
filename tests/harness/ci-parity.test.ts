@@ -117,9 +117,14 @@ test("the required gate job needs every check job and fails unless all succeeded
   expect(gates.map(([id]) => id)).toHaveLength(1);
   const [gateId, gate] = gates[0] ?? [];
   expect(gate?.if).toBe("${{ always() }}");
-  expect(gate?.steps?.map((step) => [step.env?.RESULTS, step.run])).toEqual([
-    ["${{ toJSON(needs.*.result) }}", `jq --exit-status 'all(. == "success")' <<< "$RESULTS"`],
+  const gateSteps = gate?.steps ?? [];
+  const verdict = gateSteps.at(-1);
+  expect([verdict?.env?.RESULTS, verdict?.run, verdict?.if]).toEqual([
+    "${{ toJSON(needs.*.result) }}",
+    `jq --exit-status 'all(. == "success")' <<< "$RESULTS"`,
+    undefined,
   ]);
+  expect(gateSteps.flatMap((step) => scriptsRunBy(step.run ?? ""))).toEqual([]);
   const needs = [gate?.needs ?? []].flat();
   const ungated = Object.keys(jobs).filter(
     (id) => id !== gateId && !reportOnlyJobs.has(id) && !needs.includes(id),
