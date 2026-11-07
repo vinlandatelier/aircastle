@@ -32,8 +32,10 @@ export async function withAuth(
     maxRequestBytes?: number;
     storage?: (store: AuthStore) => AuthStore;
     onPrepare?: (mail: EmailMessage) => void;
+    browserOrigin?: string;
   } = {},
 ) {
+  const origin = options.browserOrigin ?? browserOrigin;
   const url = process.env.AIRCASTLE_DATABASE_URL;
   if (!url) throw new Error("Run through vp run db:test");
   const namespace = `auth_${randomUUID().replaceAll("-", "")}`;
@@ -103,7 +105,7 @@ export async function withAuth(
       const auth = await createLocalAuth({
         config: {
           mode: "development",
-          browserOrigin,
+          browserOrigin: origin,
           limits: options.limits ?? limits,
           ...(initialEmail === undefined ? {} : { initialEmail }),
         },
@@ -139,12 +141,12 @@ export async function withAuth(
         peerAddress = "127.0.0.1",
       ) => {
         const supplied = new Headers(headers);
-        if (!supplied.has("host")) supplied.set("host", new URL(browserOrigin).host);
-        if (!supplied.has("origin")) supplied.set("origin", browserOrigin);
+        if (!supplied.has("host")) supplied.set("host", new URL(origin).host);
+        if (!supplied.has("origin")) supplied.set("origin", origin);
         if (cookie) supplied.set("cookie", cookie);
         if (body !== undefined) supplied.set("content-type", "application/json");
         return app.request(
-          `${browserOrigin}/api${path}`,
+          `${origin}/api${path}`,
           {
             method: body === undefined ? "GET" : "POST",
             headers: supplied,
