@@ -11,10 +11,10 @@ defaults:
   run:
     shell: bash
 jobs:
-  checks:
-    name: Lint, typecheck and test
+  static:
+    name: Build, typecheck, lint and coverage
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,28 +46,6 @@ jobs:
       - name: Find unused code
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: vp run knip
-      - name: Test packages, contracts, CLI, SDK and Postgres
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: vp run test:prepared
-      - name: Test database runner
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: vp run test:db
-      - id: chromium
-        name: Install Chromium
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: vp -C apps/web exec playwright install --with-deps chromium
-      - id: browser
-        name: Test browser journeys
-        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
-        run: vp run test-web:e2e
-      - name: Upload browser reports
-        if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: browser-reports
-          path: apps/web/reports/
-          if-no-files-found: warn
-          retention-days: 7
       - id: coverage
         name: Test schema coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -89,3 +67,123 @@ jobs:
             echo
             echo "Thresholds are set in \`packages/schema/vite.config.ts\`. [Run details](${RUN_URL})"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  units:
+    name: Test packages, CLI, SDK and Postgres
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          cache-save: "false"
+      - run: vp run build
+      - run: vp run db:test -- vp run test:units
+
+  fixtures:
+    name: Test type fixtures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          cache-save: "false"
+      - run: vp run test:fixtures
+
+  database:
+    name: Test database runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          cache-save: "false"
+      - run: vp run test:db
+
+  browser:
+    name: Test browser journeys (${{ matrix.shard }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          cache-save: "false"
+      - id: playwright
+        name: Read Playwright version
+        run: echo "version=$(vp -C apps/web exec playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
+      - name: Install Chromium
+        run: vp -C apps/web exec playwright install --only-shell chromium
+      - run: vp run build
+      - id: browser
+        name: Test browser journeys
+        run: vp run test-web:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - name: Upload browser timings
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-results-${{ matrix.shard }}
+          path: apps/web/reports/results.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload browser reports
+        if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-reports-${{ matrix.shard }}
+          path: apps/web/reports/
+          if-no-files-found: warn
+          retention-days: 7
+
+  browser-timings:
+    name: Summarize browser timings
+    needs: browser
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: browser-results-*
+          path: browser-results
+      - name: Post the 10 slowest journeys
+        run: |
+          {
+            echo '### Slowest browser journeys'
+            echo
+            echo '| Duration | Journey |'
+            echo '|---|---|'
+            jq -rs '[.[] | .. | objects | select(has("specs")) | .specs[]
+                | {name: "\(.file):\(.line) › \(.title | gsub("\\|"; "\\|"))", ms: ([.tests[].results[].duration] | add // 0)}]
+              | sort_by(-.ms) | .[:10][] | "| \(.ms / 100 | round / 10)s | \(.name) |"' browser-results/*/results.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  gate:
+    name: Lint, typecheck and test
+    needs: [static, units, fixtures, database, browser]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every check to pass
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: jq --exit-status 'all(. == "success")' <<< "$RESULTS"
