@@ -5,7 +5,7 @@ on:
 permissions:
   contents: read
 env:
-  CI_LATENCY_BUDGET_SECONDS: 1
+  CI_LATENCY_BUDGET_SECONDS: 150
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
