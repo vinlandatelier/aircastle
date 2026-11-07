@@ -64,15 +64,16 @@ async function enlargeText(page: Page) {
     .toBeGreaterThan(baseline.text)
 }
 
-async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
+async function exerciseControls(page: Page, scenario: 'default' | 'long-text') {
   await assertLayout(page)
   const project = page.getByRole('button', { name: /^Switch project:/ })
   await project.click()
   const input = page.getByRole('combobox')
   await expect(input).toBeFocused()
   await assertBounded(page, page.getByRole('dialog', { name: 'Switch project', exact: true }))
-  const identity = scenario === 'normal' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
-  await input.fill(scenario === 'normal' ? 'Marketing Site' : longName)
+  const identity =
+    scenario === 'default' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
+  await input.fill(scenario === 'default' ? 'Marketing Site' : longName)
   const option = page.getByRole('option', { name: identity, exact: true })
   await expect(option).toHaveAccessibleName(identity)
   await option.click()
@@ -105,7 +106,9 @@ async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
   await assertBounded(page, searchDialog)
   await query.fill('Users')
   await searchDialog.getByRole('option', { name: 'Users', exact: true }).click()
-  await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/users(?:\?.*)?$/)
+  await expect(page).toHaveURL(
+    /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/users(?:\?.*)?$/,
+  )
   await expect(searchDialog).toBeHidden()
 
   if (page.viewportSize()!.width < 768) {
@@ -114,12 +117,16 @@ async function exerciseControls(page: Page, scenario: 'normal' | 'long-text') {
     const drawer = page.getByRole('dialog')
     await assertBounded(page, drawer)
     await drawer.getByRole('link', { name: 'Tasks', exact: true }).click()
-    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks(?:\?.*)?$/)
+    await expect(page).toHaveURL(
+      /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/tasks(?:\?.*)?$/,
+    )
     await expect(drawer).toBeHidden()
     await expect(trigger).toBeFocused()
   } else {
     await page.getByRole('link', { name: 'Tasks', exact: true }).click()
-    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks(?:\?.*)?$/)
+    await expect(page).toHaveURL(
+      /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/tasks(?:\?.*)?$/,
+    )
     const trigger = visibleSidebarTrigger(page)
     await expect(trigger).toHaveAttribute('aria-expanded', /^(true|false)$/)
     const expanded = await trigger.getAttribute('aria-expanded')
@@ -141,7 +148,7 @@ test.afterEach(async ({ page }, testInfo) => {
   }
 })
 
-for (const scenario of ['normal', 'long-text'] as const) {
+for (const scenario of ['default', 'long-text'] as const) {
   for (const viewport of viewports) {
     for (const theme of ['Light', 'Dark'] as const) {
       test(`${scenario} ${viewport.width}x${viewport.height} ${theme}: controls and overlays remain reachable`, async ({
@@ -305,7 +312,7 @@ test('empty-candidates: empty search preserves the current project, dismissal an
   await assertLayout(page)
 })
 
-for (const scenario of ['normal', 'long-text'] as const) {
+for (const scenario of ['default', 'long-text'] as const) {
   test(`${scenario} sidebar boundary: 767px drawer and 768px desktop controls remain operable`, async ({
     page,
   }) => {
@@ -327,7 +334,9 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await trigger.click()
     await expect(trigger).toHaveAttribute('aria-expanded', expanded === 'true' ? 'false' : 'true')
     await page.getByRole('link', { name: 'Tasks', exact: true }).click()
-    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks(?:\?.*)?$/)
+    await expect(page).toHaveURL(
+      /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/tasks(?:\?.*)?$/,
+    )
     await trigger.click()
     await expect(trigger).toHaveAttribute('aria-expanded', expanded!)
     await assertLayout(page)
@@ -336,11 +345,15 @@ for (const scenario of ['normal', 'long-text'] as const) {
 
 for (const viewport of viewports) {
   for (const destination of [
-    { name: longName, query: longName, path: '/dash/workspaces/demo/projects/demo/tasks' },
+    {
+      name: longName,
+      query: longName,
+      path: '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/tasks',
+    },
     {
       name: '東京のプロジェクト 🚀',
       query: '東京',
-      path: '/dash/workspaces/demo/projects/demo/users',
+      path: '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/users',
     },
   ] as const) {
     test(`long-navigation ${viewport.width}x${viewport.height} ${destination.path}: sidebar and search preserve destination identity`, async ({
@@ -365,7 +378,7 @@ for (const viewport of viewports) {
       await assertLayout(page)
       await page.getByRole('link', { name: 'Aircastle', exact: true }).click()
       await expect(page).toHaveURL(
-        /\/dash\/workspaces\/demo\/projects\/demo\/collections(?:\?.*)?$/,
+        /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/collections(?:\?.*)?$/,
       )
       await page.getByRole('button', { name: 'Search pages', exact: true }).click()
       const dialog = page.getByRole('dialog', { name: 'Search pages', exact: true })

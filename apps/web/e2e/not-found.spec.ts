@@ -1,4 +1,4 @@
-import { test, expect } from './support'
+import { fixtureTest as test, expect } from './support'
 import { themeStorageKey } from '../src/theme'
 
 for (const theme of ['light', 'dark'] as const) {
@@ -16,7 +16,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.setViewportSize(viewport)
       for (const path of [
         '/a-page-that-does-not-exist',
-        '/dash/workspaces/acme/projects/editorial/missing',
+        '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/missing',
         '/privacy-policy',
       ]) {
         await page.goto(path)

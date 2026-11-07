@@ -1,22 +1,47 @@
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   createRoute,
   createRouter,
-  Outlet,
   Link,
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router'
-import App from './App'
-import { AppShell } from '@/components/shell'
-import { SignInPage } from '@/features/sign-in'
 import { NotFoundPage } from '@/features/not-found'
+import { SignInPage } from '@/features/sign-in'
 import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { navigationPages } from '@/features/navigation'
 import { landingDescription, landingTitle } from '@/metadata'
+import {
+  access,
+  unmatchedAccess,
+  AuthRoot,
+  DashboardLayout,
+  Workspaces,
+  createBrowserAuth,
+  DevelopmentInbox,
+  type AuthBrowserOptions,
+  type BrowserAuth,
+  type RouteAccess,
+} from '@/features/auth'
 
-const rootRoute = createRootRoute({
-  component: App,
+const rootRoute = createRootRouteWithContext<{ auth: BrowserAuth }>()({
+  beforeLoad: async ({ context, location, matches }) => {
+    const leaf = matches.at(-1)
+    const notFound = matches.some((match) => match._notFound)
+    return {
+      view: await context.auth.enter(
+        {
+          access: notFound
+            ? unmatchedAccess(location.pathname)
+            : (leaf?.staticData.access ?? access.denied),
+          params: leaf?.params ?? {},
+        },
+        location.pathname,
+        location.search,
+      ),
+    }
+  },
+  component: AuthRoot,
   notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [
@@ -26,10 +51,17 @@ const rootRoute = createRootRoute({
       },
     ],
   }),
+  pendingComponent: () => (
+    <main role="status" className="p-8">
+      Loading…
+    </main>
+  ),
 })
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
+  staticData: { access: access.public },
   head: () => ({
     meta: [{ title: landingTitle }],
   }),
@@ -46,33 +78,58 @@ const indexRoute = createRoute({
     </main>
   ),
 })
-const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/dash/workspaces/$workspaceId/projects/$projectId',
-  component: () => (
-    <AppShell>
-      <Outlet />
-    </AppShell>
-  ),
-})
 const dashboardEntryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dash',
+  staticData: { access: access.dashboard },
 })
-const dashboardEntryIndexRoute = createRoute({
-  getParentRoute: () => dashboardEntryRoute,
-  path: '/',
-  beforeLoad: () => {
-    throw redirect({
-      to: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
-      params: { workspaceId: 'demo', projectId: 'demo' },
-      replace: true,
-    })
-  },
+const setupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/setup',
+  staticData: { access: access.setup },
+  component: () => <SignInPage purpose="setup" />,
+})
+const signInRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sign-in',
+  staticData: { access: access.signIn },
+  component: SignInPage,
+  head: () => ({ meta: [{ title: 'Aircastle - Sign in' }] }),
+})
+const inboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/development-inbox',
+  staticData: { access: access.inbox },
+  component: DevelopmentInbox,
+})
+const workspacesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash/workspaces',
+  staticData: { access: access.workspaces },
+  component: () => <Workspaces title="Workspaces" />,
+})
+const createWorkspaceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash/workspaces/new',
+  staticData: { access: access.session },
+  component: () => <Workspaces title="Create a workspace" />,
+})
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash/workspaces/$workspaceId/projects',
+  staticData: { access: access.workspaceProjects },
+  component: () => <Workspaces title="Projects" />,
+})
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash/workspaces/$workspaceId/projects/$projectId',
+  staticData: { access: access.projectPage('collections') },
+  component: DashboardLayout,
 })
 const dashboardIndexRoute = createRoute({
   getParentRoute: () => dashboardRoute,
   path: '/',
+  staticData: { access: access.projectPage('collections') },
   beforeLoad: ({ params }) => {
     throw redirect({
       to: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
@@ -81,17 +138,11 @@ const dashboardIndexRoute = createRoute({
     })
   },
 })
-const signInRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/sign-in',
-  component: SignInPage,
-  head: () => ({ meta: [{ title: 'Aircastle - Sign in' }] }),
-})
+
 type DashboardPagePath =
   (typeof navigationPages)[number]['path'] extends `/dash/workspaces/$workspaceId/projects/$projectId/${infer Path}`
     ? Path
     : never
-
 const pageRoutes = navigationPages.map(({ path, title }) =>
   createRoute({
     getParentRoute: () => dashboardRoute,
@@ -99,28 +150,44 @@ const pageRoutes = navigationPages.map(({ path, title }) =>
       '/dash/workspaces/$workspaceId/projects/$projectId/',
       '',
     ) as DashboardPagePath,
+    staticData: { access: access.projectPage(path.split('/').at(-1) ?? '') },
     component: DashboardSkeleton,
     head: () => ({ meta: [{ title: `Aircastle - ${title}` }] }),
   }),
 )
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  dashboardEntryRoute,
+  setupRoute,
   signInRoute,
-  dashboardEntryRoute.addChildren([dashboardEntryIndexRoute]),
+  inboxRoute,
+  workspacesRoute,
+  createWorkspaceRoute,
+  projectsRoute,
   dashboardRoute.addChildren([dashboardIndexRoute, ...pageRoutes]),
 ])
 
-export function createAppRouter(history: RouterHistory) {
-  return createRouter({
+export function createAppRouter(history: RouterHistory, options?: AuthBrowserOptions) {
+  const auth = createBrowserAuth(options)
+  const router = createRouter({
     routeTree,
     history,
     notFoundMode: 'root',
     disableGlobalCatchBoundary: true,
+    context: { auth },
+    defaultPendingMs: 0,
+    defaultPendingMinMs: 0,
+    defaultPreload: false,
   })
+  router.subscribe('onResolved', () => auth.settle())
+  return router
 }
 
 declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof createAppRouter>
+  }
+  interface StaticDataRouteOption {
+    access?: RouteAccess
   }
 }

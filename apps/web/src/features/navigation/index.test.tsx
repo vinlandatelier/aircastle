@@ -2,14 +2,16 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { createAppRouter } from '@/router'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vite-plus/test'
-import { renderApp } from '@/test-utils'
+import { authenticatedDisplayHttp, renderApp } from '@/test-utils'
 
-describe('App navigation', () => {
+describe('App navigation with display-only authenticated HTTP', () => {
   it.each(['tasks', 'collections', 'media', 'analytics', 'users', 'access-tokens', 'settings'])(
     'does not keep the old flat %s destination',
     async (page) => {
       const pathname = `/dash/${page}`
-      const router = createAppRouter(createMemoryHistory({ initialEntries: [pathname] }))
+      const router = createAppRouter(createMemoryHistory({ initialEntries: [pathname] }), {
+        fetch: authenticatedDisplayHttp().fetch,
+      })
       await router.load()
       expect(router.state.location.pathname).toBe(pathname)
       render(<RouterProvider router={router} />)
@@ -19,8 +21,8 @@ describe('App navigation', () => {
   )
 
   it.each([
-    '/dash/workspaces/acme/projects/editorial',
-    '/dash/workspaces/team-42/projects/site_beta',
+    '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444',
+    '/dash/workspaces/55555555-5555-4555-8555-555555555555/projects/66666666-6666-4666-8666-666666666666',
   ])('redirects project base %s within its scope', async (base) => {
     const { router } = await renderApp(base)
     expect(router.state.location.pathname).toBe(`${base}/collections`)
@@ -28,28 +30,32 @@ describe('App navigation', () => {
   })
 
   it('keeps the brand link within the current project', async () => {
-    const { router, user } = await renderApp('/dash/workspaces/acme/projects/editorial/settings')
+    const { router, user } = await renderApp(
+      '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/settings',
+    )
     await user.click(screen.getByRole('link', { name: 'Aircastle' }))
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
-        '/dash/workspaces/acme/projects/editorial/collections',
+        '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/collections',
       ),
     )
   })
 
-  it('redirects the dashboard index to Collections', async () => {
-    const { router } = await renderApp('/dash')
-    expect(router.state.location.pathname).toBe('/dash/workspaces/demo/projects/demo/collections')
+  it.each(['/dash'])('routes authenticated %s through the workspace entry', async (path) => {
+    const { router } = await renderApp(path)
+    expect(await screen.findByRole('heading', { name: 'Workspaces' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/dash/workspaces')
     expect(router.history.length).toBe(1)
-    expect(screen.getByRole('link', { name: 'Aircastle' }).getAttribute('href')).toBe(
-      '/dash/workspaces/demo/projects/demo/collections',
-    )
   })
 
-  it('opens Collections by default and marks the current page', async () => {
-    const { router } = await renderApp()
+  it('opens the requested Collections page and marks it current', async () => {
+    const { router } = await renderApp(
+      '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/collections',
+    )
 
-    expect(router.state.location.pathname).toBe('/dash/workspaces/demo/projects/demo/collections')
+    expect(router.state.location.pathname).toBe(
+      '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/collections',
+    )
     expect(router.history.length).toBe(1)
     expect(screen.getByRole('link', { name: 'Collections' }).getAttribute('aria-current')).toBe(
       'page',
@@ -57,11 +63,15 @@ describe('App navigation', () => {
   })
 
   it('navigates through the sidebar and follows browser history', async () => {
-    const { router, user } = await renderApp('/dash/workspaces/acme/projects/editorial/collections')
+    const { router, user } = await renderApp(
+      '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/collections',
+    )
 
     await user.click(screen.getByRole('link', { name: 'Tasks' }))
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dash/workspaces/acme/projects/editorial/tasks'),
+      expect(router.state.location.pathname).toBe(
+        '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/tasks',
+      ),
     )
     expect(screen.getByRole('link', { name: 'Tasks' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('link', { name: 'Collections' }).hasAttribute('aria-current')).toBe(
@@ -70,24 +80,30 @@ describe('App navigation', () => {
 
     await user.click(screen.getByRole('link', { name: 'Media Library' }))
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dash/workspaces/acme/projects/editorial/media'),
+      expect(router.state.location.pathname).toBe(
+        '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/media',
+      ),
     )
 
     await act(async () => router.history.back())
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dash/workspaces/acme/projects/editorial/tasks'),
+      expect(router.state.location.pathname).toBe(
+        '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/tasks',
+      ),
     )
     expect(screen.getByRole('link', { name: 'Tasks' }).getAttribute('aria-current')).toBe('page')
 
     await act(async () => router.history.forward())
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dash/workspaces/acme/projects/editorial/media'),
+      expect(router.state.location.pathname).toBe(
+        '/dash/workspaces/33333333-3333-4333-8333-333333333333/projects/44444444-4444-4444-8444-444444444444/media',
+      ),
     )
   })
 
   it('navigates from keyboard search and dismisses the dialog', async () => {
     const { router, user } = await renderApp(
-      '/dash/workspaces/team-42/projects/site_beta/collections',
+      '/dash/workspaces/55555555-5555-4555-8555-555555555555/projects/66666666-6666-4666-8666-666666666666/collections',
     )
 
     await user.keyboard('{Control>}k{/Control}')
@@ -98,7 +114,7 @@ describe('App navigation', () => {
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
-        '/dash/workspaces/team-42/projects/site_beta/users',
+        '/dash/workspaces/55555555-5555-4555-8555-555555555555/projects/66666666-6666-4666-8666-666666666666/users',
       ),
     )
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -106,7 +122,9 @@ describe('App navigation', () => {
   })
 
   it('supports direct destinations and keeps sidebar state during navigation', async () => {
-    const { router, user } = await renderApp('/dash/workspaces/team-42/projects/site_beta/settings')
+    const { router, user } = await renderApp(
+      '/dash/workspaces/55555555-5555-4555-8555-555555555555/projects/66666666-6666-4666-8666-666666666666/settings',
+    )
     expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe('page')
     const trigger = screen.getAllByRole('button', { name: 'Toggle Sidebar' })[0]!
     await user.click(trigger)
@@ -115,7 +133,7 @@ describe('App navigation', () => {
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
-        '/dash/workspaces/team-42/projects/site_beta/tasks',
+        '/dash/workspaces/55555555-5555-4555-8555-555555555555/projects/66666666-6666-4666-8666-666666666666/tasks',
       ),
     )
     expect(

@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { CustomSidebarTrigger } from './custom-sidebar-trigger'
-import { NavUser } from './nav-user'
+import { NavUser, type ShellAccount } from './nav-user'
 import { ThemeSwitcher } from './theme-switcher'
 import { BookOpenIcon, CrownIcon, PlugIcon, PlusIcon } from 'lucide-react'
 import { MarkGithubIcon } from '@primer/octicons-react'
@@ -11,7 +11,7 @@ import { PageSearch } from '@/features/navigation'
 import { Link, useParams } from '@tanstack/react-router'
 import { ProjectSwitcher } from './project-switcher'
 
-export function AppHeader() {
+export function AppHeader({ account }: { account: ShellAccount }) {
   const params = useParams({ from: '/dash/workspaces/$workspaceId/projects/$projectId' })
   return (
     <header
@@ -96,7 +96,7 @@ export function AppHeader() {
           <CrownIcon data-icon="inline-start" aria-hidden="true" />
           Upgrade
         </Button>
-        <NavUser />
+        <NavUser {...account} />
       </div>
     </header>
   )

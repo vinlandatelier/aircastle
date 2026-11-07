@@ -1,7 +1,7 @@
 import { test, expect, visit, assertLayout, visibleSidebarTrigger } from './support'
 import { themeStorageKey } from '../src/theme'
 
-for (const scenario of ['normal', 'long-text'] as const) {
+for (const scenario of ['default', 'long-text'] as const) {
   test(`${scenario}: mobile project and Dark survive drawer and search navigation, route and theme survive reload`, async ({
     page,
   }, testInfo) => {
@@ -9,11 +9,11 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await visit(page, scenario)
     const longName = 'W'.repeat(1000)
     const identity =
-      scenario === 'normal' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
+      scenario === 'default' ? 'Acme Inc / Marketing Site' : `${longName} / ${longName}`
     const project = page.getByRole('button', { name: /^Switch project:/ })
     await project.click()
     const projectInput = page.getByRole('combobox')
-    await projectInput.fill(scenario === 'normal' ? 'Marketing Site' : longName)
+    await projectInput.fill(scenario === 'default' ? 'Marketing Site' : longName)
     await page.getByRole('option', { name: identity, exact: true }).click()
     await expect(projectInput).toBeHidden()
     await expect(project).toHaveAccessibleName(`Switch project: ${identity}`)
@@ -49,9 +49,14 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await trigger.click()
     const drawer = page.getByRole('dialog')
     const tasks = drawer.getByRole('link', { name: 'Tasks', exact: true })
-    await expect(tasks).toHaveAttribute('href', '/dash/workspaces/demo/projects/demo/tasks')
+    await expect(tasks).toHaveAttribute(
+      'href',
+      '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/tasks',
+    )
     await tasks.click()
-    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/tasks(?:\?.*)?$/)
+    await expect(page).toHaveURL(
+      /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/tasks(?:\?.*)?$/,
+    )
     await expect(drawer).toBeHidden()
     await expect(trigger).toBeVisible()
     await expect(trigger).toBeFocused()
@@ -80,7 +85,9 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await expect(search.getByRole('option', { name: 'Users', exact: true })).toBeVisible()
     await query.press('ArrowDown')
     await query.press('Enter')
-    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/users(?:\?.*)?$/)
+    await expect(page).toHaveURL(
+      /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/users(?:\?.*)?$/,
+    )
     await expect(search).toBeHidden()
     await expect(page.getByRole('button', { name: 'Search pages', exact: true })).toBeFocused()
     await expect(project).toHaveAccessibleName(`Switch project: ${identity}`)
@@ -97,7 +104,9 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await page.keyboard.press('Escape')
     await expect(trigger).toBeFocused()
     await page.reload()
-    await expect(page).toHaveURL(/\/dash\/workspaces\/demo\/projects\/demo\/users(?:\?.*)?$/)
+    await expect(page).toHaveURL(
+      /\/dash\/workspaces\/11111111-1111-4111-8111-111111111111\/projects\/22222222-2222-4222-8222-222222222222\/users(?:\?.*)?$/,
+    )
     await expect(page.locator('html')).toHaveClass(/\bdark\b/)
     await expect
       .poll(() => page.evaluate((key) => localStorage.getItem(key), themeStorageKey))

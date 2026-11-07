@@ -8,6 +8,7 @@ import { defineConfig, lazyPlugins, loadEnv, type Plugin } from 'vite-plus'
 const source = (path: string) => new URL(path, import.meta.url).pathname
 const envDir = fileURLToPath(new URL('../../', import.meta.url))
 const fixtureModules = new Map([
+  [source('./src/main.tsx'), source('./e2e/fixture-entry.tsx')],
   [source('./src/components/shell/data.ts'), source('./e2e/fixture-modules/shell-data.ts')],
   [
     source('./src/features/navigation/pages.ts'),
@@ -43,6 +44,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: { alias: [{ find: '@', replacement: source('./src') }] },
     server: {
+      headers: { 'Referrer-Policy': 'no-referrer' },
       port: 43121,
       strictPort: true,
       proxy: {
