@@ -136,52 +136,41 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   })
 }
 
-const centreLinks = [
-  ['Pricing', '/pricing'],
-  ['Blog', '/blog'],
-  ['Roadmap', '/roadmap'],
-  ['Docs', '/docs'],
-] as const
-
-test('desktop header centres Product and the page links', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/')
-  const nav = page.getByRole('navigation', { name: 'Marketing navigation', exact: true })
-  const product = nav.getByRole('button', { name: 'Product', exact: true })
-  await expect(product).toBeVisible()
-  for (const [name, href] of centreLinks)
-    await expect(nav.getByRole('link', { name, exact: true })).toHaveAttribute('href', href)
-  const productBox = await product.boundingBox()
-  const docsBox = await nav.getByRole('link', { name: 'Docs', exact: true }).boundingBox()
-  if (!productBox || !docsBox) throw new Error('Centre navigation is not laid out')
-  const centre = (productBox.x + docsBox.x + docsBox.width) / 2
-  expect(Math.abs(centre - 720)).toBeLessThan(2)
-})
-
-test('hovering Product opens its menu and flips the chevron up', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/')
-  const product = page.getByRole('button', { name: 'Product', exact: true })
-  const chevron = product.locator('svg')
-  await expect(product).toHaveAttribute('aria-expanded', 'false')
-  await expect(chevron).toHaveCSS('rotate', 'none')
-  await product.hover()
-  await expect(product).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(chevron).toHaveCSS('rotate', '180deg')
-  await page.mouse.move(720, 800)
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(product).toHaveAttribute('aria-expanded', 'false')
-})
-
-test('mobile header hides the centre links', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 900 })
-  await page.goto('/')
-  const nav = page.getByRole('navigation', { name: 'Marketing navigation', exact: true })
-  await expect(nav.getByRole('button', { name: 'Product', exact: true })).toBeHidden()
-  for (const [name] of centreLinks)
-    await expect(nav.getByRole('link', { name, exact: true })).toBeHidden()
-})
+for (const width of [1440, 390]) {
+  test(`header at ${width}px holds only the logo, a matched theme switch and Open Aircastle`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/')
+    const nav = page.getByRole('navigation', { name: 'Marketing navigation', exact: true })
+    await expect(nav.getByRole('button', { name: 'Product', exact: true })).toHaveCount(0)
+    for (const name of ['Pricing', 'Blog', 'Roadmap', 'Docs'])
+      await expect(nav.getByRole('link', { name, exact: true })).toHaveCount(0)
+    const theme = nav.getByRole('button', { name: 'Choose theme' })
+    const open = nav.getByRole('link', { name: 'Open Aircastle' })
+    await expect(theme).toBeVisible()
+    await expect(theme).toHaveCSS(
+      'color',
+      await open.evaluate((link) => getComputedStyle(link).color),
+    )
+    const icon = await theme.locator('svg:visible').boundingBox()
+    const arrow = await open.locator('svg').boundingBox()
+    if (!icon || !arrow) throw new Error('Icons are not laid out')
+    expect(icon.width, 'the theme icon is as large as the arrow beside it').toBeGreaterThanOrEqual(
+      arrow.width - 2,
+    )
+    const divider = nav.locator('[data-header-divider]')
+    await expect(divider).toHaveCSS('width', '1px')
+    const [themeBox, dividerBox, openBox] = await Promise.all([
+      theme.boundingBox(),
+      divider.boundingBox(),
+      open.boundingBox(),
+    ])
+    if (!themeBox || !dividerBox || !openBox) throw new Error('Header is not laid out')
+    expect(dividerBox.x).toBeGreaterThan(themeBox.x + themeBox.width - 1)
+    expect(dividerBox.x).toBeLessThan(openBox.x)
+  })
+}
 
 for (const theme of ['light', 'dark'] as const) {
   test(`${theme} hero credits Vinland above the title`, async ({ page }) => {

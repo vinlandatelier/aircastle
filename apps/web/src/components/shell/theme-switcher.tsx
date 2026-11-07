@@ -16,7 +16,7 @@ const themes = [
   { value: 'system', label: 'System', icon: MonitorIcon },
 ] as const
 
-export function ThemeSwitcher() {
+export function ThemeSwitcher({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
 
   return (
@@ -25,7 +25,14 @@ export function ThemeSwitcher() {
         <TooltipTrigger
           render={
             <DropdownMenuTrigger
-              render={<Button aria-label="Choose theme" size="icon-sm" variant="plain" />}
+              render={
+                <Button
+                  aria-label="Choose theme"
+                  size="icon-sm"
+                  variant="plain"
+                  className={className}
+                />
+              }
             />
           }
         >

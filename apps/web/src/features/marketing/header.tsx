@@ -1,20 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
-import { ArrowRightIcon, ChevronDownIcon } from 'lucide-react'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ArrowRightIcon } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeSwitcher } from '@/components/shell'
-
-const pageLinks = [
-  { label: 'Pricing', href: '/pricing' },
-  { label: 'Blog', href: '/blog' },
-  { label: 'Roadmap', href: '/roadmap' },
-  { label: 'Docs', href: '/docs' },
-] as const
-
-const centreItem =
-  'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring'
 
 export function Header() {
   const [scrolled, setScrolled] = useState(false)
@@ -35,42 +24,21 @@ export function Header() {
     >
       <nav
         aria-label="Marketing navigation"
-        className="mx-auto grid min-h-16 w-full max-w-[70rem] grid-cols-[1fr_auto_1fr] items-center gap-4 px-4"
+        className="mx-auto flex min-h-16 w-full max-w-[70rem] items-center justify-between gap-4 px-4"
       >
         <Link
           to="/"
           aria-label="Aircastle home"
-          className="brand-link inline-flex justify-self-start items-center gap-2.5 rounded-md p-2 text-[1.375rem] font-[400] focus-visible:outline-2 focus-visible:outline-ring"
+          className="brand-link inline-flex items-center gap-2.5 rounded-md p-2 text-[1.375rem] font-[400] focus-visible:outline-2 focus-visible:outline-ring"
         >
           <span aria-hidden="true" className="brand-logo block size-6" />
           Aircastle
         </Link>
-        <div className="hidden items-center gap-1 md:flex">
-          <Popover>
-            <PopoverTrigger
-              openOnHover
-              delay={0}
-              closeDelay={150}
-              className={`group ${centreItem}`}
-            >
-              Product
-              <ChevronDownIcon
-                aria-hidden="true"
-                className="size-4 transition-transform duration-200 group-data-[popup-open]:rotate-180"
-              />
-            </PopoverTrigger>
-            <PopoverContent sideOffset={8} className="min-h-40 w-96" />
-          </Popover>
-          {pageLinks.map(({ label, href }) => (
-            <a key={href} href={href} className={centreItem}>
-              {label}
-            </a>
-          ))}
-        </div>
-        <div className="flex items-center gap-1 justify-self-end">
+        <div className="flex items-center gap-1">
           <TooltipProvider>
-            <ThemeSwitcher />
+            <ThemeSwitcher className="size-9 rounded-lg text-foreground hover:text-muted-foreground [&_svg]:size-5!" />
           </TooltipProvider>
+          <span data-header-divider aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
           <Link
             to="/dash"
             className="group inline-flex items-center gap-1.5 rounded-lg px-3 py-2 whitespace-nowrap text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
