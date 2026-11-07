@@ -1631,8 +1631,18 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
       expect(state.chip).toBe('shown')
       expect(state.keys).toBe('↵')
       const pressedAt = await box(cursor)
-      expect(Math.abs(pressedAt.x - typedAt.x)).toBeLessThan(2)
-      expect(Math.abs(pressedAt.y - typedAt.y)).toBeLessThan(2)
+      const send = await box(ask.locator('[data-demo-ask-send]'))
+      expect(
+        Math.hypot(pressedAt.x - typedAt.x, pressedAt.y - typedAt.y),
+        'the cursor stays put, give or take a resting hand',
+      ).toBeLessThan(40)
+      expect(
+        pressedAt.x > send.x - 4 &&
+          pressedAt.x < send.x + send.width &&
+          pressedAt.y > send.y - 4 &&
+          pressedAt.y < send.y + send.height,
+        'Enter sends it, not a click on send',
+      ).toBe(false)
     }
     await page.clock.runFor(story(50))
   }

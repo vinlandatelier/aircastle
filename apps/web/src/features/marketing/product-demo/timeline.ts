@@ -102,6 +102,8 @@ export type Frame = {
   cursorFrom: CursorTarget
   cursorProgress: number
   cursorBend: number
+  cursorDriftX: number
+  cursorDriftY: number
   researchHovered: boolean
   researchPanelOpen: boolean
   cover: CoverState
@@ -137,6 +139,8 @@ export const stillFrame: Frame = {
   cursorFrom: 'rest',
   cursorProgress: 1,
   cursorBend: 0,
+  cursorDriftX: 0,
+  cursorDriftY: 0,
   researchHovered: false,
   researchPanelOpen: false,
   cover: 'idle',
@@ -273,6 +277,37 @@ const cursorMoves: readonly {
   { at: editorClosesAt, from: 'docs-publish', to: 'rest', duration: 200 },
 ]
 
+const driftStartsAfterArrival = 650
+const driftRampDuration = 500
+const driftSettlesBeforeMove = 150
+const driftReach = { x: 34, y: 22 } as const
+
+function ramp(value: number) {
+  const t = Math.max(0, Math.min(1, value))
+  return t * t * (3 - 2 * t)
+}
+
+function cursorDriftAt(elapsed: number) {
+  const index = cursorMoves.findLastIndex((move) => elapsed >= move.at)
+  const move = cursorMoves[index]
+  if (!move) return { x: 0, y: 0 }
+  const arrival = move.at + (move.duration ?? travelTime(move.from, move.to))
+  const nextMoveAt = cursorMoves[index + 1]?.at ?? loopDuration
+  const waited = elapsed - arrival
+  const strength =
+    ramp((waited - driftStartsAfterArrival) / driftRampDuration) *
+    ramp((nextMoveAt - driftSettlesBeforeMove - elapsed) / driftRampDuration)
+  if (strength === 0) return { x: 0, y: 0 }
+  const phase = index * 1.7
+  const x =
+    0.7 * Math.sin((waited / 2600) * 2 * Math.PI + phase) +
+    0.3 * Math.sin((waited / 1700) * 2 * Math.PI + phase * 2)
+  const y =
+    0.7 * Math.cos((waited / 3100) * 2 * Math.PI + phase) +
+    0.3 * Math.sin((waited / 2100) * 2 * Math.PI + phase * 3)
+  return { x: x * driftReach.x * strength, y: y * driftReach.y * strength }
+}
+
 function motionProgress(elapsed: number, duration: number) {
   const t = Math.max(0, Math.min(1, elapsed / duration))
   return t * t * t * (t * (6 * t - 15) + 10)
@@ -364,6 +399,7 @@ export function frameAt(elapsed: number): Frame {
   const sinceEditor = elapsed - editorOpensAt
   const inEditor = elapsed >= editorOpensAt && elapsed < editorClosesAt
   const cursorMove = cursorMoves.findLast((move) => elapsed >= move.at)
+  const cursorDrift = cursorDriftAt(elapsed)
   const askShape =
     inEditor && sinceEditor >= previewClickEndsAfterEditor
       ? askCursorShape(sinceEditor - previewClickEndsAfterEditor)
@@ -432,6 +468,8 @@ export function frameAt(elapsed: number): Frame {
         )
       : 1,
     cursorBend: cursorMove ? (cursorMove.bend ?? arcFor(cursorMove.from, cursorMove.to)) : 0,
+    cursorDriftX: cursorDrift.x,
+    cursorDriftY: cursorDrift.y,
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',

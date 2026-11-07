@@ -64,6 +64,42 @@ describe('product preview cursor', () => {
       )
   })
 
+  it('wanders gently instead of freezing whenever it waits more than a moment', () => {
+    let still = null as { from: number; key: string; drift: number } | null
+    const frozen: string[] = []
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      const waiting =
+        frame.cursor !== 'resting' &&
+        frame.outroElapsed === null &&
+        frame.cursorProgress >= 1 &&
+        (frame.cursor === 'still' || frame.cursor === 'hovering')
+      const key = `${frame.cursorFrom}->${frame.cursorTarget}`
+      if (waiting && still?.key === key) {
+        still.drift = Math.max(still.drift, Math.hypot(frame.cursorDriftX, frame.cursorDriftY))
+        continue
+      }
+      if (still && elapsed - still.from > 1500 && still.drift < 12)
+        frozen.push(`${still.key} for ${elapsed - still.from}ms`)
+      still = waiting ? { from: elapsed, key, drift: 0 } : null
+    }
+    expect(frozen).toEqual([])
+  })
+
+  it('is exactly on target whenever it clicks or sets off', () => {
+    let previous = frameAt(0)
+    for (let elapsed = step; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      const setsOff =
+        frame.cursorTarget !== previous.cursorTarget || frame.cursorFrom !== previous.cursorFrom
+      if (frame.cursor === 'clicking' || frame.cursor === 'dragging' || setsOff)
+        expect(Math.hypot(frame.cursorDriftX, frame.cursorDriftY), `at ${elapsed}ms`).toBeLessThan(
+          0.5,
+        )
+      previous = frame
+    }
+  })
+
   it('moves in straight lines, with at most a slight arc on long trips', () => {
     for (const move of moves) {
       expect(Math.abs(move.bend), `${move.from} to ${move.to}`).toBeLessThanOrEqual(0.04)

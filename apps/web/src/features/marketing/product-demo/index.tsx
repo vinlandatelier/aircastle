@@ -448,6 +448,7 @@ function DemoCursor({
   from,
   progress,
   curve,
+  drift,
 }: {
   state: CursorState
   shape: CursorShape
@@ -455,14 +456,15 @@ function DemoCursor({
   from: CursorTarget
   progress: number
   curve: number
+  drift: { x: number; y: number }
 }) {
   const start = cursorSpots[from]
   const spot = cursorSpots[target]
   const dx = spot.left - start.left
   const dy = spot.top - start.top
   const bend = Math.sin(Math.PI * progress) * curve
-  const left = start.left + dx * progress - dy * bend
-  const top = start.top + dy * progress + dx * bend
+  const left = start.left + dx * progress - dy * bend + drift.x
+  const top = start.top + dy * progress + dx * bend + drift.y
   const Shape = cursorShapes[shape]
   return (
     <span
@@ -737,6 +739,7 @@ export function ProductDemo() {
             from={frame.cursorFrom}
             progress={frame.cursorProgress}
             curve={frame.cursorBend}
+            drift={{ x: frame.cursorDriftX, y: frame.cursorDriftY }}
           />
           {frame.outroElapsed !== null && (
             <Outro elapsed={frame.outroElapsed} opacity={frame.outroOpacity} />
