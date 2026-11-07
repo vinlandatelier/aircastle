@@ -2,6 +2,8 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
+import { postgresAdapter } from "@aircastle/adapter-postgres";
+import { createAircastle, provisionDevelopment } from "@aircastle/core";
 import { bindLoopbackPort, repository } from "./support/content-processes.ts";
 
 const run = promisify(execFile);
@@ -61,6 +63,45 @@ async function inbox() {
 
 async function session(cookie: string) {
   return fetch(`${origin}/api/auth/session`, { headers: { cookie } });
+}
+
+async function seedContent() {
+  const { stdout } = await compose(["port", "postgres", "5432"]);
+  const binding = stdout.trim();
+  expect(binding).toMatch(/^127\.0\.0\.1:\d+$/u);
+  const database = postgresAdapter({
+    url: `postgresql://aircastle:aircastle-local@${binding}/aircastle`,
+    namespace: "aircastle",
+  });
+  const reported: unknown[] = [];
+  const cms = await createAircastle({ database, report: (summary) => reported.push(summary) });
+  try {
+    const provisioned = await provisionDevelopment(database);
+    if (!provisioned.issued) throw new Error("The image's namespace was already provisioned");
+    const access = { project: provisioned.project, apiKey: provisioned.apiKey };
+    const publication = await cms.publish(access, {
+      baseline: null,
+      collections: [
+        {
+          name: "articles",
+          description: {
+            fields: { title: { type: "text", required: true, nullable: false, unique: false } },
+          },
+        },
+      ],
+    });
+    if (!publication.ok) throw new Error(`Publishing failed: ${publication.error.code}`);
+    const contract = publication.data.contracts.articles;
+    if (!contract) throw new Error("The published schema has no articles contract");
+    const created = await cms.create(access, "articles", contract, {
+      title: "Retained through recreation",
+    });
+    if (!created.ok) throw new Error(`Creating the document failed: ${created.error.code}`);
+    expect(reported).toEqual([]);
+    return { ...access, contract, document: created.data };
+  } finally {
+    await cms.close();
+  }
 }
 
 describe("local auth in the built Docker image", () => {
@@ -139,6 +180,31 @@ describe("local auth in the built Docker image", () => {
     expect(
       await (await fetch(`${origin}/api/auth/state`, { headers: { cookie } })).json(),
     ).toMatchObject({ value: { kind: "authenticated" } });
+  });
+
+  test("[auth:R10] keeps existing content and its project key across stop/start and recreation", async () => {
+    const saved = await seedContent();
+    const read = () =>
+      fetch(
+        `${origin}/api/projects/${saved.project}/collections/articles/documents/${saved.document.id}`,
+        {
+          headers: { authorization: `Bearer ${saved.apiKey}`, "aircastle-schema": saved.contract },
+        },
+      );
+    for (const restart of [
+      async () => {},
+      async () => {
+        await compose(["stop", "aircastle"]);
+        await compose(["start", "aircastle"]);
+      },
+      () => compose(["up", "--detach", "--wait", "--force-recreate", "aircastle"]),
+    ]) {
+      await restart();
+      await compose(["up", "--detach", "--wait", "aircastle"]);
+      const response = await read();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true, data: saved.document });
+    }
   });
 
   test("[auth:R9] [auth:R10] keeps an exhausted email budget across restart and recreation", async () => {
