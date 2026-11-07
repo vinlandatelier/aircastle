@@ -3,7 +3,7 @@ import { claim, signIn, start, withAuth } from "./test-support/fixture.ts";
 
 const fortnight = 1_209_600_000;
 
-for (const cookie of [undefined, "better-auth.session_token=forged.secret"]) {
+for (const cookie of [undefined, `aircastle_session_43121=forged.${"A".repeat(43)}=`]) {
   test(`session read rejects ${cookie === undefined ? "missing" : "forged"} cookie independently of setup`, async () => {
     await withAuth(async ({ open }) => {
       const server = await open();

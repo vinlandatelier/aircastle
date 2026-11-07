@@ -96,9 +96,9 @@ const deliberateCatchAllowances: Readonly<Record<string, { count: number; reason
     reason: "An unreadable or malformed auth request body is treated as missing input.",
   },
   "apps/api/src/features/auth/runtime.ts": {
-    count: 4,
+    count: 1,
     reason:
-      "Confirmation, session, sign-out and preview failures report temporary-failure (503) and emit storage-unavailable without exposing details.",
+      "Any failure while answering an auth or inbox request reports temporary-failure (503) and emits storage-unavailable without exposing details.",
   },
   "apps/api/src/features/content/request.ts": {
     count: 2,

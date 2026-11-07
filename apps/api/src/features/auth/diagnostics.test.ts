@@ -160,10 +160,10 @@ test("a positive application diagnostic sink excludes actual link, session, sign
       const session = await claim(server);
       const signingSecret = await server.storage.signingSecret();
       const stored = await sql<
-        { token: string }[]
-      >`SELECT token FROM ${sql(namespace)}.auth_sessions`;
+        { token_digest: string }[]
+      >`SELECT token_digest FROM ${sql(namespace)}.auth_sessions`;
       expect(stored).toHaveLength(1);
-      const token = stored[0]?.token;
+      const token = stored[0]?.token_digest;
       expect(token).toBeTruthy();
       const replay = await server.request(
         "/auth/confirm",
@@ -185,6 +185,7 @@ test("a positive application diagnostic sink excludes actual link, session, sign
         token,
         signingSecret,
         cookieValue,
+        decodeURIComponent(cookieValue).split(".")[0],
         session.link.message.html,
         session.link.message.text,
       ]) {

@@ -55,7 +55,7 @@ test("session-write failure rolls back the setup user, marker and token consumpt
     expect(
       await server.storage.transaction((tx) => tx.userByEmail("alex@example.test")),
     ).toBeNull();
-    expect(await server.storage.transaction((tx) => tx.lockSetup())).toBe("open");
+    expect(await server.storage.transaction((tx) => tx.lockSetupClaim())).toBe("open");
     const other = await open();
     expect(await other.storage.transaction((tx) => tx.userByEmail("alex@example.test"))).toBeNull();
     expect(

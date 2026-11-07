@@ -1,11 +1,10 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { AuthStorageError } from "@aircastle/core";
 import type {
   AuthEvent,
   AuthLinkRecord,
   AuthStore,
   AuthTransaction,
-  AuthUserRecord,
   ProtectedDestination,
 } from "@aircastle/core";
 import type {
@@ -13,16 +12,14 @@ import type {
   DevelopmentInboxPublication,
   EmailMessage,
 } from "../development-inbox/index.ts";
+import type { AccountInput, LinkInput } from "./request.ts";
+import { startSession } from "./sessions.ts";
+import { digest, newToken } from "./token.ts";
 
-export type LinkInput = { purpose: "setup" | "sign-in"; token: string };
-export type AccountInput =
-  | { purpose: "setup"; name: string; email: string; returnTo: ProtectedDestination | null }
-  | { purpose: "sign-in"; email: string; returnTo: ProtectedDestination | null };
 type LinkFailure =
   | { kind: "invalid-link" | "superseded-link"; next: "setup" | "sign-in" }
   | { kind: "setup-complete" };
 
-const digest = (token: string) => createHash("sha256").update(token).digest("hex");
 const escapeHtml = (text: string) =>
   text.replace(
     /[&<>"']/g,
@@ -94,7 +91,7 @@ export function createCredentials(options: {
 
   async function inspect(tx: AuthTransaction, input: LinkInput) {
     const preliminary = await tx.link(digest(input.token));
-    const setup = await tx.lockSetup();
+    const setup = await tx.lockSetupClaim();
     if (preliminary) await tx.lockEmail(preliminary.email);
     const record = preliminary ? await tx.link(digest(input.token)) : null;
     const next = setup === "open" ? "setup" : "sign-in";
@@ -126,7 +123,7 @@ export function createCredentials(options: {
       let messageId: string | undefined;
       try {
         const outcome = await options.storage.transaction(async (tx) => {
-          const setup = await tx.lockSetup();
+          const setup = await tx.lockSetupClaim();
           await tx.lockEmail(input.email);
           let identity: AuthLinkRecord["identity"];
           if (input.purpose === "setup") {
@@ -143,7 +140,7 @@ export function createCredentials(options: {
             }
             identity = { purpose: "sign-in", userId: user.id };
           }
-          const token = randomBytes(32).toString("base64url");
+          const token = newToken();
           const at = options.clock();
           const record: AuthLinkRecord = {
             digest: digest(token),
@@ -198,38 +195,42 @@ export function createCredentials(options: {
           : result;
       });
     },
-    async confirm<Pair>(
-      tx: AuthTransaction,
-      input: LinkInput,
-      createUser: (name: string, email: string, at: number) => Promise<AuthUserRecord>,
-      createSession: (user: AuthUserRecord, at: number) => Promise<Pair>,
-    ) {
-      const result = await inspect(tx, input);
-      if (result.kind === "failure") return result;
-      const { record } = result;
-      const at = options.clock();
-      if (!(await tx.consumeLink(record.digest)))
-        return {
-          kind: "failure" as const,
-          failure: {
-            kind: "invalid-link" as const,
-            next: record.identity.purpose === "setup" ? ("setup" as const) : ("sign-in" as const),
-          },
-        };
-      const user =
-        record.identity.purpose === "setup"
-          ? await createUser(record.identity.name, record.email, at)
-          : await tx.userById(record.identity.userId);
-      if (!user) throw new AuthStorageError("unavailable");
-      if (record.identity.purpose === "setup") await tx.completeSetup(user.id);
-      const pair = await createSession(user, at);
-      let destination: ProtectedDestination | { kind: "dashboard" } = { kind: "dashboard" };
-      if (record.returnTo && (await tx.authorize(user.id, record.returnTo))) {
-        destination = record.returnTo;
-        const entry = await tx.entry(user.id);
-        await tx.saveEntry(user.id, { ...entry, onboardingOffered: true });
-      }
-      return { kind: "confirmed" as const, pair, destination };
+    /** Redeems a link, creating the setup user and a session in one transaction. */
+    async confirm(input: LinkInput) {
+      return options.storage.transaction(async (tx) => {
+        const result = await inspect(tx, input);
+        if (result.kind === "failure") return result;
+        const { record } = result;
+        const at = options.clock();
+        if (!(await tx.consumeLink(record.digest)))
+          return {
+            kind: "failure" as const,
+            failure: {
+              kind: "invalid-link" as const,
+              next: record.identity.purpose === "setup" ? ("setup" as const) : ("sign-in" as const),
+            },
+          };
+        const user =
+          record.identity.purpose === "setup"
+            ? await tx.insertUser({
+                id: randomUUID(),
+                name: record.identity.name,
+                email: record.email,
+                createdAt: at,
+                updatedAt: at,
+              })
+            : await tx.userById(record.identity.userId);
+        if (!user) throw new AuthStorageError("unavailable");
+        if (record.identity.purpose === "setup") await tx.completeSetup(user.id);
+        const { token, pair } = await startSession(tx, user, at);
+        let destination: ProtectedDestination | { kind: "dashboard" } = { kind: "dashboard" };
+        if (record.returnTo && (await tx.authorize(user.id, record.returnTo))) {
+          destination = record.returnTo;
+          const entry = await tx.entry(user.id);
+          await tx.saveEntry(user.id, { ...entry, onboardingOffered: true });
+        }
+        return { kind: "confirmed" as const, token, pair, destination };
+      });
     },
     async close() {
       closed = true;

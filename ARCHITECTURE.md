@@ -12,7 +12,7 @@ apps/
 │       └── features/         HTTP interfaces by feature
 │           ├── health/       Process liveness and its response schema
 │           ├── content/      Project schema publication and content HTTP routes
-│           ├── auth/         Local auth boundary, library configuration, and behavior tests
+│           ├── auth/         Local auth boundary, signed session cookies, and behavior tests
 │           └── development-inbox/  Local email capture interface and behavior tests
 └── web/                      React admin
     ├── scripts/              Brand icon generation
@@ -121,7 +121,7 @@ This is a general pattern, not a required file inventory for every module. Exist
 - The Postgres adapter owns SQL, row mapping, database constraints, and migrations for Aircastle's own tables. User collection migrations belong with the user's project when the eventual storage design requires them. Project collections share JSONB document storage within an instance-owned namespace. Content migration execution is deferred.
 - `packages/contracts` owns browser-safe content result types, serialized collection contracts, compatibility and projection. It uses the schema package and has no server or SQL imports.
 - Shared auth input schemas also live in `packages/contracts`. They normalize and validate email and display names with ArkType, rejecting undeclared fields. API auth configuration uses the same email validator for its optional initial identity and validates explicit local mode, browser origin, and request ceilings at startup. The API development inbox retains the newest 100 complete messages in memory, with shared read state and isolated snapshots. Its preparation/publication boundary keeps pending captures invisible and makes commit/abort idempotent, so a failed durable link replacement need not expose a message. Each runtime factory starts with an empty inbox.
-- The API auth feature owns request guards, credential issuance and confirmation, session activity, durable dashboard entry, bounded diagnostics, and its private Better Auth bridge. The bridge binds user/session writes to the exact core transaction. Its shared library and plugin factories define the configured endpoint inventory; the HTTP boundary closes raw library routes. Credential coordination publishes prepared inbox messages only after a known commit and resolves lost acknowledgments through durable issuance markers. Application startup owns construction and shutdown of injected resources.
+- The API auth feature owns request guards, credential issuance and confirmation, session activity, durable dashboard entry, and bounded diagnostics. Confirmation inserts the user and session through the same core transaction that consumes the link, and sets the cookie only after commit. Sessions use 32-byte random tokens stored as SHA-256 digests, in a cookie signed with Hono's cookie helpers and the persisted secret and named for the browser origin's port. Its exact dispatcher allowlist returns 404 for every other auth path. Credential coordination publishes prepared inbox messages only after a known commit and resolves lost acknowledgments through durable issuance markers. Application startup owns construction and shutdown of injected resources.
 - `packages/client` owns developer configuration and the typed application HTTP client. `packages/cli` owns publication and lockfile workflows and communicates over HTTP.
 - Browser code uses HTTP and browser-safe contracts. It does not import server implementations or executable collection configuration.
 

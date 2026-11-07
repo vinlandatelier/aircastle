@@ -73,8 +73,8 @@ async function durable(fixture: AuthFixture) {
   const { sql, namespace } = fixture;
   const users = await sql<{ id: string; email: string }[]>`
     SELECT id, email FROM ${sql(namespace)}.auth_users ORDER BY email`;
-  const sessions = await sql<{ id: string; user_id: string; token: string }[]>`
-    SELECT id, user_id, token FROM ${sql(namespace)}.auth_sessions ORDER BY id`;
+  const sessions = await sql<{ id: string; user_id: string; token_digest: string }[]>`
+    SELECT id, user_id, token_digest FROM ${sql(namespace)}.auth_sessions ORDER BY id`;
   return { users: [...users], sessions: [...sessions] };
 }
 
