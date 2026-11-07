@@ -193,12 +193,12 @@ jobs:
           BUDGET: ${{ env.CI_LATENCY_BUDGET_SECONDS }}
         run: |
           mkdir -p ci-latency
-          if ! gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate --jq '.jobs[]' > jobs.jsonl; then
+          if ! timeout 30 gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate --jq '.jobs[]' > jobs.jsonl; then
             echo "::notice title=CI latency::Could not read this run's jobs"
             exit 0
           fi
-          if ! jq -s --argjson budget "$BUDGET" '
-            map(select(.status == "completed" and .started_at != null and .completed_at != null)
+          if ! jq -s --argjson budget "$BUDGET" --argjson attempt "$GITHUB_RUN_ATTEMPT" '
+            map(select(.run_attempt == $attempt and .status == "completed" and .started_at != null and .completed_at != null)
               | {name, started: (.started_at | fromdate), completed: (.completed_at | fromdate)})
             | {criticalPathSeconds: ((map(.completed) | max) - (map(.started) | min)),
                budgetSeconds: $budget,
@@ -211,7 +211,7 @@ jobs:
           {
             echo "## CI critical path: ${seconds} s (budget ${BUDGET} s)"
             echo
-            echo 'From the first job start to the last job finish, without queue time before the first job. Jobs still running are left out.'
+            echo 'From the first job start to the last job finish in this run attempt, without queue time before the first job. Jobs still running are left out.'
             echo
             echo '| Seconds | Job |'
             echo '|---|---|'
@@ -223,7 +223,7 @@ jobs:
           else
             description="${seconds} s critical path (budget ${BUDGET} s)"
           fi
-          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+          timeout 30 gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
             -f state=success -f context="CI latency" -f description="$description" -f target_url="$RUN_URL" > /dev/null \
             || echo "::notice title=CI latency::Could not post the commit status"
       - name: Upload the critical path
