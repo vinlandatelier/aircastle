@@ -338,6 +338,25 @@ test.each([
     () => Promise.reject(Object.assign(new Error("callback bug"), { code: "ANY_CODE" })),
     { code: "ANY_CODE" },
   ],
+  [
+    "an AggregateError that holds a TypeError",
+    () =>
+      Promise.reject(
+        new AggregateError([
+          Object.assign(new Error("connect ECONNREFUSED"), {
+            code: "ECONNREFUSED",
+            syscall: "connect",
+          }),
+          new TypeError("callback bug"),
+        ]),
+      ),
+    { name: "AggregateError" },
+  ],
+  [
+    "an empty AggregateError",
+    () => Promise.reject(new AggregateError([])),
+    { name: "AggregateError" },
+  ],
 ] as const)(
   "%s inside a transaction is not reported as a storage failure",
   async (_, fault, raised) => {
@@ -356,6 +375,11 @@ test.each([
   [
     "refused",
     () => postgres("postgres://aircastle@127.0.0.1:1/aircastle", { max: 1, connect_timeout: 2 }),
+    "ECONNREFUSED",
+  ],
+  [
+    "refused localhost",
+    () => postgres("postgres://aircastle@localhost:1/aircastle", { max: 1, connect_timeout: 2 }),
     "ECONNREFUSED",
   ],
   [

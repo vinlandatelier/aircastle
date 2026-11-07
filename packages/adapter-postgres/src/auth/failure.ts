@@ -10,11 +10,14 @@ const connectionCodes = new Set([
 
 /**
  * True for errors the driver raises about the database: SQL errors, postgres.js connection failures,
- * and the socket errors it passes through. Other coded errors, such as Node's `ERR_` errors, are bugs.
+ * and the socket errors it passes through, alone or grouped when a host name has several addresses.
+ * Other coded errors, such as Node's `ERR_` errors, are bugs.
  */
 export function isDriverError(error: unknown): error is Error {
   if (error instanceof AuthStorageError) return false;
   if (error instanceof postgres.PostgresError) return true;
+  if (error instanceof AggregateError)
+    return error.errors.length > 0 && error.errors.every(isDriverError);
   if (!(error instanceof Error) || !("code" in error) || typeof error.code !== "string")
     return false;
   return (
