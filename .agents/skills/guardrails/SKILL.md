@@ -35,6 +35,7 @@ Put each rule at the highest layer that can express it.
 | Feature and web shell files are private outside their module | `tests/harness/module-boundaries.test.ts` | A relative import of another feature's file, then `vp test tests/harness/module-boundaries.test.ts` |
 | Source reads env only in `apps/api/src/config.ts` | `vite.config.ts` override for `apps/*/src`, `packages/*/src`: `node/no-process-env`, `Bun.env` in `no-restricted-properties`, `env` from `node:process` or `process` in `no-restricted-imports`. `packages/cli/src/index.ts` may read only `AIRCASTLE_API_KEY` | `Bun.env.X` in `packages/core/src`, then `vp run lint` |
 | No raw SQL through `.unsafe` | `no-restricted-properties` with the `rawSql` entry. The exempt files are the overrides in `vite.config.ts` that leave `rawSql` out | `sql.unsafe(...)` or `const { unsafe } = sql`, then `vp run lint` |
+| Tests are not skipped, left as todo or marked expected-to-fail | `no-restricted-properties` with the `disabledTests` entries (`skip`, `skipIf`, `runIf`, `todo`, `fails`, `fixme`) in the root rules and the `apps/web` override | `it.fails(...)` or `ctx.skip()` in a test file, then `vp run lint` |
 | No ordinary comments, no type suppressions | `ordinary-comment` and `type-suppression` in `check-code-policy.ts` | `// note` in any TS file, then `vp run check:policy` |
 | Errors are not swallowed | `swallowed-error` in `check-code-policy.ts` for catch clauses and inline `.catch`/`.then` handlers in `apps/*/src` and `packages/*/src`. `deliberateCatchAllowances` lists the exact count per file with a reason; `stale-catch-allowance` fails when the count no longer matches. Lint adds `no-empty` and `preserve-caught-error` | `catch {}` in `packages/core/src`, then `vp run check:policy` |
 | Package exports list TypeScript source first under `development` | `tests/harness/package-exports.test.ts` | Remove the `development` condition, then `vp test tests/harness/package-exports.test.ts` |
@@ -53,10 +54,11 @@ If a check blocks you, fix the code. Change the check only when it is wrong, and
 ## Add a guardrail
 
 1. Write the check at the highest layer that works. Prefer a stock rule (oxlint, knip, the compiler) over new code in the policy script.
-2. Plant a violation, run the check, and record the command and exit code. Remove the plant before you commit.
-3. Try to get past the check the way a hurried agent would: an alias, destructuring, a computed or template key, an alternate global such as `Bun.env`, a dynamic `import()`, or a broad exemption glob. Close each bypass you find and plant it again.
-4. Keep exemptions narrow and give the reason where you declare them. A policy allowance carries a reason string. A lint override names exact files, and its commit gives the reason, because `vite.config.ts` can't hold ordinary comments. A lint override replaces the rule's whole option list, so repeat the entries it must keep, as the env overrides do with `rawSql`.
-5. Name the guardrail and the planted-violation result in the PR body.
+2. Make the failure say what it protects against and how to fix it: the `message` of a lint rule, or the rule's entry in `ruleGuidance` in `check-code-policy.ts`, which the type checker requires.
+3. Plant a violation, run the check, and record the command and exit code. Remove the plant before you commit.
+4. Try to get past the check the way a hurried agent would: an alias, destructuring, a computed or template key, an alternate global such as `Bun.env`, a dynamic `import()`, or a broad exemption glob. Close each bypass you find and plant it again.
+5. Keep exemptions narrow and give the reason where you declare them. A policy allowance carries a reason string. A lint override names exact files, and its commit gives the reason, because `vite.config.ts` can't hold ordinary comments. A lint override replaces the rule's whole option list, so repeat the entries it must keep, as the env overrides do with `rawSql`.
+6. Name the guardrail and the planted-violation result in the PR body.
 
 ## Review rules
 

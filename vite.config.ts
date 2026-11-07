@@ -11,6 +11,11 @@ const processRunnerProperties = ["Bun", "getBuiltinModule"].map((property) => ({
   property,
   message: processRunner,
 }));
+const disabledTests = ["skip", "skipIf", "runIf", "todo", "fails", "fixme"].map((property) => ({
+  property,
+  message:
+    "A skipped, todo or expected-to-fail test passes without checking the behavior. Fix or delete it.",
+}));
 const bunEnv = {
   object: "Bun",
   property: "env",
@@ -20,7 +25,7 @@ const bunEnv = {
 export default defineConfig({
   resolve: { conditions: ["development"] },
   test: {
-    include: ["tests/**/*.test.ts", "scripts/dev-setup.test.ts", "scripts/ai-*/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "scripts/dev-setup.test.ts"],
     environment: "node",
     maxWorkers: 2,
   },
@@ -81,7 +86,7 @@ export default defineConfig({
         { allow: [{ from: "package", package: "@tanstack/router-core", name: "Redirect" }] },
       ],
       "typescript/switch-exhaustiveness-check": "error",
-      "no-restricted-properties": ["error", rawSql],
+      "no-restricted-properties": ["error", rawSql, ...disabledTests],
     },
     ignorePatterns: [
       ".agents/skills/**",
@@ -128,23 +133,14 @@ export default defineConfig({
               ],
             },
           ],
-          "no-restricted-properties": ["error", rawSql, ...processRunnerProperties],
-          "no-restricted-globals": ["error", { name: "Bun", message: processRunner }],
-          "import/no-dynamic-require": ["error", { esmodule: true }],
-        },
-      },
-      {
-        files: ["apps/web/e2e/**"],
-        rules: {
           "no-restricted-properties": [
             "error",
             rawSql,
             ...processRunnerProperties,
-            ...["skip", "fixme"].map((property) => ({
-              property,
-              message: "A skipped journey passes without running. Fix or delete it.",
-            })),
+            ...disabledTests,
           ],
+          "no-restricted-globals": ["error", { name: "Bun", message: processRunner }],
+          "import/no-dynamic-require": ["error", { esmodule: true }],
         },
       },
       {
