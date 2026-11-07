@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
 import { ArrowRightIcon, ChevronDownIcon } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeSwitcher } from '@/components/shell'
 
 const pageLinks = [
   { label: 'Pricing', href: '/pricing' },
@@ -65,16 +67,21 @@ export function Header() {
             </a>
           ))}
         </div>
-        <Link
-          to="/dash"
-          className="group inline-flex items-center gap-1.5 justify-self-end rounded-lg px-3 py-2 text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
-        >
-          Open Aircastle
-          <ArrowRightIcon
-            aria-hidden="true"
-            className="size-5 transition-transform group-hover:translate-x-0.5"
-          />
-        </Link>
+        <div className="flex items-center gap-1 justify-self-end">
+          <TooltipProvider>
+            <ThemeSwitcher />
+          </TooltipProvider>
+          <Link
+            to="/dash"
+            className="group inline-flex items-center gap-1.5 rounded-lg px-3 py-2 whitespace-nowrap text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Open Aircastle
+            <ArrowRightIcon
+              aria-hidden="true"
+              className="size-5 transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+        </div>
       </nav>
     </header>
   )

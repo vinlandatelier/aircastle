@@ -29,3 +29,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </TooltipProvider>
   )
 }
+
+export { ThemeSwitcher } from './theme-switcher'

@@ -32,3 +32,39 @@ for (const theme of ['light', 'dark'] as const) {
     })
   }
 }
+
+for (const width of [1440, 390]) {
+  test(`landing header at ${width}px switches between light and dark and remembers the choice`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 700 })
+    await page.addInitScript((value) => {
+      if (!localStorage.getItem('aircastle-theme')) localStorage.setItem('aircastle-theme', value)
+    }, 'light')
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    const html = page.locator('html')
+    await expect(html).not.toHaveClass(/\bdark\b/)
+    const open = page.getByRole('banner').getByRole('link', { name: 'Open Aircastle' })
+    const lineHeight = await open.evaluate((element) =>
+      parseFloat(getComputedStyle(element).lineHeight),
+    )
+    expect((await open.boundingBox())?.height, 'Open Aircastle stays on one line').toBeLessThan(
+      lineHeight * 1.5 + 16,
+    )
+
+    const trigger = page.getByRole('banner').getByRole('button', { name: 'Choose theme' })
+    await trigger.click()
+    await page.getByRole('menuitemradio', { name: 'Dark' }).click()
+    await expect(html).toHaveClass(/\bdark\b/)
+    expect(await page.evaluate(() => localStorage.getItem('aircastle-theme'))).toBe('dark')
+
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(html).toHaveClass(/\bdark\b/)
+
+    await trigger.click()
+    await page.getByRole('menuitemradio', { name: 'Light' }).click()
+    await expect(html).not.toHaveClass(/\bdark\b/)
+  })
+}
