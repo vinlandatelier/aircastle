@@ -38,7 +38,8 @@ export interface AuthUserRecord {
 export interface AuthSessionRecord {
   id: string;
   userId: string;
-  token: string;
+  /** SHA-256 of the bearer token; the token itself never reaches storage. */
+  tokenDigest: string;
   expiresAt: number;
   createdAt: number;
   updatedAt: number;
@@ -72,10 +73,14 @@ export interface AuthTransaction {
   userByEmail: (email: string) => Promise<AuthUserRecord | null>;
   insertUser: (user: AuthUserRecord) => Promise<AuthUserRecord>;
   insertSession: (session: AuthSessionRecord) => Promise<AuthSessionRecord>;
-  session: (token: string) => Promise<AuthSessionRecord | null>;
-  lockSession: (token: string) => Promise<AuthSessionRecord | null>;
-  renewSession: (token: string, at: number, expiresAt: number) => Promise<AuthSessionRecord | null>;
-  revokeSession: (token: string) => Promise<void>;
+  session: (tokenDigest: string) => Promise<AuthSessionRecord | null>;
+  lockSession: (tokenDigest: string) => Promise<AuthSessionRecord | null>;
+  renewSession: (
+    tokenDigest: string,
+    at: number,
+    expiresAt: number,
+  ) => Promise<AuthSessionRecord | null>;
+  revokeSession: (tokenDigest: string) => Promise<void>;
   authority: (userId: string) => Promise<"super_user" | null>;
   /** Locks the user's entry state until transaction completion. */
   entry: (userId: string) => Promise<AuthEntryRecord>;
