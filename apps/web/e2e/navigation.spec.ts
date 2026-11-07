@@ -225,7 +225,7 @@ test.describe('page search', () => {
         page,
       }) => {
         await visit(page)
-        const previous = page.getByRole('button', { name: 'Choose theme' })
+        const previous = page.getByRole('button', { name: 'Dark theme' })
         await previous.focus()
         await page.keyboard.press(shortcut)
         const dialog = page.getByRole('dialog', { name: 'Search pages' })

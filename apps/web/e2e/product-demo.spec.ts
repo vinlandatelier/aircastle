@@ -66,7 +66,9 @@ test('product preview mirrors the dashboard shell with a collapsed sidebar', asy
       element.querySelector(selector)?.getBoundingClientRect().left ?? -1
     return [
       left('svg.lucide-book-open'),
-      left('svg.lucide-sun, svg.lucide-moon'),
+      [...element.querySelectorAll('svg.lucide-sun, svg.lucide-moon')]
+        .map((icon) => icon.getBoundingClientRect())
+        .find((box) => box.width > 0)?.left ?? -1,
       left('[data-demo-notifications]'),
       left('[data-demo-account]'),
     ]

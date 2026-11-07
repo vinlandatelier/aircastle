@@ -20,9 +20,9 @@ function App() {
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="system"
+      defaultTheme="dark"
       storageKey={themeStorageKey}
-      enableSystem
+      enableSystem={false}
     >
       <ThemeFavicon />
       <HeadContent />

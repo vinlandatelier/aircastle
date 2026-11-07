@@ -20,16 +20,16 @@ for (const scenario of ['normal', 'long-text'] as const) {
     await assertLayout(page)
 
     const header = page.getByRole('banner')
-    await page.getByRole('button', { name: 'Choose theme', exact: true }).click()
-    await page.getByRole('menuitemradio', { name: 'Light', exact: true }).click()
+    const themeToggle = page.getByRole('button', { name: 'Dark theme', exact: true })
+    await expect(themeToggle).toHaveAttribute('aria-pressed', 'true')
+    await themeToggle.click()
     await expect(page.locator('html')).toHaveClass(/\blight\b/)
     const lightColors = await header.evaluate((element) => ({
       background: getComputedStyle(element).backgroundColor,
       foreground: getComputedStyle(element).color,
     }))
-    await page.getByRole('button', { name: 'Choose theme', exact: true }).click()
-    await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click()
-    await expect(page.getByRole('menu', { name: 'Theme', exact: true })).toBeHidden()
+    await themeToggle.click()
+    await expect(page.getByRole('menu')).toHaveCount(0)
     await expect(page.locator('html')).toHaveClass(/\bdark\b/)
     await expect
       .poll(() => page.evaluate((key) => localStorage.getItem(key), themeStorageKey))
@@ -106,12 +106,7 @@ for (const scenario of ['normal', 'long-text'] as const) {
       'href',
       '/brand/favicon-dark.svg',
     )
-    await page.getByRole('button', { name: 'Choose theme', exact: true }).click()
-    await expect(page.getByRole('menuitemradio', { name: 'Dark', exact: true })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    )
-    await page.keyboard.press('Escape')
+    await expect(themeToggle).toHaveAttribute('aria-pressed', 'true')
     await trigger.click()
     await expect(
       page.getByRole('dialog').getByRole('link', { name: 'Users', exact: true }),

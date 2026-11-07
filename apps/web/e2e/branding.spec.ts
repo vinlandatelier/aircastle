@@ -34,12 +34,14 @@ for (const theme of ['light', 'dark'] as const) {
   })
 }
 
-test('sign-in favicon follows live system theme changes', async ({ page }) => {
+test('a first visit is dark whatever the system prefers', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await page.goto('/sign-in')
-  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/brand/favicon-light.svg')
-  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/brand/favicon-dark.svg')
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
 })
 
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {

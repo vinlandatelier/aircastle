@@ -7,14 +7,15 @@ describe('Aircastle app shell', () => {
   beforeEach(() => localStorage.removeItem(themeStorageKey))
   afterEach(() => localStorage.removeItem(themeStorageKey))
 
-  it('applies and stores explicit theme choices through the public app', async () => {
+  it('starts dark and switches theme in one click, storing each choice', async () => {
     const { user } = await renderApp()
-    for (const [label, value, other] of [
-      ['Dark', 'dark', 'light'],
-      ['Light', 'light', 'dark'],
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true))
+    for (const [value, other] of [
+      ['light', 'dark'],
+      ['dark', 'light'],
     ] as const) {
-      await user.click(screen.getByRole('button', { name: 'Choose theme' }))
-      await user.click(await screen.findByRole('menuitemradio', { name: label }))
+      await user.click(screen.getByRole('button', { name: 'Dark theme' }))
+      expect(screen.queryByRole('menu')).toBeNull()
       await waitFor(() => {
         expect(document.documentElement.classList.contains(value)).toBe(true)
         expect(document.documentElement.classList.contains(other)).toBe(false)
@@ -58,7 +59,7 @@ describe('Aircastle app shell', () => {
       header.getByRole('button', { name: 'Create' }),
       header.getByRole('button', { name: 'Search pages' }),
       header.getByRole('link', { name: 'Docs' }),
-      header.getByRole('button', { name: 'Choose theme' }),
+      header.getByRole('button', { name: 'Dark theme' }),
       header.getByRole('link', { name: 'GitHub' }),
       header.getByRole('button', { name: 'Upgrade' }),
       header.getByRole('button', { name: 'Open account menu' }),

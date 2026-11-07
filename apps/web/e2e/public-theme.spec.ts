@@ -78,16 +78,13 @@ for (const theme of ['light', 'dark'] as const) {
       page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
     ).toBeVisible()
     await page.goto('/dash')
-    await expect(page.getByRole('button', { name: 'Choose theme' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Dark theme' })).toHaveAttribute(
+      'aria-pressed',
+      String(theme === 'dark'),
+    )
     const background = theme === 'dark' ? '#19191c' : '#ffffff'
     const foreground = theme === 'dark' ? 'oklch(0.97 0 none)' : 'oklch(0.269 0 none)'
     await expectPaint(page.locator('body'), background, foreground)
-    await page.getByRole('button', { name: 'Choose theme' }).click()
-    const menu = page.getByRole('menu')
-    await expect(menu).toBeVisible()
-    await expectPaint(menu, background, foreground)
-    expect(await menu.evaluate((node) => node.closest('[data-theme-scope]') === null)).toBe(true)
-    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Search pages', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Search pages' })
     await expect(dialog).toBeVisible()
@@ -101,7 +98,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goBack()
     await expectPublic(page, theme === 'dark')
     await page.goto('/dash')
-    await expect(page.getByRole('button', { name: 'Choose theme' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Dark theme' })).toBeVisible()
     await expectPaint(page.locator('body'), background, foreground)
   })
 }

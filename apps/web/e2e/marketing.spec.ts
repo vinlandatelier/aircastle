@@ -146,7 +146,7 @@ for (const width of [1440, 390]) {
     await expect(nav.getByRole('button', { name: 'Product', exact: true })).toHaveCount(0)
     for (const name of ['Pricing', 'Blog', 'Roadmap', 'Docs'])
       await expect(nav.getByRole('link', { name, exact: true })).toHaveCount(0)
-    const theme = nav.getByRole('button', { name: 'Choose theme' })
+    const theme = nav.getByRole('button', { name: 'Dark theme' })
     const open = nav.getByRole('link', { name: 'Open Aircastle' })
     await expect(theme).toBeVisible()
     await expect(theme).toHaveCSS(
@@ -239,7 +239,7 @@ test('hero offers a dim ghost demo link beside the call to action', async ({ pag
   const summaryColor = await page
     .getByText(/^Aircastle is the headless CMS/)
     .evaluate((element) => getComputedStyle(element).color)
-  expect(await color(demo)).toBe(summaryColor)
+  await expect.poll(() => color(demo), 'once its colour transition settles').toBe(summaryColor)
   const ctaBox = await cta.boundingBox()
   const demoBox = await demo.boundingBox()
   if (!ctaBox || !demoBox) throw new Error('Hero actions are not laid out')

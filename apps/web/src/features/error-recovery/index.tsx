@@ -17,11 +17,7 @@ function applyRecoveryTheme() {
       if (!(error instanceof DOMException)) throw error
       stored = null
     }
-    if (stored === 'light' || stored === 'dark') {
-      theme = stored
-    } else {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    }
+    theme = stored === 'light' ? 'light' : 'dark'
     root.classList.add(theme)
   }
   root.style.colorScheme = theme

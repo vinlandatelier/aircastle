@@ -1,56 +1,31 @@
-import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
+import { MoonIcon, SunIcon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 
-const themes = [
-  { value: 'light', label: 'Light', icon: SunIcon },
-  { value: 'dark', label: 'Dark', icon: MoonIcon },
-  { value: 'system', label: 'System', icon: MonitorIcon },
-] as const
-
+/** A one-click switch between dark and light, pressed while the dark theme is on. */
 export function ThemeSwitcher({ className }: { className?: string }) {
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
+  const dark = resolvedTheme !== 'light'
 
   return (
-    <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  aria-label="Choose theme"
-                  size="icon-sm"
-                  variant="plain"
-                  className={className}
-                />
-              }
-            />
-          }
-        >
-          <SunIcon aria-hidden="true" className="dark:hidden" />
-          <MoonIcon aria-hidden="true" className="hidden dark:block" />
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Switch theme</TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent align="end" aria-label="Theme">
-        <DropdownMenuRadioGroup value={theme ?? 'system'} onValueChange={setTheme}>
-          {themes.map((option) => (
-            <DropdownMenuRadioItem key={option.value} value={option.value} closeOnClick>
-              <option.icon aria-hidden="true" />
-              {option.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label="Dark theme"
+            aria-pressed={dark}
+            size="icon-sm"
+            variant="plain"
+            className={className}
+            onClick={() => setTheme(dark ? 'light' : 'dark')}
+          />
+        }
+      >
+        <SunIcon aria-hidden="true" className="dark:hidden" />
+        <MoonIcon aria-hidden="true" className="hidden dark:block" />
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{dark ? 'Switch to light' : 'Switch to dark'}</TooltipContent>
+    </Tooltip>
   )
 }

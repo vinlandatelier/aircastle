@@ -4,10 +4,9 @@ import { themeStorageKey } from '../src/theme'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-async function selectTheme(page: Page, name: 'Dark' | 'Light' | 'System') {
-  await page.getByRole('button', { name: 'Choose theme' }).click()
-  await page.getByRole('menuitemradio', { name, exact: true }).click()
-  await expect(page.getByRole('menu')).toBeHidden()
+async function toggleTheme(page: Page) {
+  await page.getByRole('button', { name: 'Dark theme', exact: true }).click()
+  await expect(page.getByRole('menu')).toHaveCount(0)
 }
 
 async function expectTheme(page: Page, applied: 'dark' | 'light', stored: string) {
@@ -39,92 +38,56 @@ async function shellColors(page: Page) {
   })
 }
 
-test('explicit Dark and Light change rendered colors, radio, storage and favicon and survive reload', async ({
+test('one click switches between dark and light, changing colors, storage and favicon, and survives reload', async ({
   page,
 }) => {
   await visit(page)
-  await selectTheme(page, 'Dark')
-  await expectTheme(page, 'dark', 'dark')
+  const toggle = page.getByRole('button', { name: 'Dark theme', exact: true })
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   const dark = await shellColors(page)
   expect(dark.background).not.toBe('rgba(0, 0, 0, 0)')
-  await page.getByRole('button', { name: 'Choose theme' }).click()
-  await expect(page.getByRole('menuitemradio', { name: 'Dark', exact: true })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  )
-  await expect(page.getByRole('menuitemradio', { name: 'Light', exact: true })).toHaveAttribute(
-    'aria-checked',
-    'false',
-  )
-  await page.keyboard.press('Escape')
-  await page.reload()
-  await expectTheme(page, 'dark', 'dark')
-  await expect.poll(() => shellColors(page)).toEqual(dark)
 
-  await selectTheme(page, 'Light')
+  await toggleTheme(page)
   await expectTheme(page, 'light', 'light')
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
   await expect.poll(async () => (await shellColors(page)).background).not.toBe(dark.background)
   await expect.poll(async () => (await shellColors(page)).foreground).not.toBe(dark.foreground)
   const light = await shellColors(page)
-  await page.getByRole('button', { name: 'Choose theme' }).click()
-  await expect(page.getByRole('menuitemradio', { name: 'Light', exact: true })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  )
-  await expect(page.getByRole('menuitemradio', { name: 'Dark', exact: true })).toHaveAttribute(
-    'aria-checked',
-    'false',
-  )
-  await page.keyboard.press('Escape')
   await page.reload()
   await expectTheme(page, 'light', 'light')
   await expect.poll(() => shellColors(page)).toEqual(light)
+
+  await toggleTheme(page)
+  await expectTheme(page, 'dark', 'dark')
+  await page.reload()
+  await expectTheme(page, 'dark', 'dark')
+  await expect.poll(() => shellColors(page)).toEqual(dark)
 })
 
-test('System follows live browser preference without replacing stored System selection', async ({
-  page,
-}) => {
+test('a first visit is dark even when the system prefers light', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await visit(page)
-  await selectTheme(page, 'System')
-  await expectTheme(page, 'light', 'system')
-  const light = await shellColors(page)
-  await page.emulateMedia({ colorScheme: 'dark' })
-  await expectTheme(page, 'dark', 'system')
-  await expect.poll(async () => (await shellColors(page)).background).not.toBe(light.background)
-  await expect.poll(async () => (await shellColors(page)).foreground).not.toBe(light.foreground)
-  await page.getByRole('button', { name: 'Choose theme' }).click()
-  await expect(page.getByRole('menuitemradio', { name: 'System', exact: true })).toHaveAttribute(
-    'aria-checked',
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+  await expect(page.getByRole('button', { name: 'Dark theme', exact: true })).toHaveAttribute(
+    'aria-pressed',
     'true',
   )
-  await page.keyboard.press('Escape')
-  await page.emulateMedia({ colorScheme: 'light' })
-  await expectTheme(page, 'light', 'system')
-  await expect.poll(() => shellColors(page)).toEqual(light)
-  await page.reload()
-  await expectTheme(page, 'light', 'system')
 })
 
-test('a fresh context does not inherit explicit theme selection', async ({ page, browser }) => {
+test('a fresh context does not inherit the light choice', async ({ page, browser }) => {
   await visit(page)
-  await selectTheme(page, 'Dark')
-  await expectTheme(page, 'dark', 'dark')
+  await toggleTheme(page)
+  await expectTheme(page, 'light', 'light')
   const fresh = await browser.newContext({ colorScheme: 'light' })
   try {
     const other = await fresh.newPage()
     await visit(other)
-    await expect(other.locator('html')).toHaveClass(/\blight\b/)
+    await expect(other.locator('html')).toHaveClass(/\bdark\b/)
     await expect
       .poll(() => other.evaluate((key) => localStorage.getItem(key), themeStorageKey))
-      .not.toBe('dark')
-    await other.getByRole('button', { name: 'Choose theme' }).click()
-    await expect(other.getByRole('menuitemradio', { name: 'System', exact: true })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    )
-    await other.keyboard.press('Escape')
-    await expectTheme(page, 'dark', 'dark')
+      .not.toBe('light')
+    await expectTheme(page, 'light', 'light')
   } finally {
     await fresh.close()
   }
