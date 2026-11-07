@@ -1,4 +1,5 @@
 import { bodyDraftDuration } from './body-draft'
+import { arcFor, pressDelay, travelTime, type CursorTarget } from './cursor-path'
 import { docsDecisionAnsweredAt, researchLog, researchStepsAt } from './research'
 import { askCursorPressed, askTiming, confettiAt, type PublishedEntry } from './site-ask'
 
@@ -13,15 +14,15 @@ const sendPressDuration = 350
 const enterChipDuration = 700
 const dialogCloseDuration = 300
 const cursorDelayAfterRow = 1300
-const cursorTravelDuration = 1400
-const hoverDuration = 1500
+const cursorTravelDuration = travelTime('rest', 'row')
+const rowHoverDuration = 350
 const clickDuration = 220
 const editorOpensAfterClick = 180
 const restAfterEditor = 1400
 const outroFadeOut = 900
 const outroFadeIn = 900
-const rowsReachedAfter = 420
-const agentRowReachedAfter = 940
+const rowsReachedAfter = Math.round(cursorTravelDuration * 0.3)
+const agentRowReachedAfter = Math.round(cursorTravelDuration * 0.67)
 const rowsLeftAfter = 980
 const categoriesStartAfterEditor = 1500
 const chipInterval = 200
@@ -29,18 +30,15 @@ const categoryCount = 2
 const tagCount = 3
 const lingerAfterFilling = 1000
 const moveBetweenFields = 300
-const researchCursorMovesAfterEditor = 1900
-const researchCursorTravel = 1400
-const researchHoverDuration = 500
+const researchClickAfterEditor = 3800
+const researchCursorTravel = travelTime('row', 'research')
 const researchClickDuration = 220
 const panelOpensAfterClick = 100
-const decisionCursorTravel = 1400
-const decisionHoverDuration = 400
+const decisionCursorTravel = travelTime('research', 'decision')
 const decisionClickDuration = 220
 const decisionAnsweredAfterClick = 150
 const tagsStartAfterArriving = 500
-const editorCursorTravel = 1400
-const scrollDuringCursorTravel = 600
+const editorCursorTravel = travelTime('decision', 'editor')
 const seoStartsAfterScroll = 900
 const coverGeneratingAfterEditor = 900
 
@@ -64,7 +62,7 @@ const sendAt = typingEndsAt + pauseBeforeSend
 const dialogClosesAt = sendAt + sendPressDuration
 const cursorShownAt = dialogClosesAt + dialogCloseDuration + cursorDelayAfterRow
 const cursorArrivesAt = cursorShownAt + cursorTravelDuration
-const clickAt = cursorArrivesAt + hoverDuration
+const clickAt = cursorArrivesAt + rowHoverDuration
 const clickEndsAt = clickAt + clickDuration
 const editorOpensAt = clickAt + editorOpensAfterClick
 
@@ -73,23 +71,6 @@ export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'dragging' | 'still'
 export type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer' | 'text'
-export type CursorTarget =
-  | 'rest'
-  | 'row'
-  | 'research'
-  | 'decision'
-  | 'editor'
-  | 'preview'
-  | 'site-page'
-  | 'line-start'
-  | 'line-end'
-  | 'site-read'
-  | 'reference'
-  | 'publish'
-  | 'bell'
-  | 'notification-preview'
-  | 'docs-read'
-  | 'docs-publish'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'
 
@@ -170,25 +151,33 @@ function chipsArrived(sinceFirst: number, total: number) {
   return chipsArrivedEvery(sinceFirst, chipInterval, total)
 }
 
-const researchCursorArrivesAfterEditor = researchCursorMovesAfterEditor + researchCursorTravel
-const researchClickAfterEditor = researchCursorArrivesAfterEditor + researchHoverDuration
+const researchCursorArrivesAfterEditor = researchClickAfterEditor - pressDelay
+const researchCursorMovesAfterEditor = researchCursorArrivesAfterEditor - researchCursorTravel
 const researchClickEndsAfterEditor = researchClickAfterEditor + researchClickDuration
 const researchPanelOpensAfterEditor = researchClickAfterEditor + panelOpensAfterClick
 const decisionClickAfterEditor = docsDecisionAnsweredAt - decisionAnsweredAfterClick
-const decisionCursorArrivesAfterEditor = decisionClickAfterEditor - decisionHoverDuration
+const decisionCursorArrivesAfterEditor = decisionClickAfterEditor - pressDelay
 const decisionCursorMovesAfterEditor = decisionCursorArrivesAfterEditor - decisionCursorTravel
 const decisionClickEndsAfterEditor = decisionClickAfterEditor + decisionClickDuration
-const editorCursorArrivesAfterEditor = decisionClickEndsAfterEditor + editorCursorTravel
-const scrollAfterEditor = decisionClickEndsAfterEditor + scrollDuringCursorTravel
-const seoStartsAfterEditor = scrollAfterEditor + seoStartsAfterScroll
 const researchDoneAfterEditor = researchLog.at(-1)?.at ?? 0
+const scrollLeadInDuringTravel = Math.round(editorCursorTravel * 0.2)
+const editorCursorMovesAfterEditor = Math.max(
+  decisionClickEndsAfterEditor,
+  researchDoneAfterEditor + 350 - scrollLeadInDuringTravel,
+)
+const editorCursorArrivesAfterEditor = editorCursorMovesAfterEditor + editorCursorTravel
+const scrollAfterEditor = editorCursorMovesAfterEditor + scrollLeadInDuringTravel
+const seoStartsAfterEditor = scrollAfterEditor + seoStartsAfterScroll
 const bodyDoneAfterEditor = researchDoneAfterEditor + bodyDraftDuration
 const socialImageGeneratingAfterEditor = scrollAfterEditor + 300
 const socialImageDoneAfterEditor = seoStartsAfterEditor + seoTiming.metaTitleTyped
-const previewCursorTravel = 1400
-const previewCursorMovesAfterEditor = socialImageDoneAfterEditor
+const previewCursorTravel = travelTime('editor', 'preview')
+const previewCursorMovesAfterEditor = Math.max(
+  socialImageDoneAfterEditor,
+  bodyDoneAfterEditor + 300,
+)
 const previewCursorArrivesAfterEditor = previewCursorMovesAfterEditor + previewCursorTravel
-const previewClickAfterEditor = previewCursorArrivesAfterEditor + 500
+const previewClickAfterEditor = previewCursorArrivesAfterEditor + pressDelay
 const previewClickEndsAfterEditor = previewClickAfterEditor + clickDuration
 
 const editorDuration = previewClickEndsAfterEditor + askTiming.ends
@@ -210,7 +199,7 @@ const cursorMoves: readonly {
   { at: cursorShownAt, from: 'rest', to: 'row' },
   { at: editorOpensAt + researchCursorMovesAfterEditor, from: 'row', to: 'research' },
   { at: editorOpensAt + decisionCursorMovesAfterEditor, from: 'research', to: 'decision' },
-  { at: editorOpensAt + decisionClickEndsAfterEditor, from: 'decision', to: 'editor' },
+  { at: editorOpensAt + editorCursorMovesAfterEditor, from: 'decision', to: 'editor' },
   { at: editorOpensAt + previewCursorMovesAfterEditor, from: 'editor', to: 'preview' },
   {
     at: askAt + askTiming.pageMoveStarts,
@@ -290,6 +279,7 @@ function researchCursorAt(sinceEditor: number): CursorState {
   if (sinceEditor < decisionCursorArrivesAfterEditor) return 'moving'
   if (sinceEditor < decisionClickAfterEditor) return 'hovering'
   if (sinceEditor < decisionClickEndsAfterEditor) return 'clicking'
+  if (sinceEditor < editorCursorMovesAfterEditor) return 'still'
   if (sinceEditor < editorCursorArrivesAfterEditor) return 'moving'
   if (sinceEditor < previewCursorMovesAfterEditor) return 'still'
   if (sinceEditor < previewCursorArrivesAfterEditor) return 'moving'
@@ -420,9 +410,12 @@ export function frameAt(elapsed: number): Frame {
     cursorTarget: cursorMove?.to ?? 'rest',
     cursorFrom: cursorMove?.from ?? 'rest',
     cursorProgress: cursorMove
-      ? motionProgress(elapsed - cursorMove.at, cursorMove.duration ?? cursorTravelDuration)
+      ? motionProgress(
+          elapsed - cursorMove.at,
+          cursorMove.duration ?? travelTime(cursorMove.from, cursorMove.to),
+        )
       : 1,
-    cursorBend: cursorMove?.bend ?? 0.12,
+    cursorBend: cursorMove ? (cursorMove.bend ?? arcFor(cursorMove.from, cursorMove.to)) : 0,
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',

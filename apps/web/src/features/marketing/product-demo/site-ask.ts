@@ -1,4 +1,5 @@
 import { openingLine, rewrittenLine } from './body-draft'
+import { pressDelay, travelTime } from './cursor-path'
 
 /** What the user types into Ask Air after selecting the opening line. */
 export const askInstruction = 'hm maybe lead with what a team can do with it'
@@ -7,17 +8,18 @@ const keystroke = 26
 const rewriteWordInterval = 35
 const rewrittenWords = rewrittenLine.split(' ')
 
-const pageReached = 1300
+const pageMoveStarts = 700
+const pageReached = pageMoveStarts + travelTime('preview', 'site-page')
 const scrollStarts = 1100
 const scrollDownDuration = 1200
 const overshoot = 1.6
 const scrollBackStarts = 2650
 const scrollBackDuration = 650
 const lineMoveStarts = 3300
-const lineReached = 3900
-const selectStarts = 4050
-const selectEnds = 4750
-const dropdownOpens = 4900
+const lineReached = lineMoveStarts + travelTime('site-page', 'line-start')
+const selectStarts = lineReached + pressDelay
+const selectEnds = selectStarts + 700
+const dropdownOpens = selectEnds + 150
 const typingStarts = dropdownOpens + 350
 const inkDuration = 380
 const typingEnds = typingStarts + askInstruction.length * keystroke
@@ -31,33 +33,34 @@ const approved = rewriteEnds + 300
 const finished = approved + 300
 const replied = finished + 250
 const readMoveStarts = sent + 250
-const readReached = sent + 850
+const readReached = readMoveStarts + travelTime('line-end', 'site-read')
 const readBurstDuration = 650
 const readSteps = [0.3, 0.25, 0.25, 0.2] as const
 const readBursts = readSteps.map((step, index) => ({ at: sent + 700 + index * 1050, step }))
 const readEnds = (readBursts.at(-1)?.at ?? sent) + readBurstDuration
 const referenceMoveStarts = readEnds + 250
-const referenceReached = referenceMoveStarts + 900
-const referenceClicked = referenceReached + 250
+const referenceReached = referenceMoveStarts + travelTime('site-read', 'reference')
+const referenceClicked = referenceReached + pressDelay
 const jumpStarts = referenceClicked + 120
 const jumpDuration = 900
 const jumpEnds = jumpStarts + jumpDuration
 const flashDuration = 1200
 const publishMoveStarts = jumpEnds + 700
-const publishReached = publishMoveStarts + 900
-const publishClicked = publishReached + 250
+const publishReached = publishMoveStarts + travelTime('reference', 'publish')
+const publishClicked = publishReached + pressDelay
 const confettiDuration = 2000
 const notified = publishMoveStarts + 450
 const bellMoveStarts = publishClicked + 1100
-const bellReached = bellMoveStarts + 900
-const bellClicked = bellReached + 250
+const bellReached = bellMoveStarts + travelTime('publish', 'bell')
+const bellClicked = bellReached + pressDelay
 const menuOpens = bellClicked + 100
 const notificationPreviewMoveStarts = menuOpens + 1200
-const notificationPreviewReached = notificationPreviewMoveStarts + 700
-const notificationPreviewClicked = notificationPreviewReached + 250
+const notificationPreviewReached =
+  notificationPreviewMoveStarts + travelTime('bell', 'notification-preview')
+const notificationPreviewClicked = notificationPreviewReached + pressDelay
 const docsOpens = notificationPreviewClicked + 150
 const docsReadMoveStarts = docsOpens + 700
-const docsReadReached = docsReadMoveStarts + 600
+const docsReadReached = docsReadMoveStarts + travelTime('notification-preview', 'docs-read')
 const docsScrollBurstDuration = 420
 const docsScrollSteps = [0.4, 0.35, 0.25] as const
 const docsScrollBursts = docsScrollSteps.map((step, index) => ({
@@ -68,14 +71,14 @@ const docsReadEnds = (docsScrollBursts.at(-1)?.at ?? docsReadReached) + docsScro
 const docsScrollUpStarts = docsReadEnds + 350
 const docsScrollUpDuration = 650
 const docsPublishMoveStarts = docsScrollUpStarts + docsScrollUpDuration + 150
-const docsPublishReached = docsPublishMoveStarts + 800
-const docsPublishClicked = docsPublishReached + 250
+const docsPublishReached = docsPublishMoveStarts + travelTime('docs-read', 'docs-publish')
+const docsPublishClicked = docsPublishReached + pressDelay
 const outroStarts = docsPublishClicked + 1500
 const outroHold = 4800
 
 /** When each beat of the select-to-prompt scene happens, in milliseconds after the site preview opens. */
 export const askTiming = {
-  pageMoveStarts: 700,
+  pageMoveStarts,
   pageReached,
   lineMoveStarts,
   lineReached,

@@ -29,6 +29,7 @@ import styles from './product-demo.module.css'
 import { Confetti } from './confetti'
 import { NotificationsBell } from './notifications'
 import { Outro } from './outro'
+import { cursorSpots, type CursorTarget } from './cursor-path'
 import {
   notificationPreviewPressedAt,
   notificationsOpenAt,
@@ -40,7 +41,6 @@ import {
   prompt,
   stillFrame,
   type CursorShape,
-  type CursorTarget,
   type CursorState,
   type Frame,
   type Shortcut,
@@ -426,25 +426,6 @@ function AgentLabel({ role }: { role: string }) {
     </span>
   )
 }
-
-const cursorSpots = {
-  rest: { left: 1010, top: 566 },
-  row: { left: 320, top: 218 },
-  research: { left: 700, top: 112 },
-  decision: { left: 1045, top: 518 },
-  editor: { left: 880, top: 430 },
-  preview: { left: 790, top: 112 },
-  'site-page': { left: 560, top: 470 },
-  'line-start': { left: 210, top: 299 },
-  'line-end': { left: 425, top: 327 },
-  'site-read': { left: 600, top: 440 },
-  reference: { left: 1000, top: 574 },
-  publish: { left: 872, top: 108 },
-  bell: { left: 1188, top: 52 },
-  'notification-preview': { left: 1064, top: 242 },
-  'docs-read': { left: 700, top: 460 },
-  'docs-publish': { left: 1211, top: 110 },
-} as const
 
 const cursorShapes: Record<CursorShape, LucideIcon> = {
   arrow: MousePointer2Icon,

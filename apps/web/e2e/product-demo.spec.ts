@@ -254,7 +254,12 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   await expect(cursor).toHaveAttribute('data-state', 'resting')
   await expect(agents).toHaveAttribute('data-expanded', 'false')
 
-  await page.clock.runFor(story(2900))
+  for (
+    let tick = 0;
+    tick < 80 && (await cursor.getAttribute('data-state')) !== 'hovering';
+    tick += 1
+  )
+    await page.clock.runFor(story(40))
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
   await expect(agents).toHaveAttribute('data-expanded', 'true')
@@ -324,12 +329,12 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   const editor = frame.locator('[data-demo-editor]')
   const table = frame.locator('[data-demo-table]')
 
-  await page.clock.runFor(story(8600))
+  await page.clock.runFor(story(7550))
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(editor).toHaveAttribute('data-state', 'hidden')
   await expect(table).toHaveAttribute('data-state', 'shown')
 
-  await page.clock.runFor(story(800))
+  await page.clock.runFor(story(350))
   await expect(cursor).toHaveAttribute('data-state', 'clicking')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
 
@@ -473,7 +478,7 @@ test('the agents tab starts expanding as soon as the cursor enters the agent row
   await frame.scrollIntoViewIfNeeded()
   const cursor = frame.locator('[data-demo-cursor]')
   const agents = frame.locator('[data-demo-agents]')
-  await page.clock.runFor(story(7300))
+  await page.clock.runFor(story(7000))
   await expect(cursor).toHaveAttribute('data-state', 'moving')
   await expect(agents).toHaveAttribute('data-expanded', 'false')
   await page.clock.runFor(story(150))
@@ -493,7 +498,7 @@ test('the editor top bar shows the source Canute is reading, one after another',
   const editor = frame.locator('[data-demo-editor]')
   const research = editor.locator('[data-demo-research]')
   const current = research.locator('[data-demo-source][data-state="current"]')
-  await page.clock.runFor(story(10500))
+  await page.clock.runFor(story(8990))
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(research).toContainText('Canute')
   await expect(research).toContainText('reading')
@@ -545,17 +550,17 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const panel = editor.locator('[data-demo-research-panel]')
   const cursor = frame.locator('[data-demo-cursor]')
 
-  await page.clock.runFor(story(12000))
+  await page.clock.runFor(story(11300))
   await expect(panel).toHaveAttribute('data-state', 'closed')
   await expect(research).toHaveAttribute('data-hovered', 'false')
   await expect(cursor).toHaveAttribute('data-state', 'moving')
 
-  await page.clock.runFor(story(1000))
+  await page.clock.runFor(story(450))
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
   await expect(research).toHaveAttribute('data-hovered', 'true')
 
-  await page.clock.runFor(story(600))
+  await page.clock.runFor(story(340))
   await expect(panel).toHaveAttribute('data-state', 'open')
   await expect(panel).toContainText('Canute')
   await expect(panel.locator('[data-demo-agent-label]')).toHaveText('Research Agent')
@@ -804,7 +809,7 @@ test('the preview header has an Ask Air split button with an agent menu', async 
   expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(searchBox.x)
   await expect(menu).toHaveAttribute('data-state', 'closed')
 
-  await page.clock.runFor(story(10000))
+  await page.clock.runFor(story(8490))
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
   await expect(header.locator('[data-demo-ask-agent]')).toHaveCount(0)
   const waiting = header.locator('[data-demo-ask-count]')
@@ -861,13 +866,13 @@ test('the cursor answers Canute’s decision and Canute hands it to Air', async 
   const cursor = frame.locator('[data-demo-cursor]')
   const waiting = frame.locator('[data-demo-ask-count]')
 
-  await page.clock.runFor(story(14000))
+  await page.clock.runFor(story(12490))
   await expect(decision).toHaveAttribute('data-state', 'asking')
   await expect(waiting).toHaveText('1')
 
   let hovering = false
-  for (let tick = 0; tick < 30 && !hovering; tick += 1) {
-    await page.clock.runFor(story(100))
+  for (let tick = 0; tick < 80 && !hovering; tick += 1) {
+    await page.clock.runFor(story(30))
     hovering =
       (await cursor.getAttribute('data-target')) === 'decision' &&
       (await cursor.getAttribute('data-state')) === 'hovering'
@@ -914,7 +919,7 @@ test('Thorfinn drafts the body at one fixed height and leaves when it is done', 
   const draft = body.locator('[data-demo-body-draft]')
   const readingTime = frame.locator('[data-demo-field="reading-time"]')
 
-  await page.clock.runFor(story(15000))
+  await page.clock.runFor(story(13490))
   await expect(tab).toContainText('Waiting on Canute…')
   await expect(draft).toHaveCount(0)
   await expect(readingTime).toHaveAttribute('data-empty', 'true')
@@ -1067,7 +1072,7 @@ test('scrolling starts during cursor travel and SEO agents stream into individua
   const tab = title.locator('[data-demo-agent-tab]')
   const social = seo.locator('[data-demo-field="social-image"]')
 
-  await page.clock.runFor(story(15000))
+  await page.clock.runFor(story(13490))
   for (let tick = 0; tick < 60; tick += 1) {
     if ((await decision.getAttribute('data-state')) === 'sent') break
     await page.clock.runFor(story(100))
@@ -1078,10 +1083,10 @@ test('scrolling starts during cursor travel and SEO agents stream into individua
 
   for (
     let tick = 0;
-    tick < 20 && (await editor.getAttribute('data-scrolled')) !== 'true';
+    tick < 40 && (await editor.getAttribute('data-scrolled')) !== 'true';
     tick += 1
   )
-    await page.clock.runFor(story(100))
+    await page.clock.runFor(story(50))
   await expect(cursor).toHaveAttribute('data-target', 'editor')
   await expect(cursor).toHaveAttribute('data-state', 'moving')
   await expect(cursor).toHaveAttribute('data-shape', 'arrow')
@@ -1194,13 +1199,13 @@ test('the preview plays a little faster than its timeline, opening the editor be
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
   await frame.scrollIntoViewIfNeeded()
   const editor = frame.locator('[data-demo-editor]')
-  await page.clock.runFor(7000)
+  await page.clock.runFor(6000)
   await expect(editor).toHaveAttribute('data-state', 'hidden')
   await page.clock.runFor(1700)
   await expect(editor).toHaveAttribute('data-state', 'shown')
 })
 
-test('the cursor heads for Preview once the social image is done, while SEO keeps typing', async ({
+test('the cursor heads for Preview once the social image and the body are done, while SEO keeps typing', async ({
   page,
 }) => {
   await page.clock.install({ time: 0 })
@@ -1231,21 +1236,29 @@ test('the cursor heads for Preview once the social image is done, while SEO keep
   expect(restBox.x).toBeLessThan(panelBox.x)
   expect(restBox.x).toBeGreaterThan(panelBox.x - 120)
 
-  for (let tick = 0; tick < 60 && (await social.getAttribute('data-empty')) === 'true'; tick += 1)
+  for (
+    let tick = 0;
+    tick < 120 && (await cursor.getAttribute('data-target')) !== 'preview';
+    tick += 1
+  )
     await page.clock.runFor(story(50))
-  await expect(social).toHaveAttribute('data-empty', 'false')
   await expect(cursor).toHaveAttribute('data-target', 'preview')
   await expect(cursor).toHaveAttribute('data-state', 'moving')
-  await expect(seo.locator('[data-demo-agent-tab][data-active="true"]')).toHaveCount(1)
-  await expect(seo.locator('[data-demo-field="focus-keyword"]')).toHaveAttribute(
-    'data-empty',
-    'true',
+  await expect(social).toHaveAttribute('data-empty', 'false')
+  await expect(frame.locator('[data-demo-field="body"] [data-demo-agent-tab]')).toHaveAttribute(
+    'data-active',
+    'false',
   )
+  await expect(seo.locator('[data-demo-agent-tab][data-active="true"]')).toHaveCount(1)
 
   await page.waitForTimeout(1600)
   const settled = await authors.boundingBox()
-  for (let tick = 0; tick < 30 && (await cursor.getAttribute('data-state')) === 'moving'; tick += 1)
-    await page.clock.runFor(story(100))
+  for (
+    let tick = 0;
+    tick < 120 && (await cursor.getAttribute('data-state')) === 'moving';
+    tick += 1
+  )
+    await page.clock.runFor(story(25))
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
   const cursorBox = await cursor.boundingBox()
