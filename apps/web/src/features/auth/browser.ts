@@ -51,6 +51,9 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
     clearConfirmation() {
       confirmation = undefined
     },
+    settle() {
+      handoff = undefined
+    },
     async entry(body: object) {
       return request<{ destination: Destination; session: BrowserSession }>('/auth/entry', body)
     },
