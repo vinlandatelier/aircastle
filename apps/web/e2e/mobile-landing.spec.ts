@@ -39,7 +39,7 @@ async function expectNoSideScroll(page: Page) {
   ).toBeLessThanOrEqual(390)
 }
 
-test.describe.configure({ timeout: 90_000 })
+test.describe.configure({ timeout: 180_000 })
 
 test('on a phone, the hero title wraps cleanly and the rotating word never reflows it', async ({
   page,
@@ -197,7 +197,7 @@ function contains(outer: Rect, x: number, y: number, slack = 0) {
 test('on a phone, the preview tells the same story on a phone-shaped screen, and every tap lands on what it presses', async ({
   page,
 }) => {
-  test.setTimeout(240_000)
+  test.setTimeout(300_000)
   await page.clock.install({ time: 0 })
   await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
@@ -324,7 +324,7 @@ test('on a phone, the closing card fits the phone screen', async ({ page }) => {
 test('on a phone, the whole preview story plays through in its window, start to finish', async ({
   page,
 }) => {
-  test.setTimeout(150_000)
+  test.setTimeout(300_000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()

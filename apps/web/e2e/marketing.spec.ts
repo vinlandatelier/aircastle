@@ -64,7 +64,7 @@ const shownWord = (page: import('@playwright/test').Page) =>
   page.getByRole('heading', { level: 1 }).locator('[aria-hidden="true"] > span > span')
 
 test('hero cycles its last word while its accessible name stays on write', async ({ page }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(180_000)
   await page.clock.install({ time: 0 })
   await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })

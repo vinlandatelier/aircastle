@@ -66,40 +66,50 @@ function sameFrame(left: Frame, right: Frame) {
   return (Object.keys(left) as (keyof Frame)[]).every((key) => left[key] === right[key])
 }
 
+const playsWhenVisible = 0.5
+const visibilitySteps = Array.from({ length: 21 }, (_, step) => step / 20)
+
 function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: boolean) {
   const [frame, setFrame] = useState<Frame>(() => frameAt(0))
+  const [playing, setPlaying] = useState(false)
   useEffect(() => {
     const element = stage.current
     if (reducedMotion || !element) return
     let request: number | undefined
     let played = 0
     let resumedAt = 0
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry) return
-      if (!entry.isIntersecting) {
-        if (request === undefined) return
-        cancelAnimationFrame(request)
-        request = undefined
-        played += (performance.now() - resumedAt) * playbackRate
-        return
-      }
-      if (request !== undefined) return
-      resumedAt = performance.now()
-      const tick = () => {
-        const elapsed = played + (performance.now() - resumedAt) * playbackRate
-        const next = frameAt(elapsed % loopDuration)
-        setFrame((current) => (sameFrame(current, next) ? current : next))
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return
+        const fits = Math.min(entry.boundingClientRect.height, entry.rootBounds?.height ?? Infinity)
+        if (!entry.isIntersecting || entry.intersectionRect.height < fits * playsWhenVisible) {
+          if (request === undefined) return
+          cancelAnimationFrame(request)
+          request = undefined
+          played += (performance.now() - resumedAt) * playbackRate
+          setPlaying(false)
+          return
+        }
+        if (request !== undefined) return
+        resumedAt = performance.now()
+        setPlaying(true)
+        const tick = () => {
+          const elapsed = played + (performance.now() - resumedAt) * playbackRate
+          const next = frameAt(elapsed % loopDuration)
+          setFrame((current) => (sameFrame(current, next) ? current : next))
+          request = requestAnimationFrame(tick)
+        }
         request = requestAnimationFrame(tick)
-      }
-      request = requestAnimationFrame(tick)
-    })
+      },
+      { threshold: visibilitySteps },
+    )
     observer.observe(element)
     return () => {
       observer.disconnect()
       if (request !== undefined) cancelAnimationFrame(request)
     }
   }, [stage, reducedMotion])
-  return reducedMotion ? stillFrame : frame
+  return reducedMotion ? { frame: stillFrame, playing: false } : { frame, playing }
 }
 
 function AgentDialog({
@@ -597,7 +607,7 @@ export function ProductDemo() {
   const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null)
   const stageWidth = useStageWidth(stageElement)
   const reducedMotion = usePrefersReducedMotion()
-  const frame = usePlayback(stage, reducedMotion)
+  const { frame, playing } = usePlayback(stage, reducedMotion)
   const phone = stageWidth < phoneStageWidth
   const phoneWidth = Math.min(stageWidth, phoneFrame.width * phoneMaxScale)
   const scale = phone ? phoneWidth / phoneFrame.width : stageWidth / frameWidth
@@ -621,6 +631,7 @@ export function ProductDemo() {
           setStageElement(node)
         }}
         data-demo-stage={phone ? 'phone' : 'desktop'}
+        data-demo-playing={playing}
         style={{ height: (phone ? phoneFrame.height : frameHeight) * scale }}
         className="relative w-full"
       >

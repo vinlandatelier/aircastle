@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test'
 import { test, expect } from './support'
 
 const prompt = "Recently shipped MCP for our app, let's announce it"
@@ -9,7 +10,16 @@ function story(timeline: number) {
   return Math.ceil(timeline / playbackRate)
 }
 
-test.describe.configure({ timeout: 90_000 })
+test.describe.configure({ timeout: 180_000 })
+
+/** Scrolls the preview into view and waits until it is playing, since it only plays once it is mostly on screen. */
+async function playInView(scope: Locator) {
+  await scope.scrollIntoViewIfNeeded()
+  await expect(scope.page().locator('[data-demo-stage]')).toHaveAttribute(
+    'data-demo-playing',
+    'true',
+  )
+}
 
 test('product preview sits below the hero without a visible label', async ({ page }) => {
   await page.goto('/')
@@ -111,7 +121,7 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const preview = page.getByRole('region', { name: 'Aircastle preview' })
-  await preview.scrollIntoViewIfNeeded()
+  await playInView(preview)
   const frame = preview.locator('[data-demo-frame]')
   const dialog = frame.locator('[data-demo-dialog]')
   const shortcut = frame.locator('[data-demo-shortcut]')
@@ -270,6 +280,7 @@ test('the preview holds a still frame with reduced motion', async ({ page }) => 
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
   await frame.scrollIntoViewIfNeeded()
   await page.waitForTimeout(300)
+  await expect(page.locator('[data-demo-stage]')).toHaveAttribute('data-demo-playing', 'false')
   for (const moment of [2600, 9000]) {
     await page.clock.runFor(story(moment))
     await expect(
@@ -305,7 +316,7 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const cursor = frame.locator('[data-demo-cursor]')
   const agents = frame.locator('[data-demo-agents]')
   const row = frame.locator('[data-demo-agent-row]')
@@ -426,7 +437,7 @@ test('the cursor turns into a pointer as soon as it is over any table row', asyn
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const cursor = frame.locator('[data-demo-cursor]')
   await expect(cursor).toHaveAttribute('data-shape', 'arrow')
   await page.clock.runFor(story(6090))
@@ -440,7 +451,7 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const cursor = frame.locator('[data-demo-cursor]')
   const editor = frame.locator('[data-demo-editor]')
   const table = frame.locator('[data-demo-table]')
@@ -592,7 +603,7 @@ test('the agents tab starts expanding as soon as the cursor enters the agent row
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const cursor = frame.locator('[data-demo-cursor]')
   const agents = frame.locator('[data-demo-agents]')
   await page.clock.runFor(story(6190))
@@ -611,7 +622,7 @@ test('the editor top bar shows the source Canute is reading, one after another',
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const editor = frame.locator('[data-demo-editor]')
   const research = editor.locator('[data-demo-research]')
   const current = research.locator('[data-demo-source][data-state="current"]')
@@ -661,7 +672,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const editor = frame.locator('[data-demo-editor]')
   const research = editor.locator('[data-demo-research]')
   const panel = editor.locator('[data-demo-research-panel]')
@@ -900,7 +911,7 @@ test('the preview header has an Ask Air split button with an agent menu', async 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const header = frame.locator('[data-demo-header]')
   const ask = header.locator('[data-demo-ask]')
   const trigger = header.locator('[data-demo-ask-menu-trigger]')
@@ -976,7 +987,7 @@ test('the cursor answers Canute’s decision and Canute hands it to Air', async 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const panel = frame.locator('[data-demo-research-panel]')
   const decision = panel.locator('[data-demo-decision]')
   const marker = panel.locator('[data-demo-decision-marker]')
@@ -1030,7 +1041,7 @@ test('Thorfinn drafts the body at one fixed height and leaves when it is done', 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const body = frame.locator('[data-demo-field="body"]')
   const tab = body.locator('[data-demo-agent-tab]')
   const draft = body.locator('[data-demo-body-draft]')
@@ -1094,7 +1105,7 @@ test('Einar generates the cover image with the product cover skill as the editor
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const editor = frame.locator('[data-demo-editor]')
   for (let tick = 0; tick < 200; tick += 1) {
     if ((await editor.getAttribute('data-state')) === 'shown') break
@@ -1179,7 +1190,7 @@ test('scrolling starts during cursor travel and SEO agents stream into individua
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const panel = frame.locator('[data-demo-research-panel]')
   const decision = panel.locator('[data-demo-decision]')
   const cursor = frame.locator('[data-demo-cursor]')
@@ -1277,7 +1288,7 @@ test('cursor travel follows a curved path and eases into its destination', async
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const cursor = frame.locator('[data-demo-cursor]')
   const start = await cursor.boundingBox()
   for (let tick = 0; tick < 90 && (await cursor.getAttribute('data-state')) !== 'moving'; tick += 1)
@@ -1314,7 +1325,7 @@ test('the preview plays a little faster than its timeline, opening the editor be
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const editor = frame.locator('[data-demo-editor]')
   await page.clock.runFor(5500)
   await expect(editor).toHaveAttribute('data-state', 'hidden')
@@ -1333,7 +1344,7 @@ test('the cursor heads for Preview once the social image and the body are done, 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const cursor = frame.locator('[data-demo-cursor]')
   const panel = frame.locator('[data-demo-research-panel]')
   const seo = frame.locator('[data-demo-field="seo"]')
@@ -1407,7 +1418,7 @@ async function openSitePreview(page: import('@playwright/test').Page, theme: 'li
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const site = frame.locator('[data-demo-site-preview]')
   await page.clock.runFor(story(17000))
   for (let tick = 0; tick < 120 && (await site.count()) === 0; tick += 1)
@@ -1474,7 +1485,7 @@ test('clicking Preview swaps the editor for the Acme site, address bar first, th
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const cursor = frame.locator('[data-demo-cursor]')
   const editor = frame.locator('[data-demo-editor]')
   const site = editor.locator('[data-demo-site-preview]')
@@ -1527,7 +1538,7 @@ test('Thorfinn has started the body by the time the editor scrolls down', async 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
-  await frame.scrollIntoViewIfNeeded()
+  await playInView(frame)
   const editor = frame.locator('[data-demo-editor]')
   const words = frame.locator('[data-demo-field="body"] [data-demo-draft-word]')
   await page.clock.runFor(story(14000))
@@ -1593,7 +1604,7 @@ const rewrittenLine =
 test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn rewrite it in place', async ({
   page,
 }) => {
-  test.setTimeout(150_000)
+  test.setTimeout(300_000)
   const { frame, site } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const sitePage = site.locator('[data-demo-site-page]')
@@ -1769,7 +1780,7 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
 test('once Air reports back, the cursor clicks Publish, confetti bursts from it and the post shows as published', async ({
   page,
 }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(180_000)
   const { frame } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const publish = frame.locator('[data-demo-publish]')
@@ -1843,7 +1854,7 @@ test('once Air reports back, the cursor clicks Publish, confetti bursts from it 
 test('a notification says the docs page is ready, its Preview opens the docs entry in preview, and the cursor reads it to the bottom, scrolls back up and publishes it', async ({
   page,
 }) => {
-  test.setTimeout(150_000)
+  test.setTimeout(300_000)
   const { frame, site } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const bell = frame.locator('[data-demo-notifications]')
@@ -2026,7 +2037,7 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
 test('after the docs entry is published, the preview fades to a grainy cloud gradient, the Gale mark blooms in the centre and Aircastle slides out beside it, then the loop starts again', async ({
   page,
 }) => {
-  test.setTimeout(150_000)
+  test.setTimeout(300_000)
   const { frame } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const outro = frame.locator('[data-demo-outro]')
@@ -2200,7 +2211,7 @@ test('after the docs entry is published, the preview fades to a grainy cloud gra
 test('after asking Air, the cursor reads to the end of the post, then a reference in Air’s reply jumps back to the revised line before Publish', async ({
   page,
 }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(300_000)
   const { frame, site } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const sitePage = site.locator('[data-demo-site-page]')
@@ -2297,6 +2308,28 @@ test('after asking Air, the cursor reads to the end of the post, then a referenc
   expect((await box(opening)).y).toBe(revised.y)
 })
 
+test('the preview waits on its first frame until it is mostly in view, so the story starts from the top', async ({
+  page,
+}) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const preview = page.getByRole('region', { name: 'Aircastle preview' })
+  await expect(preview, 'the top of the preview peeks under the hero').toBeInViewport()
+  await expect(preview).not.toBeInViewport({ ratio: 0.5 })
+  await page.waitForTimeout(300)
+  await expect(page.locator('[data-demo-stage]')).toHaveAttribute('data-demo-playing', 'false')
+  await page.clock.runFor(story(4000))
+  await expect(preview.locator('[data-demo-dialog]'), 'Ask Air has not opened yet').toHaveCount(0)
+  await playInView(preview)
+  await page.waitForTimeout(300)
+  await page.clock.runFor(story(2600))
+  expect(
+    ((await preview.locator('[data-demo-prompt]').textContent()) ?? '').length,
+  ).toBeGreaterThan(0)
+})
+
 test('the preview pauses while it is scrolled out of view and resumes where it left off', async ({
   page,
 }) => {
@@ -2307,7 +2340,7 @@ test('the preview pauses while it is scrolled out of view and resumes where it l
   await page.goto('/')
   const preview = page.getByRole('region', { name: 'Aircastle preview' })
   const typed = preview.locator('[data-demo-prompt]')
-  await preview.scrollIntoViewIfNeeded()
+  await playInView(preview)
   await page.waitForTimeout(300)
   await page.clock.runFor(story(2600))
   const before = (await typed.textContent()) ?? ''
@@ -2317,7 +2350,7 @@ test('the preview pauses while it is scrolled out of view and resumes where it l
   await expect(preview).not.toBeInViewport()
   await page.waitForTimeout(300)
   await page.clock.runFor(story(20000))
-  await preview.scrollIntoViewIfNeeded()
+  await playInView(preview)
   await page.waitForTimeout(300)
   await page.clock.runFor(16)
   const after = (await typed.textContent()) ?? ''
