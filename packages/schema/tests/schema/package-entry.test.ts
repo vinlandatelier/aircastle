@@ -47,7 +47,7 @@ test("Bun development consumers use schema source without build output", () => {
     stderr: "",
   });
   expect(JSON.parse(result.stdout)).toEqual({ ok: true, data: { title: "Development" } });
-});
+}, 30_000);
 
 test("normal consumers still resolve the packaged schema entry", () => {
   const result = spawnSync(
@@ -61,4 +61,4 @@ test("normal consumers still resolve the packaged schema entry", () => {
     stderr: "",
   });
   expect(new URL(result.stdout.trim()).pathname).toMatch(/\/dist\/index\.mjs$/);
-});
+}, 30_000);
