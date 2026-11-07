@@ -84,18 +84,33 @@ export async function postgresAuthAdmission(
     >`SELECT policy FROM ${table("auth_admission_policy")} WHERE singleton = 1`;
     return row?.policy === policy;
   }
+  async function holdsPolicy(transaction: postgres.TransactionSql) {
+    const [row] = await transaction<{ held: boolean }[]>`
+      SELECT EXISTS (
+        SELECT FROM pg_locks
+        WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND mode = 'ShareLock' AND granted
+          AND objsubid = 1
+          AND ((classid::bigint << 32) | objid::bigint) = hashtextextended(${policyKey}, 0)
+      ) AS held`;
+    return row?.held ?? false;
+  }
+  async function registerPolicy(transaction: postgres.TransactionSql) {
+    const [lock] = await transaction<{ acquired: boolean }[]>`
+      SELECT pg_try_advisory_xact_lock(hashtextextended(${policyKey}, 0)) AS acquired`;
+    if (lock?.acquired) {
+      await transaction`INSERT INTO ${table("auth_admission_policy")} (singleton, policy) VALUES (1, ${policy}) ON CONFLICT (singleton) DO UPDATE SET policy = EXCLUDED.policy`;
+    } else if (!(await matchesPolicy(transaction))) {
+      return false;
+    }
+    await transaction`SELECT pg_advisory_lock_shared(hashtextextended(${policyKey}, 0))`;
+    return true;
+  }
   try {
     await sql.begin(async (transaction) => {
       await initializeAuthLayout(transaction, namespace);
       await lockOperation(transaction);
-      const [lock] = await transaction<{ acquired: boolean }[]>`
-        SELECT pg_try_advisory_xact_lock(hashtextextended(${policyKey}, 0)) AS acquired`;
-      if (lock?.acquired) {
-        await transaction`INSERT INTO ${table("auth_admission_policy")} (singleton, policy) VALUES (1, ${policy}) ON CONFLICT (singleton) DO UPDATE SET policy = EXCLUDED.policy`;
-      } else if (!(await matchesPolicy(transaction))) {
+      if (!(await registerPolicy(transaction)))
         throw new Error("Auth admission limits conflict with the active namespace policy");
-      }
-      await transaction`SELECT pg_advisory_lock_shared(hashtextextended(${policyKey}, 0))`;
     });
   } catch (error) {
     await sql.end({ timeout: 5 });
@@ -108,7 +123,8 @@ export async function postgresAuthAdmission(
       try {
         return await sql.begin(async (transaction): Promise<AuthAdmission> => {
           await lockOperation(transaction);
-          await transaction`SELECT pg_advisory_xact_lock_shared(hashtextextended(${policyKey}, 0))`;
+          if (!(await holdsPolicy(transaction)) && !(await registerPolicy(transaction)))
+            throw new AuthStorageError("unavailable");
           if (!(await matchesPolicy(transaction))) throw new AuthStorageError("unavailable");
           const now = clock();
           await transaction`DELETE FROM ${table("auth_admission_events")} WHERE admitted_at <= ${now - retention}`;
