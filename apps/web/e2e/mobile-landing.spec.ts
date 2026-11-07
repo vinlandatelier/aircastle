@@ -282,7 +282,7 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
       ).toBeLessThan(0.05)
       backdropChecked = true
     }
-    await page.clock.runFor(story(40))
+    await page.clock.runFor(story(now.touch || now.dialog ? 40 : 100))
   }
 
   expect(screens).toEqual(['posts', 'editor', 'site', 'docs', 'posts'])

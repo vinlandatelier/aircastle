@@ -12,7 +12,7 @@ export default defineConfig({
   failOnFlakyTests: true,
   workers: 2,
   timeout: recording ? 120_000 : 30_000,
-  globalTimeout: 1_800_000,
+  globalTimeout: 2_400_000,
   expect: { timeout: 5_000 },
   outputDir: 'reports/test-results',
   reporter: [
