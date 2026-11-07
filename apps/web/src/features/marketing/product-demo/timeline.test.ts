@@ -102,6 +102,19 @@ describe('product preview cursor', () => {
     expect(fidgety, 'it pauses where it goes instead of jiggling').toEqual([])
   })
 
+  it('stays put once the docs entry is published', () => {
+    let after = 0
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      if (frame.confetti?.entry !== 'docs' && frame.outroElapsed === null) continue
+      after += 1
+      expect(Math.hypot(frame.cursorDriftX, frame.cursorDriftY), `at ${elapsed}ms`).toBeLessThan(
+        0.5,
+      )
+    }
+    expect(after).toBeGreaterThan(100)
+  })
+
   it('holds still while typing or scrolling', () => {
     let busy = 0
     for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {

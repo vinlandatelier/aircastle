@@ -333,6 +333,7 @@ function wanderStops(target: CursorTarget, span: { start: number; end: number })
 }
 
 function cursorDriftAt(elapsed: number) {
+  if (elapsed >= askAt + askTiming.docsPublishClicked) return { x: 0, y: 0 }
   const index = cursorMoves.findLastIndex((move) => elapsed >= move.at)
   const move = cursorMoves[index]
   if (!move) return { x: 0, y: 0 }
