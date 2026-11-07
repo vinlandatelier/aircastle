@@ -1,9 +1,33 @@
 import { expect, test } from "vite-plus/test";
-import { issue, withAuth } from "./test-support/fixture.ts";
+import { browserOrigin, claim, issue, withAuth } from "./test-support/fixture.ts";
+import type { AuthServer } from "./test-support/fixture.ts";
 
 function expectPrivate(response: Response, label: string) {
   expect(response.headers.get("cache-control"), label).toContain("no-store");
   expect(response.headers.get("referrer-policy"), label).toBe("no-referrer");
+}
+
+function rawPost(
+  server: AuthServer,
+  path: string,
+  contentType: string,
+  body: string,
+  cookie?: string,
+) {
+  return server.app.request(
+    `${browserOrigin}/api${path}`,
+    {
+      method: "POST",
+      headers: {
+        host: new URL(browserOrigin).host,
+        origin: browserOrigin,
+        "content-type": contentType,
+        ...(cookie ? { cookie } : {}),
+      },
+      body,
+    },
+    { peerAddress: "127.0.0.1" },
+  );
 }
 
 test("confirm, session, activity, entry and sign-out responses are neither cached nor referred", async () => {
@@ -38,3 +62,47 @@ test("confirm, session, activity, entry and sign-out responses are neither cache
     }
   });
 });
+
+for (const contentType of ["text/plain", "application/x-www-form-urlencoded"]) {
+  test(`confirm sent as ${contentType} returns the contracted invalid-link envelope`, async () => {
+    await withAuth(async ({ open }) => {
+      const server = await open();
+      const response = await rawPost(
+        server,
+        "/auth/confirm",
+        contentType,
+        JSON.stringify({ purpose: "setup", token: "A".repeat(43) }),
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ kind: "invalid-link", next: "setup" });
+      expect(response.headers.get("set-cookie")).toBeNull();
+    });
+  });
+
+  test(`activity and entry sent as ${contentType} without a session return unauthenticated`, async () => {
+    await withAuth(async ({ open }) => {
+      const server = await open();
+      for (const path of ["/auth/activity", "/auth/entry"]) {
+        const response = await rawPost(server, path, contentType, "kind=resolve");
+        expect(response.status, path).toBe(401);
+        expect(await response.json(), path).toEqual({ kind: "unauthenticated" });
+      }
+    });
+  });
+
+  test(`activity and entry sent as ${contentType} with a session keep the contracted envelopes`, async () => {
+    await withAuth(async ({ open }) => {
+      const server = await open();
+      const { cookie } = await claim(server);
+      const activity = await rawPost(server, "/auth/activity", contentType, "kind=resolve", cookie);
+      expect(activity.status).toBe(200);
+      expect(await activity.json()).toMatchObject({
+        kind: "ok",
+        value: { user: { name: "Alex" } },
+      });
+      const entry = await rawPost(server, "/auth/entry", contentType, "kind=resolve", cookie);
+      expect(entry.status).toBe(400);
+      expect(await entry.json()).toEqual({ kind: "invalid-input" });
+    });
+  });
+}
