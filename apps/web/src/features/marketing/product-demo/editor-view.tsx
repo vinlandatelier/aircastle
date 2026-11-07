@@ -1535,6 +1535,12 @@ function AskAir({ elapsed }: { elapsed: number }) {
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <span className="air-mascot block size-4 shrink-0" />
         <span data-demo-ask-label>Ask {orchestrator.name}</span>
+        <span
+          data-demo-role-label
+          className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none text-muted-foreground"
+        >
+          {orchestrator.role}
+        </span>
       </span>
       <span className="relative mt-2 block">
         <span data-demo-ask-input className="block min-h-12">

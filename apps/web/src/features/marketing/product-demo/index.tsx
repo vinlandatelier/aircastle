@@ -121,6 +121,12 @@ function AgentDialog({
       <p className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
         <span className="air-mascot block size-4 shrink-0" />
         Ask Air
+        <span
+          data-demo-role-label
+          className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none text-muted-foreground"
+        >
+          Orchestrator
+        </span>
       </p>
       <p className="relative min-h-20 text-lg">
         <span data-demo-prompt>{prompt.slice(0, typed)}</span>

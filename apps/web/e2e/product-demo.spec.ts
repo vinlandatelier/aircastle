@@ -154,6 +154,10 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
     dialog: 'dialog',
   })
   await expect(dialog.locator('.air-mascot')).toHaveCount(1)
+  await expect(
+    dialog.locator('[data-demo-role-label]'),
+    'Air is labelled as the orchestrator',
+  ).toHaveText('Orchestrator')
   await expect(dialog.locator('svg.lucide-sparkles')).toHaveCount(0)
   await expect(typed).toHaveText('')
   await page.clock.runFor(story(700))
@@ -1650,6 +1654,7 @@ test('selecting the opening line on the site asks Air, and Thorkell and Thorfinn
   await until(async () => (await ask.count()) > 0)
   await expect(ask.locator('.air-mascot')).toHaveCount(1)
   await expect(ask.locator('[data-demo-ask-label]')).toHaveText('Ask Air')
+  await expect(ask.locator('[data-demo-role-label]')).toHaveText('Orchestrator')
   await expect(ask.locator('[data-demo-ask-send]')).toHaveCount(1)
   const dropdown = await box(ask)
   expect(dropdown.y).toBeGreaterThan(selected.y + selected.height - 4)
