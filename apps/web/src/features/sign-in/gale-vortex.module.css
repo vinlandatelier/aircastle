@@ -38,6 +38,6 @@
 
 @keyframes vortex-turn {
   to {
-    transform: rotate(360deg);
+    transform: rotate(-360deg);
   }
 }

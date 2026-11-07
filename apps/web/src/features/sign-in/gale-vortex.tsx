@@ -27,7 +27,7 @@ const rings = Array.from({ length: ringCount }, (_, index) => {
   }
 })
 
-/** The sign-in panel's decoration: rings of Gale's comma arms turning clockwise like a slow vortex. */
+/** The sign-in panel's decoration: rings of Gale's comma arms turning counter-clockwise like a slow vortex. */
 export function GaleVortex() {
   return (
     <div aria-hidden="true" data-sign-in-vortex className={styles.art}>

@@ -43,7 +43,7 @@ test('sign-in favicon follows live system theme changes', async ({ page }) => {
 })
 
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
-  test(`sign-in art is a five-armed Gale vortex that ${reducedMotion === 'reduce' ? 'holds still' : 'turns clockwise, faster near the centre'}`, async ({
+  test(`sign-in art is a five-armed Gale vortex that ${reducedMotion === 'reduce' ? 'holds still' : 'turns counter-clockwise, faster near the centre'}`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion })
@@ -72,11 +72,11 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       return
     }
     expect(
-      turns.every((turn) => turn !== null && turn > 0),
-      'every ring turns clockwise',
+      turns.every((turn) => turn !== null && turn < 0),
+      'every ring turns counter-clockwise',
     ).toBe(true)
-    const inner = turns[0] ?? 0
-    const outer = turns.at(-1) ?? 0
+    const inner = Math.abs(turns[0] ?? 0)
+    const outer = Math.abs(turns.at(-1) ?? 0)
     expect(inner, 'the centre turns faster than the edge').toBeGreaterThan(outer)
   })
 }

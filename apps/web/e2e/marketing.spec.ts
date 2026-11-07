@@ -87,7 +87,7 @@ test('hero keeps write with reduced motion', async ({ page }) => {
   await expect(shownWord(page)).toHaveText('write')
 })
 
-test('hovering the home link spins the logo clockwise', async ({ page }) => {
+test('hovering the home link spins the logo counter-clockwise', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const home = page.getByRole('banner').getByRole('link', { name: 'Aircastle home' })
@@ -103,7 +103,7 @@ test('hovering the home link spins the logo clockwise', async ({ page }) => {
     const { a, b } = new DOMMatrix(getComputedStyle(element).transform)
     return (Math.atan2(b, a) * 180) / Math.PI
   })
-  expect(angle, 'the logo turns clockwise').toBeGreaterThan(0)
+  expect(angle, 'the logo turns counter-clockwise').toBeLessThan(0)
 })
 
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {

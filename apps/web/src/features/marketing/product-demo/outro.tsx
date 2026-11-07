@@ -83,7 +83,7 @@ function GaleBloom({ elapsed }: { elapsed: number }) {
     <svg
       data-demo-outro-mark
       viewBox="0 0 100 100"
-      style={{ width: markSize, height: markSize, rotate: `${(1 - settle) * -100}deg` }}
+      style={{ width: markSize, height: markSize, rotate: `${(1 - settle) * 100}deg` }}
       className="shrink-0 overflow-visible drop-shadow-[0_1px_14px_rgb(90_40_20/0.18)]"
     >
       {galeBlades.map((blade, index) => {
@@ -98,7 +98,7 @@ function GaleBloom({ elapsed }: { elapsed: number }) {
             opacity={Math.min(1, t * 2.5)}
             style={{
               transformOrigin: '50px 50px',
-              transform: `rotate(${(1 - grown) * -110}deg) scale(${Math.max(0, grown)})`,
+              transform: `rotate(${(1 - grown) * 110}deg) scale(${Math.max(0, grown)})`,
             }}
           />
         )

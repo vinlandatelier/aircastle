@@ -2052,6 +2052,10 @@ test('after the docs entry is published, the preview fades to a grainy cloud gra
     await opacityOf(blades.last()),
   )
   expect(await opacityOf(wordmark), 'the logo comes before the name').toBe(0)
+  const settleTurn = await mark.evaluate((element) => parseFloat(getComputedStyle(element).rotate))
+  expect(settleTurn, 'the mark settles counter-clockwise, from a clockwise offset').toBeGreaterThan(
+    0,
+  )
   const centreX = frameBox.x + frameBox.width / 2
   const centreY = frameBox.y + frameBox.height / 2
   const blooming = await box(mark)
