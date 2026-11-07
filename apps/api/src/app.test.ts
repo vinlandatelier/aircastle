@@ -68,8 +68,8 @@ describe("API", () => {
     }
     const { logger, lines } = captureLogs();
     const app = createApp({ logger });
-    app.get("/broken", () => connectToDatabase());
-    const response = await app.request("/api/broken");
+    app.get("/projects/:project/schema", () => connectToDatabase());
+    const response = await app.request("/api/projects/11111111-1111-4111-8111-111111111111/schema");
     const body = await response.text();
 
     expect(response.status).toBe(500);

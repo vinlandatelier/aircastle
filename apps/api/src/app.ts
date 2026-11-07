@@ -5,11 +5,34 @@ import { bodyLimit } from "hono/body-limit";
 import { openAPIRouteHandler } from "hono-openapi";
 import { pinoLogger } from "hono-pino";
 import { except } from "hono/combine";
+import { matchedRoutes } from "hono/route";
 import type { Logger } from "pino";
 import { ErrorSummary, type ContentService, type ReportError } from "@aircastle/core";
 import { contentRoutes } from "./features/content/index.ts";
 import { health } from "./features/health/index.ts";
 import type { LocalAuthRuntime } from "./features/auth/index.ts";
+
+/**
+ * Every route the API mounts, keyed by method and path, with the credential it requires.
+ * `middleware` runs for every request. A request that matches any unlisted route gets 404
+ * before any handler runs, so a new route must be classified here first.
+ */
+export const routeAccess = {
+  "ALL /*": "middleware",
+  "GET /api/health": "public",
+  "GET /api/openapi.json": "public",
+  "GET /api/docs": "public",
+  "GET /api/docs/scalar.js": "public",
+  "ALL /api/auth/*": "auth-dispatch",
+  "ALL /api/development-inbox/*": "development-inbox",
+  "GET /api/projects/:project/schema": "project-key",
+  "POST /api/projects/:project/schema": "project-key",
+  "POST /api/projects/:project/collections/:collection/documents": "project-key",
+  "GET /api/projects/:project/collections/:collection/documents/:id": "project-key",
+} as const satisfies Record<
+  string,
+  "middleware" | "public" | "auth-dispatch" | "development-inbox" | "project-key"
+>;
 
 /** Logs the summary of each unexpected CMS error. */
 export function cmsErrorReporter(logger: Logger): ReportError {
@@ -45,6 +68,13 @@ export function createApp({
   const credentialBearingPath = (c: Context) =>
     c.req.path.startsWith("/api/auth/") || c.req.path.startsWith("/api/development-inbox/");
   const app = new Hono<{ Bindings: { peerAddress?: string } }>()
+    .use(async (c, next) => {
+      const classified = matchedRoutes(c).every((route) =>
+        Object.hasOwn(routeAccess, `${route.method} ${route.path}`),
+      );
+      if (!classified) return c.notFound();
+      await next();
+    })
     .use(requestId())
     .use(except(credentialBearingPath, ordinaryLogger))
     .onError((error, c) => {

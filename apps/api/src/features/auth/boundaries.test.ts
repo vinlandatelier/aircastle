@@ -365,4 +365,65 @@ describe("local auth HTTP boundaries", () => {
       { logger },
     );
   });
+
+  const dispatched = [
+    ["GET", "/auth/state"],
+    ["GET", "/auth/session"],
+    ["GET", "/development-inbox/messages"],
+    ["POST", "/auth/setup"],
+    ["POST", "/auth/sign-in"],
+    ["POST", "/auth/confirm"],
+    ["POST", "/auth/confirm/preview"],
+    ["POST", "/auth/sign-out"],
+    ["POST", "/auth/activity"],
+    ["POST", "/auth/entry"],
+    ["POST", "/development-inbox/messages/message-id/open"],
+  ] as const;
+  const forgeries = [
+    { origin: "https://evil.test" },
+    { origin: "null" },
+    { host: "evil.test" },
+    { host: "localhost.evil.test:43121" },
+    { host: "localhost:43122" },
+  ];
+
+  test.each(dispatched)(
+    "%s %s rejects every disallowed Host and Origin before doing any work",
+    async (method, path) => {
+      await withAuth(async ({ open }) => {
+        const server = await open();
+        const { cookie } = await claim(server);
+        const before = server.inbox.list();
+        const variants: Record<string, string>[] = [
+          ...forgeries,
+          ...(method === "POST" ? [{ origin: "" }] : []),
+        ];
+        for (const forged of variants) {
+          const requestHeaders = new Headers({
+            host: "localhost:43121",
+            origin: browserOrigin,
+            "content-type": "application/json",
+            cookie,
+          });
+          for (const [name, value] of Object.entries(forged))
+            if (value === "") requestHeaders.delete(name);
+            else requestHeaders.set(name, value);
+          const response = await server.app.request(
+            `${browserOrigin}/api${path}`,
+            {
+              method,
+              headers: requestHeaders,
+              ...(method === "POST" ? { body: JSON.stringify(setup) } : {}),
+            },
+            { peerAddress: "127.0.0.1" },
+          );
+          expect(response.status, JSON.stringify(forged)).toBe(403);
+          expect(await response.json(), JSON.stringify(forged)).toEqual({ kind: "forbidden" });
+          expect(response.headers.get("set-cookie")).toBeNull();
+        }
+        expect(server.inbox.list()).toEqual(before);
+        expect((await server.request("/auth/session", undefined, cookie)).status).toBe(200);
+      });
+    },
+  );
 });
