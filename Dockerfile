@@ -9,7 +9,7 @@ RUN vp run build
 
 FROM bun AS runtime
 WORKDIR /app/apps/api
-ENV NODE_ENV=production AIRCASTLE_PORT=8080
+ENV NODE_ENV=production AIRCASTLE_PORT=8080 AIRCASTLE_HOST=0.0.0.0
 COPY --from=build --chown=bun:bun /app/apps/api/dist ./dist
 COPY --from=build --chown=bun:bun /app/apps/web/dist /app/apps/web/dist
 USER bun

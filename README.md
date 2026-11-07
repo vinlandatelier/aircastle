@@ -40,7 +40,7 @@ The API uses port 43122 in both development and built runs. Override it with `AI
 
 Open [API documentation](http://localhost:43122/api/docs) or its [OpenAPI document](http://localhost:43122/api/openapi.json). The documentation UI loads a pinned Scalar script from jsDelivr and requires internet access.
 
-The API validates its environment variables at startup and exits if one is invalid. `AIRCASTLE_PORT` must be an integer from 1 to 65535. `AIRCASTLE_LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`. `NODE_ENV` remains the standard runtime/build variable; use `AIRCASTLE_ENV` for Aircastle mode.
+The API validates its environment variables at startup and exits if one is invalid. `AIRCASTLE_PORT` must be an integer from 1 to 65535. `AIRCASTLE_HOST` sets the listen address and defaults to `127.0.0.1`, so other machines on your network can't reach the API; it must be an IP address. `AIRCASTLE_LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`. `NODE_ENV` remains the standard runtime/build variable; use `AIRCASTLE_ENV` for Aircastle mode.
 
 Start both apps concurrently with `vp run dev`. The dev servers load workspace TypeScript source, so no initial `vp run build` is needed.
 
@@ -52,7 +52,7 @@ To run the built application and Postgres together:
 docker compose --env-file /dev/null -f compose.development.yaml up --build
 ```
 
-Open `http://127.0.0.1:43121`. This Compose file enables development auth and keeps database data across container recreation. An image launched independently has local auth disabled unless `AIRCASTLE_ENV=development` and a loopback `AIRCASTLE_URL` are supplied. Production authentication is not included in this local workflow.
+Open `http://127.0.0.1:43121`. This Compose file enables development auth and keeps database data across container recreation. An image launched independently has local auth disabled unless `AIRCASTLE_ENV=development` and a loopback `AIRCASTLE_URL` are supplied. The image listens on every container interface, so publish its port on loopback only, for example `-p 127.0.0.1:43121:8080`. Production authentication is not included in this local workflow.
 
 The web dev server and local preview forward `/api` requests to the API, so browser code can use relative URLs such as `/api/health`. To change the API port for both servers, use `AIRCASTLE_PORT=43130 vp run dev`.
 

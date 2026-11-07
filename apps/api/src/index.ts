@@ -67,7 +67,7 @@ try {
     localAuthEnabled: authConfig.mode === "development",
   });
   const server = Bun.serve({
-    hostname: "0.0.0.0",
+    hostname: config.AIRCASTLE_HOST,
     port: config.AIRCASTLE_PORT,
     fetch: (request, transport) =>
       /^\/api(?:\/|$)/.test(new URL(request.url).pathname)
