@@ -52,8 +52,6 @@ const messageBodies = {
   'Sign in to Aircastle': 'Use this link to sign in.',
 } as const
 
-const sessionCookie = 'better-auth.session_token'
-
 export function message(page: Page, email: string, subject: string) {
   return page.getByRole('button').filter({ hasText: email }).filter({ hasText: subject })
 }
@@ -97,6 +95,7 @@ export async function signOut(page: Page, name: string, email: string) {
 }
 
 export async function expectBearerOutsideWebStorage(page: Page) {
+  const sessionCookie = `aircastle_session_${new URL(page.url()).port}`
   const session = (await page.context().cookies()).find((cookie) => cookie.name === sessionCookie)
   if (!session) throw new Error(`Claim must issue the ${sessionCookie} cookie`)
   expect(session.httpOnly, 'Session cookie must be HttpOnly').toBe(true)
