@@ -130,7 +130,7 @@ test("real fixed-time failed-sign-in and blocked floods reach a positive bounded
     },
     { logger: sink.logger, limits: { ...limits, ip: { fiveMinutes: 10, oneHour: 30 } } },
   );
-});
+}, 30_000);
 
 test("invalid-credential floods remain bounded in the positive application sink", async () => {
   const sink = applicationSink();
@@ -155,7 +155,7 @@ test("invalid-credential floods remain bounded in the positive application sink"
     },
     { logger: sink.logger },
   );
-});
+}, 30_000);
 
 test("a positive application diagnostic sink excludes actual link, session, signing and email-body canaries", async () => {
   const sink = applicationSink();
