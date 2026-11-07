@@ -34,10 +34,8 @@ packages/
 └── cli/                      Schema publication, reconciliation, and lockfiles
 
 scripts/                      Repository checks and local development tooling
-├── ai-automation/            Trigger-login authorization, PR context, and advisory review/fix publication
-└── ai-models/                Pinned model roles and bounded Claude Code CLI runs
 
-.github/                      CI workflows, shared setup, and model selections
+.github/                      CI workflows and shared setup
 ```
 
 The API assembles middleware, feature routes, and API documentation through `createApp({ logger, cms, maxRequestBytes })` in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. `src/cli.ts` exports a quiet app from the same factory with a silent logger and no `cms`, so it serves no content routes.
@@ -73,15 +71,7 @@ Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys
 
 ## Repository automation
 
-`scripts/ai-automation/index.ts` owns review/fix authorization, output validation, and prompts. Its review lenses define the two review passes: one hunts for correctness failures, the other checks quality and conformance with `AGENTS.md`. `github.ts` holds the coordinator, which owns immutable source capture, authenticated claims, revision checks, and publication. The workflow uses trusted default-branch code and accepts only the single GitHub account named by the `AI_TRIGGER_LOGIN` and `AI_TRIGGER_USER_ID` repository variables as a requester before model calls. A new PR conversation comment from that account mentioning `@vinland-ai` triggers work directly. `operations.ts` resolves natural requests in the model job, asks the requester one question on the PR when a request is unclear, binds the chosen task and model to the original claim, and keeps natural fixes behind the existing secretless verifier. `reviews.ts` runs independent correctness and quality passes with the configured reviewer, then builds one compact severity-ordered review with inline findings on supported diff ranges. The publisher uses the stock GitHub review endpoint and `diff` to parse unified hunks. It does not scan historical commands or PR revisions. Failed operations can be retried by posting a new tag. Source and model output remain data in credential-bearing jobs. Supported fixes run selected file-level checks in a separate container and publish through a fresh trusted job as follow-up PRs. Fixes for fork PRs are published only as patches. Unsupported scopes produce explicitly unverified patch artifacts without executing repository checks.
-
-`scripts/ai-models/index.ts` owns the reviewer and implementer config parser and the Claude Code CLI transport. It runs `claude -p` on the subscription token in an empty directory with a fresh configuration, no tools, and no MCP servers. Callers supply task text and a bounded output schema. `tests/harness/ai-credentials.test.ts` keeps provider API keys and endpoints out of the automation. `.github/ai-models.json` pins each role's model and effort.
-
-Privileged workflows use the `ai-automation` environment, restricted to the `main` branch. [Automation instructions](.github/AGENTS.md) record the activation requirements and trust boundaries. Live setup is distinct from offline configuration validation.
-
-`.github/workflows/gardener.yml` runs the `.agents/skills/gardener` audit of `main` on the subscription token without GitHub credentials, and a separate job opens the resulting PRs with the AI App token. `tests/harness/gardener-workflow.test.ts` guards its secrets, token scope, held paths and merge calls.
-
-`.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI workflows are advisory and do not participate in the required check, approval counts, or conversation-resolution requirements.
+`.github/workflows/ci.yml` runs the required `Lint, typecheck and test` check. `.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI review and the `.agents/skills/gardener` audit run locally, outside GitHub Actions. [Automation instructions](.github/AGENTS.md) record the workflow rules.
 
 ## Feature pattern
 

@@ -1,7 +1,0 @@
-{
-  "version": 1,
-  "roles": {
-    "reviewer": { "model": "claude-opus-5-5", "effort": "high" },
-    "implementer": { "model": "claude-opus-5-5", "effort": "high" }
-  }
-}
