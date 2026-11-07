@@ -4,15 +4,16 @@ Follow [ARCHITECTURE.md](../../ARCHITECTURE.md#web-app-structure) for the web ap
 
 ## Verification
 
-Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defines test placement, observable expectations, red evidence, fault checks, and completion evidence.
+Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defines test placement, observable expectations, red evidence, and completion evidence.
 
-- Install Chromium once with `vp -C apps/web exec playwright install chromium` from the repository root.
 - Run `vp run test-web` for fast component behavior, `vp run test-web:e2e` for built-browser journeys, and `vp run test-web:coverage` for V8 HTML/JSON reports over all frontend source.
-- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). Run only checks relevant to the current change; neither `vp run verify-web` nor `vp run check` is a required completion gate.
+- The [README](../../README.md#development) covers the Chromium install, `WEB_E2E_PORT` for concurrent worktrees, and report locations.
+- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). `vp run check` is not a required completion gate.
 - Focus component and browser runs by file and case, for example `vp run test-web src/features/sign-in/index.test.tsx` or `vp run test-web:e2e metadata.spec.ts`. Add scenario filters such as `--grep long-text` where appropriate. Check changed UI in a browser without running unrelated journeys.
-- Each command prints its output directory under `apps/web/reports/`. Read `receipt.json` for setup versus behavior failures, tested source, environment, counts, and cleanup. Its `cases` list records the selected tests by file and descriptive title, with status, errors, attempts, and browser metadata.
-- Read phase logs and JUnit/JSON reports for the failing assertion. Browser failures retain traces and screenshots under `browser/` when the page was reached. Open a trace with `vp -C apps/web exec playwright show-trace <trace.zip>`.
-- Read `coverage/index.html`, `coverage/coverage-summary.json`, and `coverage-info.json` together. Raw coverage includes shared UI wrappers and compiler-generated branches, excludes CSS, and has no percentage gate. Controlled fault checks establish selected test sensitivity, not a full mutation score.
+- `vp run test-web:record <specs>` runs the same journeys and saves a `video.webm` and a final screenshot for every test under `reports/test-results/`. Recording slows each action by 500 ms, labels each action and step in the video, and raises the test timeout to 120 s. Normal runs record no video and keep full speed.
+- A PR that changes what a user sees or does needs recorded evidence in its body. Follow [Complete the feature](VERIFICATION.md#complete-the-feature).
+- Read `coverage/index.html` and `coverage/coverage-summary.json` together. Raw coverage includes shared UI wrappers and compiler-generated branches, excludes CSS, and has no percentage gate.
+- Lint rejects child processes, server launchers, and `test.skip` or `test.fixme` in browser tooling. Add servers to `webServer` and checks to package scripts instead of writing a runner.
 
 ## UI conventions
 

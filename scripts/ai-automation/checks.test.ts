@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test, vi } from "vite-plus/test";
 import { boundVerification, verificationPlan } from "./checks.ts";
-import { digest, type Edit, type Job } from "./index.ts";
+import { digest, type Edit, type Fix, type Job } from "./index.ts";
 import { snapshot } from "./fixtures.ts";
 import { verify } from "./verify.ts";
 
@@ -83,37 +83,26 @@ test("unsupported scoped verification rejects mixed supported and unknown edits"
   ).toBeNull();
   expect(verificationPlan([])).toBeNull();
 });
-function input(path: string): {
-  job: Job;
-  output: { id: string; digest: string; result: unknown; selection: Job["selection"] };
-} {
+function input(path: string): { job: Job; fix: Fix } {
   const job: Job = {
     version: 1,
     id: "1".repeat(64),
     task: "fix",
-    role: "codexImplementer",
+    role: "implementer",
     requester: snapshot.author,
     snapshot: { ...snapshot, files: [{ ...snapshot.files[0]!, path }], changedPaths: [path] },
     instructions: "Fix the value",
     thread: "",
     control: "e".repeat(40),
-    selection: { provider: "openai", model: "fixture", effort: "high" },
+    selection: { model: "fixture", effort: "high" },
     previous: "",
   };
-  return {
-    job,
-    output: {
-      id: job.id,
-      digest: digest(job),
-      selection: job.selection,
-      result: { summary: "Fix value", edits: [edit(path)] },
-    },
-  };
+  return { job, fix: { summary: "Fix value", edits: [edit(path)] } };
 }
 test("unsupported scoped verification returns an honestly unavailable receipt without Docker", async () => {
   docker.calls.length = 0;
-  const { job, output } = input("packages/core/src/value.ts");
-  const receipt = await verify(job, output, "vinlandatelier/aircastle");
+  const { job, fix } = input("packages/core/src/value.ts");
+  const receipt = await verify(job, fix, "vinlandatelier/aircastle");
   expect(receipt).toMatchObject({
     passed: false,
     commands: null,
@@ -126,20 +115,20 @@ test("unsupported scoped verification returns an honestly unavailable receipt wi
 test("scoped verification host receipt binds exactly the selected commands", async () => {
   docker.calls.length = 0;
   const path = "apps/web/src/components/shell/app-header.tsx";
-  const { job, output } = input(path);
+  const { job, fix } = input(path);
   const commands = [
     install,
     ["vp", "lint", path],
     selectedTests("src/components/shell/index.test.tsx"),
   ];
-  const receipt = await verify(job, output, "vinlandatelier/aircastle");
+  const receipt = await verify(job, fix, "vinlandatelier/aircastle");
   expect(receipt).toMatchObject({ passed: true, commands, recipe: digest(commands) });
   expect(docker.calls.map((args) => args[0])).toEqual(["build", "run", "rm"]);
 });
 test("the verification image takes its toolchain versions from the repository files", async () => {
   docker.calls.length = 0;
-  const { job, output } = input("apps/web/src/components/shell/app-header.tsx");
-  await verify(job, output, "vinlandatelier/aircastle");
+  const { job, fix } = input("apps/web/src/components/shell/app-header.tsx");
+  await verify(job, fix, "vinlandatelier/aircastle");
   const version = (file: string) => readFileSync(file, "utf8").trim();
   const catalog = JSON.parse(readFileSync("package.json", "utf8")).catalog;
   expect(docker.calls[0]).toEqual(
@@ -155,7 +144,7 @@ test("the verification image takes its toolchain versions from the repository fi
 test("each fix publishes from its own bound verification receipt", async () => {
   const supported = input("apps/web/src/components/shell/app-header.tsx");
   const edits = [edit("apps/web/src/components/shell/app-header.tsx")];
-  const receipt = await verify(supported.job, supported.output, "vinlandatelier/aircastle");
+  const receipt = await verify(supported.job, supported.fix, "vinlandatelier/aircastle");
   expect(boundVerification(supported.job, edits, receipt)).toEqual(receipt);
   expect(boundVerification(supported.job, edits, { ...receipt, passed: false })).toBeNull();
   expect(boundVerification(supported.job, edits, undefined)).toBeNull();
@@ -163,8 +152,30 @@ test("each fix publishes from its own bound verification receipt", async () => {
   expect(boundVerification(other, edits, receipt)).toBeNull();
   expect(boundVerification(supported.job, edits, { ...receipt, recipe: "forged" })).toBeNull();
   const unsupported = input("packages/core/src/value.ts");
-  const patchOnly = await verify(unsupported.job, unsupported.output, "vinlandatelier/aircastle");
+  const patchOnly = await verify(unsupported.job, unsupported.fix, "vinlandatelier/aircastle");
   expect(
     boundVerification(unsupported.job, [edit("packages/core/src/value.ts")], patchOnly),
   ).toEqual(patchOnly);
+});
+
+test("a natural fix must pass the same scoped verifier and bind to the original request", async () => {
+  const supported = input("apps/web/src/components/shell/app-header.tsx");
+  const request: Job = {
+    ...supported.job,
+    task: "request",
+    role: "reviewer",
+    instructions: "can u change this value",
+    selection: { model: "review", effort: "high" },
+    implementation: supported.job.selection,
+  };
+  const receipt = await verify(request, supported.fix, "vinlandatelier/aircastle");
+  expect(receipt.digest).toBe(digest(request));
+  expect(receipt.passed).toBe(true);
+  expect(
+    boundVerification(
+      { ...request, instructions: "Different request" },
+      [edit("apps/web/src/components/shell/app-header.tsx")],
+      receipt,
+    ),
+  ).toBeNull();
 });

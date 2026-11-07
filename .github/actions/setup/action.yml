@@ -1,5 +1,9 @@
 name: Aircastle setup
 description: Install the pinned toolchain and frozen dependencies.
+inputs:
+  cache-save:
+    description: Save the dependency cache after the job. Set false in jobs that run untrusted code.
+    default: "true"
 runs:
   using: composite
   steps:
@@ -10,6 +14,7 @@ runs:
         run-install: |
           args: ['--frozen-lockfile']
         cache: true
+        cache-save: ${{ inputs.cache-save }}
     - name: Verify pinned toolchain
       shell: bash
       run: |

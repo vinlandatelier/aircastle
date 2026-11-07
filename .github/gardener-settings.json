@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": ["Bash", "Agent", "Skill", "TodoWrite"],
+    "deny": ["WebFetch", "WebSearch", "Read(//proc/**)"]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowedDomains": ["registry.npmjs.org"],
+      "strictAllowlist": true
+    },
+    "credentials": {
+      "envVars": [
+        {
+          "name": "CLAUDE_CODE_OAUTH_TOKEN",
+          "mode": "deny"
+        }
+      ]
+    }
+  }
+}

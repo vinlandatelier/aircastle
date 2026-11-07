@@ -1,6 +1,6 @@
-import process from 'node:process'
 import { test as base, expect, type Page } from '@playwright/test'
 import type { Scenario } from './fixtures'
+import { origins } from './origins'
 
 function runtimeMessage(error: string) {
   const [firstLine = ''] = error.split(/\n|\\n/, 1)
@@ -73,10 +73,8 @@ export const test = base.extend<{ runtimeEvidence: void; expectedRuntimeErrors: 
 export { expect }
 
 export async function visit(page: Page, scenario: Scenario = 'normal', pathname = '/dash') {
-  const origin = scenario === 'normal' ? process.env.WEB_ORIGIN : process.env.WEB_FIXTURE_ORIGIN
-  if (!origin) throw new Error('Browser origin missing; use vp run test-web:e2e')
   test.info().annotations.push({ type: 'scenario', description: scenario })
-  const url = new URL(pathname, origin)
+  const url = new URL(pathname, scenario === 'normal' ? origins.normal.url : origins.fixture.url)
   if (scenario !== 'normal') url.searchParams.set('scenario', scenario)
   await page.goto(url.href)
   await expect(page.getByRole('main')).toBeVisible()

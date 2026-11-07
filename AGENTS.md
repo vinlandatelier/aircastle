@@ -44,13 +44,16 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 
 - Before editing, identify the active worktree, approved behavior, bounded outcome, and relevant checks. Resolve blocking behavior choices before writing dependent code or expectations; choose routine implementation details autonomously.
 - Keep one authoritative specification and decision record, with one writer per shared update. Worktrees must reference them rather than maintain copies. Resolve code paths in the active worktree.
-- Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists.
+- Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists. Before writing any infrastructure, check the version-matched documentation of repository tools and well-known libraries. Infrastructure includes test harnesses and runners, server lifecycle, clients, parsers, validators, retry loops, and report formats. Write custom code only for a gap that no stock option covers, and name that gap with a documentation link in the PR body.
 - Define observable behavior and relevant failure cases before implementing a feature.
 - For executable behavior changes, write or update tests first and confirm they fail for the intended reason before implementing the change.
 - Derive expected results from requirements and test through the module's public interface.
 - Keep changes focused and follow existing repository conventions.
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.
+- Fix the class, not only the instance. When you fix a defect or a review finding, add or extend the check that would have caught it, following `.agents/skills/guardrails/SKILL.md`, and show it failing on a planted violation.
+- Before you change behavior that an earlier commit chose deliberately, read its history. Keep its intent or ask the user.
+- State the reason for every exemption, such as a lint override, knip ignore, policy allowance or type cast, in the allowance's reason string, or else in the commit and PR body that add it.
 - Verify documentation and configuration changes directly; add executable tests when behavior changes.
 - Run only the checks necessary to verify the current change and its affected callers. Select the smallest relevant test files, cases, and package checks. Explain what each selected check proves before running it.
 - Do not run repository-wide suites or aggregate commands containing unrelated tests unless the user explicitly requests them. This includes `vp run check`, `vp run test`, `vp run test:all`, and `vp run test:prepared`. Completing, committing, or merging a task does not require a full-suite run.

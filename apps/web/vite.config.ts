@@ -38,13 +38,9 @@ export default defineConfig(({ mode }) => {
         include: ['src/**/*.{ts,tsx}'],
         exclude: ['src/**/*.test.{ts,tsx}', 'src/test-setup.ts', 'src/test-utils.tsx'],
         reporter: ['text', 'html', 'json', 'json-summary'],
-        reportsDirectory: process.env.WEB_COVERAGE_DIR ?? './coverage',
       },
       setupFiles: ['./src/test-setup.ts'],
     },
-    cacheDir: process.env.WEB_RUN_DIR ? `${process.env.WEB_RUN_DIR}/cache` : 'node_modules/.vite',
-    publicDir: process.env.WEB_PUBLIC_DIR ?? 'public',
-    build: { outDir: process.env.WEB_BUILD_DIR ?? 'dist' },
     resolve: { alias: [{ find: '@', replacement: source('./src') }] },
     server: {
       port: 43121,
