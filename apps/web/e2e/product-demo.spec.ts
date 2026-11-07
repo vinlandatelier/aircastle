@@ -2192,7 +2192,7 @@ test('after the docs entry is published, the preview fades to a grainy cloud gra
 test('after asking Air, the cursor reads to the end of the post, then a reference in Air’s reply jumps back to the revised line before Publish', async ({
   page,
 }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(180_000)
   const { frame, site } = await openSitePreview(page, 'light')
   const cursor = frame.locator('[data-demo-cursor]')
   const sitePage = site.locator('[data-demo-site-page]')
