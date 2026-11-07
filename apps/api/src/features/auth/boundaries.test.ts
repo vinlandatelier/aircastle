@@ -3,6 +3,7 @@ import pino from "pino";
 import type { AuthLimits } from "@aircastle/core";
 import { createApp } from "../../app.ts";
 import { createLocalAuth } from "./index.ts";
+import { dispatched } from "./runtime.ts";
 import { browserOrigin, claim, issue, start, withAuth } from "./test-support/fixture.ts";
 
 const defaults: AuthLimits = {
@@ -366,19 +367,6 @@ describe("local auth HTTP boundaries", () => {
     );
   });
 
-  const dispatched = [
-    ["GET", "/auth/state"],
-    ["GET", "/auth/session"],
-    ["GET", "/development-inbox/messages"],
-    ["POST", "/auth/setup"],
-    ["POST", "/auth/sign-in"],
-    ["POST", "/auth/confirm"],
-    ["POST", "/auth/confirm/preview"],
-    ["POST", "/auth/sign-out"],
-    ["POST", "/auth/activity"],
-    ["POST", "/auth/entry"],
-    ["POST", "/development-inbox/messages/message-id/open"],
-  ] as const;
   const forgeries = [
     { origin: "https://evil.test" },
     { origin: "null" },
@@ -387,7 +375,9 @@ describe("local auth HTTP boundaries", () => {
     { host: "localhost:43122" },
   ];
 
-  test.each(dispatched)(
+  test.each(
+    dispatched.map(({ method, path }) => [method, path.replace(":id", "message-id")] as const),
+  )(
     "%s %s rejects every disallowed Host and Origin before doing any work",
     async (method, path) => {
       await withAuth(async ({ open }) => {
@@ -409,7 +399,7 @@ describe("local auth HTTP boundaries", () => {
             if (value === "") requestHeaders.delete(name);
             else requestHeaders.set(name, value);
           const response = await server.app.request(
-            `${browserOrigin}/api${path}`,
+            `${browserOrigin}${path}`,
             {
               method,
               headers: requestHeaders,

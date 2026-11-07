@@ -23,18 +23,22 @@ export function boundedEvents(emit: (event: AuthEvent) => void, clock: () => num
   };
 }
 
-const dispatched = {
-  GET: ["/api/auth/state", "/api/auth/session", "/api/development-inbox/messages"],
-  POST: [
-    "/api/auth/setup",
-    "/api/auth/sign-in",
-    "/api/auth/confirm",
-    "/api/auth/confirm/preview",
-    "/api/auth/sign-out",
-    "/api/auth/activity",
-    "/api/auth/entry",
-  ],
-};
+const openMessageRoute = "/api/development-inbox/messages/:id/open";
+
+/** Every method and path the development runtime answers. Anything else is 404 before the Host and Origin checks. */
+export const dispatched = [
+  { method: "GET", path: "/api/auth/state" },
+  { method: "GET", path: "/api/auth/session" },
+  { method: "GET", path: "/api/development-inbox/messages" },
+  { method: "POST", path: "/api/auth/setup" },
+  { method: "POST", path: "/api/auth/sign-in" },
+  { method: "POST", path: "/api/auth/confirm" },
+  { method: "POST", path: "/api/auth/confirm/preview" },
+  { method: "POST", path: "/api/auth/sign-out" },
+  { method: "POST", path: "/api/auth/activity" },
+  { method: "POST", path: "/api/auth/entry" },
+  { method: "POST", path: openMessageRoute },
+] as const;
 
 export async function developmentAuth(
   options: Extract<LocalAuthOptions, { storage: unknown }>,
@@ -154,10 +158,9 @@ export async function developmentAuth(
         method === "POST"
           ? /^\/api\/development-inbox\/messages\/([^/]+)\/open$/.exec(path)?.[1]
           : undefined;
-      const known =
-        (method === "GET" && dispatched.GET.includes(path)) ||
-        (method === "POST" && (dispatched.POST.includes(path) || openMessage !== undefined));
-      if (!known) return authResponse({ kind: "not-found" }, 404);
+      const route = openMessage === undefined ? path : openMessageRoute;
+      if (!dispatched.some((entry) => entry.method === method && entry.path === route))
+        return authResponse({ kind: "not-found" }, 404);
       if (
         (request.headers.get("host") ?? url.host) !== origin.host ||
         (request.headers.has("origin") && request.headers.get("origin") !== origin.origin) ||
