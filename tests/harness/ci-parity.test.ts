@@ -3,6 +3,8 @@ import { expect, test } from "vite-plus/test";
 import { parse } from "yaml";
 
 interface Step {
+  id?: string;
+  if?: string;
   run?: string;
   env?: Record<string, string>;
   "continue-on-error"?: unknown;
@@ -87,6 +89,21 @@ test("CI runs package scripts in full, without narrowing arguments or ignored fa
   expect(
     [...Object.values(jobs), ...steps].filter((entry) => "continue-on-error" in entry),
   ).toEqual([]);
+  const conditionallySkipped = Object.values(jobs).flatMap((job) =>
+    (job.steps ?? []).filter(
+      (step, index, jobSteps) =>
+        step.if !== undefined &&
+        scriptsRunBy(step.run ?? "").length > 0 &&
+        !jobSteps
+          .slice(0, index)
+          .some(
+            (earlier) =>
+              earlier.id !== undefined &&
+              step.if === `\${{ !cancelled() && steps.${earlier.id}.outcome == 'success' }}`,
+          ),
+    ),
+  );
+  expect(conditionallySkipped).toEqual([]);
 });
 
 test("the required gate job needs every check job and fails unless all succeeded", () => {
@@ -102,4 +119,8 @@ test("the required gate job needs every check job and fails unless all succeeded
     (id) => id !== gateId && !reportOnlyJobs.has(id) && !needs.includes(id),
   );
   expect(ungated).toEqual([]);
+  const reportScripts = [...reportOnlyJobs.keys()].flatMap((id) =>
+    (jobs[id]?.steps ?? []).flatMap((step) => scriptsRunBy(step.run ?? "")),
+  );
+  expect(reportScripts).toEqual([]);
 });
