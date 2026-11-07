@@ -63,7 +63,10 @@ export interface AuthEntryRecord {
 
 /** Times are Unix milliseconds. Locking reads hold their locks through transaction completion. */
 export interface AuthTransaction {
-  lockSetup: () => Promise<"open" | "complete">;
+  /** Reads setup state without locking, for observation only. */
+  setupState: () => Promise<"open" | "complete">;
+  /** Locks the setup claim so link issuance and confirmation serialize against setup completion. */
+  lockSetupClaim: () => Promise<"open" | "complete">;
   completeSetup: (userId: string) => Promise<void>;
   lockEmail: (email: string) => Promise<void>;
   link: (digest: string) => Promise<AuthLinkRecord | null>;
