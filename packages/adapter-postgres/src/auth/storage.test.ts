@@ -324,13 +324,68 @@ test("a driver failure keeps its cause and SQLSTATE without its message", async 
   });
 });
 
-test("a programming error inside a transaction is not reported as a storage failure", async () => {
-  await withStore(async ({ auth }) => {
-    const bug = new TypeError("callback bug");
-    await expect(
-      auth.transaction(async () => {
-        throw bug;
-      }),
-    ).rejects.toBe(bug);
-  });
-});
+test.each([
+  ["a TypeError", () => Promise.reject(new TypeError("callback bug")), { name: "TypeError" }],
+  [
+    "a Node TypeError with an ERR_ code",
+    async () => {
+      createHash("sha256").update(JSON.parse("null"));
+    },
+    { name: "TypeError", code: "ERR_INVALID_ARG_TYPE" },
+  ],
+  [
+    "an Error with an arbitrary code",
+    () => Promise.reject(Object.assign(new Error("callback bug"), { code: "ANY_CODE" })),
+    { code: "ANY_CODE" },
+  ],
+] as const)(
+  "%s inside a transaction is not reported as a storage failure",
+  async (_, fault, raised) => {
+    await withStore(async ({ auth }) => {
+      const failure = await auth.transaction(fault).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      expect(failure).not.toBeInstanceOf(AuthStorageError);
+      expect(failure).toMatchObject(raised);
+    });
+  },
+);
+
+test.each([
+  [
+    "refused",
+    () => postgres("postgres://aircastle@127.0.0.1:1/aircastle", { max: 1, connect_timeout: 2 }),
+    "ECONNREFUSED",
+  ],
+  [
+    "ended",
+    async () => {
+      const client = postgres("postgres://aircastle@127.0.0.1:1/aircastle", { max: 1 });
+      await client.end({ timeout: 0 });
+      return client;
+    },
+    "CONNECTION_ENDED",
+  ],
+] as const)(
+  "a %s postgres.js connection is reported as unavailable with its code",
+  async (_, connect, code) => {
+    await withStore(async ({ auth }) => {
+      const client = await connect();
+      try {
+        const failure = await auth
+          .transaction(async () => {
+            await client`SELECT 1`;
+          })
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+        expect(failure).toBeInstanceOf(AuthStorageError);
+        expect(failure).toMatchObject({ kind: "unavailable", code, message: "unavailable" });
+      } finally {
+        await client.end({ timeout: 0 });
+      }
+    });
+  },
+);
