@@ -54,10 +54,11 @@ If a check blocks you, fix the code. Change the check only when it is wrong, and
 ## Add a guardrail
 
 1. Write the check at the highest layer that works. Prefer a stock rule (oxlint, knip, the compiler) over new code in the policy script.
-2. Plant a violation, run the check, and record the command and exit code. Remove the plant before you commit.
-3. Try to get past the check the way a hurried agent would: an alias, destructuring, a computed or template key, an alternate global such as `Bun.env`, a dynamic `import()`, or a broad exemption glob. Close each bypass you find and plant it again.
-4. Keep exemptions narrow and give the reason where you declare them. A policy allowance carries a reason string. A lint override names exact files, and its commit gives the reason, because `vite.config.ts` can't hold ordinary comments. A lint override replaces the rule's whole option list, so repeat the entries it must keep, as the env overrides do with `rawSql`.
-5. Name the guardrail and the planted-violation result in the PR body.
+2. Make the failure say what it protects against and how to fix it: the `message` of a lint rule, or the rule's entry in `ruleGuidance` in `check-code-policy.ts`, which the type checker requires.
+3. Plant a violation, run the check, and record the command and exit code. Remove the plant before you commit.
+4. Try to get past the check the way a hurried agent would: an alias, destructuring, a computed or template key, an alternate global such as `Bun.env`, a dynamic `import()`, or a broad exemption glob. Close each bypass you find and plant it again.
+5. Keep exemptions narrow and give the reason where you declare them. A policy allowance carries a reason string. A lint override names exact files, and its commit gives the reason, because `vite.config.ts` can't hold ordinary comments. A lint override replaces the rule's whole option list, so repeat the entries it must keep, as the env overrides do with `rawSql`.
+6. Name the guardrail and the planted-violation result in the PR body.
 
 ## Review rules
 

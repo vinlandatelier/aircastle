@@ -91,6 +91,28 @@ test("the policy command checks untracked files and preserves docstrings", () =>
   }
 });
 
+test("each policy violation says why it fails and how to fix it", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-policy-guidance-"));
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    writeFileSync(
+      join(directory, "probe.ts"),
+      "// ordinary explanation\nexport const value = 1;\n",
+    );
+    const result = spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      "probe.ts:1:1 ordinary-comment: Comments drift from the code they describe.",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("the policy command preserves vendored shadcn code and checks authored skills", () => {
   const root = resolve(import.meta.dirname, "../..");
   const directory = mkdtempSync(join(tmpdir(), "aircastle-vendor-policy-"));
@@ -274,6 +296,61 @@ test("the policy command enforces workspace import boundaries from package manif
     const cycle = run();
     expect(cycle.status).not.toBe(0);
     expect(cycle.stderr).toContain("workspace-cycle @probe/one -> @probe/two -> @probe/one");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("the policy command checks packages whose manifests have no name", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-nameless-policy-"));
+  const write = (file: string, content: string) => {
+    mkdirSync(join(directory, file, ".."), { recursive: true });
+    writeFileSync(join(directory, file), content);
+  };
+  const run = () =>
+    spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    write("package.json", JSON.stringify({ private: true, workspaces: ["packages/*"] }));
+    write("packages/fixtures/package.json", JSON.stringify({ private: true }));
+    write("packages/two/package.json", JSON.stringify({ name: "@probe/two" }));
+    write("packages/two/src/index.ts", "export const two = 2;\n");
+    write("packages/fixtures/src/index.ts", "export const fixture = 1;\n");
+    const clean = run();
+    expect(clean.stderr).toBe("");
+    expect(clean.status).toBe(0);
+
+    write("packages/fixtures/src/index.ts", 'export { two } from "../../two/src/index.ts";\n');
+    const relative = run();
+    expect(relative.status).not.toBe(0);
+    expect(relative.stderr).toContain(
+      "packages/fixtures/src/index.ts:1:21 cross-workspace-relative-import",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test.each([
+  ["an object", { packages: ["packages/*"] }],
+  ["a string", "packages/*"],
+  ["a list with a non-string entry", ["packages/*", 1]],
+])("the policy command fails when the root workspaces field is %s", (_name, workspaces) => {
+  const root = resolve(import.meta.dirname, "../..");
+  const directory = mkdtempSync(join(tmpdir(), "aircastle-workspaces-policy-"));
+  try {
+    expect(spawnSync("git", ["init", "--quiet"], { cwd: directory }).status).toBe(0);
+    writeFileSync(join(directory, "package.json"), JSON.stringify({ name: "root", workspaces }));
+    const result = spawnSync("bun", [join(root, "scripts/check-code-policy.ts"), directory], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('"workspaces" must be a list of strings');
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
