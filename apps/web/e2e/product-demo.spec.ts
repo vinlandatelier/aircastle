@@ -2155,6 +2155,14 @@ test('after the docs entry is published, the preview fades to a grainy cloud gra
       )
       if (shown > 0.3)
         expect(logo.x + logo.width / 2, 'the logo makes room').toBeLessThan(centreX - 2)
+      const reveal = await wordmark.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return { clip: style.clipPath, mask: style.maskImage }
+      })
+      expect(reveal.clip, 'no hard edge slices the letters').toBe('none')
+      expect(reveal.mask, 'the letters fade in through a soft edge').toMatch(
+        /^linear-gradient\(.*(transparent|rgba\(0, 0, 0, 0\))/,
+      )
       slidOut = true
     }
     if (shown === 1) break

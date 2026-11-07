@@ -8,6 +8,7 @@ const bladeDuration = 900
 const settleDuration = 1700
 const nameStartsAfter = bloomStartsAfter + 1200
 const nameDuration = 1000
+const nameFeather = 45
 const markSizes = { desktop: 112, phone: 64 } as const
 
 function progress(elapsed: number, duration: number) {
@@ -72,6 +73,7 @@ export function Outro({
   const named = easeInOut(progress(sinceName, nameDuration))
   const drift = easeOut(progress(elapsed, driftDuration))
   const nameShown = easeOut(progress(sinceName - nameDuration * 0.15, nameDuration * 0.85))
+  const revealEdge = named * (100 + nameFeather) - nameFeather
   return (
     <div
       data-demo-outro
@@ -91,7 +93,7 @@ export function Outro({
           data-demo-outro-wordmark
           style={{
             opacity: nameShown,
-            clipPath: `inset(0 ${(1 - named) * 100}% 0 0)`,
+            maskImage: `linear-gradient(90deg, #000 ${revealEdge}%, transparent ${revealEdge + nameFeather}%)`,
             translate: `${(1 - named) * -16}px 0`,
           }}
           className={cn(
