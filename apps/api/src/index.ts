@@ -9,6 +9,7 @@ import { cmsErrorReporter, createApp } from "./app.ts";
 import { readAuthConfig, readConfig, readDatabaseConfig } from "./config.ts";
 import { createAuthEventLogger, createLocalAuth } from "./features/auth/index.ts";
 import { createDevelopmentInbox } from "./features/development-inbox/index.ts";
+import { scalarScript } from "./docs-script.ts" with { type: "macro" };
 import { createStaticHandler } from "./static.ts";
 
 const config = readConfig();
@@ -61,6 +62,7 @@ try {
     cms,
     auth,
     maxRequestBytes: config.AIRCASTLE_MAX_REQUEST_BYTES,
+    docsScript: scalarScript(),
   });
   const serveStatic = createStaticHandler({
     root: new URL("../../web/dist/", import.meta.url),

@@ -21,11 +21,14 @@ export function createApp({
   cms,
   maxRequestBytes = 1_048_576,
   auth,
+  docsScript,
 }: {
   logger: Logger;
   cms?: ContentService;
   maxRequestBytes?: number;
   auth?: LocalAuthRuntime;
+  /** The Scalar UI bundle served at `/api/docs/scalar.js`, so the docs page loads no CDN script. */
+  docsScript?: string;
 }) {
   const ordinaryLogger = pinoLogger({
     pino: logger,
@@ -81,10 +84,11 @@ export function createApp({
     )
     .get(
       "/docs",
-      Scalar({
-        url: "/api/openapi.json",
-        pageTitle: "Aircastle API",
-        cdn: "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0/dist/browser/standalone.js",
-      }),
+      Scalar({ url: "/api/openapi.json", pageTitle: "Aircastle API", cdn: "/api/docs/scalar.js" }),
+    )
+    .get("/docs/scalar.js", (c) =>
+      docsScript === undefined
+        ? c.notFound()
+        : c.body(docsScript, 200, { "Content-Type": "text/javascript; charset=utf-8" }),
     );
 }

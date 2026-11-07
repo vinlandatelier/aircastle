@@ -2,6 +2,7 @@ import pino from "pino";
 import { hc, type InferResponseType } from "hono/client";
 import { describe, expect, expectTypeOf, test } from "vite-plus/test";
 import { createApp } from "./app.ts";
+import { scalarScript } from "./docs-script.ts";
 
 function captureLogs(level: "info" | "error" | "silent" = "info") {
   const lines: string[] = [];
@@ -142,17 +143,30 @@ describe("API documentation", () => {
     });
   });
 
-  test("serves Scalar with the local spec and a pinned UI asset", async () => {
+  test("serves Scalar with the local spec and its UI script from the same origin", async () => {
     const { logger } = captureLogs("silent");
-    const response = await createApp({ logger }).request("/api/docs");
+    const app = createApp({ logger, docsScript: "window.scalarFixture = true;" });
+    const response = await app.request("/api/docs");
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     const html = await response.text();
     expect(html).toContain("Aircastle API");
     expect(html).toContain("/api/openapi.json");
-    expect(html).toContain("https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0");
+    expect(html).toContain('<script src="/api/docs/scalar.js"></script>');
+    expect(html).not.toContain("jsdelivr");
     expect(html).not.toContain("@latest");
+    const script = await app.request("/api/docs/scalar.js");
+    expect(script.status).toBe(200);
+    expect(script.headers.get("content-type")).toContain("text/javascript");
+    expect(await script.text()).toBe("window.scalarFixture = true;");
+  });
+
+  test("the docs script is the installed Scalar 1.76.0 standalone bundle", () => {
+    const script = scalarScript();
+    expect(script).toContain("Scalar");
+    expect(script).toContain("createApiReference");
+    expect(script).toContain("1.76.0");
   });
 });
 
