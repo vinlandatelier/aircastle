@@ -221,6 +221,7 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
   let dragStart: PhoneMoment | null = null
   let dragEnd: PhoneMoment | null = null
   let backdropChecked = false
+  let researchStripBack = false
   for (
     let tick = 0;
     tick < 1800 && !(screens.at(-1) === 'posts' && screens.length > 1);
@@ -232,6 +233,18 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
       now = await readPhone(frame)
     }
     if (screens.at(-1) !== now.screen) screens.push(now.screen)
+    if (now.sheet === 'research' && !sheets.includes('research')) {
+      await page.waitForTimeout(600)
+      expect(
+        (await box(frame.locator('[data-phone-research]'))).height,
+        "Canute's status strip folds away while his chat is open",
+      ).toBeLessThan(1)
+    }
+    if (now.sheet === 'none' && sheets.at(-1) === 'research' && !researchStripBack) {
+      await page.waitForTimeout(600)
+      await expect(frame.locator('[data-phone-research]')).toBeVisible()
+      researchStripBack = true
+    }
     if (now.sheet !== 'none' && sheets.at(-1) !== now.sheet) sheets.push(now.sheet)
     if (now.touch)
       expect(
@@ -276,6 +289,7 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
   expect(sheets).toEqual(['ask', 'research', 'air'])
   expect([...taps.keys()].sort()).toEqual(Object.keys(tapTargets).sort())
   expect(backdropChecked, 'the Ask Air sheet closed in view').toBe(true)
+  expect(researchStripBack, "Canute's status strip returns when his chat closes").toBe(true)
   const [firstLine] = dragStart?.opening ?? []
   const lastLine = dragEnd?.opening.at(-1)
   if (!dragStart || !dragEnd || !firstLine || !lastLine)

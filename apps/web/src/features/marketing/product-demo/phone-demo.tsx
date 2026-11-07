@@ -278,25 +278,34 @@ function AskSheet({ frame }: { frame: Frame }) {
   )
 }
 
-function ResearchStrip({ steps }: { steps: number }) {
+function ResearchStrip({ steps, folded }: { steps: number; folded: boolean }) {
   const read = sourcesReadBy(steps)
   const done = steps >= researchLog.length
   const source = researchSources[Math.max(0, read - 1)]
   return (
     <div
-      data-phone-research
-      data-state={done ? 'done' : 'working'}
-      className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5 text-sm"
+      className={cn(
+        'grid shrink-0 transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        folded ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
+      )}
     >
-      <AgentAvatar agent={canute} size={18} />
-      <span>{canute.name}</span>
-      <span className="truncate text-muted-foreground">
-        {done
-          ? `researched ${read} sources`
-          : read === 0
-            ? 'searching…'
-            : `reading ${source?.url ?? ''}`}
-      </span>
+      <div
+        data-phone-research
+        data-state={folded ? 'folded' : done ? 'done' : 'working'}
+        className={cn('min-h-0 overflow-hidden', !folded && 'border-b')}
+      >
+        <div className="flex items-center gap-2 px-4 py-2.5 text-sm">
+          <AgentAvatar agent={canute} size={18} />
+          <span>{canute.name}</span>
+          <span className="truncate text-muted-foreground">
+            {done
+              ? `researched ${read} sources`
+              : read === 0
+                ? 'searching…'
+                : `reading ${source?.url ?? ''}`}
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -331,7 +340,7 @@ function EditorScreen({ frame }: { frame: Frame }) {
           Preview
         </span>
       </ContextBar>
-      <ResearchStrip steps={frame.researchSteps} />
+      <ResearchStrip steps={frame.researchSteps} folded={phoneSheetAt(frame) === 'research'} />
       <div className="relative min-h-0 flex-1 overflow-hidden mask-t-from-[calc(100%-1.5rem)]">
         <div
           ref={content}
