@@ -1921,6 +1921,24 @@ test('after the docs entry is published, the whole preview fades to a grainy bac
     'background-image',
     /feTurbulence/,
   )
+  const shot = (await outro.screenshot()).toString('base64')
+  const brightness = await page.evaluate(async (data) => {
+    const image = new Image()
+    image.src = `data:image/png;base64,${data}`
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('No canvas')
+    context.drawImage(image, 0, 0)
+    const pixels = context.getImageData(0, 0, image.width, image.height).data
+    let total = 0
+    for (let index = 0; index < pixels.length; index += 4)
+      total += ((pixels[index] ?? 0) + (pixels[index + 1] ?? 0) + (pixels[index + 2] ?? 0)) / 3
+    return total / (pixels.length / 4)
+  }, shot)
+  expect(brightness, 'the card is a dark background').toBeLessThan(26)
   const covered = await page.evaluate(({ x, y, width, height }) => {
     const demo = document.querySelector('[data-demo-frame]')
     demo?.removeAttribute('inert')

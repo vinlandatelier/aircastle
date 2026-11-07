@@ -17,9 +17,9 @@ export function Outro({ elapsed, opacity }: { elapsed: number; opacity: number }
     <div
       data-demo-outro
       style={{ opacity }}
-      className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#141416]"
+      className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#070708]"
     >
-      <div className={cn('absolute inset-0', styles.coverBloom)} />
+      <div className={cn('absolute inset-0 opacity-35', styles.coverBloom)} />
       <div data-demo-outro-grain className={cn('absolute inset-0', styles.coverGrain)} />
       <span
         data-demo-outro-wordmark
