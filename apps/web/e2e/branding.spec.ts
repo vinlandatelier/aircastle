@@ -71,6 +71,7 @@ test('sign-in art is the same green folds in light and dark, on an inset rounded
     await expect(greeting.locator('[data-sign-in-air]')).toBeVisible()
     const learn = art.getByRole('link', { name: 'Learn more' })
     await expect(learn).toBeVisible()
+    await expect(learn).toHaveAttribute('href', '/blog/meet-air')
     const size = (locator: import('@playwright/test').Locator) =>
       locator.evaluate((element) => parseFloat(getComputedStyle(element).fontSize))
     expect(await size(greeting), 'a big greeting').toBeGreaterThanOrEqual(72)
@@ -78,7 +79,10 @@ test('sign-in art is the same green folds in light and dark, on an inset rounded
     const [line, more] = await Promise.all([greeting.boundingBox(), learn.boundingBox()])
     if (!line || !more) throw new Error('Greeting is not laid out')
     expect(more.y, 'Learn more sits just below').toBeGreaterThanOrEqual(line.y + line.height - 1)
-    expect(more.y - (line.y + line.height)).toBeLessThan(24)
+    expect(more.y - (line.y + line.height), 'with clear room between them').toBeGreaterThanOrEqual(
+      14,
+    )
+    expect(more.y - (line.y + line.height)).toBeLessThan(32)
     expect(
       Math.abs(more.x + more.width - (line.x + line.width)),
       'and is right-aligned with the greeting',

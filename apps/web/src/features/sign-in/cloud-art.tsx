@@ -22,7 +22,7 @@ export function CloudArt() {
         Home
       </Link>
       <div className="relative flex h-full items-center justify-center">
-        <div className="flex flex-col items-end gap-2 text-white [text-shadow:0_1px_16px_rgb(10_60_60/0.25)]">
+        <div className="flex flex-col items-end gap-5 text-white [text-shadow:0_1px_16px_rgb(10_60_60/0.25)]">
           <p
             data-sign-in-greeting
             className="flex items-center gap-[0.25em] text-[5rem] leading-none font-[300] tracking-[-0.03em]"
@@ -32,7 +32,7 @@ export function CloudArt() {
             Air
           </p>
           <a
-            href="/#product-demo"
+            href="/blog/meet-air"
             className="group inline-flex items-center gap-1.5 rounded-md text-2xl text-white/85 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-solid"
           >
             Learn more
