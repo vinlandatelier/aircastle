@@ -41,3 +41,42 @@ test('sign-in favicon follows live system theme changes', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/brand/favicon-dark.svg')
 })
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`sign-in art is a five-armed Gale vortex that ${reducedMotion === 'reduce' ? 'holds still' : 'turns clockwise, faster near the centre'}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion })
+    await page.goto('/sign-in')
+    await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
+    const vortex = page.locator('[data-sign-in-vortex]')
+    await expect(vortex).toBeVisible()
+    await expect(vortex).toHaveAttribute('aria-hidden', 'true')
+    const rings = vortex.locator('[data-vortex-ring]')
+    expect(await rings.count()).toBeGreaterThanOrEqual(8)
+    for (const ring of await rings.all())
+      await expect(ring.locator('[data-vortex-arm]')).toHaveCount(5)
+
+    const turns = await rings.evaluateAll((elements) =>
+      elements.map((element) => {
+        const [spin] = element.getAnimations()
+        if (!spin) return null
+        spin.pause()
+        spin.currentTime = 2000
+        const { a, b } = new DOMMatrix(getComputedStyle(element).transform)
+        return (Math.atan2(b, a) * 180) / Math.PI
+      }),
+    )
+    if (reducedMotion === 'reduce') {
+      expect(turns.every((turn) => turn === null)).toBe(true)
+      return
+    }
+    expect(
+      turns.every((turn) => turn !== null && turn > 0),
+      'every ring turns clockwise',
+    ).toBe(true)
+    const inner = turns[0] ?? 0
+    const outer = turns.at(-1) ?? 0
+    expect(inner, 'the centre turns faster than the edge').toBeGreaterThan(outer)
+  })
+}
