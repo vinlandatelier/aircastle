@@ -17,7 +17,9 @@ const cursorTravelDuration = 1400
 const hoverDuration = 1500
 const clickDuration = 220
 const editorOpensAfterClick = 180
-const restAfterEditor = 1800
+const restAfterEditor = 1400
+const outroFadeOut = 900
+const outroFadeIn = 900
 const rowsReachedAfter = 420
 const agentRowReachedAfter = 940
 const rowsLeftAfter = 980
@@ -121,6 +123,8 @@ export type Frame = {
   socialImage: CoverState
   previewElapsed: number | null
   confetti: { elapsed: number; entry: PublishedEntry } | null
+  outroElapsed: number | null
+  outroOpacity: number
 }
 
 /** The still frame shown when motion is reduced. */
@@ -153,6 +157,8 @@ export const stillFrame: Frame = {
   socialImage: 'idle',
   previewElapsed: null,
   confetti: null,
+  outroElapsed: null,
+  outroOpacity: 0,
 }
 
 function chipsArrivedEvery(sinceFirst: number, interval: number, total: number) {
@@ -192,6 +198,7 @@ const editorClosesAt = editorOpensAt + editorDuration
 export const loopDuration = editorClosesAt + restAfterEditor
 
 const askAt = editorOpensAt + previewClickEndsAfterEditor
+const outroStartsAt = askAt + askTiming.outroStarts
 
 const cursorMoves: readonly {
   at: number
@@ -266,7 +273,7 @@ const cursorMoves: readonly {
     to: 'docs-publish',
     duration: askTiming.docsPublishReached - askTiming.docsPublishMoveStarts,
   },
-  { at: editorClosesAt, from: 'docs-publish', to: 'rest' },
+  { at: editorClosesAt, from: 'docs-publish', to: 'rest', duration: 200 },
 ]
 
 function motionProgress(elapsed: number, duration: number) {
@@ -382,7 +389,7 @@ export function frameAt(elapsed: number): Frame {
     dialog,
     typed: typedAt(elapsed),
     sendPressed: elapsed >= sendAt && elapsed < dialogClosesAt,
-    agentRow: elapsed >= dialogClosesAt,
+    agentRow: elapsed >= dialogClosesAt && elapsed < editorClosesAt,
     cursorShape:
       askShape ??
       ((elapsed >= cursorShownAt + rowsReachedAfter && elapsed < clickEndsAt) ||
@@ -436,6 +443,14 @@ export function frameAt(elapsed: number): Frame {
         : null,
     seoElapsed: inEditor ? sinceEditor - seoStartsAfterEditor : null,
     socialImage: socialImageAt(sinceEditor, inEditor),
+    outroElapsed: elapsed >= outroStartsAt ? elapsed - outroStartsAt : null,
+    outroOpacity:
+      elapsed >= outroStartsAt
+        ? Math.min(
+            motionProgress(elapsed - outroStartsAt, outroFadeIn),
+            Math.max(0, Math.min(1, (loopDuration - elapsed) / outroFadeOut)),
+          )
+        : 0,
     confetti:
       inEditor && sinceEditor >= previewClickEndsAfterEditor
         ? confettiAt(sinceEditor - previewClickEndsAfterEditor)

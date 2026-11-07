@@ -68,6 +68,8 @@ const docsReadEnds = (docsScrollBursts.at(-1)?.at ?? docsReadReached) + docsScro
 const docsPublishMoveStarts = docsReadEnds + 300
 const docsPublishReached = docsPublishMoveStarts + 800
 const docsPublishClicked = docsPublishReached + 250
+const outroStarts = docsPublishClicked + 1500
+const outroHold = 4800
 
 /** When each beat of the select-to-prompt scene happens, in milliseconds after the site preview opens. */
 export const askTiming = {
@@ -107,7 +109,8 @@ export const askTiming = {
   docsPublishMoveStarts,
   docsPublishReached,
   docsPublishClicked,
-  ends: docsPublishClicked + confettiDuration + 600,
+  outroStarts,
+  ends: outroStarts + outroHold,
 } as const
 
 const clickDuration = 220

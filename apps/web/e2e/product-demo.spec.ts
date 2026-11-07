@@ -1860,6 +1860,104 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
   await expect(status).toHaveText('Published')
 })
 
+test('after the docs entry is published, the whole preview fades to a grainy background and Aircastle appears in the centre, then the loop starts again', async ({
+  page,
+}) => {
+  test.setTimeout(150_000)
+  const { frame } = await openSitePreview(page, 'light')
+  const cursor = frame.locator('[data-demo-cursor]')
+  const outro = frame.locator('[data-demo-outro]')
+  const wordmark = outro.locator('[data-demo-outro-wordmark]')
+  const box = async (locator: import('@playwright/test').Locator) => {
+    const value = await locator.boundingBox()
+    if (!value) throw new Error('Element is not laid out')
+    return value
+  }
+  const opacityOf = (locator: import('@playwright/test').Locator) =>
+    locator.evaluate((element) => Number(getComputedStyle(element).opacity))
+
+  await page.clock.runFor(story(14000))
+  for (
+    let tick = 0;
+    tick < 200 && (await cursor.getAttribute('data-target')) !== 'docs-publish';
+    tick += 1
+  )
+    await page.clock.runFor(story(200))
+  for (
+    let tick = 0;
+    tick < 60 && (await cursor.getAttribute('data-state')) !== 'clicking';
+    tick += 1
+  )
+    await page.clock.runFor(story(50))
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  await expect(outro).toHaveCount(0)
+
+  for (let tick = 0; tick < 80 && (await outro.count()) === 0; tick += 1)
+    await page.clock.runFor(story(50))
+  await page.clock.runFor(story(150))
+  const fadingIn = await opacityOf(outro)
+  expect(fadingIn).toBeGreaterThan(0)
+  expect(fadingIn).toBeLessThan(1)
+
+  await page.clock.runFor(story(1000))
+  await expect.poll(() => opacityOf(outro)).toBe(1)
+  const frameBox = await box(frame)
+  const outroBox = await box(outro)
+  expect(outroBox).toEqual(frameBox)
+  await expect(outro.locator('[data-demo-outro-grain]')).toHaveCSS(
+    'background-image',
+    /feTurbulence/,
+  )
+  const covered = await page.evaluate(({ x, y, width, height }) => {
+    const demo = document.querySelector('[data-demo-frame]')
+    demo?.removeAttribute('inert')
+    const onTop = [
+      [0.03, 0.03],
+      [0.5, 0.2],
+      [0.85, 0.12],
+      [0.2, 0.8],
+      [0.95, 0.95],
+    ].every(([fx, fy]) =>
+      Boolean(
+        document
+          .elementFromPoint(x + width * (fx ?? 0), y + height * (fy ?? 0))
+          ?.closest('[data-demo-outro]'),
+      ),
+    )
+    demo?.setAttribute('inert', '')
+    return onTop
+  }, frameBox)
+  expect(covered).toBe(true)
+
+  await expect(wordmark).toHaveText('Aircastle')
+  const letters = wordmark.locator('[data-demo-outro-letter]')
+  await expect(letters).toHaveCount('Aircastle'.length)
+  const firstLetter = await opacityOf(letters.first())
+  const lastLetter = await opacityOf(letters.last())
+  expect(firstLetter).toBeGreaterThan(lastLetter)
+  await page.clock.runFor(story(1500))
+  for (const letter of await letters.all()) expect(await opacityOf(letter)).toBe(1)
+  const mark = await box(wordmark)
+  expect(Math.abs(mark.x + mark.width / 2 - (frameBox.x + frameBox.width / 2))).toBeLessThan(2)
+  expect(Math.abs(mark.y + mark.height / 2 - (frameBox.y + frameBox.height / 2))).toBeLessThan(2)
+  const colour = await wordmark.evaluate((element) => getComputedStyle(element).color)
+  expect(colour).toBe('rgb(255, 255, 255)')
+
+  let fadedOut = false
+  for (let tick = 0; tick < 200 && (await outro.count()) > 0; tick += 1) {
+    const opacity = await opacityOf(outro).catch(() => 1)
+    if (opacity < 1 && opacity > 0) {
+      fadedOut = true
+      await expect(frame.locator('[data-demo-table]')).toHaveAttribute('data-state', 'shown')
+      await expect(frame.locator('[data-demo-row="agent"]')).toHaveAttribute('data-state', 'hidden')
+    }
+    await page.clock.runFor(story(100))
+  }
+  expect(fadedOut).toBe(true)
+  await expect(outro).toHaveCount(0)
+  await expect(frame.locator('[data-demo-table]')).toHaveAttribute('data-state', 'shown')
+})
+
 test('after asking Air, the cursor reads to the end of the post, then a reference in Air’s reply jumps back to the revised line before Publish', async ({
   page,
 }) => {

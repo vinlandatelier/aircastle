@@ -28,6 +28,7 @@ import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
 import { Confetti } from './confetti'
 import { NotificationsBell } from './notifications'
+import { Outro } from './outro'
 import {
   notificationPreviewPressedAt,
   notificationsOpenAt,
@@ -722,6 +723,9 @@ export function ProductDemo() {
             progress={frame.cursorProgress}
             curve={frame.cursorBend}
           />
+          {frame.outroElapsed !== null && (
+            <Outro elapsed={frame.outroElapsed} opacity={frame.outroOpacity} />
+          )}
         </div>
       </div>
     </section>
