@@ -30,7 +30,7 @@ export function RotatingWord({
   useLayoutEffect(() => {
     const measure = () => setWidth(wordRef.current?.offsetWidth)
     measure()
-    void document.fonts.ready.then(measure)
+    void document.fonts?.ready.then(measure)
   }, [index])
 
   return (
