@@ -16,7 +16,9 @@ This test contract applies to routes relative to `/api`. It implements the statu
 | GET /development-inbox/messages | 200 `{kind:"ok",value:[...]}`, no-store | 404 disabled |
 | POST /development-inbox/messages/:id/open | 200 `{kind:"ok",value:...}`, no-store | 404 disabled |
 
-Disabled mutations and inbox endpoints return 404. Unlisted methods and raw library paths return 404. Requests with disallowed Host or Origin return 403. Missing trusted transport peer never falls back to forwarded headers. Confirmation responses use `Referrer-Policy: no-referrer`.
+Disabled mutations and inbox endpoints return 404. Unlisted methods and paths return 404. Requests with disallowed Host or Origin return 403. Missing trusted transport peer never falls back to forwarded headers. Auth and inbox responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. Bodies are read as JSON whatever their `Content-Type`; an unreadable body is missing input and gets the operation's contracted failure.
+
+The session cookie is `aircastle_session_<port>`, where the port comes from the configured browser origin. Its value is a 32-byte random token signed with the namespace's persisted secret; storage holds only the token's SHA-256. It is HttpOnly, SameSite=Lax, `Path=/`, host-only, without Secure, with a 14-day Max-Age that renewal resets.
 
 `invalid-link` and `superseded-link` include `next:"setup"|"sign-in"` according to permanent setup state. Expired and consumed links are invalid. A superseded link is distinct only while unexpired. An otherwise valid losing setup claim returns setup-complete.
 

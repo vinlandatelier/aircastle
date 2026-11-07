@@ -53,6 +53,9 @@ for (const [method, path] of [
   ["POST", "/auth/setup/"],
   ["POST", "/auth/%73ign-up/email"],
   ["GET", "/auth/confirm"],
+  ["POST", "/auth/aircastle/confirm"],
+  ["GET", "/auth/aircastle/session"],
+  ["POST", "/auth/aircastle/sign-out"],
 ] as const) {
   test(`unlisted library route ${method} ${path} is unavailable`, async () => {
     await withAuth(async ({ open }) => {

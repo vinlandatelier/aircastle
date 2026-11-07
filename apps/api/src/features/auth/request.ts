@@ -1,7 +1,11 @@
 import { type } from "arktype";
 import { authSetupInput, authSignInInput } from "@aircastle/contracts";
 import type { ProtectedDestination } from "@aircastle/core";
-import type { AccountInput, LinkInput } from "./credentials.ts";
+
+export type LinkInput = { purpose: "setup" | "sign-in"; token: string };
+export type AccountInput =
+  | { purpose: "setup"; name: string; email: string; returnTo: ProtectedDestination | null }
+  | { purpose: "sign-in"; email: string; returnTo: ProtectedDestination | null };
 
 const workspaceId = type("string.uuid");
 const destination = type
@@ -80,8 +84,12 @@ export async function jsonBody(request: Request): Promise<unknown> {
   }
 }
 
+/** Auth and inbox responses carry credentials or links, so they are never cached or referred. */
 export function authResponse(value: unknown, status = 200, headers: Record<string, string> = {}) {
-  return Response.json(value, { status, headers: { "Cache-Control": "no-store", ...headers } });
+  return Response.json(value, {
+    status,
+    headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", ...headers },
+  });
 }
 
 export const ok = (value: unknown) => ({ kind: "ok" as const, value });

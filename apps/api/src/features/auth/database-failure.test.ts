@@ -41,8 +41,8 @@ test("real session INSERT trigger rolls back claim, user and consumption without
     expect(await sql`SELECT id FROM ${sql(namespace)}.auth_users`).toHaveLength(0);
     expect(await sql`SELECT id FROM ${sql(namespace)}.auth_sessions`).toHaveLength(0);
     const other = await open();
-    expect(await other.storage.transaction((tx) => tx.lockSetup())).toBe("open");
-    expect(await server.storage.transaction((tx) => tx.lockSetup())).toBe("open");
+    expect(await other.storage.transaction((tx) => tx.lockSetupClaim())).toBe("open");
+    expect(await server.storage.transaction((tx) => tx.lockSetupClaim())).toBe("open");
     await sql`DROP TRIGGER fixture_session_fault ON ${sql(namespace)}.auth_sessions`;
     expect(
       (await server.request("/auth/confirm", { purpose: "setup", token: link.token })).status,
