@@ -64,6 +64,20 @@ function notRunByCi(script: string): string[] {
   return parts.flatMap(scriptsRunBy).flatMap(notRunByCi);
 }
 
+/** Whether a step's condition can only skip it after an earlier step in its job failed. */
+function runsUnlessEarlierStepsFail(jobSteps: readonly Step[], index: number): boolean {
+  const condition = jobSteps[index]?.if;
+  if (condition === undefined || condition === "${{ !cancelled() }}") return true;
+  const earlier = jobSteps
+    .slice(0, index)
+    .findIndex(
+      (step) =>
+        step.id !== undefined &&
+        condition === `\${{ !cancelled() && steps.${step.id}.outcome == 'success' }}`,
+    );
+  return earlier !== -1 && runsUnlessEarlierStepsFail(jobSteps, earlier);
+}
+
 test("every package script that CI runs is part of vp run check", () => {
   expect(ciScripts.size).toBeGreaterThan(0);
   const checked = reachableFrom("check");
@@ -92,15 +106,7 @@ test("CI runs package scripts in full, without narrowing arguments or ignored fa
   const conditionallySkipped = Object.values(jobs).flatMap((job) =>
     (job.steps ?? []).filter(
       (step, index, jobSteps) =>
-        step.if !== undefined &&
-        scriptsRunBy(step.run ?? "").length > 0 &&
-        !jobSteps
-          .slice(0, index)
-          .some(
-            (earlier) =>
-              earlier.id !== undefined &&
-              step.if === `\${{ !cancelled() && steps.${earlier.id}.outcome == 'success' }}`,
-          ),
+        scriptsRunBy(step.run ?? "").length > 0 && !runsUnlessEarlierStepsFail(jobSteps, index),
     ),
   );
   expect(conditionallySkipped).toEqual([]);
