@@ -103,7 +103,7 @@ describe('Confirmation display over HTTP doubles, without authentication proof',
       'GET /api/auth/session': () =>
         authenticated ? ok(session) : failure('unauthenticated', 401),
       'POST /api/auth/activity': () => ok(session),
-      'POST /api/auth/entry': () => ok({ destination: { kind: 'create-workspace' } }),
+      'POST /api/auth/entry': () => ok({ destination: { kind: 'create-workspace' }, session }),
     })
     const { router, user } = await mountAuth('/setup?token=display-token', http)
     const button = await screen.findByRole('button', { name: 'Continue' })

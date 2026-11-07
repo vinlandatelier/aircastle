@@ -44,6 +44,7 @@ const displayOnlyFetch: typeof globalThis.fetch = async (input, init) => {
     return Response.json({
       kind: 'ok',
       value: {
+        session,
         destination:
           entry.kind === 'visit'
             ? entry.destination

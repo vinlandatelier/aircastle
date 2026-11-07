@@ -16,7 +16,7 @@ function authenticatedHttp(destination: object = { kind: 'workspaces' }) {
     'GET /api/auth/state': () => ok({ kind: 'authenticated', session }),
     'GET /api/auth/session': () => ok(session),
     'POST /api/auth/activity': () => ok(session),
-    'POST /api/auth/entry': () => ok({ destination }),
+    'POST /api/auth/entry': () => ok({ destination, session }),
   })
 }
 
@@ -77,7 +77,7 @@ describe('Session routing over display-only HTTP doubles', () => {
       'GET /api/auth/state': () => pending.promise,
       'GET /api/auth/session': () => ok(session),
       'POST /api/auth/activity': () => ok(session),
-      'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' } }),
+      'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' }, session }),
     })
     const { user } = await mountAuth(protectedPath, delayed)
 
@@ -161,7 +161,10 @@ describe('Session routing over display-only HTTP doubles', () => {
       'POST /api/auth/activity': () => ok(session),
       'POST /api/auth/entry': () => {
         entries += 1
-        return ok({ destination: { kind: entries === 1 ? 'create-workspace' : 'workspaces' } })
+        return ok({
+          destination: { kind: entries === 1 ? 'create-workspace' : 'workspaces' },
+          session,
+        })
       },
     })
     const { router, user } = await mountAuth('/dash', http)
@@ -194,7 +197,7 @@ describe('Session routing over display-only HTTP doubles', () => {
         ok(signedIn ? { kind: 'authenticated', session } : { kind: 'signed-out' }),
       'GET /api/auth/session': () => (signedIn ? ok(session) : failure('unauthenticated', 401)),
       'POST /api/auth/activity': () => (signedIn ? ok(session) : failure('unauthenticated', 401)),
-      'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' } }),
+      'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' }, session }),
       'POST /api/auth/sign-out': () => signingOut.promise,
     })
     const { router, user } = await mountAuth(protectedPath, transport)
@@ -210,7 +213,7 @@ describe('Session routing over display-only HTTP doubles', () => {
     expectNoShell()
   })
 
-  it('[auth:R7] foreground navigation sends activity and observes subsequent session loss', async () => {
+  it('[auth:R7] foreground navigation renews the session and observes subsequent session loss', async () => {
     let active = true
     const http = displayHttp({
       'GET /api/auth/state': () =>
@@ -218,21 +221,92 @@ describe('Session routing over display-only HTTP doubles', () => {
       'GET /api/auth/session': () => (active ? ok(session) : failure('unauthenticated', 401)),
       'POST /api/auth/activity': () => (active ? ok(session) : failure('unauthenticated', 401)),
       'POST /api/auth/entry': () =>
-        active ? ok({ destination: { kind: 'workspaces' } }) : failure('unauthenticated', 401),
+        active
+          ? ok({ destination: { kind: 'workspaces' }, session })
+          : failure('unauthenticated', 401),
     })
+    const renewals = () => http.calls('/auth/activity').length + http.calls('/auth/entry').length
     const { history, router } = await mountAuth(protectedPath, http)
     await screen.findByRole('button', { name: 'Open account menu' })
-    await waitFor(() => expect(http.calls('/auth/activity').length).toBeGreaterThan(0))
-    const initialActivity = http.calls('/auth/activity').length
+    await waitFor(() => expect(renewals()).toBeGreaterThan(0))
+    const initialRenewals = renewals()
     await act(async () => history.push('/dash/workspaces'))
     expect(await screen.findByRole('heading', { name: 'Workspaces' })).toBeTruthy()
-    await waitFor(() =>
-      expect(http.calls('/auth/activity').length).toBeGreaterThan(initialActivity),
-    )
+    await waitFor(() => expect(renewals()).toBeGreaterThan(initialRenewals))
     active = false
     await act(async () => history.push(protectedPath))
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy()
     expect(router.state.location.pathname).toBe('/sign-in')
     expectNoShell()
+  })
+})
+
+describe('Auth calls per navigation', () => {
+  const workspace = '11111111-1111-4111-8111-111111111111'
+  const renewed = { ...session, user: { ...session.user, name: 'Renewed Name' } }
+  function counted(access: 'member' | 'outsider' = 'member') {
+    return displayHttp({
+      'GET /api/auth/state': () => ok({ kind: 'authenticated', session }),
+      'GET /api/auth/session': () => ok(session),
+      'POST /api/auth/activity': () => ok(renewed),
+      'POST /api/auth/entry': async (request) => {
+        const body = await request.json()
+        if (
+          body.kind === 'visit' &&
+          body.destination.kind !== 'workspaces' &&
+          access === 'outsider'
+        )
+          return failure('forbidden', 403)
+        return ok({
+          destination: body.kind === 'visit' ? body.destination : { kind: 'workspaces' },
+          session: renewed,
+        })
+      },
+    })
+  }
+  const sent = (http: ReturnType<typeof displayHttp>) =>
+    http.requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)
+
+  it.each([
+    ['/dash/workspaces', 'Workspaces', ['GET /api/auth/state', 'POST /api/auth/entry']],
+    [
+      `/dash/workspaces/${workspace}/projects`,
+      'Projects',
+      ['GET /api/auth/state', 'POST /api/auth/entry'],
+    ],
+    [
+      '/dash/workspaces/new',
+      'Create a workspace',
+      ['GET /api/auth/state', 'POST /api/auth/activity'],
+    ],
+    ['/dash', 'Workspaces', ['GET /api/auth/state', 'POST /api/auth/entry']],
+  ] as const)('%s renews once in at most two auth calls', async (path, title, calls) => {
+    const http = counted()
+    await mountAuth(path, http)
+
+    expect(await screen.findByRole('heading', { name: title })).toBeTruthy()
+    expect(sent(http)).toEqual(calls)
+  })
+
+  it('a denied visit asks once per hop and never reads the session separately', async () => {
+    const http = counted('outsider')
+    const { router } = await mountAuth(`/dash/workspaces/${workspace}/projects`, http)
+
+    expect(await screen.findByRole('heading', { name: 'Workspaces' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/dash/workspaces')
+    expect(sent(http)).toEqual([
+      'GET /api/auth/state',
+      'POST /api/auth/entry',
+      'POST /api/auth/entry',
+    ])
+  })
+
+  it('renders the account from the renewing call, not the earlier state read', async () => {
+    const { user } = await mountAuth(protectedPath, counted())
+    await user.click(await screen.findByRole('button', { name: 'Open account menu' }))
+
+    expect(
+      within(await screen.findByRole('menu')).getByText('Renewed Name', { exact: true }),
+    ).toBeTruthy()
   })
 })
