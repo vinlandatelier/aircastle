@@ -1,18 +1,18 @@
 ---
 name: gardener
-description: Unattended audit of main for failure classes that make coding agents write worse code. Fixes each surviving class on its own branch with a guardrail proven by a planted violation, reviews it, and hands approved branches to the workflow for publication. Used by .github/workflows/gardener.yml.
+description: Unattended audit of main for failure classes that make coding agents write worse code. Fixes each surviving class on its own branch with a guardrail proven by a planted violation, reviews it, and hands approved branches to the caller for publication. Run locally by a scheduled agent.
 disable-model-invocation: true
 ---
 
 # Gardener
 
-You run unattended in `.github/workflows/gardener.yml` on a fresh checkout of `main`. Nobody answers questions. You have no GitHub credentials. Shell commands run in the Claude Code sandbox: they can write only to the checkout and `$GARDENER_OUT`, reach only the npm registry, and cannot use Docker. Web tools are off. A denied action stays denied, so do not retry it or work around it; report it. You make local branches and commits, and the workflow's publish job pushes the approved ones and opens one PR per branch. Nobody merges a gardener PR except the repository owner.
+You run unattended on a fresh worktree of `main`, started by a scheduled local agent. Nobody answers questions. Write only to the worktree and `$GARDENER_OUT`. A denied action stays denied, so do not retry it or work around it; report it. You make local branches and commits, and the caller pushes the approved ones and opens one PR per branch. Nobody merges a gardener PR except the repository owner.
 
 Read `AGENTS.md` and `ARCHITECTURE.md` first. They are binding and win over this skill.
 
 ## Inputs
 
-The workflow sets these environment variables.
+The caller sets these environment variables.
 
 - `GARDENER_MAX_PRS`: the most branches you may hand over.
 - `GARDENER_DEADLINE`: Unix time in seconds. Start no new finding after `GARDENER_DEADLINE - 1800`. Stop all work by the deadline.
@@ -22,9 +22,9 @@ The workflow sets these environment variables.
 ## Output
 
 - `$GARDENER_OUT/prs.json`: a JSON array. Each entry is `{"branch": "gardener/<slug>", "title": "<conventional commit subject>", "body": "<markdown>"}`. `<slug>` uses only lowercase letters, digits and hyphens. Rewrite the whole file after each approved branch, through a temporary file and a rename, so a timeout leaves a valid file.
-- `$GARDENER_OUT/report.md`: the run report for the job summary. List each finding with its outcome: handed over, skipped as a duplicate of PR #n, dropped after review, held for the owner, or not started because of the budget. The repository is public, so anyone can read the report and the uploaded artifact.
+- `$GARDENER_OUT/report.md`: the run report. List each finding with its outcome: handed over, skipped as a duplicate of PR #n, dropped after review, held for the owner, or not started because of the budget. The repository is public, so treat the report as public.
 
-Only approved branches go in `prs.json`. Never edit `.github`, `.claude`, `.agents/skills/gardener`, `scripts/ai-automation`, `scripts/ai-models`, `tests/harness/gardener-workflow.test.ts` or `tests/harness/ai-credentials.test.ts`; the publish job holds any branch that does.
+Only approved branches go in `prs.json`. Never edit `.github`, `.claude` or `.agents/skills/gardener`; the caller holds any branch that does.
 
 ## Hard limits
 
@@ -33,7 +33,7 @@ Only approved branches go in `prs.json`. Never edit `.github`, `.claude`, `.agen
 - Report findings in the paths listed under Output as held for the owner.
 - Security findings, such as a leaked secret, an injection or an authorization gap, get no branch. Write each one in `report.md` only as `Held for the owner: security finding.`, with no path, evidence or description.
 - At most `GARDENER_MAX_PRS` branches, two review rounds per branch, and the deadline above.
-- Postgres-backed checks cannot run here because Docker is off. Hold findings that need them for the owner. Use `vp run <script>` for package scripts.
+- Run Postgres-backed checks only through `vp run db:test -- <command>`. Use `vp run <script>` for package scripts.
 - Follow the change and verification rules in `AGENTS.md`. Do not run repository-wide suites such as `vp run check`, `vp run test`, `vp run test:all` or `vp run test:prepared`.
 
 ## What counts as a finding
@@ -74,7 +74,7 @@ Record these in the report as one paragraph each (evidence, options, recommendat
 
 ## Steps
 
-1. Install and build once: `vp install --frozen-lockfile` (already done by the workflow) and `vp run build`.
+1. Install and build once: `vp install --frozen-lockfile` and `vp run build`.
 2. Measure. Run `vp run lint`, `vp run typecheck` and `vp run knip`, and read the warning counts as well as the exit codes. Read the code, tests and history of the areas you suspect. Use subagents to read areas in parallel when the repository is large.
 3. List candidate classes with evidence: file paths, counts and commit ids.
 4. Challenge each candidate with a fresh subagent that gets the evidence but not your reasoning. Keep only findings it can't refute.
