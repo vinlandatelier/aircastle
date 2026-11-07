@@ -483,6 +483,86 @@ test.describe('forbidden destinations', () => {
   })
 })
 
+test.describe('protected path variants', () => {
+  test.use({ expectedHttpErrors: [...fixtureHttpErrors, '/api/auth/entry'] })
+
+  function variants(workspaceId: string, projectId: string) {
+    return [
+      `/dash/workspaces/${workspaceId}/projects/`,
+      `/dash/workspaces/${workspaceId}/PROJECTS`,
+      `/DASH/workspaces/${workspaceId}/projects`,
+      `/Dash/workspaces/${workspaceId}/projects/${projectId}/collections`,
+      '/dash/workspaces/not-a-uuid/projects',
+      `/dash/workspaces/${workspaceId}/projects/${projectId}/tasks/`,
+    ]
+  }
+
+  async function recordMounts(page: Page) {
+    await page.addInitScript(() => {
+      const seen = { projects: false, shell: false }
+      Object.assign(window, { protectedMounts: seen })
+      new MutationObserver(() => {
+        for (const title of document.querySelectorAll('h1'))
+          if (title.textContent === 'Projects') seen.projects = true
+        if (document.querySelector('nav[aria-label="Main navigation"]')) seen.shell = true
+      }).observe(document, { childList: true, subtree: true, characterData: true })
+    })
+  }
+
+  async function protectedMounts(page: Page) {
+    return page.evaluate(() => Reflect.get(window, 'protectedMounts'))
+  }
+
+  test('B33 signed-out visits to protected path variants go to sign-in without mounting the page', async ({
+    page,
+    authService,
+  }) => {
+    const project = await authService.provisionProject()
+    const email = uniqueEmail('variants-signed-out')
+    await completeSetupAndSkip(page, email)
+    await signOut(page, 'Alex', email)
+    await recordMounts(page)
+    for (const path of variants(project.workspaceId, project.projectId)) {
+      await page.goto(path)
+      await expectSignIn(page)
+      expect(await protectedMounts(page), path).toEqual({ projects: false, shell: false })
+    }
+  })
+
+  test('B34 signed-in visits without access to protected path variants are denied without mounting the page', async ({
+    page,
+    authService,
+  }) => {
+    const project = await authService.provisionProject()
+    await completeSetupAndSkip(page, uniqueEmail('variants-outsider'))
+    await recordMounts(page)
+    for (const path of variants(project.workspaceId, project.projectId)) {
+      await page.goto(path)
+      await expect(page).toHaveURL(`${origin(page)}/dash/workspaces`)
+      await expect(heading(page, 'Workspaces')).toBeVisible()
+      expect(await protectedMounts(page), path).toEqual({ projects: false, shell: false })
+    }
+  })
+
+  test('B35 a member reaches the canonical projects and project pages', async ({
+    page,
+    authService,
+  }) => {
+    const project = await authService.provisionProject()
+    const email = uniqueEmail('variants-member')
+    await completeSetupAndSkip(page, email)
+    await authService.grantWorkspace(email, project.workspaceId)
+    const projects = `/dash/workspaces/${project.workspaceId}/projects`
+    await page.goto(projects)
+    await expect(page).toHaveURL(`${origin(page)}${projects}`)
+    await expect(heading(page, 'Projects')).toBeVisible()
+    const collections = `${projects}/${project.projectId}/collections`
+    await page.goto(collections)
+    await expect(page).toHaveURL(`${origin(page)}${collections}`)
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+  })
+})
+
 test('B37 a superseded link that has expired shows the generic error and offers sign-in', async ({
   page,
   authService,
