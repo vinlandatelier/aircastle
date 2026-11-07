@@ -4,6 +4,7 @@ import { readConfig } from "./config.ts";
 describe("API configuration", () => {
   test("supplies development defaults without requiring a database", () => {
     expect(readConfig({})).toEqual({
+      AIRCASTLE_HOST: "127.0.0.1",
       AIRCASTLE_PORT: 43122,
       AIRCASTLE_LOG_LEVEL: "info",
       AIRCASTLE_MAX_REQUEST_BYTES: 1_048_576,
@@ -19,6 +20,7 @@ describe("API configuration", () => {
     });
 
     expect(config).toEqual({
+      AIRCASTLE_HOST: "127.0.0.1",
       AIRCASTLE_PORT: 43130,
       AIRCASTLE_LOG_LEVEL: "warn",
       AIRCASTLE_MAX_REQUEST_BYTES: 2048,
@@ -29,6 +31,7 @@ describe("API configuration", () => {
 
   test("ignores generic environment names and leaves runtime mode to the runtime", () => {
     expect(readConfig({ PORT: "45000", LOG_LEVEL: "silent", NODE_ENV: "custom" })).toEqual({
+      AIRCASTLE_HOST: "127.0.0.1",
       AIRCASTLE_PORT: 43122,
       AIRCASTLE_LOG_LEVEL: "info",
       AIRCASTLE_MAX_REQUEST_BYTES: 1_048_576,
@@ -58,6 +61,20 @@ describe("API configuration", () => {
       expect(() => readConfig({ AIRCASTLE_MAX_REQUEST_BYTES: limit })).toThrow(
         "AIRCASTLE_MAX_REQUEST_BYTES",
       );
+    },
+  );
+
+  test.each(["127.0.0.1", "0.0.0.0", "::1", "::", "192.168.1.20"])(
+    "accepts listen address %s",
+    (AIRCASTLE_HOST) => {
+      expect(readConfig({ AIRCASTLE_HOST }).AIRCASTLE_HOST).toBe(AIRCASTLE_HOST);
+    },
+  );
+
+  test.each(["", "localhost:43122", "http://0.0.0.0", "every interface", "256.0.0.1"])(
+    "rejects listen address %j",
+    (AIRCASTLE_HOST) => {
+      expect(() => readConfig({ AIRCASTLE_HOST })).toThrow("AIRCASTLE_HOST");
     },
   );
 
