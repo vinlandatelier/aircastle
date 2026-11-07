@@ -5,6 +5,7 @@ import type { PostgresOptions } from "../index.ts";
 import { identifier } from "../identifier.ts";
 import { connectionTarget } from "../layout.ts";
 import { initializeAuthLayout } from "./layout.ts";
+import { isDriverError, storageFailure } from "./failure.ts";
 import { authTransaction } from "./transaction.ts";
 
 export async function postgresAuthStore(options: PostgresOptions): Promise<AuthStore> {
@@ -40,11 +41,12 @@ export async function postgresAuthStore(options: PostgresOptions): Promise<AuthS
       });
       return result.value;
     } catch (error) {
-      if (error instanceof AuthStorageError) throw error;
-      throw new AuthStorageError(
+      if (!isDriverError(error)) throw error;
+      throw storageFailure(
         readyToCommit && !(error instanceof postgres.PostgresError)
           ? "commit-unknown"
           : "unavailable",
+        error,
       );
     }
   }
@@ -60,7 +62,8 @@ export async function postgresAuthStore(options: PostgresOptions): Promise<AuthS
           if (!row) throw new AuthStorageError("unavailable");
           return row.signing_secret;
         } catch (error) {
-          throw new AuthStorageError("unavailable", { cause: error });
+          if (!isDriverError(error)) throw error;
+          throw storageFailure("unavailable", error);
         }
       }),
     resolveIssuance: ({ messageId, email }) =>
