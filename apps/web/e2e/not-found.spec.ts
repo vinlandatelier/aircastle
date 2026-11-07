@@ -53,7 +53,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page).toHaveTitle('Aircastle - Page not found')
     await page.getByRole('link', { name: 'Sign in', exact: true }).click()
     await expect(page).toHaveTitle('Aircastle - Sign in')
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('link', { name: 'Aircastle home', exact: true }).click()
     await expect(page).toHaveURL(/\/$/)
     await expect(
       page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),

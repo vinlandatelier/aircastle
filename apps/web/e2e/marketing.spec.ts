@@ -159,14 +159,19 @@ for (const width of [1440, 390]) {
     expect(icon.width, 'the theme icon is as large as the arrow beside it').toBeGreaterThanOrEqual(
       arrow.width - 2,
     )
+    const [themeBox, openBox] = await Promise.all([theme.boundingBox(), open.boundingBox()])
+    if (!themeBox || !openBox) throw new Error('Header is not laid out')
+    expect(openBox.x, 'Open Aircastle follows the theme switch').toBeGreaterThan(
+      themeBox.x + themeBox.width - 1,
+    )
     const divider = nav.locator('[data-header-divider]')
+    if (width < 400) {
+      await expect(divider, 'small phones drop the divider to fit').toBeHidden()
+      return
+    }
     await expect(divider).toHaveCSS('width', '1px')
-    const [themeBox, dividerBox, openBox] = await Promise.all([
-      theme.boundingBox(),
-      divider.boundingBox(),
-      open.boundingBox(),
-    ])
-    if (!themeBox || !dividerBox || !openBox) throw new Error('Header is not laid out')
+    const dividerBox = await divider.boundingBox()
+    if (!dividerBox) throw new Error('Divider is not laid out')
     expect(dividerBox.x).toBeGreaterThan(themeBox.x + themeBox.width - 1)
     expect(dividerBox.x).toBeLessThan(openBox.x)
   })

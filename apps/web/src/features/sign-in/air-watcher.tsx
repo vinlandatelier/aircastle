@@ -9,8 +9,8 @@ const eye = { rx: 3.4, ry: 4.8 }
 const reach = { x: 1.6, y: 1.2 }
 const fullReachAt = 240
 
-/** Air's cloud, centred in the sign-in art, glancing toward the pointer. */
-export function AirWatcher() {
+/** Air's cloud, sized to the surrounding text, glancing toward the pointer. */
+export function AirWatcher({ eyeColour }: { eyeColour: string }) {
   const mascot = useRef<HTMLDivElement>(null)
   const [look, setLook] = useState({ x: 0, y: 0 })
 
@@ -33,15 +33,16 @@ export function AirWatcher() {
     <div
       ref={mascot}
       data-sign-in-air
-      className="absolute top-1/2 left-1/2 aspect-[61/52] w-[38%] -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_2px_24px_rgb(90_40_20/0.18)]"
+      className="relative inline-block aspect-[61/52] h-[0.9em] shrink-0"
     >
       <div className="absolute inset-0 bg-white [mask:url(/brand/air-body.svg)_center/contain_no-repeat]" />
       {eyes.map(({ cx, cy }) => (
         <span
           key={cx}
           data-air-eye
-          className="absolute rounded-[50%] bg-[#d38a6f] transition-[translate] duration-150 ease-out"
+          className="absolute rounded-[50%] transition-[translate] duration-150 ease-out"
           style={{
+            backgroundColor: eyeColour,
             left: `${((cx - eye.rx - box.left) / box.width) * 100}%`,
             top: `${((cy - eye.ry - box.top) / box.height) * 100}%`,
             width: `${((eye.rx * 2) / box.width) * 100}%`,

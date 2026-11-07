@@ -41,7 +41,7 @@ test('sign-in and dashboard metadata follows navigation and history', async ({ p
   await expect(page).toHaveTitle('Aircastle - Sign in')
   await expect(page.locator('head title')).toHaveCount(1)
   await expect(page.locator('meta[name="description"]')).toHaveCount(1)
-  await page.getByRole('link', { name: 'Home', exact: true }).click()
+  await page.getByRole('link', { name: 'Aircastle home', exact: true }).click()
   await expect(page).toHaveTitle(landingTitle)
   await page.goto('/dash')
   await expect(page).toHaveTitle('Aircastle - Collections')

@@ -48,7 +48,7 @@ test('a first visit is dark whatever the system prefers', async ({ page }) => {
   await expect(page.locator('html')).toHaveClass(/\bdark\b/)
 })
 
-test('sign-in art is the same warm cloud field in light and dark, on an inset rounded card with no logo or name', async ({
+test('sign-in art is the same green pools in light and dark, on an inset rounded card that says Meet Air', async ({
   page,
 }) => {
   const looks: { left: number[]; right: number[] }[] = []
@@ -62,10 +62,23 @@ test('sign-in art is the same warm cloud field in light and dark, on an inset ro
     await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`))
     const art = page.locator('[data-sign-in-art]')
     await expect(art).toBeVisible()
-    await expect(art).toHaveAttribute('aria-hidden', 'true')
+    await expect(art.locator('[data-sign-in-backdrop]')).toHaveAttribute('aria-hidden', 'true')
     await expect(art.locator('feTurbulence')).toHaveCount(1)
     await expect(art.getByText('Aircastle')).toHaveCount(0)
     await expect(art.locator('img, svg image, .brand-logo')).toHaveCount(0)
+    const greeting = art.locator('[data-sign-in-greeting]')
+    await expect(greeting).toHaveText(/^Meet\s*Air$/)
+    await expect(greeting.locator('[data-sign-in-air]')).toBeVisible()
+    const learn = art.getByRole('link', { name: 'Learn more' })
+    await expect(learn).toBeVisible()
+    const [line, more] = await Promise.all([greeting.boundingBox(), learn.boundingBox()])
+    if (!line || !more) throw new Error('Greeting is not laid out')
+    expect(more.y, 'Learn more sits just below').toBeGreaterThanOrEqual(line.y + line.height - 1)
+    expect(more.y - (line.y + line.height)).toBeLessThan(24)
+    expect(
+      Math.abs(more.x + more.width - (line.x + line.width)),
+      'and is right-aligned with the greeting',
+    ).toBeLessThan(2)
     const radius = parseFloat(
       await art.evaluate((element) => getComputedStyle(element).borderTopLeftRadius),
     )
@@ -103,8 +116,8 @@ test('sign-in art is the same warm cloud field in light and dark, on an inset ro
   }
   const [light, dark] = looks
   if (!light || !dark) throw new Error('Both themes were not captured')
-  const [red = 0, , blue = 0] = light.left
-  expect(red - blue, 'warm orange on the left').toBeGreaterThan(60)
+  const [red = 0, green = 0] = light.left
+  expect(green - red, 'green and cyan, not orange').toBeGreaterThan(40)
   for (const side of ['left', 'right'] as const)
     for (const channel of [0, 1, 2])
       expect(
@@ -114,7 +127,7 @@ test('sign-in art is the same warm cloud field in light and dark, on an inset ro
 })
 
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
-  test(`Air sits in the middle of the sign-in art and its eyes ${reducedMotion === 'reduce' ? 'hold still' : 'follow the pointer'}`, async ({
+  test(`Meet Air sits in the middle of the sign-in art and Air's eyes ${reducedMotion === 'reduce' ? 'hold still' : 'follow the pointer'}`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion })
@@ -124,10 +137,16 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     await expect(air).toBeVisible()
     const [artBox, airBox] = await Promise.all([art.boundingBox(), air.boundingBox()])
     if (!artBox || !airBox) throw new Error('Art is not laid out')
-    expect(Math.abs(airBox.x + airBox.width / 2 - (artBox.x + artBox.width / 2))).toBeLessThan(2)
-    expect(Math.abs(airBox.y + airBox.height / 2 - (artBox.y + artBox.height / 2))).toBeLessThan(2)
-    expect(airBox.width / artBox.width, 'sized to the panel').toBeGreaterThan(0.25)
-    expect(airBox.width / artBox.width).toBeLessThan(0.5)
+    const greeting = await art.locator('[data-sign-in-greeting]').boundingBox()
+    if (!greeting) throw new Error('Greeting is not laid out')
+    expect(Math.abs(greeting.x + greeting.width / 2 - (artBox.x + artBox.width / 2))).toBeLessThan(
+      2,
+    )
+    expect(
+      Math.abs(greeting.y + greeting.height / 2 - (artBox.y + artBox.height / 2)),
+    ).toBeLessThan(40)
+    expect(greeting.width / artBox.width, 'sized to the panel').toBeGreaterThan(0.35)
+    expect(airBox.height, 'Air sits in the line of text').toBeLessThan(greeting.height * 1.2)
     const eye = air.locator('[data-air-eye]').first()
     await expect(air.locator('[data-air-eye]')).toHaveCount(2)
     const eyeX = async () => (await eye.boundingBox())?.x ?? 0

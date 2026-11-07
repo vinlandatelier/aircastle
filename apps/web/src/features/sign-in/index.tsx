@@ -19,7 +19,7 @@ export function SignInPage() {
           <Link
             to="/"
             aria-label="Aircastle home"
-            className="brand-link mb-3 self-start rounded-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
+            className="brand-link mb-6 self-start rounded-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
           >
             <span aria-hidden="true" className="brand-logo block size-10 shrink-0" />
           </Link>

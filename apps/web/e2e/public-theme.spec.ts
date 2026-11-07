@@ -84,7 +84,7 @@ async function expectPublic(page: Page, dark: boolean) {
   expect(
     headingBox.y - (logo.y + logo.height),
     'room between the logo and the heading',
-  ).toBeGreaterThanOrEqual(28)
+  ).toBeGreaterThanOrEqual(40)
   expect(
     groupBox.y - (headingBox.y + headingBox.height),
     'room before the fields',
