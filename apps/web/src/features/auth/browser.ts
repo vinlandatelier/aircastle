@@ -125,8 +125,10 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
         requested = undefined
         const next = destinationPath(entry.value.destination)
         handoff = { path: next, view }
-        go(next)
+        return go(next)
       }
+      const checked = destinationPath(guard.destination)
+      if (checked !== path) handoff = { path: checked, view }
       return view
     },
   }

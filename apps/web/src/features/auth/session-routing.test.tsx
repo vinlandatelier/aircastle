@@ -267,24 +267,25 @@ describe('Auth calls per navigation', () => {
   const sent = (http: ReturnType<typeof displayHttp>) =>
     http.requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)
 
+  const projectBase = `/dash/workspaces/${workspace}/projects/22222222-2222-4222-8222-222222222222`
+  const entered = ['GET /api/auth/state', 'POST /api/auth/entry']
+
   it.each([
-    ['/dash/workspaces', 'Workspaces', ['GET /api/auth/state', 'POST /api/auth/entry']],
-    [
-      `/dash/workspaces/${workspace}/projects`,
-      'Projects',
-      ['GET /api/auth/state', 'POST /api/auth/entry'],
-    ],
+    ['/dash/workspaces', ['heading', 'Workspaces'], entered],
+    [`/dash/workspaces/${workspace}/projects`, ['heading', 'Projects'], entered],
     [
       '/dash/workspaces/new',
-      'Create a workspace',
+      ['heading', 'Create a workspace'],
       ['GET /api/auth/state', 'POST /api/auth/activity'],
     ],
-    ['/dash', 'Workspaces', ['GET /api/auth/state', 'POST /api/auth/entry']],
-  ] as const)('%s renews once in at most two auth calls', async (path, title, calls) => {
+    ['/dash', ['heading', 'Workspaces'], entered],
+    [projectBase, ['navigation', 'Main navigation'], entered],
+    [`${projectBase}/`, ['navigation', 'Main navigation'], entered],
+  ] as const)('%s renews once in at most two auth calls', async (path, [role, name], calls) => {
     const http = counted()
     await mountAuth(path, http)
 
-    expect(await screen.findByRole('heading', { name: title })).toBeTruthy()
+    expect(await screen.findByRole(role, { name })).toBeTruthy()
     expect(sent(http)).toEqual(calls)
   })
 
