@@ -29,6 +29,10 @@ export const routeAccess = {
   "POST /api/projects/:project/schema": "project-key",
   "POST /api/projects/:project/collections/:collection/documents": "project-key",
   "GET /api/projects/:project/collections/:collection/documents/:id": "project-key",
+  "PATCH /api/projects/:project/collections/:collection/documents/:id": "project-key",
+  "DELETE /api/projects/:project/collections/:collection/documents/:id": "project-key",
+  "GET /api/projects/:project/collections/:collection/documents": "project-key",
+  "POST /api/projects/:project/collections/:collection/documents/query": "project-key",
 } as const satisfies Record<
   string,
   "middleware" | "public" | "auth-dispatch" | "development-inbox" | "project-key"
