@@ -3,8 +3,12 @@ import postgres from "postgres";
 import { StorageUnavailable } from "@aircastle/core";
 import type { ContentStore, ProjectTransaction } from "@aircastle/core";
 import { identifier } from "./identifier.ts";
-import { initializeLayout } from "./layout.ts";
+import { connectionTarget, initializeLayout } from "./layout.ts";
 import { projectTransaction } from "./project.ts";
+
+export { readPostgresOptions } from "./config.ts";
+export { postgresAuthAdmission } from "./auth/admission.ts";
+export { postgresAuthStore } from "./auth/index.ts";
 
 export interface PostgresOptions {
   url: string;
@@ -12,17 +16,6 @@ export interface PostgresOptions {
 }
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
-
-function validatedNamespace(value: string) {
-  if (typeof value !== "string" || !value || value.includes("\0") || Buffer.byteLength(value) > 63)
-    throw new Error("Invalid Postgres namespace");
-  for (const point of value) {
-    const code = point.charCodeAt(0);
-    if (point.length === 1 && code >= 0xd800 && code <= 0xdfff)
-      throw new Error("Invalid Postgres namespace Unicode");
-  }
-  return value;
-}
 
 async function databaseOperation<Value>(operation: () => Promise<Value>): Promise<Value> {
   try {
@@ -63,12 +56,8 @@ async function databaseOperation<Value>(operation: () => Promise<Value>): Promis
 }
 
 export function postgresAdapter(options: PostgresOptions): ContentStore {
-  const namespace = validatedNamespace(
-    options.namespace === undefined ? "aircastle" : options.namespace,
-  );
-  if (typeof options.url !== "string" || options.url.length === 0)
-    throw new Error("Postgres URL is required");
-  const sql = postgres(options.url, { max: 10, onnotice: () => {} });
+  const { url, namespace } = connectionTarget(options);
+  const sql = postgres(url, { max: 10, onnotice: () => {} });
   const table = (name: string) => identifier(sql, namespace, name);
   let closing: Promise<void> | undefined;
   return {
