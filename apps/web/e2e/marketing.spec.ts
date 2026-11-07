@@ -87,7 +87,7 @@ test('hero keeps write with reduced motion', async ({ page }) => {
   await expect(shownWord(page)).toHaveText('write')
 })
 
-test('hovering the home link spins the logo', async ({ page }) => {
+test('hovering the home link spins the logo clockwise', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const home = page.getByRole('banner').getByRole('link', { name: 'Aircastle home' })
@@ -95,6 +95,15 @@ test('hovering the home link spins the logo', async ({ page }) => {
   await expect(logo).toHaveCSS('animation-name', 'none')
   await home.hover()
   await expect(logo).toHaveCSS('animation-name', 'brand-spin')
+  const angle = await logo.evaluate((element) => {
+    const [spin] = element.getAnimations()
+    if (!spin) throw new Error('Logo is not spinning')
+    spin.pause()
+    spin.currentTime = 1000
+    const { a, b } = new DOMMatrix(getComputedStyle(element).transform)
+    return (Math.atan2(b, a) * 180) / Math.PI
+  })
+  expect(angle, 'the logo turns clockwise').toBeGreaterThan(0)
 })
 
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
