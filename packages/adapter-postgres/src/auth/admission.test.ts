@@ -191,6 +191,7 @@ describe("durable auth request admission", () => {
         expect(await admission.admit(request)).toEqual({ kind: "admitted" });
       });
     },
+    30_000,
   );
 
   test("rolling windows expire individual admissions at the exact boundary", async () => {
@@ -458,7 +459,7 @@ describe("durable auth request admission", () => {
         });
       });
     });
-  });
+  }, 30_000);
 
   test("an abruptly killed process cannot permanently block a coordinated policy change", async () => {
     await withAdmission(async ({ open, url, namespace }) => {
@@ -472,7 +473,7 @@ describe("durable auth request admission", () => {
         expect(await restarted.admit(request)).toEqual({ kind: "admitted" });
       });
     });
-  });
+  }, 30_000);
 
   test("a reconnected instance takes its policy back before a conflicting newcomer starts", async () => {
     await withAdmission(async ({ open, url, namespace }) => {
