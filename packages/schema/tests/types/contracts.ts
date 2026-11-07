@@ -1,6 +1,8 @@
 import type {
   CompiledCollection,
   CompiledSchema,
+  DecodeResult,
+  decodeCollection,
   SchemaIssue,
   ValidationIssue,
   ValidationResult,
@@ -21,6 +23,13 @@ export type ValidationCodes = Assert<
     | "too_short"
     | "too_long"
     | "invalid_choice"
+  >
+>;
+
+export type DecodeCollectionResult = Assert<
+  Equal<
+    ReturnType<typeof decodeCollection>,
+    DecodeResult<CompiledCollection<Record<string, string | null>>>
   >
 >;
 

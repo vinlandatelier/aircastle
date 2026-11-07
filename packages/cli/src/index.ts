@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createInterface } from "node:readline/promises";
 import { ConfigurationError, defineConfig } from "@aircastle/client";
-import { isPlainRecord, SchemaError } from "@aircastle/schema";
+import { assertCollectionDefinitions, isPlainRecord, SchemaError } from "@aircastle/schema";
 import {
   contractId,
   describeCollections,
@@ -75,19 +75,20 @@ function publication(
   value: unknown,
   expected: readonly PublishedCollection[],
 ): value is Publication {
+  if (!isPlainRecord(value) || !exact(value, ["revision", "contracts"])) return false;
+  const contracts = value.contracts;
   return (
-    isPlainRecord(value) &&
-    exact(value, ["revision", "contracts"]) &&
     revision(value.revision) &&
-    isPlainRecord(value.contracts) &&
-    Object.keys(value.contracts).length === expected.length &&
-    expected.every(
-      ({ name }) =>
-        Object.hasOwn(value.contracts as object, name) &&
-        isPlainRecord(value.contracts) &&
-        typeof value.contracts[name] === "string" &&
-        /^v1:[0-9a-f]{64}$/.test(value.contracts[name]),
-    )
+    isPlainRecord(contracts) &&
+    Object.keys(contracts).length === expected.length &&
+    expected.every(({ name }) => {
+      const contract = contracts[name];
+      return (
+        Object.hasOwn(contracts, name) &&
+        typeof contract === "string" &&
+        /^v1:[0-9a-f]{64}$/.test(contract)
+      );
+    })
   );
 }
 async function confirmation(diff: string): Promise<boolean> {
@@ -114,7 +115,13 @@ export async function push(options: PushOptions = {}): Promise<number> {
     ).default;
     if (!isNonArrayObject(imported))
       return fail("invalid_request", "Expected an Aircastle configuration");
-    const config = defineConfig(imported as unknown as Parameters<typeof defineConfig>[0]);
+    const { url: configuredUrl, project, collections: definitions } = imported;
+    assertCollectionDefinitions(definitions);
+    const config = defineConfig({
+      url: typeof configuredUrl === "string" ? configuredUrl : undefined,
+      project: typeof project === "string" ? project : undefined,
+      collections: definitions,
+    });
     const collections = describeCollections(config.collections);
     const apiKey = options.apiKey ?? process.env.AIRCASTLE_API_KEY;
     if (typeof apiKey !== "string" || !apiKey.length || /\s/.test(apiKey))

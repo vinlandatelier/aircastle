@@ -1,19 +1,18 @@
 import {
+  compileDescription,
   contractId,
   describeCollections,
   parseContentError,
-  validateStored,
+  storedDocument,
 } from "@aircastle/contracts";
 import { compileSchema, isPlainRecord } from "@aircastle/schema";
 import type {
   CollectionDefinitions,
   CollectionDescription,
-  ContentDocument,
-  DocumentData,
   Fetch,
   Result,
 } from "@aircastle/contracts";
-import type { InferInput, InferOutput } from "@aircastle/schema";
+import type { CompiledCollection, InferInput, InferOutput } from "@aircastle/schema";
 
 export interface AircastleConfig<Collections extends CollectionDefinitions> {
   url: string;
@@ -86,10 +85,10 @@ export function defineConfig<const Collections extends CollectionDefinitions>(co
   };
 }
 
-function responseResult(
-  description: CollectionDescription,
+function responseResult<Output extends object>(
   response: unknown,
-): Result<ContentDocument> | undefined {
+  stored: (fields: Record<string, unknown>) => Output | undefined,
+): Result<{ id: string } & Output> | undefined {
   if (!isPlainRecord(response)) return undefined;
   if (response.ok === false) {
     if (Object.keys(response).some((key) => key !== "ok" && key !== "error")) return undefined;
@@ -105,16 +104,22 @@ function responseResult(
   const document = response.data;
   if (typeof document.id !== "string" || !uuid.test(document.id)) return undefined;
   const fields = Object.fromEntries(Object.entries(document).filter(([key]) => key !== "id"));
-  if (!validateStored(description, fields)) return undefined;
-  return { ok: true, data: { id: document.id, ...(fields as DocumentData) } };
+  const data = stored(fields);
+  return data === undefined ? undefined : { ok: true, data: { id: document.id, ...data } };
 }
 
+type ClientOptions<Collections extends CollectionDefinitions> = AircastleConfig<Collections> & {
+  apiKey: string | undefined;
+  fetch?: Fetch;
+};
+
+/** This overload is the only unchecked type claim in `createClient`. The returned object is built key by key from `config.collections`, so the declarations carry its collection names and output types. */
 export function createClient<const Collections extends CollectionDefinitions>(
-  options: AircastleConfig<Collections> & {
-    apiKey: string | undefined;
-    fetch?: Fetch;
-  },
-): AircastleClient<Collections> {
+  options: ClientOptions<Collections>,
+): AircastleClient<Collections>;
+export function createClient<const Collections extends CollectionDefinitions>(
+  options: ClientOptions<Collections>,
+): Partial<AircastleClient<Collections>> {
   const config = defineConfig(options);
   if (
     typeof options.apiKey !== "string" ||
@@ -131,7 +136,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
   async function send<Output extends object>(
     method: "GET" | "POST",
     endpoint: string,
-    description: CollectionDescription,
+    collection: CompiledCollection<Output>,
     data?: object,
     expectedId?: string,
   ): Promise<Result<{ id: string } & Output>> {
@@ -141,7 +146,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
     };
     const headers: Record<string, string> = {
       authorization,
-      "aircastle-schema": await contractId(description),
+      "aircastle-schema": await contractId(collection.describe()),
     };
     const init: RequestInit = { method, headers, keepalive: false };
     if (data !== undefined) {
@@ -156,7 +161,7 @@ export function createClient<const Collections extends CollectionDefinitions>(
     } catch {
       return failed;
     }
-    const parsed = responseResult(description, body);
+    const parsed = responseResult(body, (fields) => storedDocument(collection, fields));
     if (!parsed || response.ok !== parsed.ok) return failed;
     if (
       parsed.ok &&
@@ -164,42 +169,40 @@ export function createClient<const Collections extends CollectionDefinitions>(
         (expectedId !== undefined && parsed.data.id.toLowerCase() !== expectedId))
     )
       return failed;
-    return parsed as Result<{ id: string } & Output>;
+    return parsed;
   }
 
   for (const name of Object.keys(config.collections) as (keyof Collections & string)[]) {
     const definition = compiled[name]!;
-    const description = definition.describe();
     const endpoint = `${config.url}/api/projects/${encodeURIComponent(config.project)}/collections/${encodeURIComponent(name)}/documents`;
     client[name] = {
       async create(input) {
         const validated = definition.validate(input);
         if (!validated.ok)
           return { ok: false, error: { code: "validation_failed", issues: validated.issues } };
-        return send<InferOutput<Collections[typeof name]>>(
-          "POST",
-          endpoint,
-          description,
-          validated.data,
-        );
+        return send("POST", endpoint, definition, validated.data);
       },
       async findById(id) {
         if (typeof id !== "string" || !uuid.test(id))
           return { ok: false, error: { code: "invalid_request" } };
         const normalized = id.toLowerCase();
-        return send<InferOutput<Collections[typeof name]>>(
+        return send(
           "GET",
           `${endpoint}/${encodeURIComponent(normalized)}`,
-          description,
+          definition,
           undefined,
           normalized,
         );
       },
     };
   }
-  return client as AircastleClient<Collections>;
+  return client;
 }
 
 export function validateResponse(description: CollectionDescription, response: unknown): boolean {
-  return responseResult(description, response) !== undefined;
+  return (
+    responseResult(response, (fields) =>
+      storedDocument(compileDescription(description), fields),
+    ) !== undefined
+  );
 }

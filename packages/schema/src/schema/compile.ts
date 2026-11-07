@@ -21,6 +21,7 @@ import { validateValue, type TextRules } from "./values.ts";
 
 type MutableRules = { -readonly [Key in keyof TextRules]: TextRules[Key] };
 const issueOrder: Record<SchemaIssue["code"], number> = {
+  invalid_description: 0,
   invalid_definition: 0,
   conflicting_defaults: 1,
   conflicting_formats: 2,
@@ -63,7 +64,7 @@ function equalChoices(left: unknown, right: unknown): boolean {
   );
 }
 
-function compileField(
+export function compileField(
   modifiers: readonly Modifier[],
   path: IssuePath,
 ): { rules: TextRules; issues: SchemaIssue[] } {
@@ -114,6 +115,7 @@ function compileField(
     else {
       let valid = true;
       const firstIndices = new Map<string, number>();
+      const accepted: string[] = [];
       for (const [index, choice] of choices.entries()) {
         if (typeof choice !== "string") {
           issues.push(
@@ -122,14 +124,15 @@ function compileField(
           valid = false;
           continue;
         }
-        const causes = validateValue(choice, rules, path);
-        if (causes[0]) {
+        accepted.push(choice);
+        const checked = validateValue(choice, rules, path);
+        if (!checked.ok) {
           issues.push(
             schemaIssue(path, {
               code: "invalid_choices",
               reason: "violates_constraints",
               index,
-              causes: [causes[0], ...causes.slice(1)],
+              causes: checked.issues,
             }),
           );
           valid = false;
@@ -140,7 +143,7 @@ function compileField(
           valid = false;
         } else firstIndices.set(choice, index);
       }
-      if (valid) rules.choices = Object.freeze([...choices] as string[]);
+      if (valid) rules.choices = Object.freeze(accepted);
     }
   }
   const editors: TextEditorDescription[] = [];
@@ -164,21 +167,17 @@ function compileField(
       );
   }
   if (defaults.length === 1) {
-    const value = defaults[0];
-    const causes = validateValue(value, rules, path);
-    if (causes[0])
-      issues.push(
-        schemaIssue(path, { code: "invalid_default", causes: [causes[0], ...causes.slice(1)] }),
-      );
-    else if (typeof value === "string" || value === null) rules.default = value;
+    const checked = validateValue(defaults[0], rules, path);
+    if (checked.ok) rules.default = checked.value;
+    else issues.push(schemaIssue(path, { code: "invalid_default", causes: checked.issues }));
   }
   issues.sort((left, right) => issueOrder[left.code] - issueOrder[right.code]);
   return { rules: Object.freeze(rules), issues };
 }
 
-function compiledCollection(
+export function compiledCollection(
   fields: readonly (readonly [string, TextRules])[],
-): CompiledCollection<Record<string, unknown>> {
+): CompiledCollection<Record<string, string | null>> {
   const knownNames = new Set(fields.map(([name]) => name));
   return Object.freeze({
     validate(input: unknown) {
@@ -189,7 +188,7 @@ function compiledCollection(
           issues: [validationIssue([], { code: "invalid_document" })] as const,
         };
       const values = new Map(snapshot.entries);
-      const output: [string, unknown][] = [];
+      const output: [string, string | null][] = [];
       const issues: ValidationIssue[] = [];
       for (const [name, rules] of fields) {
         let value = values.get(name);
@@ -201,9 +200,9 @@ function compiledCollection(
             continue;
           }
         }
-        const failures = validateValue(value, rules, [name]);
-        if (failures.length) issues.push(...failures);
-        else output.push([name, value]);
+        const checked = validateValue(value, rules, [name]);
+        if (checked.ok) output.push([name, checked.value]);
+        else issues.push(...checked.issues);
       }
       for (const name of [...values.keys()].filter((name) => !knownNames.has(name)).sort()) {
         issues.push(validationIssue([name], { code: "unknown_field" }));
@@ -236,9 +235,19 @@ function compiledCollection(
   });
 }
 
+/** The runtime compiler builds one collection per declared name, so the declarations carry the output types. */
 export function compileSchema<const Collections extends CollectionDefinitions>(
   definitions: Collections,
-): CompiledSchema<{ [Name in keyof Collections]: InferOutput<Collections[Name]> }> {
+): CompiledSchema<{ [Name in keyof Collections]: InferOutput<Collections[Name]> }>;
+export function compileSchema(
+  definitions: unknown,
+): CompiledSchema<Record<string, Record<string, unknown>>> {
+  return compileUnknown(definitions);
+}
+
+function compileUnknown(
+  definitions: unknown,
+): CompiledSchema<Record<string, Record<string, unknown>>> {
   const root = snapshotRecord(definitions);
   if (!root.ok)
     throw new SchemaError([
@@ -288,7 +297,12 @@ export function compileSchema<const Collections extends CollectionDefinitions>(
     compiled.push([name, compiledCollection(fields)]);
   }
   if (issues[0]) throw new SchemaError([issues[0], ...issues.slice(1)]);
-  return Object.freeze(Object.fromEntries(compiled)) as CompiledSchema<{
-    [Name in keyof Collections]: InferOutput<Collections[Name]>;
-  }>;
+  return Object.freeze(Object.fromEntries(compiled));
+}
+
+/** Narrows untrusted collection declarations, such as a loaded config module, by throwing the `SchemaError` that `compileSchema` would throw. */
+export function assertCollectionDefinitions(
+  definitions: unknown,
+): asserts definitions is CollectionDefinitions {
+  compileUnknown(definitions);
 }

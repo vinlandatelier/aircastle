@@ -45,11 +45,25 @@ export function rejection(input: unknown): unknown {
     return decoded.ok ? decoded : decoded.issue;
   return {
     reason: "invalid_schema",
+    path: decoded.issue.path,
     issues: decoded.issue.issues.map(({ code, path }) => ({ code, path })),
   };
 }
 
-/** The `rejection` summary for one schema issue on a field of the decoded collection. */
+/** The `rejection` summary for one schema issue on a field of the first collection's description. */
 export function schemaRejection(code: string, name = "title") {
-  return { reason: "invalid_schema", issues: [{ code, path: ["wire", name] }] };
+  return {
+    reason: "invalid_schema",
+    path: [0, "description"],
+    issues: [{ code, path: ["fields", name] }],
+  };
+}
+
+/** The `rejection` summary for a malformed value at `path` inside the first collection's description. */
+export function malformedRejection(...path: (string | number)[]) {
+  return {
+    reason: "invalid_schema",
+    path: [0, "description"],
+    issues: [{ code: "invalid_description", path }],
+  };
 }

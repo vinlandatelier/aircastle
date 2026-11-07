@@ -1,5 +1,10 @@
 import { type } from "arktype";
-import type { IssuePath, TextEditorDescription, ValidationIssue } from "./contract.ts";
+import type {
+  IssuePath,
+  NonemptyIssues,
+  TextEditorDescription,
+  ValidationIssue,
+} from "./contract.ts";
 import { validationIssue } from "./errors.ts";
 import { isEmail, isUrl } from "./formats.ts";
 import { receivedType } from "./records.ts";
@@ -27,25 +32,28 @@ function graphemeLength(value: string): number {
   return count;
 }
 
-export function validateValue(
-  value: unknown,
-  rules: TextRules,
-  path: IssuePath,
-): ValidationIssue[] {
-  if (value === null && rules.nullable) return [];
+type CheckedValue =
+  | { readonly ok: true; readonly value: string | null }
+  | { readonly ok: false; readonly issues: NonemptyIssues<ValidationIssue> };
+
+export function validateValue(value: unknown, rules: TextRules, path: IssuePath): CheckedValue {
+  if (value === null && rules.nullable) return { ok: true, value };
   if (!stringType.allows(value))
-    return [
-      validationIssue(path, {
-        code: "invalid_type",
-        expected: "string",
-        received: receivedType(value),
-      }),
-    ];
+    return {
+      ok: false,
+      issues: [
+        validationIssue(path, {
+          code: "invalid_type",
+          expected: "string",
+          received: receivedType(value),
+        }),
+      ],
+    };
   const issues: ValidationIssue[] = [];
   if (unpairedSurrogate.test(value))
     issues.push(validationIssue(path, { code: "invalid_unicode" }));
   if (value.includes("\u0000")) issues.push(validationIssue(path, { code: "invalid_character" }));
-  if (issues.length) return issues;
+  if (issues[0]) return { ok: false, issues: [issues[0], ...issues.slice(1)] };
   if (rules.min !== undefined || rules.max !== undefined) {
     const actual = graphemeLength(value);
     const { min = 0, max = Infinity } = rules;
@@ -64,5 +72,5 @@ export function validateValue(
     issues.push(validationIssue(path, { code: "invalid_url" }));
   if (rules.choices && !rules.choices.includes(value))
     issues.push(validationIssue(path, { code: "invalid_choice", allowed: [...rules.choices] }));
-  return issues;
+  return issues[0] ? { ok: false, issues: [issues[0], ...issues.slice(1)] } : { ok: true, value };
 }

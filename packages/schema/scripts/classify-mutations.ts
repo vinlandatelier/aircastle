@@ -22,6 +22,45 @@ interface ClassifiedMutant {
 }
 const defaultRoot = resolve(import.meta.dirname, "..");
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPosition(value: unknown): value is Mutant["location"]["start"] {
+  return isRecord(value) && typeof value.line === "number" && typeof value.column === "number";
+}
+
+function isMutant(value: unknown): value is Mutant {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.replacement === "string" &&
+    typeof value.status === "string" &&
+    (value.statusReason === undefined || typeof value.statusReason === "string") &&
+    isRecord(value.location) &&
+    isPosition(value.location.start) &&
+    isPosition(value.location.end)
+  );
+}
+
+function mutationFile(value: unknown): MutationFile {
+  if (
+    !isRecord(value) ||
+    typeof value.source !== "string" ||
+    !Array.isArray(value.mutants) ||
+    !value.mutants.every(isMutant)
+  )
+    throw new Error("Invalid mutation report file");
+  return { source: value.source, mutants: value.mutants };
+}
+
+function mutationFiles(report: unknown): Record<string, MutationFile> {
+  if (!isRecord(report) || !isRecord(report.files)) throw new Error("Invalid mutation report");
+  return Object.fromEntries(
+    Object.entries(report.files).map(([file, data]) => [file, mutationFile(data)]),
+  );
+}
+
 export function applyMutation(
   source: string,
   mutant: Pick<Mutant, "location" | "replacement">,
@@ -73,11 +112,9 @@ export async function classifyMutations(
   root = defaultRoot,
   sourceSubdirectory = "src/schema",
 ): Promise<void> {
-  const report = JSON.parse(readFileSync(reportPath, "utf8")) as {
-    files: Record<string, MutationFile>;
-  };
+  const files = mutationFiles(JSON.parse(readFileSync(reportPath, "utf8")));
   const tasks: { file: string; source: string; mutant: Mutant }[] = [];
-  for (const [file, data] of Object.entries(report.files)) {
+  for (const [file, data] of Object.entries(files)) {
     if (!resolve(root, file).startsWith(resolve(root, sourceSubdirectory) + sep))
       throw new Error(`Unexpected mutation file: ${file}`);
     if (readFileSync(resolve(root, file), "utf8") !== data.source)

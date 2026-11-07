@@ -87,18 +87,10 @@ const signInRoute = createRoute({
   component: SignInPage,
   head: () => ({ meta: [{ title: 'Aircastle - Sign in' }] }),
 })
-type DashboardPagePath =
-  (typeof navigationPages)[number]['path'] extends `/dash/workspaces/$workspaceId/projects/$projectId/${infer Path}`
-    ? Path
-    : never
-
-const pageRoutes = navigationPages.map(({ path, title }) =>
+const pageRoutes = navigationPages.map(({ segment, title }) =>
   createRoute({
     getParentRoute: () => dashboardRoute,
-    path: path.replace(
-      '/dash/workspaces/$workspaceId/projects/$projectId/',
-      '',
-    ) as DashboardPagePath,
+    path: segment,
     component: DashboardSkeleton,
     head: () => ({ meta: [{ title: `Aircastle - ${title}` }] }),
   }),

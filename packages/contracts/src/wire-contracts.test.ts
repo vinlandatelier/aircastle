@@ -12,7 +12,13 @@ import {
   parseCollections,
   validateStored,
 } from "./index.ts";
-import { description, field, rejection, schemaRejection } from "./support/fixtures.ts";
+import {
+  description,
+  field,
+  malformedRejection,
+  rejection,
+  schemaRejection,
+} from "./support/fixtures.ts";
 
 const codeLanguages: Record<CodeLanguage, true> = {
   plaintext: true,
@@ -174,7 +180,7 @@ describe("wire declaration rejection", () => {
     [
       "textarea missing rows",
       { type: "textarea" },
-      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
+      malformedRejection("fields", "status", "editor"),
     ],
     [
       "textarea nonnumeric rows",
@@ -186,11 +192,7 @@ describe("wire declaration rejection", () => {
       { type: "code", language: "typescript", extra: true },
       schemaRejection("invalid_editor_options", "status"),
     ],
-    [
-      "code missing language",
-      { type: "code" },
-      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
-    ],
+    ["code missing language", { type: "code" }, malformedRejection("fields", "status", "editor")],
     [
       "code nonstring language",
       { type: "code", language: 1 },
@@ -206,16 +208,8 @@ describe("wire declaration rejection", () => {
       { type: "radio", extra: true },
       schemaRejection("invalid_editor_options", "status"),
     ],
-    [
-      "editor primitive",
-      "textarea",
-      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
-    ],
-    [
-      "editor null",
-      null,
-      { reason: "invalid_field", path: [0, "description", "fields", "status", "editor"] },
-    ],
+    ["editor primitive", "textarea", malformedRejection("fields", "status", "editor")],
+    ["editor null", null, malformedRejection("fields", "status", "editor")],
   ])("rejects %s", (_name, editor, reason) => {
     const definition = {
       type: "text",
@@ -239,7 +233,7 @@ describe("wire declaration rejection", () => {
     [
       "required input despite a default",
       { required: true, default: "draft" },
-      { reason: "invalid_field", path: [0, "description", "fields", "title", "default"] },
+      malformedRejection("fields", "title", "default"),
     ],
   ])("rejects malformed %s", (_name, overrides, reason) => {
     expect(
@@ -273,7 +267,7 @@ describe("wire field values are validated by the schema compiler", () => {
         causes: [
           {
             code: "invalid_type",
-            path: ["wire", "title"],
+            path: ["fields", "title"],
             expected: "string",
             received: "number",
             message: "Expected a text value.",
@@ -326,7 +320,7 @@ describe("wire field values are validated by the schema compiler", () => {
     }
     expect(thrown).toBeInstanceOf(SchemaError);
     expect((thrown as SchemaError).issues).toStrictEqual([
-      { ...issue, path: ["wire", "title"], message: expect.any(String) },
+      { ...issue, path: ["fields", "title"], message: expect.any(String) },
     ]);
   });
 
@@ -341,11 +335,14 @@ describe("wire field values are validated by the schema compiler", () => {
     } catch (error) {
       thrown = error;
     }
-    expect(thrown).toStrictEqual(new TypeError("Invalid collection description"));
-    expect((thrown as Error).cause).toStrictEqual({
-      reason: "invalid_field",
-      path: ["fields", "title", "editor"],
-    });
+    expect(thrown).toBeInstanceOf(SchemaError);
+    expect((thrown as SchemaError).issues).toStrictEqual([
+      {
+        code: "invalid_description",
+        path: ["fields", "title", "editor"],
+        message: expect.any(String),
+      },
+    ]);
   });
 
   test("rejects an editor accessor without invoking supplied code", () => {
@@ -364,7 +361,7 @@ describe("wire field values are validated by the schema compiler", () => {
           description: description({ title: { ...base, editor: editor as never } }),
         },
       ]),
-    ).toEqual({ reason: "invalid_field", path: [0, "description", "fields", "title", "editor"] });
+    ).toEqual(malformedRejection("fields", "title", "editor"));
     expect(called).toBe(false);
   });
 });
