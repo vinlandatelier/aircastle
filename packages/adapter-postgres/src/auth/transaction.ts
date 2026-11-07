@@ -43,22 +43,24 @@ function sessionRecord(row: SessionRow | undefined): AuthSessionRecord | null {
 export function authTransaction(sql: postgres.TransactionSql, namespace: string): AuthTransaction {
   const table = (name: string) => identifier(sql, namespace, name);
   const userColumns = () =>
-    sql`id, name, email, email_verified AS "emailVerified", image, created_at AS "createdAt", updated_at AS "updatedAt"`;
+    sql`id, name, email, created_at AS "createdAt", updated_at AS "updatedAt"`;
   const sessionColumns = () =>
-    sql`id, user_id AS "userId", token, expires_at AS "expiresAt", created_at AS "createdAt", updated_at AS "updatedAt", ip_address AS "ipAddress", user_agent AS "userAgent"`;
+    sql`id, user_id AS "userId", token_digest AS "tokenDigest", expires_at AS "expiresAt", created_at AS "createdAt", updated_at AS "updatedAt"`;
   const linkColumns = () =>
     sql`digest, message_id AS "messageId", email, identity, issued_at AS "issuedAt", expires_at AS "expiresAt", status, return_to AS "returnTo"`;
   const lockEmail = async (email: string) => {
     await sql`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([namespace, "auth-email", email])}, 0))`;
   };
+  const setupState = async (lock: "locked" | "unlocked") => {
+    const [row] = await sql<
+      { setup_user_id: string | null }[]
+    >`SELECT setup_user_id FROM ${table("auth_settings")} WHERE singleton = 1 ${lock === "locked" ? sql`FOR UPDATE` : sql``}`;
+    if (!row) throw new AuthStorageError("unavailable");
+    return row.setup_user_id === null ? "open" : "complete";
+  };
   return {
-    lockSetup: async () => {
-      const [row] = await sql<
-        { setup_user_id: string | null }[]
-      >`SELECT setup_user_id FROM ${table("auth_settings")} WHERE singleton = 1 FOR UPDATE`;
-      if (!row) throw new AuthStorageError("unavailable");
-      return row.setup_user_id === null ? "open" : "complete";
-    },
+    setupState: () => setupState("unlocked"),
+    lockSetupClaim: () => setupState("locked"),
     completeSetup: async (userId) => {
       const rows =
         await sql`UPDATE ${table("auth_settings")} SET setup_user_id = ${userId} WHERE singleton = 1 AND setup_user_id IS NULL AND EXISTS (SELECT FROM ${table("auth_users")} WHERE id = ${userId}) RETURNING singleton`;
@@ -104,7 +106,7 @@ export function authTransaction(sql: postgres.TransactionSql, namespace: string)
     insertUser: async (user) => {
       const [row] = await sql<
         UserRow[]
-      >`INSERT INTO ${table("auth_users")} (id, name, email, email_verified, image, created_at, updated_at) VALUES (${user.id}, ${user.name}, ${user.email}, ${user.emailVerified}, ${user.image}, ${new Date(user.createdAt)}, ${new Date(user.updatedAt)}) RETURNING ${userColumns()}`;
+      >`INSERT INTO ${table("auth_users")} (id, name, email, created_at, updated_at) VALUES (${user.id}, ${user.name}, ${user.email}, ${new Date(user.createdAt)}, ${new Date(user.updatedAt)}) RETURNING ${userColumns()}`;
       const inserted = userRecord(row);
       if (!inserted) throw new AuthStorageError("unavailable");
       return inserted;
@@ -112,31 +114,31 @@ export function authTransaction(sql: postgres.TransactionSql, namespace: string)
     insertSession: async (session) => {
       const [row] = await sql<
         SessionRow[]
-      >`INSERT INTO ${table("auth_sessions")} (id, user_id, token, expires_at, created_at, updated_at, ip_address, user_agent) VALUES (${session.id}, ${session.userId}, ${session.token}, ${new Date(session.expiresAt)}, ${new Date(session.createdAt)}, ${new Date(session.updatedAt)}, ${session.ipAddress}, ${session.userAgent}) RETURNING ${sessionColumns()}`;
+      >`INSERT INTO ${table("auth_sessions")} (id, user_id, token_digest, expires_at, created_at, updated_at) VALUES (${session.id}, ${session.userId}, ${session.tokenDigest}, ${new Date(session.expiresAt)}, ${new Date(session.createdAt)}, ${new Date(session.updatedAt)}) RETURNING ${sessionColumns()}`;
       const inserted = sessionRecord(row);
       if (!inserted) throw new AuthStorageError("unavailable");
       return inserted;
     },
-    session: async (token) => {
+    session: async (tokenDigest) => {
       const [row] = await sql<
         SessionRow[]
-      >`SELECT ${sessionColumns()} FROM ${table("auth_sessions")} WHERE token = ${token}`;
+      >`SELECT ${sessionColumns()} FROM ${table("auth_sessions")} WHERE token_digest = ${tokenDigest}`;
       return sessionRecord(row);
     },
-    lockSession: async (token) => {
+    lockSession: async (tokenDigest) => {
       const [row] = await sql<
         SessionRow[]
-      >`SELECT ${sessionColumns()} FROM ${table("auth_sessions")} WHERE token = ${token} FOR UPDATE`;
+      >`SELECT ${sessionColumns()} FROM ${table("auth_sessions")} WHERE token_digest = ${tokenDigest} FOR UPDATE`;
       return sessionRecord(row);
     },
-    renewSession: async (token, at, expiresAt) => {
+    renewSession: async (tokenDigest, at, expiresAt) => {
       const [row] = await sql<
         SessionRow[]
-      >`UPDATE ${table("auth_sessions")} SET updated_at = ${new Date(at)}, expires_at = ${new Date(expiresAt)} WHERE token = ${token} AND expires_at > ${new Date(at)} RETURNING ${sessionColumns()}`;
+      >`UPDATE ${table("auth_sessions")} SET updated_at = ${new Date(at)}, expires_at = ${new Date(expiresAt)} WHERE token_digest = ${tokenDigest} AND expires_at > ${new Date(at)} RETURNING ${sessionColumns()}`;
       return sessionRecord(row);
     },
-    revokeSession: async (token) => {
-      await sql`DELETE FROM ${table("auth_sessions")} WHERE token = ${token}`;
+    revokeSession: async (tokenDigest) => {
+      await sql`DELETE FROM ${table("auth_sessions")} WHERE token_digest = ${tokenDigest}`;
     },
     authority: async (userId) => {
       const [row] = await sql<
