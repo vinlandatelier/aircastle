@@ -275,3 +275,8 @@ export const researchSources: readonly Source[] = researchLog.flatMap((entry) =>
 export function researchStepsAt(sinceEditor: number) {
   return researchLog.filter((entry) => sinceEditor >= entry.at).length
 }
+
+/** How many sources Canute has opened once the log has reached this many steps. */
+export function sourcesReadBy(steps: number) {
+  return researchLog.slice(0, steps).filter((entry) => entry.kind === 'source').length
+}

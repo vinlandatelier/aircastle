@@ -7,10 +7,12 @@ export function NotificationsBell({
   unread,
   open,
   previewPressed,
+  menuClassName,
 }: {
   unread: number
   open: boolean
   previewPressed: boolean
+  menuClassName?: string
 }) {
   return (
     <span className="relative flex">
@@ -34,16 +36,25 @@ export function NotificationsBell({
           </span>
         )}
       </span>
-      {open && <NotificationsMenu previewPressed={previewPressed} />}
+      {open && <NotificationsMenu previewPressed={previewPressed} className={menuClassName} />}
     </span>
   )
 }
 
-function NotificationsMenu({ previewPressed }: { previewPressed: boolean }) {
+function NotificationsMenu({
+  previewPressed,
+  className,
+}: {
+  previewPressed: boolean
+  className: string | undefined
+}) {
   return (
     <div
       data-demo-notifications-menu
-      className="absolute top-full right-0 mt-2 w-[340px] origin-top-right rounded-xl border bg-popover text-popover-foreground shadow-lg transition-[opacity,scale] duration-200 ease-out starting:scale-95 starting:opacity-0"
+      className={cn(
+        'absolute top-full right-0 mt-2 w-[340px] origin-top-right rounded-xl border bg-popover text-popover-foreground shadow-lg transition-[opacity,scale] duration-200 ease-out starting:scale-95 starting:opacity-0',
+        className,
+      )}
     >
       <div className="flex items-center justify-between border-b px-4 py-2.5">
         <span>Notifications</span>

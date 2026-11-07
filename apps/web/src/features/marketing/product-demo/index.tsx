@@ -36,7 +36,10 @@ import styles from './product-demo.module.css'
 import { Confetti } from './confetti'
 import { NotificationsBell } from './notifications'
 import { Outro } from './outro'
-import { cameraLeft, cameraWindow } from './camera'
+import { AuthorsCell, StatusPill } from './posts'
+import { posts } from './posts-data'
+import { PhoneDemo } from './phone-demo'
+import { phoneFrame } from './phone-story'
 import { AgentAvatar } from './agent-avatar'
 import { cursorPosition, type CursorTarget } from './cursor-path'
 import {
@@ -184,60 +187,8 @@ function ShortcutChip({ shortcut }: { shortcut: Shortcut | undefined }) {
   )
 }
 
-type Status = 'Published' | 'In review' | 'Draft'
-
-const posts: readonly {
-  title: string
-  body: string
-  status: Status
-  authors: readonly string[]
-  updated: string
-}[] = [
-  {
-    title: 'How we cut build times by 40%',
-    body: 'Our CI pipeline had grown to 18 minutes. We profiled every step, cached the slowest ones and split tests across runners. Here is what changed and what it cost us.',
-    status: 'Published',
-    authors: ['Maya', 'Theo'],
-    updated: '2d ago',
-  },
-  {
-    title: 'Designing for offline-first',
-    body: 'Users lose signal on trains, in lifts and on flights. We rebuilt sync around a local store so edits never block on the network, and conflicts resolve without prompts.',
-    status: 'In review',
-    authors: ['Theo'],
-    updated: '3d ago',
-  },
-  {
-    title: 'Q3 product roundup',
-    body: 'Scheduled publishing, image focal points, field-level permissions and twelve smaller fixes shipped this quarter. Here is a tour of each one with links to the docs.',
-    status: 'Published',
-    authors: ['Priya', 'Sam', 'Maya'],
-    updated: '1w ago',
-  },
-  {
-    title: 'A field guide to content models',
-    body: 'Good content models start from how editors work, not from the database. We walk through modelling articles, authors and references for a typical publication.',
-    status: 'Draft',
-    authors: ['Sam'],
-    updated: '1w ago',
-  },
-  {
-    title: 'Why we moved to Postgres',
-    body: 'We outgrew our document store once references and uniqueness mattered. This post covers the migration plan, the dual-write period and the queries that got faster.',
-    status: 'Published',
-    authors: ['Maya'],
-    updated: '2w ago',
-  },
-  {
-    title: 'Shipping localisation in a week',
-    body: 'Translating fields was the easy part. Locale fallbacks, right-to-left layouts and keeping slugs stable across languages took the rest of the week.',
-    status: 'Published',
-    authors: ['Theo', 'Priya'],
-    updated: '3w ago',
-  },
-]
-
 const phoneStageWidth = 640
+const phoneMaxScale = 1.1
 
 function useStageWidth(element: HTMLElement | null) {
   const subscribe = useCallback(
@@ -253,21 +204,6 @@ function useStageWidth(element: HTMLElement | null) {
     subscribe,
     () => element?.getBoundingClientRect().width ?? frameWidth,
     () => frameWidth,
-  )
-}
-
-function StatusPill({ status }: { status: Status }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 justify-self-start rounded-full px-2.5 py-0.5 text-[13px]',
-        status === 'Published' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-        status === 'In review' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-        status === 'Draft' && 'bg-muted text-muted-foreground',
-      )}
-    >
-      {status}
-    </span>
   )
 }
 
@@ -598,26 +534,6 @@ function AgentRow({
   )
 }
 
-function AuthorsCell({ authors }: { authors: readonly string[] }) {
-  return (
-    <span
-      data-demo-authors={authors.length}
-      className="flex min-w-0 items-center gap-2 text-muted-foreground"
-    >
-      <span className="flex shrink-0 -space-x-1.5">
-        {authors.map((author) => (
-          <span key={author} className="rounded-full ring-2 ring-card">
-            <PersonAvatar name={author} className="size-6 text-xs" />
-          </span>
-        ))}
-      </span>
-      <span className="truncate">
-        {authors.length === 1 ? authors[0] : `${authors[0]} +${authors.length - 1}`}
-      </span>
-    </span>
-  )
-}
-
 function PostsView({
   shown,
   agentRow,
@@ -683,8 +599,8 @@ export function ProductDemo() {
   const reducedMotion = usePrefersReducedMotion()
   const frame = usePlayback(stage, reducedMotion)
   const phone = stageWidth < phoneStageWidth
-  const scale = stageWidth / (phone ? cameraWindow : frameWidth)
-  const panned = phone ? cameraLeft(frame) * scale : 0
+  const phoneWidth = Math.min(stageWidth, phoneFrame.width * phoneMaxScale)
+  const scale = phone ? phoneWidth / phoneFrame.width : stageWidth / frameWidth
 
   return (
     <section
@@ -705,83 +621,85 @@ export function ProductDemo() {
           setStageElement(node)
         }}
         data-demo-stage={phone ? 'phone' : 'desktop'}
-        style={{ height: frameHeight * scale }}
-        className={cn('relative w-full', phone && 'overflow-hidden rounded-[18px] shadow-xl')}
+        style={{ height: (phone ? phoneFrame.height : frameHeight) * scale }}
+        className="relative w-full"
       >
-        <div
-          data-demo-frame
-          aria-hidden="true"
-          inert
-          style={{
-            width: frameWidth,
-            height: frameHeight,
-            scale: String(scale),
-            translate: `${-panned}px 0`,
-          }}
-          className={cn(
-            'absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden bg-card text-sm text-card-foreground select-none',
-            phone ? 'rounded-none' : 'rounded-[18px] shadow-xl',
-            styles.agentPulse,
-          )}
-        >
-          <WindowDots />
-          <DemoHeader
-            decisionsWaiting={
-              frame.view === 'editor' && docsDecisionState(frame.researchSteps) === 'asking' ? 1 : 0
-            }
-            askElapsed={frame.previewElapsed}
-          />
-          <div className="flex h-[calc(100%-5.5rem)]">
-            <DemoSidebar />
-            <div className="relative min-w-0 flex-1">
-              <PostsView
-                shown={frame.view === 'table'}
-                agentRow={frame.agentRow}
-                agentsJoined={frame.rowAgents}
-                hovered={frame.agentRowHovered}
-              />
-              <EditorView
-                shown={frame.view === 'editor'}
-                categories={frame.categories}
-                tags={frame.tags}
-                writerOnCategories={frame.writerOnCategories}
-                writerOnTags={frame.writerOnTags}
-                writerOnBody={frame.writerOnBody}
-                researchSteps={frame.researchSteps}
-                researchHovered={frame.researchHovered}
-                researchPanelOpen={frame.researchPanelOpen}
-                cover={frame.cover}
-                scrollProgress={frame.editorScroll}
-                bodyElapsed={frame.bodyElapsed}
-                seoElapsed={frame.seoElapsed}
-                socialImage={frame.socialImage}
-                previewElapsed={frame.previewElapsed}
-              />
-            </div>
+        {phone ? (
+          <div className="relative mx-auto h-full" style={{ width: phoneWidth }}>
+            <PhoneDemo frame={frame} scale={scale} />
           </div>
+        ) : (
           <div
-            data-demo-dialog-backdrop
+            data-demo-frame
+            aria-hidden="true"
+            inert
+            style={{ width: frameWidth, height: frameHeight, scale: String(scale) }}
             className={cn(
-              'absolute inset-x-0 top-8 bottom-0 z-[45] bg-background/30 backdrop-blur-[3px] transition-opacity duration-300',
-              frame.dialog === 'open' ? 'opacity-100' : 'opacity-0',
+              'absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-[18px] bg-card text-sm text-card-foreground shadow-xl select-none',
+              styles.agentPulse,
             )}
-          />
-          <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
-          <ShortcutChip shortcut={frame.shortcut} />
-          {frame.confetti && <Confetti {...frame.confetti} />}
-          <DemoCursor
-            state={frame.cursor}
-            shape={frame.cursorShape}
-            target={frame.cursorTarget}
-            from={frame.cursorFrom}
-            progress={frame.cursorProgress}
-            curve={frame.cursorBend}
-            drift={{ x: frame.cursorDriftX, y: frame.cursorDriftY }}
-          />
-          {frame.outroElapsed !== null && (
-            <Outro elapsed={frame.outroElapsed} opacity={frame.outroOpacity} />
-          )}
-        </div>
+          >
+            <WindowDots />
+            <DemoHeader
+              decisionsWaiting={
+                frame.view === 'editor' && docsDecisionState(frame.researchSteps) === 'asking'
+                  ? 1
+                  : 0
+              }
+              askElapsed={frame.previewElapsed}
+            />
+            <div className="flex h-[calc(100%-5.5rem)]">
+              <DemoSidebar />
+              <div className="relative min-w-0 flex-1">
+                <PostsView
+                  shown={frame.view === 'table'}
+                  agentRow={frame.agentRow}
+                  agentsJoined={frame.rowAgents}
+                  hovered={frame.agentRowHovered}
+                />
+                <EditorView
+                  shown={frame.view === 'editor'}
+                  categories={frame.categories}
+                  tags={frame.tags}
+                  writerOnCategories={frame.writerOnCategories}
+                  writerOnTags={frame.writerOnTags}
+                  writerOnBody={frame.writerOnBody}
+                  researchSteps={frame.researchSteps}
+                  researchHovered={frame.researchHovered}
+                  researchPanelOpen={frame.researchPanelOpen}
+                  cover={frame.cover}
+                  scrollProgress={frame.editorScroll}
+                  bodyElapsed={frame.bodyElapsed}
+                  seoElapsed={frame.seoElapsed}
+                  socialImage={frame.socialImage}
+                  previewElapsed={frame.previewElapsed}
+                />
+              </div>
+            </div>
+            <div
+              data-demo-dialog-backdrop
+              className={cn(
+                'absolute inset-x-0 top-8 bottom-0 z-[45] bg-background/30 backdrop-blur-[3px] transition-opacity duration-300',
+                frame.dialog === 'open' ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
+            <ShortcutChip shortcut={frame.shortcut} />
+            {frame.confetti && <Confetti {...frame.confetti} />}
+            <DemoCursor
+              state={frame.cursor}
+              shape={frame.cursorShape}
+              target={frame.cursorTarget}
+              from={frame.cursorFrom}
+              progress={frame.cursorProgress}
+              curve={frame.cursorBend}
+              drift={{ x: frame.cursorDriftX, y: frame.cursorDriftY }}
+            />
+            {frame.outroElapsed !== null && (
+              <Outro elapsed={frame.outroElapsed} opacity={frame.outroOpacity} />
+            )}
+          </div>
+        )}
       </div>
     </section>
   )

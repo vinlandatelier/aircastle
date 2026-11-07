@@ -42,6 +42,7 @@ import {
   researchBrief,
   researchLog,
   researchSources,
+  sourcesReadBy,
   type Artifact,
   type ResearchEntry,
 } from './research'
@@ -277,10 +278,7 @@ function MediaPlaceholder({ hint, className }: { hint: string; className?: strin
   )
 }
 
-function sourcesReadBy(steps: number) {
-  return researchLog.slice(0, steps).filter((entry) => entry.kind === 'source').length
-}
-
+/** Canute's research status chip: the source being read, then the number researched. */
 function ResearchStatus({
   steps,
   hovered,
@@ -757,14 +755,17 @@ function AirChat({ elapsed }: { elapsed: number }) {
   )
 }
 
-function ResearchPanel({
+/** The agent chat: Canute's research and decision, then Air's thread once a line is asked about. On phones it rises as a bottom sheet. */
+export function ResearchPanel({
   open,
   steps,
   askElapsed,
+  sheet = false,
 }: {
   open: boolean
   steps: number
   askElapsed: number | null
+  sheet?: boolean
 }) {
   const done = steps >= researchLog.length
   const airChat = askElapsed !== null && askElapsed >= askTiming.sent
@@ -775,8 +776,15 @@ function ResearchPanel({
       data-demo-research-panel
       data-state={open ? 'open' : 'closed'}
       className={cn(
-        'absolute top-0 right-0 bottom-0 z-30 flex w-[340px] flex-col border-l bg-card transition-[translate,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
-        open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-full opacity-0',
+        'absolute z-30 flex flex-col bg-card transition-[translate,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        sheet
+          ? 'inset-x-0 top-[38%] bottom-0 rounded-t-2xl border-t shadow-[0_-12px_40px_-12px_rgb(0_0_0/0.35)]'
+          : 'top-0 right-0 bottom-0 w-[340px] border-l',
+        open
+          ? 'translate-0 opacity-100'
+          : sheet
+            ? 'pointer-events-none translate-y-[calc(100%+4rem)]'
+            : 'pointer-events-none translate-x-full opacity-0',
       )}
     >
       <div
@@ -805,7 +813,12 @@ function ResearchPanel({
         </div>
         <EllipsisVerticalIcon className="size-4 text-muted-foreground" />
       </div>
-      <div className="flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4">
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col justify-end gap-4 overflow-hidden p-4',
+          sheet && 'mask-t-from-[calc(100%-2rem)]',
+        )}
+      >
         {airChat ? (
           <AirChat elapsed={askElapsed} />
         ) : (
@@ -854,7 +867,7 @@ function ResearchPanel({
           </>
         )}
       </div>
-      <div className="flex flex-col gap-2 p-3">
+      <div className={cn('flex flex-col gap-2 p-3', sheet && 'pb-6')}>
         {!airChat && docsDecisionState(steps) !== 'unasked' && (
           <DecisionCard state={docsDecisionState(steps) === 'sent' ? 'sent' : 'asking'} />
         )}
@@ -863,7 +876,9 @@ function ResearchPanel({
             readOnly
             tabIndex={-1}
             rows={1}
-            placeholder="Ask anything, @tag documents, or / for commands"
+            placeholder={
+              sheet ? 'Ask anything…' : 'Ask anything, @tag documents, or / for commands'
+            }
             className="min-h-0 p-3"
           />
           <InputGroupAddon align="block-end" className="justify-end">
@@ -1008,7 +1023,7 @@ function DraftBlocks({ elapsed, from = 0 }: { elapsed: number; from?: number }) 
       return (
         <pre
           key={index}
-          className="rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 whitespace-pre"
+          className="overflow-hidden rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 whitespace-pre"
         >
           {visible
             .filter((line) => line.length > 0)
@@ -1193,7 +1208,8 @@ function SeoGroup({ elapsed, socialImage }: { elapsed: number | null; socialImag
   )
 }
 
-function MainColumn({
+/** The editor's main fields: title, slug, summary, body and SEO. */
+export function MainColumn({
   writerOnBody,
   bodyElapsed,
   seoElapsed,
@@ -1308,14 +1324,17 @@ function CoverField({ state }: { state: CoverState }) {
   )
 }
 
-function SideColumn({
+/** The editor's side fields: authors, categories, tags, cover, date and reading time. */
+export function SideColumn({
   writerOnCategories,
   writerOnTags,
   categoriesShown,
   tagsShown,
   cover,
   bodyDone,
+  className,
 }: {
+  className?: string
   writerOnCategories: boolean
   writerOnTags: boolean
   categoriesShown: number
@@ -1324,7 +1343,7 @@ function SideColumn({
   bodyDone: boolean
 }) {
   return (
-    <div className="flex w-[300px] shrink-0 flex-col gap-6 rounded-lg border p-4">
+    <div className={cn('flex w-[300px] shrink-0 flex-col gap-6 rounded-lg border p-4', className)}>
       <Field name="authors" label="Authors" empty={false}>
         <Multiselect empty={false} placeholderText="Add authors">
           <Chip>
@@ -1381,9 +1400,10 @@ function SideColumn({
 }
 
 const siteLoadingDuration = 600
-const siteUrl = 'acme.com/blog/introducing-acme-mcp'
+export const siteUrl = 'acme.com/blog/introducing-acme-mcp'
 
-function SitePreview({
+/** A browser window for the live site preview, with its address bar and a loading bar. */
+export function SitePreview({
   url,
   elapsed,
   children,
@@ -1441,12 +1461,12 @@ const siteNav = ['Product', 'Customers', 'Changelog', 'Pricing', 'Blog'] as cons
 
 function SiteNav() {
   return (
-    <div className="flex h-16 shrink-0 items-center justify-between px-8">
+    <div className="flex h-16 shrink-0 items-center justify-between px-8 @max-[560px]:h-14 @max-[560px]:px-5">
       <span className="flex items-center gap-2 text-[15px] font-medium tracking-tight text-neutral-950 dark:text-white">
         <GeneratedAvatar name="Acme Inc" size={20} />
         Acme
       </span>
-      <span className="flex items-center gap-0.5 rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/70 dark:bg-white/[0.04] p-1 text-[13px] text-neutral-500 dark:text-neutral-400 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+      <span className="flex items-center gap-0.5 rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/70 @max-[560px]:hidden dark:bg-white/[0.04] p-1 text-[13px] text-neutral-500 dark:text-neutral-400 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
         {siteNav.map((item) => (
           <span
             key={item}
@@ -1461,7 +1481,7 @@ function SiteNav() {
         ))}
       </span>
       <span className="flex items-center gap-4 text-[13px]">
-        <span className="text-neutral-500 dark:text-neutral-400">Sign in</span>
+        <span className="text-neutral-500 @max-[560px]:hidden dark:text-neutral-400">Sign in</span>
         <span className="flex h-8 items-center gap-1 rounded-full bg-neutral-950 pr-2.5 pl-3.5 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.15)] dark:bg-white dark:text-neutral-950">
           Get started
           <ArrowRightIcon className="size-3.5" />
@@ -1471,7 +1491,8 @@ function SiteNav() {
   )
 }
 
-const openingAt = 110
+const openingAt = { wide: 110, narrow: 28 } as const
+const narrowSite = 560
 
 function useSiteScroll({ opening, end }: { opening: number; end: number }) {
   const page = useRef<HTMLDivElement>(null)
@@ -1480,7 +1501,8 @@ function useSiteScroll({ opening, end }: { opening: number; end: number }) {
     const lead = element?.querySelector<HTMLElement>('[data-demo-site-lead]')
     const viewport = element?.parentElement
     if (!element || !lead || !viewport) return
-    const toOpening = Math.max(0, lead.offsetTop - openingAt)
+    const offset = viewport.clientWidth < narrowSite ? openingAt.narrow : openingAt.wide
+    const toOpening = Math.max(0, lead.offsetTop - offset)
     const toEnd = Math.max(toOpening, element.offsetHeight - viewport.clientHeight)
     element.style.translate = `0 -${toOpening * opening + (toEnd - toOpening) * end}px`
   }, [page, opening, end])
@@ -1530,7 +1552,7 @@ function AskAir({ elapsed }: { elapsed: number }) {
   return (
     <div
       data-demo-ask-air
-      className="absolute top-full left-0 z-10 mt-2 flex w-[400px] flex-col rounded-xl border bg-popover p-3 text-[15px] leading-6 text-popover-foreground shadow-lg transition-[opacity,translate] duration-200 starting:translate-y-1 starting:opacity-0"
+      className="absolute top-full left-0 z-10 mt-2 flex w-[400px] max-w-full flex-col rounded-xl border bg-popover p-3 text-[15px] leading-6 text-popover-foreground shadow-lg transition-[opacity,translate] duration-200 starting:translate-y-1 starting:opacity-0"
     >
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <span className="air-mascot block size-4 shrink-0" />
@@ -1572,12 +1594,21 @@ function AskAir({ elapsed }: { elapsed: number }) {
   )
 }
 
-function SitePage({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: number | null }) {
-  const page = useSiteScroll(siteScrollAt(elapsed))
+/** The Acme blog post as the live site renders it, scrolled by the story or by `scroll` when given. */
+export function SitePage({
+  elapsed,
+  bodyElapsed,
+  scroll,
+}: {
+  elapsed: number
+  bodyElapsed: number | null
+  scroll?: { opening: number; end: number }
+}) {
+  const page = useSiteScroll(scroll ?? siteScrollAt(elapsed))
   return (
-    <div ref={page} className={cn('relative flex flex-col', styles.streamCard)}>
+    <div ref={page} className={cn('@container relative flex flex-col', styles.streamCard)}>
       <SiteNav />
-      <article className="mx-auto flex w-full max-w-[600px] flex-col px-6 pt-9">
+      <article className="mx-auto flex w-full max-w-[600px] flex-col px-6 pt-9 @max-[560px]:px-5 @max-[560px]:pt-5">
         <span className="flex items-center gap-1 text-[13px] text-neutral-500 dark:text-neutral-400">
           <ArrowLeftIcon className="size-3.5" />
           All posts
@@ -1590,7 +1621,7 @@ function SitePage({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: numb
           <span className="text-neutral-300 dark:text-neutral-600">·</span>
           <span>{bodyReadingTime}</span>
         </div>
-        <h1 className="mt-4 text-[38px] leading-[1.08] font-medium tracking-[-0.03em] text-neutral-950 dark:text-white">
+        <h1 className="mt-4 text-[38px] @max-[560px]:text-[30px] leading-[1.08] font-medium tracking-[-0.03em] text-neutral-950 dark:text-white">
           Introducing Acme MCP
         </h1>
         <p className="mt-4 text-base leading-7 text-neutral-500 dark:text-neutral-400">
@@ -1623,10 +1654,10 @@ function SitePage({ elapsed, bodyElapsed }: { elapsed: number; bodyElapsed: numb
         <div className="mt-9 flex flex-col gap-3.5 text-[15px] leading-7 text-neutral-600 dark:text-neutral-400 [&_code]:bg-black/[0.05] dark:[&_code]:bg-white/[0.08] [&_h2]:pt-4 [&_h2]:text-[21px] [&_h2]:font-semibold [&_h2]:tracking-[-0.015em] [&_h2]:text-neutral-950 dark:[&_h2]:text-white [&_pre]:border [&_pre]:border-black/[0.06] dark:[&_pre]:border-white/[0.08] [&_pre]:bg-white dark:[&_pre]:bg-white/[0.04] [&_pre]:text-neutral-800 dark:[&_pre]:text-neutral-200">
           {bodyElapsed !== null && (
             <>
-              <p data-demo-site-lead className="relative">
+              <div data-demo-site-lead className="relative">
                 <OpeningLine elapsed={elapsed} /> {openingRest}
                 {askOpenAt(elapsed) && <AskAir elapsed={elapsed} />}
-              </p>
+              </div>
               <DraftBlocks elapsed={bodyElapsed} from={1} />
             </>
           )}

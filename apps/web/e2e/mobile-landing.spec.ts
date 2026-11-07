@@ -103,54 +103,202 @@ test('on a phone, the hero title wraps cleanly and the rotating word never reflo
   )
 })
 
-test('on a phone, the preview zooms into a full-height window that follows the same story', async ({
+const tapTargets: Record<string, string> = {
+  row: '[data-phone-agent-card]',
+  research: '[data-phone-research]',
+  decision: '[data-demo-decision-option]',
+  preview: '[data-phone-preview-button]',
+  reference: '[data-phone-reference]',
+  publish: '[data-phone-publish]',
+  bell: '[data-demo-notifications]',
+  'notification-preview': '[data-demo-notification-action][data-pressed]',
+  'docs-publish': '[data-phone-publish]',
+}
+
+const overlays = [
+  '[data-phone-sheet="ask"]',
+  '[data-demo-research-panel][data-state="open"]',
+  '[data-demo-notifications-menu]',
+  '[data-phone-reply][data-state="shown"]',
+  '[data-demo-ask-air]',
+]
+
+type Rect = { left: number; top: number; right: number; bottom: number }
+
+type PhoneMoment = {
+  screen: string
+  sheet: string
+  dialog: string | null
+  finger: { x: number; y: number; target: string; state: string; opacity: number }
+  phone: Rect
+  pressed: Rect | null
+  opening: Rect[]
+  overlays: { selector: string; rect: Rect }[]
+  sheetOpacities: number[]
+}
+
+function readPhone(frame: Locator) {
+  return frame.evaluate(
+    (element, { tapTargets, overlays }) => {
+      const rect = (node: Element) => {
+        const { left, top, right, bottom } = node.getBoundingClientRect()
+        return { left, top, right, bottom }
+      }
+      const finger = element.querySelector('[data-phone-finger]')
+      if (!finger) throw new Error('The phone preview has no finger')
+      const fingerBox = finger.getBoundingClientRect()
+      const target = finger.getAttribute('data-target') ?? ''
+      const pressed = tapTargets[target] ? element.querySelector(tapTargets[target]) : null
+      const opening = element.querySelector('[data-demo-site-opening]')
+      return {
+        screen: element.getAttribute('data-phone-screen') ?? '',
+        sheet: element.getAttribute('data-phone-sheet-open') ?? '',
+        dialog:
+          element.querySelector('[data-phone-sheet="ask"]')?.getAttribute('data-state') ?? null,
+        finger: {
+          x: fingerBox.left + fingerBox.width / 2,
+          y: fingerBox.top + fingerBox.height / 2,
+          target,
+          state: finger.getAttribute('data-state') ?? '',
+          opacity: Number(getComputedStyle(finger).opacity),
+        },
+        phone: rect(element),
+        pressed: pressed ? rect(pressed) : null,
+        opening: opening
+          ? [...opening.getClientRects()].map((line) => ({
+              left: line.left,
+              top: line.top,
+              right: line.right,
+              bottom: line.bottom,
+            }))
+          : [],
+        sheetOpacities: [
+          ...element.querySelectorAll('[data-phone-sheet], [data-demo-research-panel]'),
+        ].map((sheet) => Number(getComputedStyle(sheet).opacity)),
+        overlays: overlays.flatMap((selector) =>
+          [...element.querySelectorAll(selector)].map((node) => ({ selector, rect: rect(node) })),
+        ),
+      }
+    },
+    { tapTargets, overlays },
+  ) as Promise<PhoneMoment>
+}
+
+function contains(outer: Rect, x: number, y: number, slack = 0) {
+  return (
+    x >= outer.left - slack &&
+    x <= outer.right + slack &&
+    y >= outer.top - slack &&
+    y <= outer.bottom + slack
+  )
+}
+
+test('on a phone, the preview tells the same story on a phone-shaped screen, and every tap lands on what it presses', async ({
   page,
 }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(240_000)
   await page.clock.install({ time: 0 })
   await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const stage = page.locator('[data-demo-stage]')
   await stage.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(300)
   await expect(stage).toHaveAttribute('data-demo-stage', 'phone')
-  await expectNoSideScroll(page)
-  const frame = page.locator('[data-demo-frame]')
+  const frame = page.locator('[data-demo-phone]')
+  await expect(frame).toBeVisible()
+  await expectInside(frame, stage, 'the phone screen')
   const stageBox = await box(stage)
-  const zoom = (await box(frame)).width / 1280
-  expect(zoom, 'the preview reads at about twice the fitted size').toBeGreaterThan(0.55)
-  expect(Math.abs(stageBox.height - 740 * zoom), 'the window shows the full height').toBeLessThan(2)
-  const cursor = frame.locator('[data-demo-cursor]')
+  const phoneBox = await box(frame)
+  expect(phoneBox.width, 'the phone screen fills the column').toBeGreaterThan(340)
+  expect(Math.abs(stageBox.height - phoneBox.height), 'the stage fits the phone').toBeLessThan(2)
+  await expectNoSideScroll(page)
 
-  await page.clock.runFor(story(2600))
-  await expectInside(frame.locator('[data-demo-dialog]'), stage, 'the Ask Air dialog')
-  await expect(frame.locator('[data-demo-dialog]')).toContainText('Ask Air')
-
-  const clickOn = async (target: string) => {
-    for (let tick = 0; tick < 1200; tick += 1) {
-      const state = await cursor.evaluate((element) => ({
-        target: element.getAttribute('data-target'),
-        state: element.getAttribute('data-state'),
-      }))
-      if (state.target === target && state.state === 'clicking') return
-      await page.clock.runFor(story(state.target === target ? 30 : 120))
+  const screens: string[] = []
+  const sheets: string[] = []
+  const taps = new Map<string, number>()
+  let dragStart: PhoneMoment | null = null
+  let dragEnd: PhoneMoment | null = null
+  let backdropChecked = false
+  for (
+    let tick = 0;
+    tick < 1800 && !(screens.at(-1) === 'posts' && screens.length > 1);
+    tick += 1
+  ) {
+    let now = await readPhone(frame)
+    if (now.finger.state === 'clicking' && !taps.has(now.finger.target)) {
+      await page.waitForTimeout(600)
+      now = await readPhone(frame)
     }
-    throw new Error(`The cursor never clicked ${target}`)
-  }
-  for (const [target, label] of [
-    ['row', 'the agent row click'],
-    ['research', 'the research click'],
-    ['preview', 'the Preview click'],
-    ['reference', 'the reference click'],
-    ['bell', 'the bell click'],
-    ['docs-publish', 'the final Publish click'],
-  ] as const) {
-    await clickOn(target)
-    await expectInside(cursor, stage, label)
+    if (screens.at(-1) !== now.screen) screens.push(now.screen)
+    if (now.sheet !== 'none' && sheets.at(-1) !== now.sheet) sheets.push(now.sheet)
+    if (now.finger.opacity > 0)
+      expect(
+        contains(now.phone, now.finger.x, now.finger.y),
+        `the finger stays on the screen at ${now.finger.target}`,
+      ).toBe(true)
+    for (const opacity of now.sheetOpacities)
+      expect(opacity, 'sheets slide in solid, never see-through').toBe(1)
+    for (const overlay of now.overlays) {
+      expect(overlay.rect.left, `${overlay.selector} starts on the screen`).toBeGreaterThanOrEqual(
+        now.phone.left - 1,
+      )
+      expect(overlay.rect.right, `${overlay.selector} ends on the screen`).toBeLessThanOrEqual(
+        now.phone.right + 1,
+      )
+    }
+    if (now.finger.state === 'clicking' && !taps.has(now.finger.target)) {
+      expect(now.pressed, `${now.finger.target} is on the screen when tapped`).not.toBeNull()
+      expect(
+        contains(now.pressed!, now.finger.x, now.finger.y),
+        `the ${now.finger.target} tap at ${Math.round(now.finger.x - now.phone.left)},${Math.round(now.finger.y - now.phone.top)} lands on it: ${JSON.stringify(now.pressed)} in ${JSON.stringify(now.phone)}`,
+      ).toBe(true)
+      taps.set(now.finger.target, tick)
+    }
+    if (now.finger.state === 'dragging') {
+      dragStart ??= now
+      dragEnd = now
+    }
+    if (now.dialog === 'closing' && !backdropChecked) {
+      await page.waitForTimeout(450)
+      const backdrop = frame.locator('[data-phone-backdrop]')
+      expect(
+        Number(await backdrop.evaluate((element) => getComputedStyle(element).opacity)),
+        'the blur lifts with the Ask Air sheet',
+      ).toBeLessThan(0.05)
+      backdropChecked = true
+    }
+    await page.clock.runFor(story(now.finger.state === 'moving' ? 30 : 60))
   }
 
-  const outro = frame.locator('[data-demo-outro]')
-  for (let tick = 0; tick < 200 && (await outro.count()) === 0; tick += 1)
+  expect(screens).toEqual(['posts', 'editor', 'site', 'docs', 'posts'])
+  expect(sheets).toEqual(['ask', 'research', 'air'])
+  expect([...taps.keys()].sort()).toEqual(Object.keys(tapTargets).sort())
+  expect(backdropChecked, 'the Ask Air sheet closed in view').toBe(true)
+  const [firstLine] = dragStart?.opening ?? []
+  const lastLine = dragEnd?.opening.at(-1)
+  if (!dragStart || !dragEnd || !firstLine || !lastLine)
+    throw new Error('The finger never selected the opening line')
+  expect(
+    contains(firstLine, dragStart.finger.x, dragStart.finger.y, 12),
+    'the selection starts on the opening line',
+  ).toBe(true)
+  expect(
+    contains(lastLine, dragEnd.finger.x, dragEnd.finger.y, 12),
+    'and ends on its last word',
+  ).toBe(true)
+})
+
+test('on a phone, the closing card fits the phone screen', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const stage = page.locator('[data-demo-stage]')
+  await stage.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(300)
+  const outro = page.locator('[data-demo-phone] [data-demo-outro]')
+  for (let tick = 0; tick < 800 && (await outro.count()) === 0; tick += 1)
     await page.clock.runFor(story(100))
   await page.clock.runFor(story(4000))
   await expectInside(outro.locator('[data-demo-outro-mark]'), stage, 'the closing mark')
@@ -170,20 +318,28 @@ test('on a phone, the whole preview story plays through in its window, start to 
     await stage.scrollIntoViewIfNeeded()
     await expect(stage).toHaveAttribute('data-demo-stage', 'phone')
   })
-  const frame = page.locator('[data-demo-frame]')
-  await test.step('Ask Air takes the request', async () => {
-    await expect(frame.locator('[data-demo-dialog]')).toBeVisible({ timeout: 10_000 })
+  const frame = page.locator('[data-demo-phone]')
+  await test.step('Ask Air takes the request in a sheet', async () => {
+    await expect(frame.locator('[data-phone-sheet="ask"]')).toBeVisible({ timeout: 10_000 })
   })
   await test.step('the agents open the post in the editor', async () => {
-    await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown', {
+    await expect(frame).toHaveAttribute('data-phone-screen', 'editor', { timeout: 20_000 })
+  })
+  await test.step("Canute's research rises as a sheet", async () => {
+    await expect(frame).toHaveAttribute('data-phone-sheet-open', 'research', { timeout: 20_000 })
+  })
+  await test.step('the post is previewed on the live site', async () => {
+    await expect(frame).toHaveAttribute('data-phone-screen', 'site', { timeout: 30_000 })
+  })
+  await test.step('Air takes the line to its team', async () => {
+    await expect(frame).toHaveAttribute('data-phone-sheet-open', 'air', { timeout: 20_000 })
+    await expect(frame.locator('[data-phone-reply]')).toHaveAttribute('data-state', 'shown', {
       timeout: 20_000,
     })
   })
-  await test.step('the post is previewed on the live site', async () => {
-    await expect(frame.locator('[data-demo-site-preview]')).toHaveCount(1, { timeout: 30_000 })
-  })
   await test.step('the docs page is previewed and published', async () => {
-    await expect(frame.locator('[data-demo-docs-page]')).toBeVisible({ timeout: 40_000 })
+    await expect(frame).toHaveAttribute('data-phone-screen', 'docs', { timeout: 30_000 })
+    await expect(frame.locator('[data-phone-status]')).toHaveText('Published', { timeout: 20_000 })
   })
   await test.step('the closing card names Aircastle', async () => {
     const wordmark = frame.locator('[data-demo-outro-wordmark]')

@@ -62,14 +62,14 @@ function useDocsScroll(progress: number) {
 export function DocsPage({ scroll }: { scroll: number }) {
   const content = useDocsScroll(scroll)
   return (
-    <div data-demo-docs-page className="flex h-full flex-col">
-      <div className="flex h-14 shrink-0 items-center gap-6 border-b border-black/[0.06] px-6 dark:border-white/[0.08]">
+    <div data-demo-docs-page className="@container flex h-full flex-col">
+      <div className="flex h-14 shrink-0 items-center gap-6 border-b border-black/[0.06] px-6 @max-[640px]:px-5 dark:border-white/[0.08]">
         <span className="flex items-center gap-2 text-[15px] font-medium tracking-tight text-neutral-950 dark:text-white">
           <GeneratedAvatar name="Acme Inc" size={20} />
           Acme
           <span className="text-neutral-400 dark:text-neutral-500">Docs</span>
         </span>
-        <span className="flex items-center gap-1 text-[13px] text-neutral-500 dark:text-neutral-400">
+        <span className="flex items-center gap-1 text-[13px] text-neutral-500 @max-[640px]:hidden dark:text-neutral-400">
           {docsTabs.map((tab) => (
             <span
               key={tab}
@@ -82,9 +82,9 @@ export function DocsPage({ scroll }: { scroll: number }) {
             </span>
           ))}
         </span>
-        <span className="ms-auto flex h-8 w-56 items-center gap-2 rounded-lg border border-black/[0.06] bg-white px-2.5 text-[13px] text-neutral-400 dark:border-white/[0.08] dark:bg-white/[0.04]">
+        <span className="ms-auto flex h-8 w-56 items-center @max-[640px]:w-8 @max-[640px]:justify-center @max-[640px]:px-0 @max-[640px]:[&>:not(svg)]:hidden gap-2 rounded-lg border border-black/[0.06] bg-white px-2.5 text-[13px] text-neutral-400 dark:border-white/[0.08] dark:bg-white/[0.04]">
           <SearchIcon className="size-3.5" />
-          Search docs
+          <span>Search docs</span>
           <span className="ms-auto text-[11px]">⌘K</span>
         </span>
       </div>
@@ -92,7 +92,7 @@ export function DocsPage({ scroll }: { scroll: number }) {
         <div ref={content} className="flex min-h-full">
           <nav
             data-demo-docs-nav
-            className="flex w-56 shrink-0 flex-col gap-5 border-r border-black/[0.06] px-4 py-6 text-[13px] dark:border-white/[0.08]"
+            className="flex w-56 shrink-0 flex-col gap-5 border-r @max-[640px]:hidden border-black/[0.06] px-4 py-6 text-[13px] dark:border-white/[0.08]"
           >
             {docsNav.map(({ group, items }) => (
               <div key={group} className="flex flex-col gap-0.5">
@@ -115,7 +115,7 @@ export function DocsPage({ scroll }: { scroll: number }) {
               </div>
             ))}
           </nav>
-          <article className="min-w-0 flex-1 px-12 pt-8">
+          <article className="min-w-0 flex-1 px-12 pt-8 @max-[640px]:px-5 @max-[640px]:pt-6">
             <div className="max-w-[580px]">
               <span className="text-[13px] text-neutral-500 dark:text-neutral-400">
                 Integrations
@@ -199,7 +199,7 @@ export function DocsPage({ scroll }: { scroll: number }) {
               </div>
             </div>
           </article>
-          <aside className="flex w-48 shrink-0 flex-col gap-1.5 py-8 pr-6 text-[12px] text-neutral-500 dark:text-neutral-400">
+          <aside className="flex w-48 shrink-0 flex-col gap-1.5 py-8 pr-6 text-[12px] @max-[640px]:hidden text-neutral-500 dark:text-neutral-400">
             <span className="pb-1 text-neutral-950 dark:text-white">On this page</span>
             {onThisPage.map((item, index) => (
               <span key={item} className={cn(index === 0 && 'text-neutral-950 dark:text-white')}>

@@ -33,8 +33,16 @@ const pieces = Array.from({ length: 64 }, (_, index) => {
 })
 
 /** A burst of confetti from the entry's Publish button, placed from the milliseconds since the click. */
-export function Confetti({ elapsed, entry }: { elapsed: number; entry: PublishedEntry }) {
-  const origin = origins[entry]
+export function Confetti({
+  elapsed,
+  entry,
+  from,
+}: {
+  elapsed: number
+  entry: PublishedEntry
+  from?: { left: number; top: number }
+}) {
+  const origin = from ?? origins[entry]
   const travelled = (1 - Math.exp(-drag * elapsed)) / drag
   const fall = (gravity * elapsed * elapsed) / 2
   const opacity = Math.max(0, Math.min(1, 1 - (elapsed - fadeAfter) / fadeDuration))

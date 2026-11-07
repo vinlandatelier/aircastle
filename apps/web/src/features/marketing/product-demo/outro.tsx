@@ -1,3 +1,4 @@
+import { cn } from 'cn'
 import { CloudGradient, CloudGrain } from '@/components/brand/cloud-gradient'
 
 const bloomStartsAfter = 1000
@@ -7,7 +8,7 @@ const bladeDuration = 900
 const settleDuration = 1700
 const nameStartsAfter = bloomStartsAfter + 1200
 const nameDuration = 1000
-const markSize = 112
+const markSizes = { desktop: 112, phone: 64 } as const
 
 function progress(elapsed: number, duration: number) {
   return Math.max(0, Math.min(1, elapsed / duration))
@@ -28,7 +29,7 @@ function overshoot(t: number) {
 
 const galeBlades = [1, 2, 3, 4, 5].map((blade) => `url(/brand/gale-blade-${blade}.svg)`)
 
-function GaleBloom({ elapsed }: { elapsed: number }) {
+function GaleBloom({ elapsed, markSize }: { elapsed: number; markSize: number }) {
   const settle = easeOut(progress(elapsed - bloomStartsAfter, settleDuration))
   return (
     <div
@@ -57,7 +58,16 @@ function GaleBloom({ elapsed }: { elapsed: number }) {
 }
 
 /** The closing card: a grainy cloud gradient over the whole preview, where the Gale mark blooms and the Aircastle name slides out beside it. */
-export function Outro({ elapsed, opacity }: { elapsed: number; opacity: number }) {
+export function Outro({
+  elapsed,
+  opacity,
+  phone = false,
+}: {
+  elapsed: number
+  opacity: number
+  phone?: boolean
+}) {
+  const markSize = markSizes[phone ? 'phone' : 'desktop']
   const sinceName = elapsed - nameStartsAfter
   const named = easeInOut(progress(sinceName, nameDuration))
   const drift = easeOut(progress(elapsed, driftDuration))
@@ -73,10 +83,10 @@ export function Outro({ elapsed, opacity }: { elapsed: number; opacity: number }
       </div>
       <CloudGrain data-demo-outro-grain />
       <div
-        className="relative flex items-center gap-6"
+        className={cn('relative flex items-center', phone ? 'gap-3.5' : 'gap-6')}
         style={{ translate: `calc((50% - ${markSize / 2}px) * ${1 - named}) 0` }}
       >
-        <GaleBloom elapsed={elapsed} />
+        <GaleBloom elapsed={elapsed} markSize={markSize} />
         <span
           data-demo-outro-wordmark
           style={{
@@ -84,7 +94,10 @@ export function Outro({ elapsed, opacity }: { elapsed: number; opacity: number }
             clipPath: `inset(0 ${(1 - named) * 100}% 0 0)`,
             translate: `${(1 - named) * -16}px 0`,
           }}
-          className="text-[84px] leading-none font-[300] tracking-[-0.03em] text-white [text-shadow:0_1px_14px_rgb(90_40_20/0.2)]"
+          className={cn(
+            'leading-none font-[300] tracking-[-0.03em] text-white [text-shadow:0_1px_14px_rgb(90_40_20/0.2)]',
+            phone ? 'text-[48px]' : 'text-[84px]',
+          )}
         >
           Aircastle
         </span>

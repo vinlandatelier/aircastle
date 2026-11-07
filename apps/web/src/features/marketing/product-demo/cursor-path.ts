@@ -47,15 +47,17 @@ export function cursorPosition({
   progress,
   curve,
   drift,
+  spots = cursorSpots,
 }: {
+  spots?: Readonly<Record<CursorTarget, { left: number; top: number }>>
   from: CursorTarget
   target: CursorTarget
   progress: number
   curve: number
   drift: { x: number; y: number }
 }) {
-  const start = cursorSpots[from]
-  const spot = cursorSpots[target]
+  const start = spots[from]
+  const spot = spots[target]
   const dx = spot.left - start.left
   const dy = spot.top - start.top
   const bend = Math.sin(Math.PI * progress) * curve
