@@ -12,6 +12,8 @@ import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 import { navigationPages } from '@/features/navigation'
 import { landingDescription, landingTitle } from '@/metadata'
 import {
+  access,
+  unmatchedAccess,
   AuthRoot,
   DashboardLayout,
   Workspaces,
@@ -19,12 +21,26 @@ import {
   DevelopmentInbox,
   type AuthBrowserOptions,
   type BrowserAuth,
+  type RouteAccess,
 } from '@/features/auth'
 
 const rootRoute = createRootRouteWithContext<{ auth: BrowserAuth }>()({
-  beforeLoad: async ({ context, location }) => ({
-    view: await context.auth.enter(location.pathname, location.search),
-  }),
+  beforeLoad: async ({ context, location, matches }) => {
+    const leaf = matches.at(-1)
+    const notFound = matches.some((match) => match._notFound)
+    return {
+      view: await context.auth.enter(
+        {
+          access: notFound
+            ? unmatchedAccess(location.pathname)
+            : (leaf?.staticData.access ?? access.denied),
+          params: leaf?.params ?? {},
+        },
+        location.pathname,
+        location.search,
+      ),
+    }
+  },
   component: AuthRoot,
   notFoundComponent: NotFoundPage,
   head: () => ({
@@ -45,6 +61,7 @@ const rootRoute = createRootRouteWithContext<{ auth: BrowserAuth }>()({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
+  staticData: { access: access.public },
   head: () => ({
     meta: [{ title: landingTitle }],
   }),
@@ -61,46 +78,58 @@ const indexRoute = createRoute({
     </main>
   ),
 })
-const dashboardEntryRoute = createRoute({ getParentRoute: () => rootRoute, path: '/dash' })
+const dashboardEntryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dash',
+  staticData: { access: access.dashboard },
+})
 const setupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/setup',
+  staticData: { access: access.setup },
   component: () => <SignInPage purpose="setup" />,
 })
 const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sign-in',
+  staticData: { access: access.signIn },
   component: SignInPage,
   head: () => ({ meta: [{ title: 'Aircastle - Sign in' }] }),
 })
 const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/development-inbox',
+  staticData: { access: access.inbox },
   component: DevelopmentInbox,
 })
 const workspacesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dash/workspaces',
+  staticData: { access: access.workspaces },
   component: () => <Workspaces title="Workspaces" />,
 })
 const createWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dash/workspaces/new',
+  staticData: { access: access.session },
   component: () => <Workspaces title="Create a workspace" />,
 })
 const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dash/workspaces/$workspaceId/projects',
+  staticData: { access: access.workspaceProjects },
   component: () => <Workspaces title="Projects" />,
 })
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dash/workspaces/$workspaceId/projects/$projectId',
+  staticData: { access: access.projectPage('collections') },
   component: DashboardLayout,
 })
 const dashboardIndexRoute = createRoute({
   getParentRoute: () => dashboardRoute,
   path: '/',
+  staticData: { access: access.projectPage('collections') },
   beforeLoad: ({ params }) => {
     throw redirect({
       to: '/dash/workspaces/$workspaceId/projects/$projectId/collections',
@@ -121,6 +150,7 @@ const pageRoutes = navigationPages.map(({ path, title }) =>
       '/dash/workspaces/$workspaceId/projects/$projectId/',
       '',
     ) as DashboardPagePath,
+    staticData: { access: access.projectPage(path.split('/').at(-1) ?? '') },
     component: DashboardSkeleton,
     head: () => ({ meta: [{ title: `Aircastle - ${title}` }] }),
   }),
@@ -153,5 +183,8 @@ export function createAppRouter(history: RouterHistory, auth?: AuthBrowserOption
 declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof createAppRouter>
+  }
+  interface StaticDataRouteOption {
+    access?: RouteAccess
   }
 }

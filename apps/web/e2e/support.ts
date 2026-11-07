@@ -100,7 +100,7 @@ export const fixtureTest = test.extend<{ fixtureScenario: void }>({
 export async function visit(
   page: Page,
   scenario: Scenario = 'default',
-  pathname = '/dash/workspaces/demo/projects/demo/collections',
+  pathname = '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/collections',
 ) {
   test
     .info()

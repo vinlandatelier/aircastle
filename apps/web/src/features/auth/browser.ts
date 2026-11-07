@@ -1,5 +1,5 @@
 import { redirect } from '@tanstack/react-router'
-import { navigationPages } from '@/features/navigation'
+import type { RouteAccess, RouteParams } from './access'
 import {
   createAuthHttp,
   destinationPath,
@@ -24,37 +24,6 @@ export type AuthView =
   | { kind: 'authenticated'; session: BrowserSession }
   | { kind: 'disabled' }
   | { kind: 'failure' }
-
-const uuid =
-  /^(?:[\dA-Fa-f]{8}-[\dA-Fa-f]{4}-[1-8][\dA-Fa-f]{3}-[89ABab][\dA-Fa-f]{3}-[\dA-Fa-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/
-
-function protectedDestination(path: string): ProtectedDestination | undefined {
-  if (path === '/dash/workspaces') return { kind: 'workspaces' }
-  try {
-    const [, projectsWorkspace] = /^\/dash\/workspaces\/([^/]+)\/projects$/.exec(path) ?? []
-    if (projectsWorkspace !== undefined) {
-      const workspaceId = decodeURIComponent(projectsWorkspace)
-      if (uuid.test(workspaceId)) return { kind: 'workspace-projects', workspaceId }
-    }
-    const [, pageWorkspace, pageProject, page] =
-      /^\/dash\/workspaces\/([^/]+)\/projects\/([^/]+)\/([^/]+)$/.exec(path) ?? []
-    if (
-      pageWorkspace !== undefined &&
-      pageProject !== undefined &&
-      page !== undefined &&
-      navigationPages.some((item) => item.path.endsWith(`/${page}`))
-    ) {
-      const workspaceId = decodeURIComponent(pageWorkspace)
-      const projectId = decodeURIComponent(pageProject)
-      if (uuid.test(workspaceId) && uuid.test(projectId)) {
-        return { kind: 'project-page', workspaceId, projectId, page }
-      }
-    }
-  } catch (error) {
-    if (!(error instanceof URIError)) throw error
-    return undefined
-  }
-}
 
 export function createBrowserAuth(options: AuthBrowserOptions = {}) {
   const request = createAuthHttp(options)
@@ -82,17 +51,15 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
     async entry(body: object) {
       return request<{ destination: Destination }>('/auth/entry', body)
     },
-    async enter(path: string, search: Record<string, unknown>): Promise<AuthView> {
-      if (
-        path !== '/dash' &&
-        !path.startsWith('/dash/') &&
-        path !== '/setup' &&
-        path !== '/sign-in' &&
-        path !== '/development-inbox'
-      ) {
-        return { kind: 'public' }
-      }
-      const purpose = path === '/setup' ? 'setup' : path === '/sign-in' ? 'sign-in' : undefined
+    async enter(
+      route: { access: RouteAccess; params: RouteParams },
+      path: string,
+      search: Record<string, unknown>,
+    ): Promise<AuthView> {
+      const { access } = route
+      if (access.kind === 'public') return { kind: 'public' }
+      const purpose =
+        access.kind === 'setup' ? 'setup' : access.kind === 'sign-in' ? 'sign-in' : undefined
       const token = typeof search.token === 'string' && search.token ? search.token : undefined
       if (purpose && !token && confirmation?.purpose === purpose) return { kind: 'public' }
       const state: HttpResult<InstanceState> =
@@ -114,12 +81,13 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
         go(path)
       }
       confirmation = undefined
-      if (path === '/development-inbox') {
+      if (access.kind === 'inbox') {
         if (state.value.kind === 'authenticated') await request('/auth/activity', {})
         return { kind: 'public' }
       }
+      const guard = access.kind === 'protected' ? access.guard(route.params) : undefined
       if (state.value.kind !== 'authenticated') {
-        requested = protectedDestination(path) ?? requested
+        requested = guard?.kind === 'visit' ? guard.destination : requested
         const target = state.value.kind === 'setup-required' ? '/setup' : '/sign-in'
         if (path !== target) {
           handoff = { path: target, state: state.value }
@@ -133,8 +101,8 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
       const activity = await request<BrowserSession>('/auth/activity', {})
       if (activity.kind === 'unauthenticated') signedOut()
       if (activity.kind !== 'ok') return { kind: 'failure' }
-      if (path === '/setup' || path === '/sign-in') go('/dash')
-      if (path === '/dash' || path === '/dash/') {
+      if (!guard) go('/dash')
+      if (guard?.kind === 'resolve') {
         const entry = await request<{ destination: Destination }>('/auth/entry', {
           kind: 'resolve',
         })
@@ -143,11 +111,10 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
         requested = undefined
         go(destinationPath(entry.value.destination))
       }
-      const destination = protectedDestination(path)
-      if (destination) {
+      if (guard?.kind === 'visit') {
         const entry = await request<{ destination: Destination }>('/auth/entry', {
           kind: 'visit',
-          destination,
+          destination: guard.destination,
         })
         if (entry.kind === 'unauthenticated') signedOut()
         if (entry.kind === 'forbidden') go('/dash')

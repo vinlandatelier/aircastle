@@ -17,8 +17,8 @@ const responses: Record<string, unknown> = {
   'POST /api/auth/entry': {
     destination: {
       kind: 'project-page',
-      workspaceId: 'demo',
-      projectId: 'demo',
+      workspaceId: '11111111-1111-4111-8111-111111111111',
+      projectId: '22222222-2222-4222-8222-222222222222',
       page: 'collections',
     },
   },
@@ -47,7 +47,12 @@ const displayOnlyFetch: typeof globalThis.fetch = async (input, init) => {
         destination:
           entry.kind === 'visit'
             ? entry.destination
-            : { kind: 'project-page', workspaceId: 'demo', projectId: 'demo', page: 'collections' },
+            : {
+                kind: 'project-page',
+                workspaceId: '11111111-1111-4111-8111-111111111111',
+                projectId: '22222222-2222-4222-8222-222222222222',
+                page: 'collections',
+              },
       },
     })
   }
