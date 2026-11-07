@@ -120,12 +120,17 @@ export async function assertLayout(page: Page) {
       expect(overlap <= 1 || vertical <= 1, 'Essential controls must not overlap').toBe(true)
     }
   }
-  for (const popup of await page
+  const popups = await page
     .locator('[role="dialog"], [data-slot="popover-content"], [role="menu"]')
-    .all()) {
-    if (!(await popup.isVisible())) continue
-    const box = await popup.boundingBox()
-    expect(box!.x).toBeGreaterThanOrEqual(-1)
-    expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1)
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => element.checkVisibility({ visibilityProperty: true }))
+        .map((element) => element.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .map(({ x, width }) => ({ x, width })),
+    )
+  for (const box of popups) {
+    expect(box.x).toBeGreaterThanOrEqual(-1)
+    expect(box.x + box.width).toBeLessThanOrEqual(width + 1)
   }
 }
