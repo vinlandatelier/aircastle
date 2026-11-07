@@ -564,6 +564,37 @@ test.describe('protected path variants', () => {
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
     expect(await protectedMounts(page)).toEqual({ projects: false, shell: true })
   })
+
+  test('B36 a case-variant project page is checked again after access is removed or the session ends', async ({
+    page,
+    authService,
+  }) => {
+    const project = await authService.provisionProject()
+    const email = uniqueEmail('variants-revoked')
+    await completeSetupAndSkip(page, email)
+    await authService.grantWorkspace(email, project.workspaceId)
+    const variant = `/Dash/workspaces/${project.workspaceId}/projects/${project.projectId}/collections`
+    const navigation = page.getByRole('navigation', { name: 'Main navigation' })
+
+    await page.goto(variant)
+    await expect(navigation).toBeVisible()
+    await authService.revokeWorkspace(email, project.workspaceId)
+    await navigation.getByRole('link', { name: 'Collections', exact: true }).click()
+    await expect(page).toHaveURL(`${origin(page)}/dash/workspaces`)
+    await expect(heading(page, 'Workspaces')).toBeVisible()
+    await expect(navigation).toHaveCount(0)
+
+    await authService.grantWorkspace(email, project.workspaceId)
+    await page.goto(variant)
+    await expect(navigation).toBeVisible()
+    const second = await page.context().newPage()
+    await second.goto('/dash/workspaces')
+    await expect(heading(second, 'Workspaces')).toBeVisible()
+    await signOut(second, 'Alex', email)
+    await navigation.getByRole('link', { name: 'Collections', exact: true }).click()
+    await expectSignIn(page)
+    await expect(navigation).toHaveCount(0)
+  })
 })
 
 test('B37 a superseded link that has expired shows the generic error and offers sign-in', async ({
