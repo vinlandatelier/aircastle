@@ -383,4 +383,34 @@ describe('[auth:R7] a checked view lasts one navigation', () => {
     expect(router.state.location.pathname).toBe('/sign-in')
     expectNoShell()
   })
+
+  it('a project base visit that a newer navigation supersedes leaves nothing for the next visit', async () => {
+    const server = { signedIn: true }
+    const held = deferredResponse()
+    const http = displayHttp({
+      'GET /api/auth/state': () =>
+        ok(server.signedIn ? { kind: 'authenticated', session } : { kind: 'signed-out' }),
+      'POST /api/auth/entry': async (request) => {
+        const { destination } = await request.json()
+        await held.promise
+        return ok({ destination, session })
+      },
+    })
+    const { history, router } = await mountAuth('/', http)
+    await screen.findByRole('heading', { name: 'Aircastle' })
+    await act(async () => history.push(protectedPath.replace(/\/collections$/, '')))
+    await waitFor(() => expect(http.calls('/auth/entry')).toHaveLength(1))
+    await act(async () => history.push('/'))
+    await waitFor(() => expect(router.state.status).toBe('idle'))
+    await act(async () => {
+      held.resolve(new Response(null))
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    server.signedIn = false
+    await act(async () => history.push(protectedPath))
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/sign-in')
+    expectNoShell()
+  })
 })

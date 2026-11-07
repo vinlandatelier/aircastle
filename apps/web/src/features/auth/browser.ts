@@ -61,6 +61,7 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
       route: { access: RouteAccess; params: RouteParams },
       path: string,
       search: Record<string, unknown>,
+      signal: AbortSignal,
     ): Promise<AuthView> {
       const { access } = route
       if (access.kind === 'public') return { kind: 'public' }
@@ -73,7 +74,7 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
       if (handed && 'view' in handed) return handed.view
       const state: HttpResult<InstanceState> = handed
         ? { kind: 'ok', value: handed.state }
-        : await request<InstanceState>('/auth/state')
+        : await request<InstanceState>('/auth/state', undefined, signal)
       if (state.kind !== 'ok') return { kind: 'failure' }
       if (state.value.kind === 'disabled') {
         confirmation = undefined
@@ -83,13 +84,13 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
         confirmation = {
           purpose,
           token,
-          preview: await request('/auth/confirm/preview', { purpose, token }),
+          preview: await request('/auth/confirm/preview', { purpose, token }, signal),
         }
         go(path)
       }
       confirmation = undefined
       if (access.kind === 'inbox') {
-        if (state.value.kind === 'authenticated') await request('/auth/activity', {})
+        if (state.value.kind === 'authenticated') await request('/auth/activity', {}, signal)
         return { kind: 'public' }
       }
       const guard = access.kind === 'protected' ? access.guard(route.params) : undefined
@@ -109,7 +110,7 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
       }
       if (!guard) return toDashboard()
       if (guard.kind === 'session') {
-        const activity = await request<BrowserSession>('/auth/activity', {})
+        const activity = await request<BrowserSession>('/auth/activity', {}, signal)
         if (activity.kind === 'unauthenticated') signedOut()
         if (activity.kind !== 'ok') return { kind: 'failure' }
         return { kind: 'authenticated', session: activity.value }
@@ -119,6 +120,7 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
         guard.kind === 'resolve'
           ? { kind: 'resolve' }
           : { kind: 'visit', destination: guard.destination },
+        signal,
       )
       if (entry.kind === 'unauthenticated') signedOut()
       if (entry.kind === 'forbidden') toDashboard()

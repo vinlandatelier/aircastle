@@ -25,7 +25,7 @@ import {
 } from '@/features/auth'
 
 const rootRoute = createRootRouteWithContext<{ auth: BrowserAuth }>()({
-  beforeLoad: async ({ context, location, matches }) => {
+  beforeLoad: async ({ context, location, matches, abortController }) => {
     const leaf = matches.at(-1)
     const notFound = matches.some((match) => match._notFound)
     return {
@@ -38,6 +38,7 @@ const rootRoute = createRootRouteWithContext<{ auth: BrowserAuth }>()({
         },
         location.pathname,
         location.search,
+        abortController.signal,
       ),
     }
   },

@@ -32,12 +32,17 @@ export type HttpResult<Value> =
 
 export function createAuthHttp(options: AuthBrowserOptions) {
   const transport = options.fetch ?? globalThis.fetch.bind(globalThis)
-  return async function request<Value>(path: string, body?: object): Promise<HttpResult<Value>> {
+  return async function request<Value>(
+    path: string,
+    body?: object,
+    signal?: AbortSignal,
+  ): Promise<HttpResult<Value>> {
     try {
       const response = await transport(`/api${path}`, {
         method: body === undefined ? 'GET' : 'POST',
         credentials: 'same-origin',
         cache: 'no-store',
+        signal: signal ?? null,
         ...(body === undefined
           ? {}
           : {
@@ -46,6 +51,7 @@ export function createAuthHttp(options: AuthBrowserOptions) {
             }),
       })
       const result: HttpResult<Value> = await response.json()
+      if (signal?.aborted) return { kind: 'temporary-failure' }
       return response.ok && result.kind === 'ok'
         ? result
         : result.kind === 'ok'
