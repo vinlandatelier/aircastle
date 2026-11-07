@@ -4,37 +4,34 @@ import { describe, expect, test } from "vite-plus/test";
 
 const apiDirectory = resolve(import.meta.dirname, "..");
 const cli = resolve(apiDirectory, "node_modules/.bin/hono");
-const cliTimeout = 10_000;
-const testTimeout = cliTimeout + 5_000;
+const childTimeout = 10_000;
+const testTimeout = childTimeout + 5_000;
 
 describe("Hono CLI", () => {
-  test(
-    "discovers API routes without starting the server",
-    () => {
-      const result = spawnSync(process.execPath, [cli, "routes", "src/cli.ts"], {
-        cwd: apiDirectory,
-        encoding: "utf8",
-        timeout: cliTimeout,
-      });
+  test("discovers API routes without starting the server", { timeout: testTimeout }, () => {
+    const result = spawnSync(process.execPath, [cli, "routes", "src/cli.ts"], {
+      cwd: apiDirectory,
+      encoding: "utf8",
+      timeout: childTimeout,
+    });
 
-      expect(result.status, result.stderr).toBe(0);
-      const output = JSON.parse(result.stdout);
+    expect(result.status, result.stderr).toBe(0);
+    const output = JSON.parse(result.stdout);
 
-      expect(output.ok).toBe(true);
-      expect(output.data.routes).toContainEqual(
-        expect.objectContaining({ method: "GET", path: "/api/health" }),
-      );
-    },
-    testTimeout,
-  );
+    expect(output.ok).toBe(true);
+    expect(output.data.routes).toContainEqual(
+      expect.objectContaining({ method: "GET", path: "/api/health" }),
+    );
+  });
 
   test(
     "sends a request through the Bun runtime without starting the server",
+    { timeout: testTimeout },
     () => {
       const result = spawnSync(
         process.execPath,
         [cli, "request", "/api/health", "src/cli.ts", "--runtime", "bun"],
-        { cwd: apiDirectory, encoding: "utf8", timeout: cliTimeout },
+        { cwd: apiDirectory, encoding: "utf8", timeout: childTimeout },
       );
 
       expect(result.status, result.stderr).toBe(0);
@@ -43,6 +40,5 @@ describe("Hono CLI", () => {
         data: { status: 200, body: { status: "ok" }, runtime: "bun" },
       });
     },
-    testTimeout,
   );
 });
