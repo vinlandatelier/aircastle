@@ -106,12 +106,21 @@ export interface AuthStore {
   close: () => Promise<void>;
 }
 
+/**
+ * A storage failure the auth boundary reports as temporary. `code` holds only a driver
+ * code such as a SQLSTATE or a connection error name; anything else is dropped so a
+ * message can never reach diagnostics through it.
+ */
 export class AuthStorageError extends Error {
+  readonly code?: string;
+
   constructor(
     readonly kind: "unavailable" | "commit-unknown",
-    options?: ErrorOptions,
+    options?: ErrorOptions & { code?: string },
   ) {
     super(kind, options);
+    if (options?.code !== undefined && /^[0-9A-Z_]{1,64}$/u.test(options.code))
+      this.code = options.code;
   }
 }
 
@@ -122,4 +131,4 @@ export type AuthEvent =
       reason: "unknown-identity" | "invalid-link" | "superseded-link" | "setup-complete";
     }
   | { kind: "delivery-failed" }
-  | { kind: "storage-unavailable" };
+  | { kind: "storage-unavailable"; code?: string };
