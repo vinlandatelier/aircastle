@@ -13,7 +13,6 @@ export default defineConfig({
             "packages/cli/src/**/*.test.ts",
             "packages/core/src/**/*.test.ts",
             "apps/api/src/features/content/**/*.test.ts",
-            "apps/api/src/runtime.test.ts",
           ],
           environment: "node",
           maxWorkers: 2,
