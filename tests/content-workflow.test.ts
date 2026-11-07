@@ -195,7 +195,7 @@ test(
   "R1-R13 SDK lifecycle: update, unset, paged lists, delete and a long-title cursor",
   async () => {
     const namespace = `workflow_${randomUUID().replaceAll("-", "")}`;
-    const store = postgresAdapter({ url: process.env.DATABASE_URL ?? "", namespace });
+    const store = postgresAdapter({ url: process.env.AIRCASTLE_DATABASE_URL ?? "", namespace });
     const app = await developerApp();
     let server: Awaited<ReturnType<typeof standaloneServer>> | undefined;
     try {
