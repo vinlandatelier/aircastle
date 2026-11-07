@@ -4,7 +4,7 @@ This test contract applies to routes relative to `/api`. It implements the statu
 
 | Operation | Success | Expected failure |
 | --- | --- | --- |
-| GET /auth/state | 200 `{kind:"ok",value:{kind:"setup-required"\|"signed-out"\|"authenticated"\|"disabled",...}}` | 503 temporary-failure |
+| GET /auth/state | 200 `{kind:"ok",value:{kind:"setup-required"\|"signed-out"\|"disabled"}}`, or `{kind:"ok",value:{kind:"authenticated",session}}` with the projected session; read without locks or renewal | 503 temporary-failure |
 | POST /auth/setup | 200 `{kind:"ok",value:{confirmation:"setup-inbox"}}` | 400 invalid-input, 403 email-not-allowed, 409 setup-complete, 429 throttled, 503 temporary-failure |
 | POST /auth/sign-in | 200 `{kind:"ok",value:{confirmation:"sign-in-inbox"}}` for known and unknown identities | 400 invalid-input, 409 setup-required, 429 throttled, 503 temporary-failure |
 | POST /auth/confirm/preview | 200 `{kind:"ok",value:{email,purpose}}`, no cookie | 400 invalid-link or superseded-link, 409 setup-complete |
@@ -12,7 +12,7 @@ This test contract applies to routes relative to `/api`. It implements the statu
 | GET /auth/session | 200 `{kind:"ok",value:{user:{id,name,email,authority:"super_user"},expiresAt}}` | 401 unauthenticated, 503 temporary-failure |
 | POST /auth/activity | 200 same projected session, renewed cookie | 401 unauthenticated, 503 temporary-failure |
 | POST /auth/sign-out | 200 `{kind:"ok",value:{destination:"/sign-in"}}`, cleared cookie | 503 temporary-failure |
-| POST /auth/entry | 200 `{kind:"ok",value:{destination}}` | 401 unauthenticated, 403 forbidden, 400 invalid-input |
+| POST /auth/entry | 200 `{kind:"ok",value:{destination,session}}` with the renewed session projection and cookie | 401 unauthenticated, 403 forbidden, 400 invalid-input |
 | GET /development-inbox/messages | 200 `{kind:"ok",value:[...]}`, no-store | 404 disabled |
 | POST /development-inbox/messages/:id/open | 200 `{kind:"ok",value:...}`, no-store | 404 disabled |
 

@@ -1,5 +1,16 @@
 import { expect, test } from "vite-plus/test";
-import { claim, withAuth } from "./test-support/fixture.ts";
+import { claim, start, withAuth } from "./test-support/fixture.ts";
+
+const alex = {
+  user: {
+    id: expect.any(String),
+    name: "Alex",
+    email: "alex@example.test",
+    authority: "super_user",
+  },
+  expiresAt: start + 1_209_600_000,
+};
+const entered = (destination: unknown) => ({ kind: "ok", value: { destination, session: alex } });
 
 for (const body of [
   { kind: "resolve" },
@@ -22,14 +33,11 @@ test("onboarding is offered once and survives leaving without an explicit skip",
     const { cookie } = await claim(server);
     const first = await server.request("/auth/entry", { kind: "resolve" }, cookie);
     expect(first.status).toBe(200);
-    expect(await first.json()).toEqual({
-      kind: "ok",
-      value: { destination: { kind: "create-workspace" } },
-    });
+    expect(await first.json()).toEqual(entered({ kind: "create-workspace" }));
     const reopened = await open();
     expect(
       await (await reopened.request("/auth/entry", { kind: "resolve" }, cookie)).json(),
-    ).toEqual({ kind: "ok", value: { destination: { kind: "workspaces" } } });
+    ).toEqual(entered({ kind: "workspaces" }));
   });
 });
 
@@ -39,14 +47,11 @@ test("skip persists and never invents a workspace", async () => {
     const { cookie } = await claim(server);
     const skipped = await server.request("/auth/entry", { kind: "skip-onboarding" }, cookie);
     expect(skipped.status).toBe(200);
-    expect(await skipped.json()).toEqual({
-      kind: "ok",
-      value: { destination: { kind: "workspaces" } },
-    });
+    expect(await skipped.json()).toEqual(entered({ kind: "workspaces" }));
     const reopened = await open();
     expect(
       await (await reopened.request("/auth/entry", { kind: "resolve" }, cookie)).json(),
-    ).toEqual({ kind: "ok", value: { destination: { kind: "workspaces" } } });
+    ).toEqual(entered({ kind: "workspaces" }));
     expect(await sql`SELECT id FROM ${sql(namespace)}.workspaces`).toHaveLength(0);
   });
 });
@@ -92,15 +97,15 @@ test("fixture-granted membership authorizes requested entry and persists the las
     const destination = { kind: "workspace-projects", workspaceId: project.workspace };
     const visit = await server.request("/auth/entry", { kind: "visit", destination }, cookie);
     expect(visit.status).toBe(200);
-    expect(await visit.json()).toEqual({ kind: "ok", value: { destination } });
+    expect(await visit.json()).toEqual(entered(destination));
     const reopened = await open();
     expect(
       await (await reopened.request("/auth/entry", { kind: "resolve" }, cookie)).json(),
-    ).toEqual({ kind: "ok", value: { destination } });
+    ).toEqual(entered(destination));
     await sql`DELETE FROM ${sql(namespace)}.auth_workspace_access WHERE user_id = ${user.id}`;
     expect(
       await (await reopened.request("/auth/entry", { kind: "resolve" }, cookie)).json(),
-    ).toEqual({ kind: "ok", value: { destination: { kind: "workspaces" } } });
+    ).toEqual(entered({ kind: "workspaces" }));
   });
 });
 
@@ -167,10 +172,10 @@ test("authorized requested destination takes priority over onboarding and record
       cookie,
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ kind: "ok", value: { destination } });
+    expect(await response.json()).toEqual(entered(destination));
     await sql`DELETE FROM ${sql(namespace)}.auth_workspace_access WHERE user_id = ${user.id}`;
     expect(await (await server.request("/auth/entry", { kind: "resolve" }, cookie)).json()).toEqual(
-      { kind: "ok", value: { destination: { kind: "workspaces" } } },
+      entered({ kind: "workspaces" }),
     );
   });
 });
@@ -191,9 +196,6 @@ test("unauthorized requested destination falls back to the first onboarding offe
       cookie,
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      kind: "ok",
-      value: { destination: { kind: "create-workspace" } },
-    });
+    expect(await response.json()).toEqual(entered({ kind: "create-workspace" }));
   });
 });
