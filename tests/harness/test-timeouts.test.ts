@@ -6,6 +6,12 @@ import { expect, test } from "vite-plus/test";
 const root = resolve(import.meta.dirname, "../..");
 const postgresPackages = new Set(["postgres", "@aircastle/adapter-postgres"]);
 const dependencyFields = ["dependencies", "devDependencies"];
+const exempt = new Map([
+  [
+    "apps/web",
+    "Postgres serves the Playwright journeys in e2e/, which set their own timeouts. Vitest runs src/ against HTTP doubles.",
+  ],
+]);
 
 function reachesPostgres(directory: string) {
   const manifest = JSON.parse(
@@ -29,19 +35,23 @@ test("every package whose tests can reach Postgres gives each test and hook 30 s
       reachesPostgres(directory),
   );
   const timeouts = await Promise.all(
-    directories.map(async (directory) => {
-      const { default: config } = (await import(
-        pathToFileURL(join(root, directory, "vite.config.ts")).href
-      )) as { default: { test?: { testTimeout?: number; hookTimeout?: number } } };
-      return {
-        directory,
-        testTimeout: config.test?.testTimeout,
-        hookTimeout: config.test?.hookTimeout,
-      };
-    }),
+    directories
+      .filter((directory) => !exempt.has(directory))
+      .map(async (directory) => {
+        const { default: config } = (await import(
+          pathToFileURL(join(root, directory, "vite.config.ts")).href
+        )) as { default: { test?: { testTimeout?: number; hookTimeout?: number } } };
+        return {
+          directory,
+          testTimeout: config.test?.testTimeout,
+          hookTimeout: config.test?.hookTimeout,
+        };
+      }),
   );
 
-  expect(directories).toEqual(expect.arrayContaining(["apps/api", "packages/adapter-postgres"]));
+  expect(directories).toEqual(
+    expect.arrayContaining(["apps/api", "packages/adapter-postgres", ...exempt.keys()]),
+  );
   expect(
     timeouts.filter((entry) => entry.testTimeout !== 30_000 || entry.hookTimeout !== 30_000),
   ).toEqual([]);
