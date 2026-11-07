@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vite-plus/test";
+import postgres from "postgres";
+import { AuthStorageError } from "@aircastle/core";
 import { postgresAdapter, postgresAuthAdmission, postgresAuthStore } from "../index.ts";
 import { withDatabase } from "../test-support/database.ts";
 
@@ -294,5 +296,41 @@ test("reading setup state does not wait for a held setup claim lock", async () =
       release();
       await claim;
     }
+  });
+});
+
+test("a driver failure keeps its cause and SQLSTATE without its message", async () => {
+  await withStore(async ({ auth }) => {
+    const user = {
+      id: "user-1",
+      name: "Alex",
+      email: "alex@example.test",
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    await auth.transaction((tx) => tx.insertUser(user));
+    const failure = await auth
+      .transaction((tx) => tx.insertUser({ ...user, id: "user-2" }))
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+    expect(failure).toBeInstanceOf(AuthStorageError);
+    if (!(failure instanceof AuthStorageError)) throw new Error("Expected a storage failure");
+    expect(failure.kind).toBe("unavailable");
+    expect(failure.code).toBe("23505");
+    expect(failure.message).toBe("unavailable");
+    expect(failure.cause).toBeInstanceOf(postgres.PostgresError);
+  });
+});
+
+test("a programming error inside a transaction is not reported as a storage failure", async () => {
+  await withStore(async ({ auth }) => {
+    const bug = new TypeError("callback bug");
+    await expect(
+      auth.transaction(async () => {
+        throw bug;
+      }),
+    ).rejects.toBe(bug);
   });
 });

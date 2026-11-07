@@ -9,6 +9,7 @@ import type {
 import type { PostgresOptions } from "../index.ts";
 import { identifier } from "../identifier.ts";
 import { connectionTarget } from "../layout.ts";
+import { isDriverError, storageFailure } from "./failure.ts";
 import { initializeAuthLayout } from "./layout.ts";
 
 const windows = [
@@ -139,7 +140,8 @@ export async function postgresAuthAdmission(
           return { kind: "admitted" };
         });
       } catch (error) {
-        throw new AuthStorageError("unavailable", { cause: error });
+        if (!isDriverError(error)) throw error;
+        throw storageFailure("unavailable", error);
       }
     },
     close: () => (closing ??= sql.end({ timeout: 5 })),
