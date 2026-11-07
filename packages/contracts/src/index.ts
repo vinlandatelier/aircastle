@@ -19,6 +19,7 @@ export type Permission = "content:read" | "content:write" | "schema:publish";
 export type ContentError =
   | { code: "validation_failed"; issues: readonly [ValidationIssue, ...ValidationIssue[]] }
   | { code: "unique_conflict"; field: string }
+  | { code: "referenced"; collection: string; field: string }
   | {
       code:
         | "invalid_request"
@@ -35,6 +36,54 @@ export type ContentError =
         | "unknown_write_outcome";
     };
 export type Result<Data> = { ok: true; data: Data } | { ok: false; error: ContentError };
+/**
+ * A partial update: `changes` replaces the supplied top-level fields and `unset` names fields to
+ * remove. Callers validate `changes` against the collection schema.
+ */
+export interface DocumentUpdate {
+  changes: unknown;
+  unset: readonly string[];
+}
+/**
+ * A list request as it travels over the wire. `where` is an unvalidated filter object, `sort` is a
+ * field name with an optional `-` prefix and `cursor` is an opaque value from a previous page.
+ */
+export interface DocumentListQuery {
+  where?: unknown;
+  sort?: string;
+  limit?: number;
+  cursor?: string;
+}
+/** The page size a list query uses when it does not name one. */
+export const defaultListLimit = 20;
+/** The largest page size a list query may request. */
+export const maximumListLimit = 100;
+const listQueryKeys = new Set<string>([
+  "where",
+  "sort",
+  "limit",
+  "cursor",
+] satisfies (keyof DocumentListQuery)[]);
+const listSortPattern = /^-?[A-Za-z_][A-Za-z0-9_]*$/;
+/** Whether `key` names a {@link DocumentListQuery} property. */
+export function isListQueryKey(key: string): key is keyof DocumentListQuery {
+  return listQueryKeys.has(key);
+}
+/** Whether `value` is an integer page size from 1 to {@link maximumListLimit}. */
+export function isListLimit(value: unknown): value is number {
+  return (
+    typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= maximumListLimit
+  );
+}
+/** Whether `value` is a field name, optionally prefixed with `-` for descending order. */
+export function isListSort(value: unknown): value is string {
+  return typeof value === "string" && listSortPattern.test(value);
+}
+/** One page of a list. `next` is null exactly when no further matching documents existed. */
+export interface DocumentPage<Document = ContentDocument> {
+  documents: Document[];
+  next: string | null;
+}
 export interface PublishedCollection {
   name: string;
   description: CollectionDescription;
@@ -57,7 +106,10 @@ type PlainIssueCode = Exclude<
   ValidationIssue["code"],
   "invalid_type" | "too_short" | "too_long" | "invalid_choice"
 >;
-type PlainErrorCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
+type PlainErrorCode = Exclude<
+  ContentError["code"],
+  "validation_failed" | "unique_conflict" | "referenced"
+>;
 
 /** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
 const plainIssueCodes = {
@@ -286,6 +338,11 @@ export function parseContentError(input: unknown): ContentError | undefined {
   if (input.code === "unique_conflict") {
     return typeof input.field === "string"
       ? { code: "unique_conflict", field: input.field }
+      : undefined;
+  }
+  if (input.code === "referenced") {
+    return typeof input.collection === "string" && typeof input.field === "string"
+      ? { code: "referenced", collection: input.collection, field: input.field }
       : undefined;
   }
   return isMember(plainErrorCodes, input.code) ? { code: input.code } : undefined;

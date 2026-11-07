@@ -10,6 +10,7 @@ const statuses: Record<ContentError["code"], ContentfulStatusCode> = {
   not_found: 404,
   validation_failed: 422,
   unique_conflict: 409,
+  referenced: 409,
   schema_mismatch: 409,
   schema_conflict: 409,
   migration_required: 409,
@@ -21,7 +22,7 @@ const statuses: Record<ContentError["code"], ContentfulStatusCode> = {
 };
 
 export function failure(
-  code: Exclude<ContentError["code"], "validation_failed" | "unique_conflict">,
+  code: Exclude<ContentError["code"], "validation_failed" | "unique_conflict" | "referenced">,
 ): Result<never> {
   return { ok: false, error: { code } };
 }
