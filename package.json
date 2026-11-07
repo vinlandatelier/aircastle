@@ -50,7 +50,9 @@
     "test:content": "vp test --config vite.content.config.ts",
     "test:content:db": "vp run db:test -- vp run test:content --project database",
     "dev:setup": "bun --conditions=development scripts/dev-setup.ts",
-    "test:all": "bun run test:typecheck && vp run --filter '@aircastle/*' --parallel test && vp test && bun run test:inference",
+    "test:all": "vp run test:fixtures && vp run test:units",
+    "test:fixtures": "bun run test:typecheck && bun run test:inference",
+    "test:units": "vp run --filter '@aircastle/*' --parallel test && vp test",
     "test:content:mutation": "vp -C packages/contracts run test:mutation",
     "test:prepared": "vp run db:test -- vp run test:all",
     "test-web:e2e": "vp -C apps/web run test:e2e",
@@ -66,7 +68,8 @@
     "knip": "6.42.1",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "yaml": "2.9.1"
   },
   "overrides": {
     "@types/node": "24.19.2",
