@@ -12,7 +12,7 @@ defaults:
     shell: bash
 jobs:
   static:
-    name: Build, typecheck, lint and coverage
+    name: Build, typecheck, lint, type fixtures and coverage
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     steps:
@@ -46,6 +46,9 @@ jobs:
       - name: Find unused code
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: vp run knip
+      - name: Test type fixtures
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: vp run test:fixtures
       - id: coverage
         name: Test schema coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -82,19 +85,6 @@ jobs:
       - run: vp run build
       - run: vp run db:test -- vp run test:units
 
-  fixtures:
-    name: Test type fixtures
-    runs-on: ubuntu-24.04
-    timeout-minutes: 3
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          cache-save: "false"
-      - run: vp run test:fixtures
-
   database:
     name: Test database runner
     runs-on: ubuntu-24.04
@@ -111,11 +101,11 @@ jobs:
   browser:
     name: Test browser journeys (${{ matrix.shard }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 6
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,12 +116,19 @@ jobs:
       - id: playwright
         name: Read Playwright version
         run: echo "version=$(vp -C apps/web exec playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - id: chromium-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
       - name: Install Chromium
         run: vp -C apps/web exec playwright install --only-shell chromium
+      - name: Save Chromium before building or testing the pull request
+        if: ${{ steps.chromium-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.chromium-cache.outputs.cache-primary-key }}
       - run: vp run build
       - id: browser
         name: Test browser journeys
@@ -178,7 +175,7 @@ jobs:
 
   gate:
     name: Lint, typecheck and test
-    needs: [static, units, fixtures, database, browser]
+    needs: [static, units, database, browser]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2

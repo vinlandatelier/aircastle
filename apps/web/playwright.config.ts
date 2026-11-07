@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test'
 import { origins } from './e2e/origins'
 
 const recording = process.env.WEB_E2E_VIDEO === '1'
+const ci = Boolean(process.env.CI)
 
 export default defineConfig({
   testDir: './e2e',
@@ -11,9 +12,9 @@ export default defineConfig({
   fullyParallel: true,
   retries: 0,
   failOnFlakyTests: true,
-  workers: process.env.CI ? 4 : 2,
+  workers: ci ? 4 : 2,
   timeout: recording ? 120_000 : 30_000,
-  globalTimeout: recording ? 1_800_000 : 600_000,
+  globalTimeout: recording ? 1_800_000 : ci ? 240_000 : 600_000,
   expect: { timeout: 5_000 },
   outputDir: 'reports/test-results',
   reporter: [
@@ -26,7 +27,7 @@ export default defineConfig({
     url,
     env: { WEB_FIXTURES: name === 'fixture' ? '1' : '0' },
     reuseExistingServer: false,
-    timeout: 300_000,
+    timeout: ci ? 60_000 : 300_000,
   })),
   use: {
     browserName: 'chromium',
