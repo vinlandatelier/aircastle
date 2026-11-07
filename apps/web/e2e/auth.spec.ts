@@ -25,7 +25,7 @@ test.beforeEach(async ({ baseURL }, testInfo) => {
   })
 })
 
-test('[auth:R1] [auth:R2] fresh local entry shows setup without the protected shell or sign-in', async ({
+test('[auth:R1] [auth:R2] a fresh instance keeps / public and sends sign-in and admin entries to setup without the shell or a sign-in action', async ({
   page,
 }) => {
   await page.goto('/')
