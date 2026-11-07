@@ -279,3 +279,77 @@ test("a storage outage event carries the driver code and never the driver messag
     },
   );
 });
+
+test("a bug while resolving an unknown commit is logged as a summary and not retried as an outage", async () => {
+  const sink = applicationSink();
+  let lookups = 0;
+  await withAuth(
+    async ({ open, events, storageFailure }) => {
+      const server = await open();
+      storageFailure("ack");
+      const response = await server.request("/auth/setup", {
+        name: "Alex",
+        email: "alex@example.test",
+      });
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ kind: "temporary-failure" });
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      expect(lookups).toBe(1);
+      expect(events).toEqual([{ kind: "storage-unavailable" }]);
+      const errors = sink.records().filter((record) => record.msg === "Unexpected auth error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.err).toMatchObject({ type: "ErrorSummary", message: "TypeError" });
+      for (const field of loggedStrings(sink.records())) expect(field).not.toContain("bug-canary");
+      expect(server.inbox.list()).toEqual([]);
+    },
+    {
+      logger: sink.logger,
+      storage: (store) => ({
+        ...store,
+        resolveIssuance: async () => {
+          lookups += 1;
+          throw new TypeError("bug-canary");
+        },
+      }),
+    },
+  );
+}, 30_000);
+
+test("a bug in background issuance reconciliation drops the capture and logs a summary once", async () => {
+  const sink = applicationSink();
+  let lookups = 0;
+  await withAuth(
+    async ({ open, events, storageFailure }) => {
+      const server = await open();
+      storageFailure("ack");
+      const response = await server.request("/auth/setup", {
+        name: "Alex",
+        email: "alex@example.test",
+      });
+      expect(response.status).toBe(503);
+      const deadline = Date.now() + 5_000;
+      while (lookups < 2 && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(lookups).toBe(2);
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      expect(lookups).toBe(2);
+      expect(events).toEqual([{ kind: "storage-unavailable" }]);
+      const errors = sink.records().filter((record) => record.msg === "Unexpected auth error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.err).toMatchObject({ type: "ErrorSummary", message: "TypeError" });
+      for (const field of loggedStrings(sink.records())) expect(field).not.toContain("bug-canary");
+      expect(server.inbox.list()).toEqual([]);
+    },
+    {
+      logger: sink.logger,
+      storage: (store) => ({
+        ...store,
+        resolveIssuance: async () => {
+          lookups += 1;
+          if (lookups === 1) throw new AuthStorageError("unavailable");
+          throw new TypeError("bug-canary");
+        },
+      }),
+    },
+  );
+}, 30_000);

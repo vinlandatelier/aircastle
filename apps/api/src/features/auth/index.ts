@@ -1,4 +1,10 @@
-import type { AuthAdmissionStore, AuthEvent, AuthLimits, AuthStore } from "@aircastle/core";
+import type {
+  AuthAdmissionStore,
+  AuthEvent,
+  AuthLimits,
+  AuthStore,
+  ReportError,
+} from "@aircastle/core";
 import type { Logger } from "pino";
 import { developmentAuth, boundedEvents } from "./runtime.ts";
 import { authResponse, ok } from "./request.ts";
@@ -27,6 +33,8 @@ export type LocalAuthOptions =
       clock?: () => number;
       inbox?: DevelopmentInbox;
       emit: (event: AuthEvent) => void;
+      /** Receives the summary of an unexpected error raised outside a request, such as in background reconciliation. */
+      report: ReportError;
     };
 
 export async function createLocalAuth(options: LocalAuthOptions): Promise<LocalAuthRuntime> {
@@ -46,4 +54,9 @@ export async function createLocalAuth(options: LocalAuthOptions): Promise<LocalA
 /** Writes bounded, structured auth diagnostics through the application logger. */
 export function createAuthEventLogger(logger: Logger): (event: AuthEvent) => void {
   return boundedEvents((event) => logger.info({ auth: event }, "Authentication event"), Date.now);
+}
+
+/** Logs the summary of an unexpected auth error with the same message as a failed auth request. */
+export function authErrorReporter(logger: Logger): ReportError {
+  return (summary) => logger.error({ err: summary }, "Unexpected auth error");
 }

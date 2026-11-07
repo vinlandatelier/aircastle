@@ -7,7 +7,11 @@ import {
 import { createAircastle } from "@aircastle/core";
 import { cmsErrorReporter, createApp } from "./app.ts";
 import { readAuthConfig, readConfig, readDatabaseConfig } from "./config.ts";
-import { createAuthEventLogger, createLocalAuth } from "./features/auth/index.ts";
+import {
+  authErrorReporter,
+  createAuthEventLogger,
+  createLocalAuth,
+} from "./features/auth/index.ts";
 import { createDevelopmentInbox } from "./features/development-inbox/index.ts";
 import { scalarScript } from "./docs-script.ts" with { type: "macro" };
 import { createStaticHandler } from "./static.ts";
@@ -54,6 +58,7 @@ try {
       admission,
       inbox: createDevelopmentInbox(),
       emit: createAuthEventLogger(logger),
+      report: authErrorReporter(logger),
     });
   })();
   cleanup.push(() => auth.close());

@@ -10,7 +10,7 @@ import type { Logger } from "pino";
 import { ErrorSummary, type ContentService, type ReportError } from "@aircastle/core";
 import { contentRoutes } from "./features/content/index.ts";
 import { health } from "./features/health/index.ts";
-import type { LocalAuthRuntime } from "./features/auth/index.ts";
+import { authErrorReporter, type LocalAuthRuntime } from "./features/auth/index.ts";
 
 /**
  * Every route the API mounts, keyed by method and path, with the credential it requires.
@@ -65,6 +65,7 @@ export function createApp({
       onResMessage: () => "Request completed",
     },
   });
+  const reportAuthError = authErrorReporter(logger);
   const credentialBearingPath = (c: Context) =>
     c.req.path.startsWith("/api/auth/") || c.req.path.startsWith("/api/development-inbox/");
   const app = new Hono<{ Bindings: { peerAddress?: string } }>()
@@ -78,9 +79,10 @@ export function createApp({
     .use(requestId())
     .use(except(credentialBearingPath, ordinaryLogger))
     .onError((error, c) => {
-      c.error = ErrorSummary.of(error);
+      const summary = ErrorSummary.of(error);
+      c.error = summary;
       if (!credentialBearingPath(c)) return c.json({ error: "Internal server error" }, 500);
-      logger.error({ err: c.error }, "Unexpected auth error");
+      reportAuthError(summary);
       return c.json({ kind: "temporary-failure" }, 500, {
         "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer",
