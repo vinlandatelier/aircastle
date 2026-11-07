@@ -1,8 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { ProtectedDestination } from "@aircastle/core";
 import { expect, test } from "vite-plus/test";
-import { browserOrigin, claim, withAuth } from "./test-support/fixture.ts";
+import { browserOrigin, claim, start, withAuth } from "./test-support/fixture.ts";
 import type { AuthFixture, AuthServer } from "./test-support/fixture.ts";
+
+const alexSession = {
+  user: {
+    id: expect.any(String),
+    name: "Alex",
+    email: "alex@example.test",
+    authority: "super_user",
+  },
+  expiresAt: start + 1_209_600_000,
+};
 
 async function credentialCounts(sql: AuthFixture["sql"], namespace: string) {
   const [counts] = await sql<{ users: number; sessions: number }[]>`
@@ -321,12 +331,18 @@ test("setup restores its link-carried authorized destination and skips automatic
     });
     const restored = await observer.request("/auth/entry", { kind: "resolve" }, cookie);
     expect(restored.status).toBe(200);
-    expect(await restored.json()).toEqual({ kind: "ok", value: { destination } });
+    expect(await restored.json()).toEqual({
+      kind: "ok",
+      value: { destination, session: alexSession },
+    });
     const session = await reopened.request("/auth/session", undefined, cookie);
     expect(session.status).toBe(200);
     const entry = await reopened.request("/auth/entry", { kind: "resolve" }, cookie);
     expect(entry.status).toBe(200);
-    expect(await entry.json()).toEqual({ kind: "ok", value: { destination } });
+    expect(await entry.json()).toEqual({
+      kind: "ok",
+      value: { destination, session: alexSession },
+    });
   });
 });
 
@@ -353,7 +369,10 @@ for (const revoked of [false, true]) {
       } as const;
       const before = await server.request("/auth/entry", { kind: "visit", destination }, cookie);
       expect(before.status).toBe(200);
-      expect(await before.json()).toEqual({ kind: "ok", value: { destination } });
+      expect(await before.json()).toEqual({
+        kind: "ok",
+        value: { destination, session: alexSession },
+      });
       const link = await pendingLink(server, "sign-in", destination);
       const preview = await server.request("/auth/confirm/preview", link);
       expect(preview.status).toBe(200);
@@ -375,7 +394,9 @@ for (const revoked of [false, true]) {
       const visit = await reopened.request("/auth/entry", { kind: "visit", destination }, signedIn);
       expect(visit.status).toBe(revoked ? 403 : 200);
       expect(await visit.json()).toEqual(
-        revoked ? { kind: "forbidden" } : { kind: "ok", value: { destination } },
+        revoked
+          ? { kind: "forbidden" }
+          : { kind: "ok", value: { destination, session: alexSession } },
       );
     });
   });
@@ -394,10 +415,16 @@ for (const change of ["delete-workspace", "remove-membership"] as const) {
       const destination = { kind: "workspace-projects", workspaceId };
       const visited = await server.request("/auth/entry", { kind: "visit", destination }, cookie);
       expect(visited.status).toBe(200);
-      expect(await visited.json()).toEqual({ kind: "ok", value: { destination } });
+      expect(await visited.json()).toEqual({
+        kind: "ok",
+        value: { destination, session: alexSession },
+      });
       const remembered = await server.request("/auth/entry", { kind: "resolve" }, cookie);
       expect(remembered.status).toBe(200);
-      expect(await remembered.json()).toEqual({ kind: "ok", value: { destination } });
+      expect(await remembered.json()).toEqual({
+        kind: "ok",
+        value: { destination, session: alexSession },
+      });
       if (change === "delete-workspace") {
         await sql`DELETE FROM ${sql(namespace)}.workspaces WHERE id = ${workspaceId}`;
         expect(
@@ -425,7 +452,7 @@ for (const change of ["delete-workspace", "remove-membership"] as const) {
       expect(entry.status).toBe(200);
       expect(await entry.json()).toEqual({
         kind: "ok",
-        value: { destination: { kind: "workspaces" } },
+        value: { destination: { kind: "workspaces" }, session: alexSession },
       });
     });
   });

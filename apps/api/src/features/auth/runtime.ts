@@ -91,9 +91,11 @@ export async function developmentAuth(
           result.kind === "ok" ? { kind: "unauthenticated" } : result,
           result.kind === "forbidden" ? 403 : result.kind === "invalid-input" ? 400 : 401,
         );
-      return authResponse(ok({ destination: result.destination }), 200, {
-        "Set-Cookie": await cookie.issue(token),
-      });
+      return authResponse(
+        ok({ destination: result.destination, session: sessionProjection(result.pair) }),
+        200,
+        { "Set-Cookie": await cookie.issue(token) },
+      );
     }
     if (path === "/api/auth/confirm") {
       const result = await credentials.confirm(parseLink(body));
