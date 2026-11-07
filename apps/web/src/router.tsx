@@ -167,17 +167,20 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute.addChildren([dashboardIndexRoute, ...pageRoutes]),
 ])
 
-export function createAppRouter(history: RouterHistory, auth?: AuthBrowserOptions) {
-  return createRouter({
+export function createAppRouter(history: RouterHistory, options?: AuthBrowserOptions) {
+  const auth = createBrowserAuth(options)
+  const router = createRouter({
     routeTree,
     history,
     notFoundMode: 'root',
     disableGlobalCatchBoundary: true,
-    context: { auth: createBrowserAuth(auth) },
+    context: { auth },
     defaultPendingMs: 0,
     defaultPendingMinMs: 0,
     defaultPreload: false,
   })
+  router.subscribe('onResolved', () => auth.settle())
+  return router
 }
 
 declare module '@tanstack/react-router' {
