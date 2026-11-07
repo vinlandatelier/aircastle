@@ -16,6 +16,7 @@ interface Job {
   if?: string;
   steps?: Step[];
   defaults?: unknown;
+  env?: unknown;
   "continue-on-error"?: unknown;
 }
 
@@ -23,8 +24,11 @@ const scriptReference = /\b(?:vp (?:-C (\S+) )?run|bun run) ([\w:][\w:-]*)/g;
 const scripts: Readonly<Record<string, string>> = JSON.parse(
   readFileSync("package.json", "utf8"),
 ).scripts;
-const workflow: { readonly defaults?: unknown; readonly jobs: Readonly<Record<string, Job>> } =
-  parse(readFileSync(".github/workflows/ci.yml", "utf8"));
+const workflow: {
+  readonly defaults?: unknown;
+  readonly env?: Readonly<Record<string, unknown>>;
+  readonly jobs: Readonly<Record<string, Job>>;
+} = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
 const { jobs } = workflow;
 const steps = Object.values(jobs).flatMap((job) => job.steps ?? []);
 const commands = steps.flatMap((step) => step.run ?? []);
@@ -120,7 +124,9 @@ test("the required gate job needs every check job and fails unless all succeeded
   expect(gate?.if).toBe("${{ always() }}");
   const gateSteps = gate?.steps ?? [];
   expect(workflow.defaults).toEqual({ run: { shell: "bash" } });
+  expect(Object.keys(workflow.env ?? {})).toEqual(["CI_LATENCY_BUDGET_SECONDS"]);
   expect(gate?.defaults).toBeUndefined();
+  expect(gate?.env).toBeUndefined();
   expect(gateSteps.at(-1)).toEqual({
     name: "Require every check to pass",
     env: { RESULTS: "${{ toJSON(needs.*.result) }}" },
