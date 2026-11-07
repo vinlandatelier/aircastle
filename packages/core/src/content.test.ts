@@ -60,6 +60,20 @@ for (const input of [
   });
 }
 
+test("R13 reads accept an uppercase id and return the lowercase id", async () => {
+  const id = "abcdef12-3456-4789-8abc-def012345678";
+  const saved = { id, title: "Hello", slug: "hello", status: "draft" };
+  const { store } = controlledStore({ documents: { articles: [saved] } });
+  expect(
+    await createService(store, failOnReport).findById(
+      access,
+      "articles",
+      contract,
+      id.toUpperCase(),
+    ),
+  ).toEqual({ ok: true, data: saved });
+});
+
 test("stored reads preserve omitted optional fields and never synthesize defaults", async () => {
   const saved = { id: documentId, title: "Hello", slug: "hello", status: "draft" };
   const { store } = controlledStore({ documents: { articles: [saved] } });

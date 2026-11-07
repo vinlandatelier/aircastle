@@ -10,6 +10,7 @@ import {
   setFutureVersion,
   snapshotLayout,
 } from "./test-support/layout.ts";
+import { layoutVersions } from "./test-support/layout-v1.ts";
 
 const permissions: readonly Permission[] = ["content:read", "content:write", "schema:publish"];
 const verifier = createHash("sha256").update("ac_integrity_fixture_secret").digest("hex");
@@ -18,6 +19,13 @@ const description = {
 };
 const collections: PublishedCollection[] = [{ name: "articles", description }];
 const contract = `v1:${"1".repeat(64)}`;
+
+test("R13 a fresh namespace starts at ledger [1,2] with ownership marker 1", async () => {
+  await withDatabase(async ({ sql, store, namespace }) => {
+    await store.initialize();
+    expect(await layoutVersions(sql, namespace)).toEqual({ ledger: [1, 2], marker: [1] });
+  });
+});
 
 for (const location of ["marker", "ledger"] as const) {
   test(`startup refuses a newer ${location} version without modifying stored or foreign data`, async () => {
