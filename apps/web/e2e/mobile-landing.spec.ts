@@ -1,7 +1,13 @@
+import process from 'node:process'
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './support'
 
-test.use({ viewport: { width: 390, height: 844 } })
+const phone = { width: 390, height: 844 }
+
+test.use({
+  viewport: phone,
+  ...(process.env.WEB_E2E_VIDEO === '1' ? { video: { mode: 'on' as const, size: phone } } : {}),
+})
 
 const playbackRate = 1.2
 
@@ -138,5 +144,48 @@ test('on a phone, the preview zooms into a full-height window that follows the s
   await page.clock.runFor(story(4000))
   await expectInside(outro.locator('[data-demo-outro-mark]'), stage, 'the closing mark')
   await expectInside(outro.locator('[data-demo-outro-wordmark]'), stage, 'the closing name')
+  await expectNoSideScroll(page)
+})
+
+test('on a phone, the whole preview story plays through in its window, start to finish', async ({
+  page,
+}) => {
+  test.setTimeout(150_000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  const stage = page.locator('[data-demo-stage]')
+  await test.step('scroll down to the preview', async () => {
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute('data-demo-stage', 'phone')
+  })
+  const frame = page.locator('[data-demo-frame]')
+  await test.step('Ask Air takes the request', async () => {
+    await expect(frame.locator('[data-demo-dialog]')).toBeVisible({ timeout: 10_000 })
+  })
+  await test.step('the agents open the post in the editor', async () => {
+    await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown', {
+      timeout: 20_000,
+    })
+  })
+  await test.step('the post is previewed on the live site', async () => {
+    await expect(frame.locator('[data-demo-site-preview]')).toHaveCount(1, { timeout: 30_000 })
+  })
+  await test.step('the docs page is previewed and published', async () => {
+    await expect(frame.locator('[data-demo-docs-page]')).toBeVisible({ timeout: 40_000 })
+  })
+  await test.step('the closing card names Aircastle', async () => {
+    const wordmark = frame.locator('[data-demo-outro-wordmark]')
+    await expect(wordmark).toBeVisible({ timeout: 30_000 })
+    await expect
+      .poll(() => wordmark.evaluate((element) => Number(getComputedStyle(element).opacity)), {
+        timeout: 10_000,
+      })
+      .toBe(1)
+    const name = await box(wordmark)
+    const window = await box(stage)
+    expect(name.x).toBeGreaterThanOrEqual(window.x)
+    expect(name.x + name.width).toBeLessThanOrEqual(window.x + window.width)
+  })
   await expectNoSideScroll(page)
 })
