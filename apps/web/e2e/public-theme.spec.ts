@@ -60,8 +60,43 @@ async function expectPublic(page: Page, dark: boolean) {
   ).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toHaveCSS(
     'font-weight',
-    '600',
+    '400',
   )
+  await expect(page.getByRole('link', { name: 'Home', exact: true })).toHaveCount(0)
+  const heading = page.getByRole('heading', { name: 'Sign in to Aircastle' })
+  expect(
+    parseFloat(await heading.evaluate((element) => getComputedStyle(element).fontSize)),
+    'a heading sized for the page',
+  ).toBeGreaterThanOrEqual(32)
+  const email = page.getByRole('textbox', { name: 'Email', exact: true })
+  const submitBox = await page.getByRole('button', { name: 'Continue with email' }).boundingBox()
+  const groupBox = await page.locator('[data-slot="input-group"]').boundingBox()
+  expect(groupBox?.height ?? 0, 'a roomy email field').toBeGreaterThanOrEqual(44)
+  expect(submitBox?.height ?? 0, 'a roomy button').toBeGreaterThanOrEqual(44)
+  expect(submitBox?.width ?? 0, 'a wider form column').toBeGreaterThanOrEqual(420)
+  expect(
+    parseFloat(await email.evaluate((element) => getComputedStyle(element).fontSize)),
+  ).toBeGreaterThanOrEqual(16)
+  const logo = await page.getByRole('link', { name: 'Aircastle home' }).boundingBox()
+  expect(logo?.height ?? 0, 'a logo in proportion').toBeGreaterThanOrEqual(40)
+  const headingBox = await heading.boundingBox()
+  if (!logo || !headingBox || !groupBox) throw new Error('Sign-in form is not laid out')
+  expect(
+    headingBox.y - (logo.y + logo.height),
+    'room between the logo and the heading',
+  ).toBeGreaterThanOrEqual(28)
+  expect(
+    groupBox.y - (headingBox.y + headingBox.height),
+    'room before the fields',
+  ).toBeGreaterThanOrEqual(28)
+  expect(
+    await page.evaluate(() =>
+      [...document.querySelectorAll('main *')].some((element) =>
+        getComputedStyle(element).backgroundImage.includes('radial-gradient'),
+      ),
+    ),
+    'the form side is a solid background',
+  ).toBe(false)
 }
 
 for (const theme of ['light', 'dark'] as const) {
@@ -74,7 +109,7 @@ for (const theme of ['light', 'dark'] as const) {
     })
     await page.goto('/sign-in')
     await expectPublic(page, theme === 'dark')
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('link', { name: 'Aircastle home', exact: true }).click()
     await expect(
       page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
     ).toBeVisible()

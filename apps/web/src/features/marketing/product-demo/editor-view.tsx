@@ -93,7 +93,7 @@ import {
   TraceTitle,
 } from '@/components/ui/trace'
 import { Badge } from '@/components/ui/badge'
-import { GeneratedAvatar } from '@/components/shell/generated-avatar'
+import { GeneratedAvatar } from '@/components/shell'
 
 const control = 'flex h-9 items-center rounded-md border bg-background px-3 dark:bg-input/30'
 

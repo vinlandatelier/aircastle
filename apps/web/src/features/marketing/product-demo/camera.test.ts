@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test'
 import { cameraLeft, cameraWindow } from './camera'
-import { cursorSpots } from './cursor-path'
+import { cursorPosition } from './cursor-path'
 import { frameAt, loopDuration } from './timeline'
 
 const step = 5
@@ -8,9 +8,13 @@ const frameWidth = 1280
 
 function cursorX(elapsed: number) {
   const frame = frameAt(elapsed)
-  const from = cursorSpots[frame.cursorFrom]
-  const to = cursorSpots[frame.cursorTarget]
-  return from.left + (to.left - from.left) * frame.cursorProgress + frame.cursorDriftX
+  return cursorPosition({
+    from: frame.cursorFrom,
+    target: frame.cursorTarget,
+    progress: frame.cursorProgress,
+    curve: frame.cursorBend,
+    drift: { x: frame.cursorDriftX, y: frame.cursorDriftY },
+  }).left
 }
 
 describe('mobile preview camera', () => {
@@ -47,7 +51,16 @@ describe('mobile preview camera', () => {
 
   it('centres the opening dialog and the closing card', () => {
     const centred = (frameWidth - cameraWindow) / 2
-    expect(cameraLeft(frameAt(2500))).toBeCloseTo(centred, 0)
-    expect(cameraLeft(frameAt(loopDuration - 1500))).toBeCloseTo(centred, 0)
+    let dialogFrames = 0
+    let cardFrames = 0
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      if (frame.dialog === 'closed' && frame.outroOpacity < 1) continue
+      if (frame.dialog !== 'closed') dialogFrames += 1
+      else cardFrames += 1
+      expect(cameraLeft(frame), `at ${elapsed}ms`).toBeCloseTo(centred, 0)
+    }
+    expect(dialogFrames).toBeGreaterThan(100)
+    expect(cardFrames).toBeGreaterThan(100)
   })
 })

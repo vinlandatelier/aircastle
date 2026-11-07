@@ -73,10 +73,10 @@ const clickAt = cursorArrivesAt + rowHoverDuration
 const clickEndsAt = clickAt + clickDuration
 const editorOpensAt = clickAt + editorOpensAfterClick
 
-export type DialogState = 'closed' | 'open' | 'closing'
+type DialogState = 'closed' | 'open' | 'closing'
 export type Shortcut = 'open-agents' | 'send'
 export type CursorState = 'resting' | 'moving' | 'hovering' | 'clicking' | 'dragging' | 'still'
-export type View = 'table' | 'editor'
+type View = 'table' | 'editor'
 export type CursorShape = 'arrow' | 'pointer' | 'text'
 /** Einar's cover image: untouched, the skill starting, the image developing, or finished. */
 export type CoverState = 'idle' | 'starting' | 'generating' | 'done'

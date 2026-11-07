@@ -6,7 +6,6 @@ test.use({ viewport: { width: 1440, height: 900 } })
 
 async function toggleTheme(page: Page) {
   await page.getByRole('button', { name: 'Dark theme', exact: true }).click()
-  await expect(page.getByRole('menu')).toHaveCount(0)
 }
 
 async function expectTheme(page: Page, applied: 'dark' | 'light', stored: string) {
@@ -74,6 +73,51 @@ test('a first visit is dark even when the system prefers light', async ({ page }
     'true',
   )
 })
+
+test('a returning visitor with the old System setting gets dark, and one click switches to light', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.addInitScript((key) => {
+    if (!sessionStorage.getItem('seeded')) {
+      localStorage.setItem(key, 'system')
+      sessionStorage.setItem('seeded', '1')
+    }
+  }, themeStorageKey)
+  await visit(page)
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+  await expect(page.locator('html')).not.toHaveClass(/\bsystem\b/)
+  const toggle = page.getByRole('button', { name: 'Dark theme', exact: true })
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await toggleTheme(page)
+  await expectTheme(page, 'light', 'light')
+})
+
+for (const [stored, applied] of [
+  [null, 'dark'],
+  ['light', 'light'],
+  ['dark', 'dark'],
+  ['system', 'dark'],
+] as const) {
+  test(`before any app code runs, a ${stored ?? 'first'} visit paints ${applied}`, async ({
+    page,
+  }) => {
+    await page.route(/\/assets\/.*\.js$/, (route) =>
+      route.fulfill({ contentType: 'text/javascript', body: '' }),
+    )
+    if (stored)
+      await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+        key: themeStorageKey,
+        value: stored,
+      })
+    await page.emulateMedia({ colorScheme: applied === 'dark' ? 'light' : 'dark' })
+    await page.goto('/')
+    const html = page.locator('html')
+    await expect(html).toHaveClass(new RegExp(`\\b${applied}\\b`))
+    await expect(html).toHaveCSS('color-scheme', applied)
+    expect(await page.evaluate((key) => localStorage.getItem(key), themeStorageKey)).toBe(applied)
+  })
+}
 
 test('a fresh context does not inherit the light choice', async ({ page, browser }) => {
   await visit(page)

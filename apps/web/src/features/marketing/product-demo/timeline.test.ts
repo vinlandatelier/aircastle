@@ -34,8 +34,12 @@ function playLoop() {
     }
     const move = moves.at(-1)
     if (move && move.arrivesAt === null && frame.cursorProgress >= 1) move.arrivesAt = elapsed
-    if (frame.cursor === 'clicking' && previousState !== 'clicking' && move?.arrivesAt != null)
-      presses.push({ at: elapsed, waited: elapsed - move.arrivesAt, on: move.to })
+    if (frame.cursor === 'clicking' && previousState !== 'clicking' && move)
+      presses.push({
+        at: elapsed,
+        waited: move.arrivesAt === null ? -1 : elapsed - move.arrivesAt,
+        on: move.to,
+      })
     previousState = frame.cursor
   }
   return { moves: moves.filter((move) => move.distance > 0 && move.to !== 'rest'), presses }
@@ -58,10 +62,12 @@ describe('product preview cursor', () => {
 
   it('clicks as soon as it reaches a button', () => {
     expect(presses.length).toBeGreaterThan(5)
-    for (const press of presses)
+    for (const press of presses) {
+      expect(press.waited, `clicked ${press.on} only after arriving`).toBeGreaterThanOrEqual(0)
       expect(press.waited, `waited on ${press.on}`).toBeLessThanOrEqual(
         press.on === 'row' ? 400 : 120,
       )
+    }
   })
 
   it('drifts off somewhere and pauses, rather than freezing, whenever it waits for a while', () => {

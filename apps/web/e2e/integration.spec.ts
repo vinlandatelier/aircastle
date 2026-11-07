@@ -29,7 +29,6 @@ for (const scenario of ['normal', 'long-text'] as const) {
       foreground: getComputedStyle(element).color,
     }))
     await themeToggle.click()
-    await expect(page.getByRole('menu')).toHaveCount(0)
     await expect(page.locator('html')).toHaveClass(/\bdark\b/)
     await expect
       .poll(() => page.evaluate((key) => localStorage.getItem(key), themeStorageKey))

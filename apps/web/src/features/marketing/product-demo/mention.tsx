@@ -3,7 +3,7 @@ import { AgentAvatar } from './agent-avatar'
 import { agentNamed, orchestrator, type DemoAgent } from './agents'
 
 /** An inline reference to an agent, shown as a pill with its avatar. */
-export function AgentMention({ agent, className }: { agent: DemoAgent; className?: string }) {
+function AgentMention({ agent, className }: { agent: DemoAgent; className?: string }) {
   return (
     <span
       data-demo-mention

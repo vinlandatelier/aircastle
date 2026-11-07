@@ -46,7 +46,7 @@ export function MarketingPage() {
               Get started
             </Link>
             <a
-              href="/demo"
+              href="#product-demo"
               className="group inline-flex items-center gap-1.5 rounded-lg px-0 py-2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring sm:px-4"
             >
               See Aircastle in action

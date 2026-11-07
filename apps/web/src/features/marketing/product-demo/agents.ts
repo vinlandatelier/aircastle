@@ -49,7 +49,7 @@ export const einar: DemoAgent = {
 export const workingAgents: readonly DemoAgent[] = [thorfinn, canute, askeladd, thorkell, einar]
 
 /** Every agent in the preview, orchestrator first. */
-export const allAgents: readonly DemoAgent[] = [orchestrator, ...workingAgents]
+const allAgents: readonly DemoAgent[] = [orchestrator, ...workingAgents]
 
 /** The agent with this name, if there is one. */
 export function agentNamed(name: string) {

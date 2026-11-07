@@ -15,7 +15,6 @@ describe('Aircastle app shell', () => {
       ['dark', 'light'],
     ] as const) {
       await user.click(screen.getByRole('button', { name: 'Dark theme' }))
-      expect(screen.queryByRole('menu')).toBeNull()
       await waitFor(() => {
         expect(document.documentElement.classList.contains(value)).toBe(true)
         expect(document.documentElement.classList.contains(other)).toBe(false)

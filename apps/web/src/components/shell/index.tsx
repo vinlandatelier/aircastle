@@ -30,4 +30,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   )
 }
 
+export { GeneratedAvatar } from './generated-avatar'
 export { ThemeSwitcher } from './theme-switcher'

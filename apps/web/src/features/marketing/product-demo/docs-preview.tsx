@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import { ArrowLeftIcon, ArrowRightIcon, InfoIcon, SearchIcon } from 'lucide-react'
 import { cn } from 'cn'
-import { GeneratedAvatar } from '@/components/shell/generated-avatar'
+import { GeneratedAvatar } from '@/components/shell'
 
 /** Where the docs entry is published on Acme's docs site. */
 export const docsUrl = 'docs.acme.com/integrations/connect-to-acme-mcp'

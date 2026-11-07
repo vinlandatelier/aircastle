@@ -124,6 +124,35 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText('Ask Air')
   await expect(dialog).not.toContainText('Ask agents')
+  await page.waitForTimeout(400)
+  const layers = await frame.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const scale = box.width / 1280
+    element.removeAttribute('inert')
+    const at = (x: number, y: number) => {
+      const hit = document.elementFromPoint(box.x + x * scale, box.y + y * scale)
+      if (hit?.closest('[data-demo-window-dots]')) return 'dots'
+      if (hit?.closest('[data-demo-dialog-backdrop]')) return 'backdrop'
+      if (hit?.closest('[data-demo-dialog]')) return 'dialog'
+      return 'uncovered'
+    }
+    const result = {
+      dots: at(200, 16),
+      header: at(900, 60),
+      sidebar: at(28, 300),
+      table: at(640, 650),
+      dialog: at(640, 230),
+    }
+    element.setAttribute('inert', '')
+    return result
+  })
+  expect(layers, 'the blur covers the whole app but the window dots').toEqual({
+    dots: 'dots',
+    header: 'backdrop',
+    sidebar: 'backdrop',
+    table: 'backdrop',
+    dialog: 'dialog',
+  })
   await expect(dialog.locator('.air-mascot')).toHaveCount(1)
   await expect(dialog.locator('svg.lucide-sparkles')).toHaveCount(0)
   await expect(typed).toHaveText('')
@@ -227,14 +256,24 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect.poll(gapToNextRow).toBe(true)
 })
 
-test('the agent dialog stays closed with reduced motion', async ({ page }) => {
-  await page.clock.install()
+test('the preview holds a still frame with reduced motion', async ({ page }) => {
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
   await frame.scrollIntoViewIfNeeded()
-  await page.clock.runFor(story(8000))
-  await expect(frame.locator('[data-demo-dialog]')).toHaveCount(0)
+  await page.waitForTimeout(300)
+  for (const moment of [2600, 9000]) {
+    await page.clock.runFor(story(moment))
+    await expect(
+      frame.locator('[data-demo-dialog]'),
+      'the dialog would be open at 2.6s',
+    ).toHaveCount(0)
+    await expect(frame.locator('[data-demo-table]')).toHaveAttribute('data-state', 'shown')
+    await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'hidden')
+    await expect(frame.locator('[data-demo-cursor]')).toHaveAttribute('data-state', 'resting')
+  }
 })
 
 test('product preview has a bordered window-dots strip above the header and no frame border', async ({
@@ -255,7 +294,8 @@ test('product preview has a bordered window-dots strip above the header and no f
 test('the cursor hovers the agent row and the agents tab expands to name them', async ({
   page,
 }) => {
-  await page.clock.install()
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
@@ -412,9 +452,9 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(table).toHaveAttribute('data-state', 'hidden')
   await expect(editor).toContainText('Introducing Acme MCP')
-  await expect(editor.locator('[data-demo-agent-outline]')).toHaveCount(
-    await editor.locator('[data-demo-field] [data-demo-agent-outline]').count(),
-  )
+  const outlines = await editor.locator('[data-demo-agent-outline]').count()
+  expect(outlines, 'agents outline the fields they work on').toBeGreaterThan(0)
+  await expect(editor.locator('[data-demo-field] [data-demo-agent-outline]')).toHaveCount(outlines)
   await expect(editor.locator('[data-demo-post-status]')).toHaveText('Draft')
 
   const preview = editor.locator('[data-demo-preview]')
@@ -1272,8 +1312,11 @@ test('the preview plays a little faster than its timeline, opening the editor be
   const editor = frame.locator('[data-demo-editor]')
   await page.clock.runFor(5500)
   await expect(editor).toHaveAttribute('data-state', 'hidden')
-  await page.clock.runFor(1700)
-  await expect(editor).toHaveAttribute('data-state', 'shown')
+  await page.clock.runFor(700)
+  await expect(editor, 'at 1x the editor would still be hidden').toHaveAttribute(
+    'data-state',
+    'shown',
+  )
 })
 
 test('the cursor heads for Preview once the social image and the body are done, while SEO keeps typing', async ({
@@ -1849,6 +1892,8 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
     if (now.target === 'bell' && now.state === 'clicking') break
     await page.clock.runFor(story(50))
   }
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  await expect(cursor).toHaveAttribute('data-target', 'bell')
   await expect(status).toHaveText('Published')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
   await expectCursorOn(bell)
@@ -1870,6 +1915,8 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
     if (now.target === 'notification-preview' && now.state === 'clicking') break
     await page.clock.runFor(story(50))
   }
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  await expect(cursor).toHaveAttribute('data-target', 'notification-preview')
   await expectCursorOn(actions.last())
 
   await page.clock.runFor(story(400))
@@ -1944,6 +1991,8 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
     if (now.target === 'docs-publish' && now.state === 'clicking') break
     await page.clock.runFor(story(50))
   }
+  await expect(cursor).toHaveAttribute('data-state', 'clicking')
+  await expect(cursor).toHaveAttribute('data-target', 'docs-publish')
   await expectCursorOn(publish)
   await page.clock.runFor(story(100))
   expect(await confetti.locator('[data-demo-confetti-piece]').count()).toBeGreaterThan(30)
@@ -2231,4 +2280,36 @@ test('after asking Air, the cursor reads to the end of the post, then a referenc
     await page.clock.runFor(story(50))
   await expect(cursor).toHaveAttribute('data-state', 'clicking')
   expect((await box(opening)).y).toBe(revised.y)
+})
+
+test('the preview pauses while it is scrolled out of view and resumes where it left off', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 520 })
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  const preview = page.getByRole('region', { name: 'Aircastle preview' })
+  const typed = preview.locator('[data-demo-prompt]')
+  await preview.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(300)
+  await page.clock.runFor(story(2600))
+  const before = (await typed.textContent()) ?? ''
+  expect(before.length).toBeGreaterThan(0)
+  expect(before.length).toBeLessThan(prompt.length)
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await expect(preview).not.toBeInViewport()
+  await page.waitForTimeout(300)
+  await page.clock.runFor(story(20000))
+  await preview.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(300)
+  await page.clock.runFor(16)
+  const after = (await typed.textContent()) ?? ''
+  expect(after.startsWith(before), 'the prompt picks up where it was').toBe(true)
+  expect(after.length - before.length, 'no time passed while hidden').toBeLessThan(4)
+  await page.clock.runFor(story(400))
+  expect(((await typed.textContent()) ?? '').length, 'and it plays on').toBeGreaterThan(
+    after.length,
+  )
 })

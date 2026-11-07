@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   ArrowUpIcon,
   MousePointer2Icon,
@@ -17,8 +17,8 @@ import {
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
 import { Kbd } from '@/components/ui/kbd'
-import { GeneratedAvatar } from '@/components/shell/generated-avatar'
-import { navigationGroups } from '@/features/navigation/pages'
+import { GeneratedAvatar } from '@/components/shell'
+import { navigationGroups } from '@/features/navigation'
 import { EditorView } from './editor-view'
 import { PersonAvatar } from './person'
 import { docsDecisionState } from './research'
@@ -38,7 +38,7 @@ import { NotificationsBell } from './notifications'
 import { Outro } from './outro'
 import { cameraLeft, cameraWindow } from './camera'
 import { AgentAvatar } from './agent-avatar'
-import { cursorSpots, type CursorTarget } from './cursor-path'
+import { cursorPosition, type CursorTarget } from './cursor-path'
 import {
   notificationPreviewPressedAt,
   notificationsOpenAt,
@@ -69,11 +69,22 @@ function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: 
     const element = stage.current
     if (reducedMotion || !element) return
     let request: number | undefined
+    let played = 0
+    let resumedAt = 0
     const observer = new IntersectionObserver(([entry]) => {
-      if (!entry?.isIntersecting || request !== undefined) return
-      const startedAt = performance.now()
+      if (!entry) return
+      if (!entry.isIntersecting) {
+        if (request === undefined) return
+        cancelAnimationFrame(request)
+        request = undefined
+        played += (performance.now() - resumedAt) * playbackRate
+        return
+      }
+      if (request !== undefined) return
+      resumedAt = performance.now()
       const tick = () => {
-        const next = frameAt(((performance.now() - startedAt) * playbackRate) % loopDuration)
+        const elapsed = played + (performance.now() - resumedAt) * playbackRate
+        const next = frameAt(elapsed % loopDuration)
         setFrame((current) => (sameFrame(current, next) ? current : next))
         request = requestAnimationFrame(tick)
       }
@@ -103,7 +114,7 @@ function AgentDialog({
       data-demo-dialog
       data-state={state}
       className={cn(
-        'absolute top-[182px] left-1/2 z-30 w-[560px] -translate-x-1/2 rounded-xl border bg-popover p-4 text-base text-popover-foreground shadow-2xl transition-[opacity,scale,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-y-2 starting:scale-[0.97] starting:opacity-0',
+        'absolute top-[182px] left-1/2 z-50 w-[560px] -translate-x-1/2 rounded-xl border bg-popover p-4 text-base text-popover-foreground shadow-2xl transition-[opacity,scale,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-y-2 starting:scale-[0.97] starting:opacity-0',
         state === 'closing' && 'translate-y-1 scale-[0.98] opacity-0',
       )}
     >
@@ -154,7 +165,7 @@ function ShortcutChip({ shortcut }: { shortcut: Shortcut | undefined }) {
       data-demo-shortcut
       data-state={shortcut ? 'shown' : 'hidden'}
       className={cn(
-        'absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg transition-[opacity,translate] duration-300',
+        'absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg transition-[opacity,translate] duration-300',
         shortcut ? 'opacity-100' : 'translate-y-2 opacity-0',
       )}
     >
@@ -222,18 +233,21 @@ const posts: readonly {
 
 const phoneStageWidth = 640
 
-function useStageWidth(stage: React.RefObject<HTMLElement | null>) {
-  const [width, setWidth] = useState(frameWidth)
-  useEffect(() => {
-    const element = stage.current
-    if (!element) return
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(entry.contentRect.width)
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [stage])
-  return width
+function useStageWidth(element: HTMLElement | null) {
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      if (!element) return () => {}
+      const observer = new ResizeObserver(notify)
+      observer.observe(element)
+      return () => observer.disconnect()
+    },
+    [element],
+  )
+  return useSyncExternalStore(
+    subscribe,
+    () => element?.getBoundingClientRect().width ?? frameWidth,
+    () => frameWidth,
+  )
 }
 
 function StatusPill({ status }: { status: Status }) {
@@ -461,13 +475,7 @@ function DemoCursor({
   curve: number
   drift: { x: number; y: number }
 }) {
-  const start = cursorSpots[from]
-  const spot = cursorSpots[target]
-  const dx = spot.left - start.left
-  const dy = spot.top - start.top
-  const bend = Math.sin(Math.PI * progress) * curve
-  const left = start.left + dx * progress - dy * bend + drift.x
-  const top = start.top + dy * progress + dx * bend + drift.y
+  const { left, top } = cursorPosition({ from, target, progress, curve, drift })
   const Shape = cursorShapes[shape]
   return (
     <span
@@ -476,7 +484,7 @@ function DemoCursor({
       data-shape={shape}
       data-target={target}
       style={{ transform: `translate(${left}px, ${top}px)` }}
-      className="absolute top-0 left-0 z-40"
+      className="absolute top-0 left-0 z-[46]"
     >
       <Shape
         className={cn(
@@ -664,7 +672,8 @@ function PostsView({
 /** A scaled mock of the Aircastle app shown below the hero. */
 export function ProductDemo() {
   const stage = useRef<HTMLDivElement>(null)
-  const stageWidth = useStageWidth(stage)
+  const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null)
+  const stageWidth = useStageWidth(stageElement)
   const reducedMotion = usePrefersReducedMotion()
   const frame = usePlayback(stage, reducedMotion)
   const phone = stageWidth < phoneStageWidth
@@ -673,8 +682,9 @@ export function ProductDemo() {
 
   return (
     <section
+      id="product-demo"
       aria-labelledby="product-demo-title"
-      className="mx-auto w-full max-w-[70rem] px-4 pb-24"
+      className="mx-auto w-full max-w-[70rem] scroll-mt-20 px-4 pb-24"
     >
       <h2 id="product-demo-title" className="sr-only">
         Aircastle preview
@@ -684,7 +694,10 @@ export function ProductDemo() {
         keyboard shortcut opens a dialog for asking agents to do the work.
       </p>
       <div
-        ref={stage}
+        ref={(node) => {
+          stage.current = node
+          setStageElement(node)
+        }}
         data-demo-stage={phone ? 'phone' : 'desktop'}
         style={{ height: frameHeight * scale }}
         className={cn('relative w-full', phone && 'overflow-hidden rounded-[18px] shadow-xl')}
@@ -741,8 +754,9 @@ export function ProductDemo() {
             </div>
           </div>
           <div
+            data-demo-dialog-backdrop
             className={cn(
-              'absolute inset-0 z-20 bg-background/30 backdrop-blur-[3px] transition-opacity duration-300',
+              'absolute inset-x-0 top-8 bottom-0 z-[45] bg-background/30 backdrop-blur-[3px] transition-opacity duration-300',
               frame.dialog === 'open' ? 'opacity-100' : 'opacity-0',
             )}
           />

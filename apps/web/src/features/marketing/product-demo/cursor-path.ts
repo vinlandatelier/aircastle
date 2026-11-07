@@ -39,3 +39,28 @@ export function arcFor(from: CursorTarget, to: CursorTarget) {
 
 /** How long the cursor rests on a button before pressing it. */
 export const pressDelay = 80
+
+/** Where the cursor is drawn in the frame: along its move, bowed by its arc, plus any idle drift. */
+export function cursorPosition({
+  from,
+  target,
+  progress,
+  curve,
+  drift,
+}: {
+  from: CursorTarget
+  target: CursorTarget
+  progress: number
+  curve: number
+  drift: { x: number; y: number }
+}) {
+  const start = cursorSpots[from]
+  const spot = cursorSpots[target]
+  const dx = spot.left - start.left
+  const dy = spot.top - start.top
+  const bend = Math.sin(Math.PI * progress) * curve
+  return {
+    left: start.left + dx * progress - dy * bend + drift.x,
+    top: start.top + dy * progress + dx * bend + drift.y,
+  }
+}

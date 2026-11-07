@@ -7,7 +7,9 @@
       ;(() => {
         let theme = 'dark'
         try {
-          if (localStorage.getItem('aircastle-theme') === 'light') theme = 'light'
+          const stored = localStorage.getItem('aircastle-theme')
+          if (stored === 'light') theme = 'light'
+          else if (stored !== 'dark') localStorage.setItem('aircastle-theme', 'dark')
         } catch {}
         document.documentElement.classList.add(theme)
         document.documentElement.style.colorScheme = theme

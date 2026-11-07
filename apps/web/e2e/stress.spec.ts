@@ -36,7 +36,6 @@ async function chooseTheme(page: Page, theme: 'Light' | 'Dark') {
   await assertBounded(page, toggle)
   if (((await toggle.getAttribute('aria-pressed')) === 'true') !== (theme === 'Dark'))
     await toggle.click()
-  await expect(page.getByRole('menu')).toHaveCount(0)
   await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme.toLowerCase()}\\b`))
 }
 

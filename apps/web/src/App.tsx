@@ -21,6 +21,7 @@ function App() {
     <ThemeProvider
       attribute="class"
       defaultTheme="dark"
+      themes={['light', 'dark']}
       storageKey={themeStorageKey}
       enableSystem={false}
     >

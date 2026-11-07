@@ -41,10 +41,14 @@ test('a first visit is dark whatever the system prefers', async ({ page }) => {
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/brand/favicon-dark.svg')
   await page.emulateMedia({ colorScheme: 'dark' })
   await page.emulateMedia({ colorScheme: 'light' })
+  await expect
+    .poll(() => page.locator('html').getAttribute('class'), { timeout: 1000, intervals: [100] })
+    .toMatch(/\bdark\b/)
+  await page.waitForTimeout(300)
   await expect(page.locator('html')).toHaveClass(/\bdark\b/)
 })
 
-test('sign-in art is the same warm cloud field in light and dark, with a modest logo and name', async ({
+test('sign-in art is the same warm cloud field in light and dark, on an inset rounded card with no logo or name', async ({
   page,
 }) => {
   const looks: { left: number[]; right: number[] }[] = []
@@ -55,17 +59,20 @@ test('sign-in art is the same warm cloud field in light and dark, with a modest 
     })
     await page.goto('/sign-in')
     await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
+    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`))
     const art = page.locator('[data-sign-in-art]')
     await expect(art).toBeVisible()
     await expect(art).toHaveAttribute('aria-hidden', 'true')
     await expect(art.locator('feTurbulence')).toHaveCount(1)
-    const name = art.getByText('Aircastle', { exact: true })
-    await expect(name).toHaveCSS('color', 'rgb(255, 255, 255)')
-    expect(
-      parseFloat(await name.evaluate((element) => getComputedStyle(element).fontSize)),
-    ).toBeLessThanOrEqual(28)
-    const mark = await art.locator('[data-sign-in-mark]').boundingBox()
-    expect(mark?.width ?? Infinity).toBeLessThanOrEqual(36)
+    await expect(art.getByText('Aircastle')).toHaveCount(0)
+    await expect(art.locator('img, svg image, .brand-logo')).toHaveCount(0)
+    const radius = parseFloat(
+      await art.evaluate((element) => getComputedStyle(element).borderTopLeftRadius),
+    )
+    expect(radius, 'a rounded card').toBeGreaterThanOrEqual(16)
+    const card = await art.boundingBox()
+    expect(card?.x ?? 0, 'inset from the window edge').toBeGreaterThanOrEqual(8)
+    expect(card?.y ?? 0).toBeGreaterThanOrEqual(8)
     const shot = (await art.screenshot()).toString('base64')
     looks.push(
       await page.evaluate(async (data) => {

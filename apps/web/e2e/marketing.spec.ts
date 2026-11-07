@@ -232,7 +232,7 @@ test('hero offers a dim ghost demo link beside the call to action', async ({ pag
   const cta = main.getByRole('link', { name: 'Get started', exact: true })
   const demo = main.getByRole('link', { name: 'See Aircastle in action', exact: true })
   await expect(demo).toBeVisible()
-  await expect(demo).toHaveAttribute('href', '/demo')
+  await expect(demo).toHaveAttribute('href', '#product-demo')
   await expect(demo).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   const color = (locator: typeof demo) =>
     locator.evaluate((element) => getComputedStyle(element).color)
@@ -263,4 +263,14 @@ test('underline beam keeps one length across every rotating word', async ({ page
   await expect(shownWord(page)).toHaveText('research')
   expect(await beamLength()).toBe(writeBeam)
   expect(writeBeam.split(' ')[0]).toMatch(/px$/)
+})
+
+test('See Aircastle in action scrolls to the preview instead of leaving the page', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByRole('main').getByRole('link', { name: 'See Aircastle in action' }).click()
+  await expect(page).toHaveURL(/\/#product-demo$/)
+  await expect(page.getByRole('region', { name: 'Aircastle preview' })).toBeInViewport()
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toHaveCount(0)
 })

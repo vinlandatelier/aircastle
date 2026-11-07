@@ -1,5 +1,4 @@
 import { CloudGradient, CloudGrain } from '@/components/brand/cloud-gradient'
-import { galeBlades } from './gale-blades'
 
 const bloomStartsAfter = 1000
 const driftDuration = 2400
@@ -27,33 +26,33 @@ function overshoot(t: number) {
   return 1 + (pull + 1) * (t - 1) ** 3 + pull * (t - 1) ** 2
 }
 
+const galeBlades = [1, 2, 3, 4, 5].map((blade) => `url(/brand/gale-blade-${blade}.svg)`)
+
 function GaleBloom({ elapsed }: { elapsed: number }) {
   const settle = easeOut(progress(elapsed - bloomStartsAfter, settleDuration))
   return (
-    <svg
+    <div
       data-demo-outro-mark
-      viewBox="0 0 100 100"
       style={{ width: markSize, height: markSize, rotate: `${(1 - settle) * 100}deg` }}
-      className="shrink-0 overflow-visible drop-shadow-[0_1px_14px_rgb(90_40_20/0.18)]"
+      className="relative shrink-0 drop-shadow-[0_1px_14px_rgb(90_40_20/0.18)]"
     >
       {galeBlades.map((blade, index) => {
         const t = progress(elapsed - bloomStartsAfter - index * bladeStagger, bladeDuration)
         const grown = overshoot(t)
         return (
-          <path
-            key={index}
+          <span
+            key={blade}
             data-demo-outro-blade
-            d={blade}
-            fill="white"
-            opacity={Math.min(1, t * 2.5)}
+            className="absolute inset-0 bg-white"
             style={{
-              transformOrigin: '50px 50px',
+              opacity: Math.min(1, t * 2.5),
+              mask: `${blade} center / contain no-repeat`,
               transform: `rotate(${(1 - grown) * 110}deg) scale(${Math.max(0, grown)})`,
             }}
           />
         )
       })}
-    </svg>
+    </div>
   )
 }
 

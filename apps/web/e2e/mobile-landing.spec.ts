@@ -42,7 +42,8 @@ async function expectNoSideScroll(page: Page) {
 test('on a phone, the hero title wraps cleanly and the rotating word never reflows it', async ({
   page,
 }) => {
-  await page.clock.install()
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const title = page.getByRole('heading', { level: 1 })
@@ -54,18 +55,26 @@ test('on a phone, the hero title wraps cleanly and the rotating word never reflo
   expect(fontSize, 'a phone-sized title').toBeLessThanOrEqual(36)
   const heights = new Set<number>()
   const slotLines = new Set<number>()
+  const words = new Set<string>()
   for (let turn = 0; turn < 5; turn += 1) {
-    const now = await title.evaluate((element) => {
+    const now = await title.evaluate(async (element) => {
       const slot = element.querySelector('[aria-hidden="true"] > span')
+      if (!slot) throw new Error('No rotating word')
+      await Promise.all(
+        slot.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      )
       return {
+        word: slot.textContent ?? '',
         height: Math.round(element.getBoundingClientRect().height),
-        slot: slot ? Math.round(slot.getBoundingClientRect().top) : -1,
+        slot: Math.round(slot.getBoundingClientRect().top),
       }
     })
+    words.add(now.word)
     heights.add(now.height)
     slotLines.add(now.slot)
-    await page.clock.runFor(3000)
+    await page.clock.runFor(4000)
   }
+  expect(words.size, 'every rotating word was measured once settled').toBeGreaterThanOrEqual(4)
   expect(heights.size, 'the title keeps one height as the word rotates').toBe(1)
   expect(slotLines.size, 'the rotating word stays on its line').toBe(1)
   const actions = [

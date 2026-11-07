@@ -49,10 +49,16 @@ describe('Sign in', () => {
     }
   })
 
-  it('returns Home to the marketing homepage', async () => {
+  it('has no Home button, and the logo above the heading returns to the marketing homepage', async () => {
     const { router, user } = await renderApp('/sign-in')
-    expect(screen.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/')
-    await user.click(screen.getByRole('link', { name: 'Home' }))
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+    const logo = screen.getByRole('link', { name: 'Aircastle home' })
+    expect(logo.getAttribute('href')).toBe('/')
+    expect(
+      logo.compareDocumentPosition(screen.getByRole('heading', { name: 'Sign in to Aircastle' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    await user.click(logo)
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
     expect(await screen.findByRole('navigation', { name: 'Marketing navigation' })).toBeTruthy()
