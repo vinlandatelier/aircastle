@@ -38,7 +38,7 @@ describe('Requested destinations over display-only HTTP, without authorization p
           authenticated = true
           return ok({ destination: membership ? returnTo : { kind: 'dashboard' } })
         },
-        'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' } }),
+        'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' }, session }),
       })
       const { router, history, user } = await mountAuth(
         `${requested}?callbackURL=https%3A%2F%2Fevil.test&redirect=%2F%2Fevil.test`,

@@ -56,6 +56,7 @@ export function authenticatedDisplayHttp() {
       const entry = await request.json()
       return ok({
         destination: entry.kind === 'visit' ? entry.destination : { kind: 'workspaces' },
+        session,
       })
     },
   })

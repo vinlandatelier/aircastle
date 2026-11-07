@@ -29,7 +29,10 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
   const request = createAuthHttp(options)
   let requested: ProtectedDestination | undefined
   let confirmation: Confirmation | undefined
-  let handoff: { path: string; state: InstanceState } | undefined
+  let handoff:
+    | { path: string; state: InstanceState }
+    | { path: string; view: Extract<AuthView, { kind: 'authenticated' }> }
+    | undefined
   const go = (path: string): never => {
     throw redirect({ href: path, replace: true })
   }
@@ -49,7 +52,7 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
       confirmation = undefined
     },
     async entry(body: object) {
-      return request<{ destination: Destination }>('/auth/entry', body)
+      return request<{ destination: Destination; session: BrowserSession }>('/auth/entry', body)
     },
     async enter(
       route: { access: RouteAccess; params: RouteParams },
@@ -62,11 +65,12 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
         access.kind === 'setup' ? 'setup' : access.kind === 'sign-in' ? 'sign-in' : undefined
       const token = typeof search.token === 'string' && search.token ? search.token : undefined
       if (purpose && !token && confirmation?.purpose === purpose) return { kind: 'public' }
-      const state: HttpResult<InstanceState> =
-        handoff?.path === path
-          ? { kind: 'ok', value: handoff.state }
-          : await request<InstanceState>('/auth/state')
+      const handed = handoff?.path === path ? handoff : undefined
       handoff = undefined
+      if (handed && 'view' in handed) return handed.view
+      const state: HttpResult<InstanceState> = handed
+        ? { kind: 'ok', value: handed.state }
+        : await request<InstanceState>('/auth/state')
       if (state.kind !== 'ok') return { kind: 'failure' }
       if (state.value.kind === 'disabled') {
         confirmation = undefined
@@ -95,32 +99,35 @@ export function createBrowserAuth(options: AuthBrowserOptions = {}) {
         }
         return { kind: 'public' }
       }
-      const session = await request<BrowserSession>('/auth/session')
-      if (session.kind === 'unauthenticated') signedOut()
-      if (session.kind !== 'ok') return { kind: 'failure' }
-      const activity = await request<BrowserSession>('/auth/activity', {})
-      if (activity.kind === 'unauthenticated') signedOut()
-      if (activity.kind !== 'ok') return { kind: 'failure' }
-      if (!guard) go('/dash')
-      if (guard?.kind === 'resolve') {
-        const entry = await request<{ destination: Destination }>('/auth/entry', {
-          kind: 'resolve',
-        })
-        if (entry.kind === 'unauthenticated') signedOut()
-        if (entry.kind !== 'ok') return { kind: 'failure' }
+      const authenticated = state.value
+      const toDashboard = (): never => {
+        handoff = { path: '/dash', state: authenticated }
+        return go('/dash')
+      }
+      if (!guard) return toDashboard()
+      if (guard.kind === 'session') {
+        const activity = await request<BrowserSession>('/auth/activity', {})
+        if (activity.kind === 'unauthenticated') signedOut()
+        if (activity.kind !== 'ok') return { kind: 'failure' }
+        return { kind: 'authenticated', session: activity.value }
+      }
+      const entry = await request<{ destination: Destination; session: BrowserSession }>(
+        '/auth/entry',
+        guard.kind === 'resolve'
+          ? { kind: 'resolve' }
+          : { kind: 'visit', destination: guard.destination },
+      )
+      if (entry.kind === 'unauthenticated') signedOut()
+      if (entry.kind === 'forbidden') toDashboard()
+      if (entry.kind !== 'ok') return { kind: 'failure' }
+      const view = { kind: 'authenticated', session: entry.value.session } as const
+      if (guard.kind === 'resolve') {
         requested = undefined
-        go(destinationPath(entry.value.destination))
+        const next = destinationPath(entry.value.destination)
+        handoff = { path: next, view }
+        go(next)
       }
-      if (guard?.kind === 'visit') {
-        const entry = await request<{ destination: Destination }>('/auth/entry', {
-          kind: 'visit',
-          destination: guard.destination,
-        })
-        if (entry.kind === 'unauthenticated') signedOut()
-        if (entry.kind === 'forbidden') go('/dash')
-        if (entry.kind !== 'ok') return { kind: 'failure' }
-      }
-      return { kind: 'authenticated', session: activity.value }
+      return view
     },
   }
 }
