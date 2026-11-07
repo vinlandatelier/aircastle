@@ -72,6 +72,7 @@ export function readDatabaseConfig(env: Record<string, string | undefined> = pro
 export function readConfig(env: Record<string, string | undefined> = process.env) {
   return arkenv(
     {
+      AIRCASTLE_HOST: "string.ip = '127.0.0.1'",
       AIRCASTLE_PORT: "1 <= number.integer <= 65535 = 43122",
       AIRCASTLE_LOG_LEVEL:
         "'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent' = 'info'",
