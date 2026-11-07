@@ -12,7 +12,6 @@ const session = {
   expiresAt: Date.UTC(2030, 0, 15),
 }
 const responses: Record<string, unknown> = {
-  'GET /api/auth/session': session,
   'POST /api/auth/activity': session,
   'POST /api/auth/entry': {
     destination: {

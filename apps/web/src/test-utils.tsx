@@ -26,7 +26,6 @@ export function displayHttp(
   const requests: Request[] = []
   const handlers: Record<string, (request: Request) => Response | Promise<Response>> = {
     'GET /api/auth/state': () => ok({ kind: 'signed-out' }),
-    'GET /api/auth/session': () => Response.json({ kind: 'unauthenticated' }, { status: 401 }),
     ...routes,
   }
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -50,7 +49,6 @@ export function displayHttp(
 export function authenticatedDisplayHttp() {
   return displayHttp({
     'GET /api/auth/state': () => ok({ kind: 'authenticated', session }),
-    'GET /api/auth/session': () => ok(session),
     'POST /api/auth/activity': () => ok(session),
     'POST /api/auth/entry': async (request) => {
       const entry = await request.json()

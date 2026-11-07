@@ -29,7 +29,6 @@ function http(state: 'authenticated' | 'signed-out', access: 'member' | 'outside
   return displayHttp({
     'GET /api/auth/state': () =>
       ok(state === 'authenticated' ? { kind: 'authenticated', session } : { kind: 'signed-out' }),
-    'GET /api/auth/session': () => ok(session),
     'POST /api/auth/activity': () => ok(session),
     'POST /api/auth/entry': async (request) => {
       const body = await request.json()

@@ -100,8 +100,6 @@ describe('Confirmation display over HTTP doubles, without authentication proof',
       'POST /api/auth/confirm': () => pending.promise,
       'GET /api/auth/state': () =>
         ok(authenticated ? { kind: 'authenticated', session } : { kind: 'setup-required' }),
-      'GET /api/auth/session': () =>
-        authenticated ? ok(session) : failure('unauthenticated', 401),
       'POST /api/auth/activity': () => ok(session),
       'POST /api/auth/entry': () => ok({ destination: { kind: 'create-workspace' }, session }),
     })

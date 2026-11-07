@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vite-plus/test'
 import {
   displayHttp,
   expectNoShell,
-  failure,
   mountAuth,
   ok,
   session,
@@ -28,8 +27,6 @@ describe('Requested destinations over display-only HTTP, without authorization p
       const http = displayHttp({
         'GET /api/auth/state': () =>
           ok(authenticated ? { kind: 'authenticated', session } : { kind: 'signed-out' }),
-        'GET /api/auth/session': () =>
-          authenticated ? ok(session) : failure('unauthenticated', 401),
         'POST /api/auth/activity': () => ok(session),
         'POST /api/auth/sign-in': () => ok({ confirmation: 'sign-in-inbox' }),
         'POST /api/auth/confirm/preview': () =>

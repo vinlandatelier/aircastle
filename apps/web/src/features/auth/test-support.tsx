@@ -38,7 +38,6 @@ export function displayHttp(
   const requests: Request[] = []
   const handlers: Record<string, (request: Request) => Response | Promise<Response>> = {
     'GET /api/auth/state': () => ok({ kind: 'signed-out' }),
-    'GET /api/auth/session': () => failure('unauthenticated', 401),
     ...routes,
   }
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
