@@ -129,7 +129,7 @@ type PhoneMoment = {
   screen: string
   sheet: string
   dialog: string | null
-  finger: { x: number; y: number; target: string; state: string; opacity: number }
+  finger: { x: number; y: number; target: string; state: string; shown: boolean }
   phone: Rect
   pressed: Rect | null
   opening: Rect[]
@@ -160,7 +160,7 @@ function readPhone(frame: Locator) {
           y: fingerBox.top + fingerBox.height / 2,
           target,
           state: finger.getAttribute('data-state') ?? '',
-          opacity: Number(getComputedStyle(finger).opacity),
+          shown: finger.getAttribute('data-shown') === 'true',
         },
         phone: rect(element),
         pressed: pressed ? rect(pressed) : null,
@@ -232,7 +232,7 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
     }
     if (screens.at(-1) !== now.screen) screens.push(now.screen)
     if (now.sheet !== 'none' && sheets.at(-1) !== now.sheet) sheets.push(now.sheet)
-    if (now.finger.opacity > 0)
+    if (now.finger.shown)
       expect(
         contains(now.phone, now.finger.x, now.finger.y),
         `the finger stays on the screen at ${now.finger.target}`,

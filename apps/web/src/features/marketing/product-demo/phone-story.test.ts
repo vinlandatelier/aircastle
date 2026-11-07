@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test'
 import {
+  phoneEditorFieldAt,
+  phoneFingerAt,
   phoneFrame,
   phoneReplyToastAt,
   phoneScreenAt,
@@ -8,7 +10,7 @@ import {
   phoneSpots,
 } from './phone-story'
 import { askTiming } from './site-ask'
-import { frameAt, loopDuration } from './timeline'
+import { frameAt, loopDuration, seoTiming } from './timeline'
 
 const step = 10
 
@@ -56,7 +58,10 @@ describe('the phone story', () => {
     const airSheet = runsOf((elapsed) => phoneSheetAt(frameAt(elapsed))).find(
       (run) => run.value === 'air',
     )
-    expect(toast!.from).toBe(airSheet!.to)
+    expect(
+      toast!.from - airSheet!.to,
+      'the toast waits for the sheet to lower',
+    ).toBeGreaterThanOrEqual(350)
     for (let elapsed = toast!.from; elapsed < toast!.to; elapsed += step)
       expect(phoneSheetAt(frameAt(elapsed))).toBeNull()
   })
@@ -64,6 +69,38 @@ describe('the phone story', () => {
   it('holds the live post at the opening line while Air works, then reads down', () => {
     expect(phoneSiteScrollAt(askTiming.replied).end).toBe(0)
     expect(phoneSiteScrollAt(askTiming.referenceClicked - 1).end).toBeGreaterThan(0.9)
+  })
+
+  it('scrolls the editor to the body as Thorfinn writes, then to SEO while Askeladd works', () => {
+    const fields = runsOf((elapsed) => {
+      const frame = frameAt(elapsed)
+      return phoneScreenAt(frame) === 'editor' ? phoneEditorFieldAt(frame) : null
+    }).filter((run) => run.value !== null)
+    expect(fields.map((run) => run.value)).toEqual(['top', 'body', 'seo'])
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      if (phoneScreenAt(frame) !== 'editor' || frame.seoElapsed === null) continue
+      if (frame.seoElapsed >= 0 && frame.seoElapsed < seoTiming.done)
+        expect(phoneEditorFieldAt(frame), 'Askeladd is on screen while filling SEO').toBe('seo')
+    }
+  })
+
+  it('keeps the finger on the screen, clear of its rounded corners, all loop long', () => {
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const finger = phoneFingerAt(frameAt(elapsed))
+      if (!finger.shown) continue
+      expect(finger.left).toBeGreaterThanOrEqual(20)
+      expect(finger.left).toBeLessThanOrEqual(phoneFrame.width - 20)
+      expect(finger.top).toBeGreaterThanOrEqual(20)
+      expect(finger.top).toBeLessThanOrEqual(phoneFrame.height - 20)
+    }
+  })
+
+  it("lifts the finger while Air's sheet is up, since nothing in it is tapped", () => {
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      if (phoneSheetAt(frame) === 'air') expect(phoneFingerAt(frame).shown).toBe(false)
+    }
   })
 
   it('keeps every tap spot on the phone screen, clear of its rounded corners', () => {

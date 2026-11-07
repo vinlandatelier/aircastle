@@ -1,4 +1,4 @@
-import type { CursorTarget } from './cursor-path'
+import { cursorPosition, type CursorTarget } from './cursor-path'
 import { researchLog } from './research'
 import { askTiming, docsPreviewAt, siteScrollAt } from './site-ask'
 import type { Frame } from './timeline'
@@ -10,8 +10,10 @@ export type PhoneScreen = 'posts' | 'editor' | 'site' | 'docs'
 export type PhoneSheet = 'ask' | 'research' | 'air'
 
 const airSheetLingers = 900
+const sheetLowers = 400
 const readDownDuration = 1100
 const toastLingersAfterJump = 900
+const phoneDrift = 0.35
 
 /** Which screen the phone shows for this frame of the story. */
 export function phoneScreenAt(frame: Frame): PhoneScreen {
@@ -43,7 +45,7 @@ export function phoneReplyToastAt(frame: Frame) {
   return (
     phoneScreenAt(frame) === 'site' &&
     elapsed !== null &&
-    elapsed >= askTiming.replied + airSheetLingers &&
+    elapsed >= askTiming.replied + airSheetLingers + sheetLowers &&
     elapsed < askTiming.referenceClicked + toastLingersAfterJump
   )
 }
@@ -61,6 +63,25 @@ export function phoneSiteScrollAt(elapsed: number) {
   if (elapsed < askTiming.referenceClicked)
     return { opening: desktop.opening, end: eased((elapsed - readFrom) / readDownDuration) }
   return desktop
+}
+
+/** Which editor field the phone scrolls to: the body while Thorfinn starts writing, then the SEO fields once Askeladd starts. */
+export function phoneEditorFieldAt(frame: Frame): 'top' | 'body' | 'seo' {
+  if (frame.bodyElapsed === null) return 'top'
+  return frame.seoElapsed !== null && frame.seoElapsed >= 0 ? 'seo' : 'body'
+}
+
+/** Where the finger is on the phone, and whether it touches the screen. It lifts while Air's sheet is up, since nothing in it is tapped. */
+export function phoneFingerAt(frame: Frame) {
+  const { left, top } = cursorPosition({
+    spots: phoneSpots,
+    from: frame.cursorFrom,
+    target: frame.cursorTarget,
+    progress: frame.cursorProgress,
+    curve: frame.cursorBend,
+    drift: { x: frame.cursorDriftX * phoneDrift, y: frame.cursorDriftY * phoneDrift },
+  })
+  return { left, top, shown: frame.cursor !== 'resting' && phoneSheetAt(frame) !== 'air' }
 }
 
 /** The phone preview's size in its own pixels, before it is scaled to the stage. */

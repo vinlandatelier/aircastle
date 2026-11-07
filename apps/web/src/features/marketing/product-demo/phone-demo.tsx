@@ -13,7 +13,6 @@ import { AgentAvatar } from './agent-avatar'
 import { askeladd, canute, einar, orchestrator, thorfinn } from './agents'
 import { rewrittenLine } from './body-draft'
 import { Confetti } from './confetti'
-import { cursorPosition } from './cursor-path'
 import { DocsPage, docsTitle, docsUrl } from './docs-preview'
 import {
   MainColumn,
@@ -27,6 +26,8 @@ import { NotificationsBell } from './notifications'
 import { Outro } from './outro'
 import { PersonAvatar } from './person'
 import {
+  phoneEditorFieldAt,
+  phoneFingerAt,
   phoneFrame,
   phoneReplyToastAt,
   phoneScreenAt,
@@ -55,7 +56,6 @@ const appBarHeight = 48
 const contextBarHeight = 52
 
 const fingerRadius = 14
-const fingerInset = 20
 
 const rowAgents = [orchestrator, thorfinn, canute, askeladd, einar] as const
 
@@ -303,14 +303,13 @@ function ResearchStrip({ steps }: { steps: number }) {
   )
 }
 
-function useFieldScroll(target: string | null) {
+function useFieldScroll(target: 'top' | 'body' | 'seo') {
   const content = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const element = content.current
     if (!element) return
-    const field = target
-      ? element.querySelector<HTMLElement>(`[data-demo-field="${target}"]`)
-      : null
+    const field =
+      target === 'top' ? null : element.querySelector<HTMLElement>(`[data-demo-field="${target}"]`)
     element.style.translate = `0 -${field ? Math.max(0, field.offsetTop - 16) : 0}px`
   }, [content, target])
   return content
@@ -318,7 +317,7 @@ function useFieldScroll(target: string | null) {
 
 function EditorScreen({ frame }: { frame: Frame }) {
   const bodyDone = frame.bodyElapsed !== null && frame.bodyElapsed >= bodyDraftDuration
-  const target = bodyDone ? 'seo' : frame.bodyElapsed !== null ? 'body' : null
+  const target = phoneEditorFieldAt(frame)
   const content = useFieldScroll(target)
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -339,7 +338,7 @@ function EditorScreen({ frame }: { frame: Frame }) {
         <div
           ref={content}
           data-phone-fields
-          data-target={target ?? 'top'}
+          data-target={target}
           className="flex flex-col gap-6 p-4 transition-[translate] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
         >
           <SideColumn
@@ -454,26 +453,18 @@ function DocsScreen({ elapsed, docsElapsed }: { elapsed: number; docsElapsed: nu
 }
 
 function PhoneFinger({ frame }: { frame: Frame }) {
-  const { left, top } = cursorPosition({
-    spots: phoneSpots,
-    from: frame.cursorFrom,
-    target: frame.cursorTarget,
-    progress: frame.cursorProgress,
-    curve: frame.cursorBend,
-    drift: { x: frame.cursorDriftX * 0.35, y: frame.cursorDriftY * 0.35 },
-  })
+  const { left, top, shown } = phoneFingerAt(frame)
   const pressing = frame.cursor === 'clicking' || frame.cursor === 'dragging'
-  const x = Math.min(phoneFrame.width - fingerInset, Math.max(fingerInset, left))
-  const y = Math.min(phoneFrame.height - fingerInset, Math.max(fingerInset, top))
   return (
     <span
       data-phone-finger
       data-state={frame.cursor}
       data-target={frame.cursorTarget}
-      style={{ translate: `${x - fingerRadius}px ${y - fingerRadius}px` }}
+      data-shown={shown}
+      style={{ translate: `${left - fingerRadius}px ${top - fingerRadius}px` }}
       className={cn(
         'pointer-events-none absolute top-0 left-0 z-[55] size-7 rounded-full border border-white/70 bg-white/35 shadow-[0_2px_10px_rgb(0_0_0/0.25)] backdrop-blur-[1px] transition-[opacity,scale] duration-150',
-        frame.cursor === 'resting' ? 'opacity-0' : 'opacity-100',
+        shown ? 'opacity-100' : 'opacity-0',
         pressing && 'scale-75 bg-white/55',
       )}
     >
