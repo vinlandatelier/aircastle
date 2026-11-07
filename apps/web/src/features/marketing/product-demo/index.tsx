@@ -36,6 +36,7 @@ import styles from './product-demo.module.css'
 import { Confetti } from './confetti'
 import { NotificationsBell } from './notifications'
 import { Outro } from './outro'
+import { cameraLeft, cameraWindow } from './camera'
 import { AgentAvatar } from './agent-avatar'
 import { cursorSpots, type CursorTarget } from './cursor-path'
 import {
@@ -219,18 +220,20 @@ const posts: readonly {
   },
 ]
 
-function useFitScale(stage: React.RefObject<HTMLElement | null>) {
-  const [scale, setScale] = useState(1)
+const phoneStageWidth = 640
+
+function useStageWidth(stage: React.RefObject<HTMLElement | null>) {
+  const [width, setWidth] = useState(frameWidth)
   useEffect(() => {
     const element = stage.current
     if (!element) return
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setScale(entry.contentRect.width / frameWidth)
+      if (entry) setWidth(entry.contentRect.width)
     })
     observer.observe(element)
     return () => observer.disconnect()
   }, [stage])
-  return scale
+  return width
 }
 
 function StatusPill({ status }: { status: Status }) {
@@ -661,9 +664,12 @@ function PostsView({
 /** A scaled mock of the Aircastle app shown below the hero. */
 export function ProductDemo() {
   const stage = useRef<HTMLDivElement>(null)
-  const scale = useFitScale(stage)
+  const stageWidth = useStageWidth(stage)
   const reducedMotion = usePrefersReducedMotion()
   const frame = usePlayback(stage, reducedMotion)
+  const phone = stageWidth < phoneStageWidth
+  const scale = stageWidth / (phone ? cameraWindow : frameWidth)
+  const panned = phone ? cameraLeft(frame) * scale : 0
 
   return (
     <section
@@ -677,14 +683,25 @@ export function ProductDemo() {
         The Aircastle dashboard with its sidebar collapsed, showing a blog posts collection. A
         keyboard shortcut opens a dialog for asking agents to do the work.
       </p>
-      <div ref={stage} style={{ height: frameHeight * scale }} className="relative w-full">
+      <div
+        ref={stage}
+        data-demo-stage={phone ? 'phone' : 'desktop'}
+        style={{ height: frameHeight * scale }}
+        className={cn('relative w-full', phone && 'overflow-hidden rounded-[18px] shadow-xl')}
+      >
         <div
           data-demo-frame
           aria-hidden="true"
           inert
-          style={{ width: frameWidth, height: frameHeight, scale: String(scale) }}
+          style={{
+            width: frameWidth,
+            height: frameHeight,
+            scale: String(scale),
+            translate: `${-panned}px 0`,
+          }}
           className={cn(
-            'absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-[18px] bg-card text-sm text-card-foreground shadow-xl select-none',
+            'absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden bg-card text-sm text-card-foreground select-none',
+            phone ? 'rounded-none' : 'rounded-[18px] shadow-xl',
             styles.agentPulse,
           )}
         >

@@ -1,6 +1,12 @@
 import { cn } from 'cn'
 
-const photos: Record<string, string> = { Abyan: '/demo/abyan.jpg' }
+const photos: Record<string, string> = {
+  Abyan: '/demo/abyan.jpg',
+  Maya: '/demo/maya.svg',
+  Theo: '/demo/theo.svg',
+  Priya: '/demo/priya.svg',
+  Sam: '/demo/sam.svg',
+}
 
 /** A person's photo in the preview, or their initial when they have none. */
 export function PersonAvatar({ name, className }: { name: string; className?: string }) {

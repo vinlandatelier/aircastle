@@ -360,6 +360,18 @@ test('the preview table lists authors, with some posts written by several people
   )
   expect(counts.some((count) => count > 1)).toBe(true)
   await expect(frame.locator('[data-demo-authors]').filter({ hasText: /agent/i })).toHaveCount(0)
+  const faces = await authorCells.evaluateAll((cells) =>
+    cells.flatMap((cell) =>
+      [...cell.querySelectorAll(':scope > span:first-child > span')].map(
+        (avatar) => avatar.querySelector('img')?.getAttribute('src') ?? null,
+      ),
+    ),
+  )
+  expect(faces.length).toBeGreaterThan(6)
+  expect(
+    faces.every((src) => src?.startsWith('/demo/')),
+    'every author has a portrait',
+  ).toBe(true)
 })
 
 test('the cursor turns into a pointer as soon as it is over any table row', async ({ page }) => {
