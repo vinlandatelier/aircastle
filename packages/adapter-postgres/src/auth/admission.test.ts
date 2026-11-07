@@ -2,6 +2,8 @@ import { describe, expect, test } from "vite-plus/test";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
+import postgres from "postgres";
+import { AuthStorageError } from "@aircastle/core";
 import type { AuthAdmissionStore, AuthLimits, AuthLimitScope } from "@aircastle/core";
 import { postgresAuthAdmission } from "../index.ts";
 import { withDatabase } from "../test-support/database.ts";
@@ -116,6 +118,41 @@ async function withAdmission(
     }
   });
 }
+
+async function dropPolicyConnections(url: string, namespace: string) {
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    const key = JSON.stringify([namespace, "auth-admission-policy"]);
+    const dropped = await sql<{ terminated: boolean }[]>`
+      SELECT pg_terminate_backend(pid) AS terminated FROM pg_locks
+      WHERE locktype = 'advisory' AND mode = 'ShareLock' AND granted AND pid <> pg_backend_pid()
+        AND ((classid::bigint << 32) | objid::bigint) = hashtextextended(${key}, 0)`;
+    expect(dropped.length).toBeGreaterThan(0);
+    await expect
+      .poll(
+        async () =>
+          (
+            await sql<{ held: number }[]>`
+              SELECT count(*)::int AS held FROM pg_locks
+              WHERE locktype = 'advisory' AND granted
+                AND ((classid::bigint << 32) | objid::bigint) = hashtextextended(${key}, 0)`
+          )[0]?.held,
+      )
+      .toBe(0);
+  } finally {
+    await sql.end();
+  }
+}
+
+const admitAfterReconnect = (admission: AuthAdmissionStore) =>
+  expect
+    .poll(() =>
+      admission.admit(request).then(
+        (result) => result.kind,
+        (error: unknown) => (error instanceof AuthStorageError ? "reconnecting" : error),
+      ),
+    )
+    .toBe("admitted");
 
 describe("durable auth request admission", () => {
   test.each<AuthLimitScope>(["email", "ip", "global"])(
@@ -434,6 +471,31 @@ describe("durable auth request admission", () => {
         const restarted = await open(changed);
         expect(await restarted.admit(request)).toEqual({ kind: "admitted" });
       });
+    });
+  });
+
+  test("a reconnected instance takes its policy back before a conflicting newcomer starts", async () => {
+    await withAdmission(async ({ open, url, namespace }) => {
+      const first = await open(generous);
+      expect(await first.admit(request)).toEqual({ kind: "admitted" });
+      await dropPolicyConnections(url, namespace);
+      await admitAfterReconnect(first);
+      await expect(
+        open({ ...generous, global: { fiveMinutes: 999, oneHour: 1_000 } }),
+      ).rejects.toThrow(/policy|configuration|limits/i);
+      expect(await first.admit(request)).toEqual({ kind: "admitted" });
+    });
+  });
+
+  test("an instance whose policy a newcomer replaced after a reconnect fails closed", async () => {
+    await withAdmission(async ({ open, url, namespace }) => {
+      const first = await open(generous);
+      expect(await first.admit(request)).toEqual({ kind: "admitted" });
+      await dropPolicyConnections(url, namespace);
+      const newcomer = await open({ ...generous, global: { fiveMinutes: 999, oneHour: 1_000 } });
+      for (let attempt = 0; attempt < 3; attempt++)
+        await expect(first.admit(request)).rejects.toBeInstanceOf(AuthStorageError);
+      expect(await newcomer.admit(request)).toEqual({ kind: "admitted" });
     });
   });
 });
