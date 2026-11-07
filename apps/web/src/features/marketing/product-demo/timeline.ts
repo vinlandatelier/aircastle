@@ -1,11 +1,12 @@
 import { bodyDraftDuration } from './body-draft'
-import { arcFor, pressDelay, travelTime, type CursorTarget } from './cursor-path'
+import { arcFor, cursorSpots, pressDelay, travelTime, type CursorTarget } from './cursor-path'
 import { docsDecisionAnsweredAt, researchLog, researchStepsAt } from './research'
 import {
   askCursorPressed,
   askKeystroke,
   askTiming,
   confettiAt,
+  cursorBusyWindows,
   type PublishedEntry,
 } from './site-ask'
 
@@ -104,6 +105,7 @@ export type Frame = {
   cursorBend: number
   cursorDriftX: number
   cursorDriftY: number
+  cursorBusy: boolean
   researchHovered: boolean
   researchPanelOpen: boolean
   cover: CoverState
@@ -141,6 +143,7 @@ export const stillFrame: Frame = {
   cursorBend: 0,
   cursorDriftX: 0,
   cursorDriftY: 0,
+  cursorBusy: false,
   researchHovered: false,
   researchPanelOpen: false,
   cover: 'idle',
@@ -278,13 +281,55 @@ const cursorMoves: readonly {
 ]
 
 const driftStartsAfterArrival = 650
-const driftRampDuration = 500
 const driftSettlesBeforeMove = 150
-const driftReach = { x: 34, y: 22 } as const
+const driftGlide = 650
+const busyMargin = 120
+const shortestWander = 1200
+const twoStopWander = 3000
 
-function ramp(value: number) {
-  const t = Math.max(0, Math.min(1, value))
-  return t * t * (3 - 2 * t)
+const busyWindows = cursorBusyWindows.map(
+  ([start, end]) => [askAt + start - busyMargin, askAt + end + busyMargin] as const,
+)
+
+function cursorBusyAt(elapsed: number) {
+  return busyWindows.some(([start, end]) => elapsed >= start && elapsed < end)
+}
+
+function freeSpanAround(elapsed: number, from: number, to: number) {
+  let start = from
+  let end = to
+  for (const [busyStart, busyEnd] of busyWindows) {
+    if (busyEnd <= from || busyStart >= to) continue
+    if (busyEnd <= elapsed) start = Math.max(start, busyEnd)
+    else if (busyStart > elapsed) end = Math.min(end, busyStart)
+    else return null
+  }
+  return elapsed >= start && elapsed < end ? { start, end } : null
+}
+
+function seeded(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453
+  return value - Math.floor(value)
+}
+
+function eased(t: number) {
+  const clamped = Math.max(0, Math.min(1, t))
+  return clamped * clamped * (3 - 2 * clamped)
+}
+
+function wanderStops(target: CursorTarget, span: { start: number; end: number }) {
+  const spot = cursorSpots[target]
+  const count = span.end - span.start >= twoStopWander ? 2 : 1
+  const stops: { x: number; y: number }[] = []
+  for (let index = 0; index < count; index += 1) {
+    const angle = seeded(span.start + index * 7.1) * Math.PI * 2
+    const reach = 50 + seeded(span.start + index * 3.3) * 50
+    stops.push({
+      x: Math.max(40 - spot.left, Math.min(1240 - spot.left, Math.cos(angle) * reach)),
+      y: Math.max(70 - spot.top, Math.min(700 - spot.top, Math.sin(angle) * reach * 0.7)),
+    })
+  }
+  return stops
 }
 
 function cursorDriftAt(elapsed: number) {
@@ -293,19 +338,28 @@ function cursorDriftAt(elapsed: number) {
   if (!move) return { x: 0, y: 0 }
   const arrival = move.at + (move.duration ?? travelTime(move.from, move.to))
   const nextMoveAt = cursorMoves[index + 1]?.at ?? loopDuration
-  const waited = elapsed - arrival
-  const strength =
-    ramp((waited - driftStartsAfterArrival) / driftRampDuration) *
-    ramp((nextMoveAt - driftSettlesBeforeMove - elapsed) / driftRampDuration)
-  if (strength === 0) return { x: 0, y: 0 }
-  const phase = index * 1.7
-  const x =
-    0.7 * Math.sin((waited / 2600) * 2 * Math.PI + phase) +
-    0.3 * Math.sin((waited / 1700) * 2 * Math.PI + phase * 2)
-  const y =
-    0.7 * Math.cos((waited / 3100) * 2 * Math.PI + phase) +
-    0.3 * Math.sin((waited / 2100) * 2 * Math.PI + phase * 3)
-  return { x: x * driftReach.x * strength, y: y * driftReach.y * strength }
+  const span = freeSpanAround(
+    elapsed,
+    arrival + driftStartsAfterArrival,
+    nextMoveAt - driftSettlesBeforeMove,
+  )
+  if (!span || span.end - span.start < shortestWander) return { x: 0, y: 0 }
+  const path = [{ x: 0, y: 0 }, ...wanderStops(move.to, span), { x: 0, y: 0 }]
+  const legs = path.length - 1
+  const pause = (span.end - span.start - legs * driftGlide) / legs
+  let at = span.start
+  for (let leg = 0; leg < legs; leg += 1) {
+    const from = path[leg] ?? { x: 0, y: 0 }
+    const to = path[leg + 1] ?? { x: 0, y: 0 }
+    if (elapsed < at + driftGlide) {
+      const t = eased((elapsed - at) / driftGlide)
+      return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t }
+    }
+    at += driftGlide
+    if (elapsed < at + pause) return to
+    at += pause
+  }
+  return { x: 0, y: 0 }
 }
 
 function motionProgress(elapsed: number, duration: number) {
@@ -470,6 +524,7 @@ export function frameAt(elapsed: number): Frame {
     cursorBend: cursorMove ? (cursorMove.bend ?? arcFor(cursorMove.from, cursorMove.to)) : 0,
     cursorDriftX: cursorDrift.x,
     cursorDriftY: cursorDrift.y,
+    cursorBusy: cursorBusyAt(elapsed),
     researchHovered: inEditor && sinceEditor >= researchCursorArrivesAfterEditor - 100,
     researchPanelOpen: inEditor && sinceEditor >= researchPanelOpensAfterEditor,
     view: elapsed >= editorOpensAt && elapsed < editorClosesAt ? 'editor' : 'table',

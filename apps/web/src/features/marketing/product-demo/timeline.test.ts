@@ -64,26 +64,55 @@ describe('product preview cursor', () => {
       )
   })
 
-  it('wanders gently instead of freezing whenever it waits more than a moment', () => {
-    let still = null as { from: number; key: string; drift: number } | null
+  it('drifts off somewhere and pauses, rather than freezing, whenever it waits for a while', () => {
+    type Stretch = { from: number; key: string; reach: number; resting: number; steps: number }
+    let stretch = null as Stretch | null
+    let previous = frameAt(0)
     const frozen: string[] = []
+    const fidgety: string[] = []
+    const close = (end: number) => {
+      if (!stretch || end - stretch.from <= 1500) return
+      if (stretch.reach < 40) frozen.push(`${stretch.key} for ${end - stretch.from}ms`)
+      if (stretch.resting / stretch.steps < 0.3) fidgety.push(stretch.key)
+    }
     for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
       const frame = frameAt(elapsed)
       const waiting =
         frame.cursor !== 'resting' &&
+        !frame.cursorBusy &&
         frame.outroElapsed === null &&
         frame.cursorProgress >= 1 &&
         (frame.cursor === 'still' || frame.cursor === 'hovering')
       const key = `${frame.cursorFrom}->${frame.cursorTarget}`
-      if (waiting && still?.key === key) {
-        still.drift = Math.max(still.drift, Math.hypot(frame.cursorDriftX, frame.cursorDriftY))
-        continue
+      if (waiting && stretch?.key === key) {
+        const moved = Math.hypot(
+          frame.cursorDriftX - previous.cursorDriftX,
+          frame.cursorDriftY - previous.cursorDriftY,
+        )
+        stretch.reach = Math.max(stretch.reach, Math.hypot(frame.cursorDriftX, frame.cursorDriftY))
+        stretch.resting += moved < 0.05 ? 1 : 0
+        stretch.steps += 1
+      } else {
+        close(elapsed)
+        stretch = waiting ? { from: elapsed, key, reach: 0, resting: 0, steps: 0 } : null
       }
-      if (still && elapsed - still.from > 1500 && still.drift < 12)
-        frozen.push(`${still.key} for ${elapsed - still.from}ms`)
-      still = waiting ? { from: elapsed, key, drift: 0 } : null
+      previous = frame
     }
-    expect(frozen).toEqual([])
+    expect(frozen, 'long waits go somewhere').toEqual([])
+    expect(fidgety, 'it pauses where it goes instead of jiggling').toEqual([])
+  })
+
+  it('holds still while typing or scrolling', () => {
+    let busy = 0
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      if (!frame.cursorBusy) continue
+      busy += 1
+      expect(Math.hypot(frame.cursorDriftX, frame.cursorDriftY), `at ${elapsed}ms`).toBeLessThan(
+        0.5,
+      )
+    }
+    expect(busy).toBeGreaterThan(100)
   })
 
   it('is exactly on target whenever it clicks or sets off', () => {

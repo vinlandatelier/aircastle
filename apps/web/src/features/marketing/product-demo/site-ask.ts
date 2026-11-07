@@ -79,6 +79,17 @@ const docsPublishClicked = docsPublishReached + pressDelay
 const outroStarts = docsPublishClicked + 1500
 const outroHold = 4800
 
+/** When the person at the cursor is typing or scrolling, so the cursor holds still, in milliseconds after the site preview opens. */
+export const cursorBusyWindows: readonly (readonly [number, number])[] = [
+  [scrollStarts, scrollStarts + scrollDownDuration],
+  [scrollBackStarts, scrollBackStarts + scrollBackDuration],
+  [dropdownOpens, sent],
+  ...readBursts.map(({ at }) => [at, at + readBurstDuration] as const),
+  [jumpStarts, jumpEnds],
+  ...docsScrollBursts.map(({ at }) => [at, at + docsScrollBurstDuration] as const),
+  [docsScrollUpStarts, docsScrollUpStarts + docsScrollUpDuration],
+]
+
 /** When each beat of the select-to-prompt scene happens, in milliseconds after the site preview opens. */
 export const askTiming = {
   pageMoveStarts,
