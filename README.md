@@ -50,7 +50,7 @@ Run common commands from the repository root:
 
 | Command | Scope |
 | --- | --- |
-| `vp run check` | Build, types, lint, unused code, runtime and database tests, browser journeys, and database runner checks |
+| `vp run check` | Everything CI runs: build, types, lint, workflow lint, unused code, runtime and database tests, browser journeys, database runner checks, and schema coverage |
 | `vp run test:db` | Disposable Postgres runner lifecycle checks |
 | `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases |
 | `vp run test-web` | Fast web component tests |
@@ -97,7 +97,7 @@ vp run db:test -- vp run test-api
 
 The wrapper uses the same Compose file and pinned image. Each invocation gets a unique project, volume and automatically assigned localhost port. It supplies `DATABASE_URL` to the command, overriding any inherited value. It preserves the command's exit status and deletes its database after success, failure, Ctrl-C or termination. Forced kills and Docker outages can prevent cleanup; the wrapper prints its project name for recovery with `docker compose -p <project> -f compose.yaml down --volumes`.
 
-The full `vp run test` and `vp run check` commands require Docker and create disposable databases automatically. `vp run check` also runs web browser journeys and requires the Chromium installation described above.
+The full `vp run test` and `vp run check` commands require Docker and create disposable databases automatically. `vp run check` also runs web browser journeys, which need the Chromium installation described above, and lints workflows with [actionlint](https://github.com/rhysd/actionlint), which must be on your `PATH`.
 
 Run `vp run dev:setup` to provision local development connection settings. Reruns reuse the project and do not reveal its existing key. Use `vp run dev:setup --new-key` to issue another key.
 

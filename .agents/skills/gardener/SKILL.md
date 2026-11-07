@@ -34,7 +34,7 @@ Only approved branches go in `prs.json`. Never edit `.github`, `.claude` or `.ag
 - Security findings, such as a leaked secret, an injection or an authorization gap, get no branch. Write each one in `report.md` only as `Held for the owner: security finding.`, with no path, evidence or description.
 - At most `GARDENER_MAX_PRS` branches, two review rounds per branch, and the deadline above.
 - Run Postgres-backed checks only through `vp run db:test -- <command>`. Use `vp run <script>` for package scripts.
-- Follow the change and verification rules in `AGENTS.md`. Do not run repository-wide suites such as `vp run check`, `vp run test`, `vp run test:all` or `vp run test:prepared`.
+- Follow the change and verification rules in `AGENTS.md`. Run `vp run check` once on each branch before you hand it over. Do not run other repository-wide suites such as `vp run test`, `vp run test:all` or `vp run test:prepared`.
 
 ## What counts as a finding
 
