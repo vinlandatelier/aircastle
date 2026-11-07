@@ -1,6 +1,7 @@
 import { CloudGradient, CloudGrain } from '@/components/brand/cloud-gradient'
+import { AirWatcher } from './air-watcher'
 
-/** The sign-in panel's art: the warm cloud gradient on a rounded card, the same in every theme. */
+/** The sign-in panel's art: the warm cloud gradient on a rounded card with Air in the middle, the same in every theme. */
 export function CloudArt() {
   return (
     <div
@@ -10,6 +11,7 @@ export function CloudArt() {
     >
       <CloudGradient id="sign-in" />
       <CloudGrain />
+      <AirWatcher />
     </div>
   )
 }

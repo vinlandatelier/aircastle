@@ -112,3 +112,45 @@ test('sign-in art is the same warm cloud field in light and dark, on an inset ro
         'the art does not change with the theme',
       ).toBeLessThan(4)
 })
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`Air sits in the middle of the sign-in art and its eyes ${reducedMotion === 'reduce' ? 'hold still' : 'follow the pointer'}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion })
+    await page.goto('/sign-in')
+    const art = page.locator('[data-sign-in-art]')
+    const air = art.locator('[data-sign-in-air]')
+    await expect(air).toBeVisible()
+    const [artBox, airBox] = await Promise.all([art.boundingBox(), air.boundingBox()])
+    if (!artBox || !airBox) throw new Error('Art is not laid out')
+    expect(Math.abs(airBox.x + airBox.width / 2 - (artBox.x + artBox.width / 2))).toBeLessThan(2)
+    expect(Math.abs(airBox.y + airBox.height / 2 - (artBox.y + artBox.height / 2))).toBeLessThan(2)
+    expect(airBox.width / artBox.width, 'sized to the panel').toBeGreaterThan(0.25)
+    expect(airBox.width / artBox.width).toBeLessThan(0.5)
+    const eye = air.locator('[data-air-eye]').first()
+    await expect(air.locator('[data-air-eye]')).toHaveCount(2)
+    const eyeX = async () => (await eye.boundingBox())?.x ?? 0
+    const eyeY = async () => (await eye.boundingBox())?.y ?? 0
+    await page.mouse.move(artBox.x + 4, airBox.y + airBox.height / 2)
+    await page.waitForTimeout(400)
+    const left = await eyeX()
+    await page.mouse.move(1430, airBox.y + airBox.height / 2)
+    await page.waitForTimeout(400)
+    const right = await eyeX()
+    await page.mouse.move(airBox.x + airBox.width / 2, artBox.y + 4)
+    await page.waitForTimeout(400)
+    const up = await eyeY()
+    await page.mouse.move(airBox.x + airBox.width / 2, artBox.y + artBox.height - 4)
+    await page.waitForTimeout(400)
+    const down = await eyeY()
+    if (reducedMotion === 'reduce') {
+      expect(right - left).toBe(0)
+      expect(down - up).toBe(0)
+      return
+    }
+    expect(right - left, 'the eyes look toward the pointer').toBeGreaterThan(2)
+    expect(down - up).toBeGreaterThan(2)
+    expect(right - left, 'only subtly').toBeLessThan(airBox.width * 0.1)
+  })
+}
