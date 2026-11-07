@@ -38,7 +38,7 @@ vp run dev-api
 
 The API uses port 43122 in both development and built runs. Override it with `AIRCASTLE_PORT`; override the web app's port with `vp run dev-web -- --port <port>`. An occupied port stops startup rather than selecting another port.
 
-Open [API documentation](http://localhost:43122/api/docs) or its [OpenAPI document](http://localhost:43122/api/openapi.json). The documentation UI loads a pinned Scalar script from jsDelivr and requires internet access.
+Open [API documentation](http://localhost:43122/api/docs) or its [OpenAPI document](http://localhost:43122/api/openapi.json). The API serves the documentation UI's pinned Scalar script itself, so the page works offline.
 
 The API validates its environment variables at startup and exits if one is invalid. `AIRCASTLE_PORT` must be an integer from 1 to 65535. `AIRCASTLE_HOST` sets the listen address and defaults to `127.0.0.1`, so other machines on your network can't reach the API; it must be an IP address. `AIRCASTLE_LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`. `NODE_ENV` remains the standard runtime/build variable; use `AIRCASTLE_ENV` for Aircastle mode.
 
