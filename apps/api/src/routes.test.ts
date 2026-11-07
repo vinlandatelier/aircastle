@@ -30,6 +30,26 @@ type App = Awaited<ReturnType<typeof mountedApp>>["app"];
 
 const key = (method: string, path: string) => `${method} ${path}`;
 
+const handlerChains: Record<keyof typeof routeAccess, readonly string[]> = {
+  "ALL /*": ["default deny", "request id", "request logger"],
+  "GET /api/health": ["OpenAPI description", "health"],
+  "GET /api/openapi.json": ["OpenAPI document"],
+  "GET /api/docs": ["Scalar page"],
+  "GET /api/docs/scalar.js": ["Scalar script"],
+  "ALL /api/auth/*": ["body limit", "auth dispatch"],
+  "ALL /api/development-inbox/*": ["auth dispatch"],
+  "GET /api/projects/:project/schema": ["OpenAPI description", "read schema"],
+  "POST /api/projects/:project/schema": ["OpenAPI description", "publish schema"],
+  "POST /api/projects/:project/collections/:collection/documents": [
+    "OpenAPI description",
+    "create document",
+  ],
+  "GET /api/projects/:project/collections/:collection/documents/:id": [
+    "OpenAPI description",
+    "read document",
+  ],
+};
+
 const classStatus = {
   middleware: 404,
   public: 200,
@@ -80,11 +100,14 @@ const probes: Record<keyof typeof routeAccess, { method: string; path: string; b
   };
 
 describe("API route access", () => {
-  test("every mounted route is classified and every classified route is mounted", async () => {
+  test("every mounted handler is a named handler of a classified route", async () => {
     const { app, close } = await mountedApp();
     try {
-      const mounted = new Set(app.routes.map((route) => key(route.method, route.path)));
-      expect([...mounted].sort()).toEqual(Object.keys(routeAccess).sort());
+      const mounted = app.routes.map((route) => key(route.method, route.path)).sort();
+      const expected = Object.entries(handlerChains)
+        .flatMap(([route, handlers]) => handlers.map(() => route))
+        .sort();
+      expect(mounted).toEqual(expected);
     } finally {
       await close();
     }
