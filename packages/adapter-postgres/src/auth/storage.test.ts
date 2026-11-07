@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { expect, test } from "vite-plus/test";
+import { createServer, type Socket } from "node:net";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import postgres from "postgres";
 import { AuthStorageError } from "@aircastle/core";
 import { postgresAdapter, postgresAuthAdmission, postgresAuthStore } from "../index.ts";
@@ -371,6 +372,45 @@ test.each([
   },
 );
 
+function message(type: string, body: string | Buffer) {
+  const bytes = Buffer.from(body);
+  const header = Buffer.alloc(5);
+  header.write(type);
+  header.writeUInt32BE(bytes.length + 4, 1);
+  return Buffer.concat([header, bytes]);
+}
+
+function authentication(step: number, data = "") {
+  const head = Buffer.alloc(4);
+  head.writeUInt32BE(step);
+  return message("R", Buffer.concat([head, Buffer.from(data)]));
+}
+
+async function scriptedServer(script: ((packet: Buffer) => string | Buffer | undefined)[]) {
+  const sockets = new Set<Socket>();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    let step = 0;
+    socket.on("error", () => sockets.delete(socket));
+    socket.on("data", (packet) => {
+      const reply = script[step++]?.(packet);
+      if (reply === undefined) socket.destroy();
+      else socket.write(reply);
+    });
+  });
+  const port = await new Promise<number>((resolve) =>
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      resolve(typeof address === "object" && address !== null ? address.port : 0);
+    }),
+  );
+  onTestFinished(() => {
+    for (const socket of sockets) socket.destroy();
+    server.close();
+  });
+  return `postgres://aircastle:secret@127.0.0.1:${port}/aircastle`;
+}
+
 test.each([
   [
     "refused",
@@ -381,6 +421,48 @@ test.each([
     "refused localhost",
     () => postgres("postgres://aircastle@localhost:1/aircastle", { max: 1, connect_timeout: 2 }),
     "ECONNREFUSED",
+  ],
+  [
+    "TLS-required connection to a server without TLS",
+    async () =>
+      postgres(await scriptedServer([() => "N"]), { max: 1, connect_timeout: 2, ssl: "require" }),
+    "ECONNRESET",
+  ],
+  [
+    "TLS connection answered in plain text",
+    async () =>
+      postgres(await scriptedServer([() => "S", () => message("E", "not a TLS record")]), {
+        max: 1,
+        connect_timeout: 2,
+        ssl: "require",
+      }),
+    "ERR_SSL_WRONG_VERSION_NUMBER",
+  ],
+  [
+    "SCRAM connection with a wrong server signature",
+    async () =>
+      postgres(
+        await scriptedServer([
+          () => authentication(10, "SCRAM-SHA-256\0\0"),
+          (packet) =>
+            authentication(
+              11,
+              `r=${/r=([^,\0]+)/u.exec(packet.toString())?.[1]}server,s=${Buffer.from("salt").toString("base64")},i=4096`,
+            ),
+          () => authentication(12, `v=${Buffer.from("wrong").toString("base64")}`),
+        ]),
+        { max: 1, connect_timeout: 2 },
+      ),
+    "SASL_SIGNATURE_MISMATCH",
+  ],
+  [
+    "protocol-negotiating",
+    async () =>
+      postgres(await scriptedServer([() => message("v", Buffer.alloc(8))]), {
+        max: 1,
+        connect_timeout: 2,
+      }),
+    "MESSAGE_NOT_SUPPORTED",
   ],
   [
     "ended",
@@ -413,3 +495,30 @@ test.each([
     });
   },
 );
+
+test.each([
+  ["an untrusted certificate", { code: "DEPTH_ZERO_SELF_SIGNED_CERT" }],
+  ["an expired certificate", { code: "CERT_HAS_EXPIRED" }],
+  [
+    "a certificate for another host",
+    {
+      code: "ERR_TLS_CERT_ALTNAME_INVALID",
+      reason: "Host: db.example. is not in the cert's altnames",
+    },
+  ],
+] as const)("%s refused by TLS is reported as unavailable with its code", async (_, fields) => {
+  await withStore(async ({ auth }) => {
+    const failure = await auth
+      .transaction(() => Promise.reject(Object.assign(new Error("TLS verification"), fields)))
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+    expect(failure).toBeInstanceOf(AuthStorageError);
+    expect(failure).toMatchObject({
+      kind: "unavailable",
+      code: fields.code,
+      message: "unavailable",
+    });
+  });
+});
