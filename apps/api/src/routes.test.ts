@@ -20,6 +20,9 @@ async function mountedApp() {
     publish: () => refuse("publish"),
     create: () => refuse("create"),
     findById: () => refuse("findById"),
+    update: () => refuse("update"),
+    delete: () => refuse("delete"),
+    list: () => refuse("list"),
   };
   const auth = await createLocalAuth({ config: { mode: "disabled" } });
   const app = createApp({ logger: pino({ level: "silent" }), cms, auth, docsScript: "void 0;" });
@@ -47,6 +50,22 @@ const handlerChains: Record<keyof typeof routeAccess, readonly string[]> = {
   "GET /api/projects/:project/collections/:collection/documents/:id": [
     "OpenAPI description",
     "read document",
+  ],
+  "PATCH /api/projects/:project/collections/:collection/documents/:id": [
+    "OpenAPI description",
+    "update document",
+  ],
+  "DELETE /api/projects/:project/collections/:collection/documents/:id": [
+    "OpenAPI description",
+    "delete document",
+  ],
+  "GET /api/projects/:project/collections/:collection/documents": [
+    "OpenAPI description",
+    "list documents",
+  ],
+  "POST /api/projects/:project/collections/:collection/documents/query": [
+    "OpenAPI description",
+    "query documents",
   ],
 };
 
@@ -95,6 +114,29 @@ const probes: Record<keyof typeof routeAccess, { method: string; path: string; b
       {
         method: "GET",
         path: `/api/projects/${project}/collections/articles/documents/${project}`,
+      },
+    ],
+    "PATCH /api/projects/:project/collections/:collection/documents/:id": [
+      {
+        method: "PATCH",
+        path: `/api/projects/${project}/collections/articles/documents/${project}`,
+        body: JSON.stringify({ changes: { title: "Edited" } }),
+      },
+    ],
+    "DELETE /api/projects/:project/collections/:collection/documents/:id": [
+      {
+        method: "DELETE",
+        path: `/api/projects/${project}/collections/articles/documents/${project}`,
+      },
+    ],
+    "GET /api/projects/:project/collections/:collection/documents": [
+      { method: "GET", path: `/api/projects/${project}/collections/articles/documents?limit=1` },
+    ],
+    "POST /api/projects/:project/collections/:collection/documents/query": [
+      {
+        method: "POST",
+        path: `/api/projects/${project}/collections/articles/documents/query`,
+        body: JSON.stringify({ limit: 1 }),
       },
     ],
   };
