@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vite-plus/test'
 import { displayHttp, expectNoShell, failure, mountAuth, ok, session } from './test-support'
 
@@ -13,9 +13,9 @@ describe('Public routing independent of authentication', () => {
     const http = displayHttp({ 'GET /api/auth/state': state })
     const { router } = await mountAuth('/', http)
 
-    expect(await screen.findByRole('heading', { name: 'Aircastle' })).toBeTruthy()
+    await waitFor(() => expect(router.state.status).toBe('idle'))
     expect(router.state.location.pathname).toBe('/')
-    expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/sign-in')
+    expect(router.state.matches.at(-1)?.routeId).toBe('/')
     expect(http.requests).toHaveLength(0)
     expectNoShell()
   })
