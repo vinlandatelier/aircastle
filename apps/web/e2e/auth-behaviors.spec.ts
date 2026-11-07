@@ -504,7 +504,7 @@ test.describe('protected path variants', () => {
       new MutationObserver(() => {
         for (const title of document.querySelectorAll('h1'))
           if (title.textContent === 'Projects') seen.projects = true
-        if (document.querySelector('nav[aria-label="Main navigation"]')) seen.shell = true
+        if (document.querySelector('[aria-label="Main navigation"]')) seen.shell = true
       }).observe(document, { childList: true, subtree: true, characterData: true })
     })
   }
@@ -552,14 +552,17 @@ test.describe('protected path variants', () => {
     const email = uniqueEmail('variants-member')
     await completeSetupAndSkip(page, email)
     await authService.grantWorkspace(email, project.workspaceId)
+    await recordMounts(page)
     const projects = `/dash/workspaces/${project.workspaceId}/projects`
     await page.goto(projects)
     await expect(page).toHaveURL(`${origin(page)}${projects}`)
     await expect(heading(page, 'Projects')).toBeVisible()
+    expect(await protectedMounts(page)).toEqual({ projects: true, shell: false })
     const collections = `${projects}/${project.projectId}/collections`
     await page.goto(collections)
     await expect(page).toHaveURL(`${origin(page)}${collections}`)
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+    expect(await protectedMounts(page)).toEqual({ projects: false, shell: true })
   })
 })
 
