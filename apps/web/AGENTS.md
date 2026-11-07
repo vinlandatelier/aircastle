@@ -8,7 +8,7 @@ Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defin
 
 - Run `vp run test-web` for fast component behavior, `vp run test-web:e2e` for built-browser journeys, and `vp run test-web:coverage` for V8 HTML/JSON reports over all frontend source.
 - The [README](../../README.md#development) covers the Chromium install, `WEB_E2E_PORT` for concurrent worktrees, and report locations.
-- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). `vp run check` is not a required completion gate.
+- Follow the root [verification rules](../../AGENTS.md#changes-and-verification). Run `vp run check` only before pushing to a PR.
 - Focus component and browser runs by file and case, for example `vp run test-web src/features/sign-in/index.test.tsx` or `vp run test-web:e2e metadata.spec.ts`. Add scenario filters such as `--grep long-text` where appropriate. Check changed UI in a browser without running unrelated journeys.
 - `vp run test-web:record <specs>` runs the same journeys and saves a `video.webm` and a final screenshot for every test under `reports/test-results/`. Recording slows each action by 500 ms, labels each action and step in the video, and raises the test timeout to 120 s. Normal runs record no video and keep full speed.
 - A PR that changes what a user sees or does needs recorded evidence in its body. Follow [Complete the feature](VERIFICATION.md#complete-the-feature).

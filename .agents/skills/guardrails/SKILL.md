@@ -47,7 +47,8 @@ Put each rule at the highest layer that can express it.
 | Schema and contracts mutation score meets the break threshold | `thresholds.break` in `packages/{schema,contracts}/stryker.config.json`; nightly `.github/workflows/mutation.yml`, not on pull requests | `vp -C packages/schema run test:mutation` |
 | Logged errors carry no message or cause | `packages/core/src/error-summary.ts`: `ErrorSummary` has a private constructor, `ReportError` accepts only an `ErrorSummary`, and the API sets `c.error = ErrorSummary.of(error)`. `apps/api/src/app.test.ts` checks a secret never reaches the log | Pass a raw error to `report`, then `vp run typecheck` |
 | The fake store and the Postgres store behave alike | `contentStoreContract` in `packages/core/src/test-support/store-contract.ts`, run by `packages/core/src/store-contract.test.ts` and `packages/adapter-postgres/src/store-contract.test.ts` | `vp -C packages/core test src/store-contract.test.ts`; the Postgres run needs `vp run db:test -- vp -C packages/adapter-postgres test src/store-contract.test.ts` |
-| Workflow files are valid | actionlint in the CI step "Lint workflows" | CI only |
+| Workflow files are valid | actionlint through `vp run lint:workflows`, in CI and `vp run check` | An unknown key in a workflow, then `vp run lint:workflows` |
+| `vp run check` runs every package script CI runs | `tests/harness/ci-parity.test.ts` | Add a `vp run` step to `ci.yml` that `check` lacks, then `vp test tests/harness/ci-parity.test.ts` |
 
 If a check blocks you, fix the code. Change the check only when it is wrong, and say why in the PR.
 
