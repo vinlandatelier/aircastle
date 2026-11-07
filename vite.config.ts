@@ -16,6 +16,23 @@ const disabledTests = ["skip", "skipIf", "runIf", "todo", "fails", "fixme"].map(
   message:
     "A skipped, todo or expected-to-fail test passes without checking the behavior. Fix or delete it.",
 }));
+const testTimeoutRaises = [
+  {
+    property: "slow",
+    message:
+      "The only per-test timeout is in apps/web/playwright.config.ts. Fix the journey's design, jump the clock with page.clock, or split the journey.",
+  },
+  {
+    property: "setTimeout",
+    message:
+      "The only per-test timeout is in apps/web/playwright.config.ts. Fix the journey's design, jump the clock with page.clock, or split the journey. Call the global setTimeout for a timer.",
+  },
+  {
+    property: "configure",
+    message:
+      "Journeys run fully parallel with the timeout and retries in apps/web/playwright.config.ts. Fix the journey's design, jump the clock with page.clock, or split the journey.",
+  },
+];
 const bunEnv = {
   object: "Bun",
   property: "env",
@@ -141,6 +158,18 @@ export default defineConfig({
           ],
           "no-restricted-globals": ["error", { name: "Bun", message: processRunner }],
           "import/no-dynamic-require": ["error", { esmodule: true }],
+        },
+      },
+      {
+        files: ["apps/web/e2e/**"],
+        rules: {
+          "no-restricted-properties": [
+            "error",
+            rawSql,
+            ...processRunnerProperties,
+            ...disabledTests,
+            ...testTimeoutRaises,
+          ],
         },
       },
       {

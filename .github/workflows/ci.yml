@@ -4,6 +4,8 @@ on:
   merge_group:
 permissions:
   contents: read
+env:
+  CI_LATENCY_BUDGET_SECONDS: 150
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -179,7 +181,58 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2
+    permissions:
+      actions: read
+      statuses: write
     steps:
+      - name: Report the critical path without failing on it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BUDGET: ${{ env.CI_LATENCY_BUDGET_SECONDS }}
+        run: |
+          mkdir -p ci-latency
+          if ! timeout 30 gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --paginate --jq '.jobs[]' > jobs.jsonl; then
+            echo "::notice title=CI latency::Could not read this run's jobs"
+            exit 0
+          fi
+          if ! jq -s --argjson budget "$BUDGET" --argjson attempt "$GITHUB_RUN_ATTEMPT" '
+            map(select(.run_attempt == $attempt and .status == "completed" and .started_at != null and .completed_at != null)
+              | {name, started: (.started_at | fromdate), completed: (.completed_at | fromdate)})
+            | {criticalPathSeconds: ((map(.completed) | max) - (map(.started) | min)),
+               budgetSeconds: $budget,
+               jobs: map({name, seconds: (.completed - .started)}) | sort_by(-.seconds)}
+          ' jobs.jsonl > ci-latency/ci-latency.json; then
+            echo "::notice title=CI latency::Could not compute the critical path"
+            exit 0
+          fi
+          seconds=$(jq '.criticalPathSeconds' ci-latency/ci-latency.json)
+          {
+            echo "## CI critical path: ${seconds} s (budget ${BUDGET} s)"
+            echo
+            echo 'From the first job start to the last job finish in this run attempt, without queue time before the first job. Jobs still running are left out.'
+            echo
+            echo '| Seconds | Job |'
+            echo '|---|---|'
+            jq -r '.jobs[] | "| \(.seconds) | \(.name) |"' ci-latency/ci-latency.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          if (( seconds > BUDGET )); then
+            echo "::warning title=CI latency::${seconds} s critical path, budget ${BUDGET} s"
+            description="${seconds} s critical path, over the ${BUDGET} s budget"
+          else
+            description="${seconds} s critical path (budget ${BUDGET} s)"
+          fi
+          timeout 30 gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+            -f state=success -f context="CI latency" -f description="$description" -f target_url="$RUN_URL" > /dev/null \
+            || echo "::notice title=CI latency::Could not post the commit status"
+      - name: Upload the critical path
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-latency
+          path: ci-latency/ci-latency.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Require every check to pass
         env:
           RESULTS: ${{ toJSON(needs.*.result) }}
