@@ -11,7 +11,6 @@ import {
   PlugIcon,
   PlusIcon,
   SearchIcon,
-  SparklesIcon,
   SunIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -23,12 +22,21 @@ import { navigationGroups } from '@/features/navigation/pages'
 import { EditorView } from './editor-view'
 import { PersonAvatar } from './person'
 import { docsDecisionState } from './research'
-import { canute, orchestrator, thorfinn, workingAgents, type DemoAgent } from './agents'
+import {
+  askeladd,
+  canute,
+  einar,
+  orchestrator,
+  thorfinn,
+  workingAgents,
+  type DemoAgent,
+} from './agents'
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
 import styles from './product-demo.module.css'
 import { Confetti } from './confetti'
 import { NotificationsBell } from './notifications'
 import { Outro } from './outro'
+import { AgentAvatar } from './agent-avatar'
 import { cursorSpots, type CursorTarget } from './cursor-path'
 import {
   notificationPreviewPressedAt,
@@ -99,8 +107,8 @@ function AgentDialog({
       )}
     >
       <p className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
-        <SparklesIcon className="size-4" />
-        Ask agents
+        <span className="air-mascot block size-4 shrink-0" />
+        Ask Air
       </p>
       <p className="relative min-h-20 text-lg">
         <span data-demo-prompt>{prompt.slice(0, typed)}</span>
@@ -262,7 +270,7 @@ function WindowDots() {
 function AgentMark({ agent, size }: { agent: DemoAgent; size: number }) {
   if (agent === orchestrator)
     return <span style={{ width: size, height: size }} className="air-mascot block shrink-0" />
-  return <GeneratedAvatar name={agent.name} size={size} variant="beam" />
+  return <AgentAvatar agent={agent} size={size} />
 }
 
 function AskMenu() {
@@ -421,7 +429,7 @@ const rowGrid = 'grid grid-cols-[14rem_1fr_7rem_8.5rem_5.5rem] items-center gap-
 
 function AgentLabel({ role }: { role: string }) {
   return (
-    <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none text-white">
+    <span className="rounded-sm bg-black/10 px-1 py-px text-[10px] leading-none text-neutral-900">
       {role}
     </span>
   )
@@ -475,7 +483,17 @@ function DemoCursor({
   )
 }
 
-function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
+const rowAgents = [orchestrator, thorfinn, canute, askeladd, einar] as const
+
+function AgentRow({
+  shown,
+  expanded,
+  joined,
+}: {
+  shown: boolean
+  expanded: boolean
+  joined: number
+}) {
   return (
     <div
       data-demo-row="agent"
@@ -492,7 +510,10 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
           shown ? 'translate-y-0 opacity-100 delay-150' : '-translate-y-1 opacity-0',
         )}
       >
-        <div data-demo-agent-row className={cn(rowGrid, 'relative border-b py-3', styles.agentRow)}>
+        <div
+          data-demo-agent-row
+          className={cn(rowGrid, 'relative border-b py-3', styles.agentRow, styles.airRow)}
+        >
           <span className="truncate">Introducing Acme MCP</span>
           <span className="truncate text-muted-foreground italic">Agents are drafting…</span>
           <StatusPill status="Draft" />
@@ -502,18 +523,28 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
             data-demo-agents
             data-expanded={expanded}
             className={cn(
-              'absolute top-[calc(100%-3px)] left-3 z-10 flex items-center rounded-b-md px-1.5 pt-[calc(0.25rem+3px)] pb-1 shadow-sm',
+              'absolute top-[calc(100%-1.5px)] left-3 z-10 flex items-center rounded-b-md px-1.5 pt-[calc(0.25rem+1.5px)] pb-1 shadow-sm',
               styles.agentTab,
             )}
           >
             <span className="flex -space-x-1.5">
-              {workingAgents.map((agent) => (
+              {rowAgents.slice(0, joined).map((agent) => (
                 <span
                   key={agent.name}
                   data-demo-agent-avatar
-                  className={cn('rounded-full', styles.agentAvatar)}
+                  className={cn(
+                    'rounded-full text-neutral-900',
+                    styles.agentAvatar,
+                    agent !== orchestrator && styles.avatarJoin,
+                  )}
                 >
-                  <GeneratedAvatar name={agent.name} size={18} variant="beam" />
+                  {agent === orchestrator ? (
+                    <span className="flex size-[18px] items-center justify-center rounded-full bg-black">
+                      <span className="air-mascot block size-3 text-white" />
+                    </span>
+                  ) : (
+                    <AgentAvatar agent={agent} size={18} />
+                  )}
                 </span>
               ))}
             </span>
@@ -524,20 +555,20 @@ function AgentRow({ shown, expanded }: { shown: boolean; expanded: boolean }) {
               )}
             >
               <span className="overflow-hidden whitespace-nowrap">
-                <span className="inline-flex items-center gap-1.5 pr-1 pl-2 text-xs text-white">
+                <span className="inline-flex items-center gap-1.5 pr-1 pl-2 text-xs text-neutral-900">
+                  <span className="inline-flex items-center gap-1">
+                    {orchestrator.name}
+                    <span className="inline-flex items-center">
+                      <AgentLabel role={orchestrator.role} />,
+                    </span>
+                  </span>
                   <span className="inline-flex items-center gap-1">
                     {thorfinn.name}
                     <span className="inline-flex items-center">
-                      <AgentLabel role={thorfinn.role} />,
+                      <AgentLabel role={thorfinn.role} />
                     </span>
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    {canute.name}
-                    <span className="inline-flex items-center">
-                      <AgentLabel role={canute.role} />
-                    </span>
-                  </span>
-                  <span>and {workingAgents.length - 2} others are working</span>
+                  <span>and {rowAgents.length - 2} others are working</span>
                 </span>
               </span>
             </span>
@@ -571,10 +602,12 @@ function AuthorsCell({ authors }: { authors: readonly string[] }) {
 function PostsView({
   shown,
   agentRow,
+  agentsJoined,
   hovered,
 }: {
   shown: boolean
   agentRow: boolean
+  agentsJoined: number
   hovered: boolean
 }) {
   return (
@@ -606,7 +639,7 @@ function PostsView({
           <span>Authors</span>
           <span>Updated</span>
         </div>
-        <AgentRow shown={agentRow} expanded={hovered} />
+        <AgentRow shown={agentRow} expanded={hovered} joined={agentsJoined} />
         {posts.map((post) => (
           <div key={post.title} className={cn(rowGrid, 'border-b py-3 last:border-b-0')}>
             <span className="truncate">{post.title}</span>
@@ -666,6 +699,7 @@ export function ProductDemo() {
               <PostsView
                 shown={frame.view === 'table'}
                 agentRow={frame.agentRow}
+                agentsJoined={frame.rowAgents}
                 hovered={frame.agentRowHovered}
               />
               <EditorView

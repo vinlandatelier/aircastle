@@ -1,5 +1,5 @@
 import { cn } from 'cn'
-import { GeneratedAvatar } from '@/components/shell/generated-avatar'
+import { AgentAvatar } from './agent-avatar'
 import { agentNamed, orchestrator, type DemoAgent } from './agents'
 
 /** An inline reference to an agent, shown as a pill with its avatar. */
@@ -15,7 +15,7 @@ export function AgentMention({ agent, className }: { agent: DemoAgent; className
       {agent === orchestrator ? (
         <span className="air-mascot inline-block size-3.5 shrink-0" />
       ) : (
-        <GeneratedAvatar name={agent.name} size={14} variant="beam" />
+        <AgentAvatar agent={agent} size={14} />
       )}
       {agent.name}
     </span>

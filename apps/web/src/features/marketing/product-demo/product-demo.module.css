@@ -24,7 +24,7 @@
 }
 
 .agentField {
-  box-shadow: inset 0 0 0 3px var(--agent-colour);
+  box-shadow: inset 0 0 0 1.5px var(--agent-colour);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -46,10 +46,7 @@
 }
 
 .agentRow {
-  box-shadow:
-    inset 0 0 0 3px var(--agent-colour),
-    0 0 22px 2px
-      color-mix(in oklab, var(--agent-base) calc(var(--agent-strength) - 30%), transparent);
+  box-shadow: inset 0 0 0 1.5px var(--agent-colour);
   background-color: color-mix(
     in oklab,
     var(--agent-base) calc(var(--agent-strength) / 10),
@@ -207,4 +204,21 @@
   background-size: 160px 160px;
   mix-blend-mode: overlay;
   opacity: 0.3;
+}
+
+.airRow {
+  --agent-base: rgb(255 255 255);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .avatarJoin {
+    animation: avatar-join 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+}
+
+@keyframes avatar-join {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
 }

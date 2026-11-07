@@ -48,6 +48,7 @@ import {
 import { askeladd, canute, einar, orchestrator, thorfinn, thorkell, type DemoAgent } from './agents'
 import { DocsPage, docsTitle, docsUrl } from './docs-preview'
 import { MentionText } from './mention'
+import { AgentAvatar } from './agent-avatar'
 import { PersonAvatar } from './person'
 import { prompt, seoTiming, type CoverState } from './timeline'
 import {
@@ -199,13 +200,13 @@ function AgentTab({
       data-active={active}
       style={agentHue(agent)}
       className={cn(
-        'absolute right-2 bottom-[calc(100%-3px)] z-10 flex items-center gap-1.5 rounded-t-md px-1.5 pt-1 pb-[calc(0.25rem+3px)] text-xs whitespace-nowrap text-white transition-[opacity,translate] duration-500',
+        'absolute right-2 bottom-[calc(100%-1.5px)] z-10 flex items-center gap-1.5 rounded-t-md px-1.5 pt-1 pb-[calc(0.25rem+1.5px)] text-xs whitespace-nowrap text-white transition-[opacity,translate] duration-500',
         styles.agentTab,
         active ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0',
       )}
     >
       <span className={cn('rounded-full', styles.agentAvatar)}>
-        <GeneratedAvatar name={agent.name} size={16} variant="beam" />
+        <AgentAvatar agent={agent} size={16} />
       </span>
       {agent.name}
       <span className="rounded-sm bg-white/20 px-1 py-px text-[10px] leading-none">
@@ -311,7 +312,7 @@ function ResearchStatus({
             hovered ? 'bg-muted' : 'bg-muted/60',
           )}
         >
-          <GeneratedAvatar name={researcher} size={18} variant="beam" />
+          <AgentAvatar agent={canute} size={18} />
           <span>{researcher}</span>
           <span className="rounded-sm bg-foreground/[0.06] px-1 py-px text-[10px] leading-none text-muted-foreground">
             {canute.role}
@@ -579,7 +580,7 @@ function AskingCard() {
 function SentReceipt() {
   return (
     <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 text-xs shadow-sm dark:bg-input/30">
-      <GeneratedAvatar name={researcher} size={16} variant="beam" />
+      <AgentAvatar agent={canute} size={16} />
       <span className="min-w-0 truncate">
         <MentionText text={`Sent to @${orchestrator.name}: draft ${docsDecision.target.title}`} />
       </span>
@@ -606,7 +607,7 @@ function AgentByline({ agent, dim = false }: { agent: DemoAgent; dim?: boolean }
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <span className={cn('flex', dim && 'opacity-70')}>
-        <GeneratedAvatar name={agent.name} size={16} variant="beam" />
+        <AgentAvatar agent={agent} size={16} />
       </span>
       <span data-demo-thread-name className={cn(!dim && 'text-foreground')}>
         {agent.name}
@@ -790,7 +791,7 @@ function ResearchPanel({
             {airChat ? (
               <span className="air-mascot block size-[22px]" />
             ) : (
-              <GeneratedAvatar name={researcher} size={22} variant="beam" />
+              <AgentAvatar agent={canute} size={22} />
             )}
           </span>
           <span>{chatAgent.name}</span>

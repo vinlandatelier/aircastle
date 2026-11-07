@@ -5,6 +5,9 @@ import { pressDelay, travelTime } from './cursor-path'
 export const askInstruction = 'hm maybe lead with what a team can do with it'
 
 const keystroke = 26
+
+/** How long each keystroke takes when the preview types a prompt. */
+export const askKeystroke = keystroke
 const rewriteWordInterval = 35
 const rewrittenWords = rewrittenLine.split(' ')
 

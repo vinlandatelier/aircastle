@@ -120,15 +120,18 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(shortcut).toContainText('J')
   await page.clock.runFor(story(500))
   await expect(dialog).toBeVisible()
-  await expect(dialog).toContainText('Ask agents')
+  await expect(dialog).toContainText('Ask Air')
+  await expect(dialog).not.toContainText('Ask agents')
+  await expect(dialog.locator('.air-mascot')).toHaveCount(1)
+  await expect(dialog.locator('svg.lucide-sparkles')).toHaveCount(0)
   await expect(typed).toHaveText('')
-  await page.clock.runFor(story(1200))
+  await page.clock.runFor(story(700))
   const partway = (await typed.textContent()) ?? ''
   expect(partway.length).toBeGreaterThan(0)
   expect(prompt.startsWith(partway)).toBe(true)
   await expect(typed).not.toHaveText(prompt)
-  await page.clock.runFor(story(1500))
-  await expect(typed).toHaveText(prompt)
+  await page.clock.runFor(story(1100))
+  await expect(typed, 'the prompt types as fast as Ask Air later on').toHaveText(prompt)
   await expect(shortcut).toHaveAttribute('data-state', 'hidden')
   const send = dialog.locator('[data-demo-send]')
   for (let tick = 0; tick < 20 && (await send.getAttribute('data-pressed')) !== 'true'; tick += 1)
@@ -155,7 +158,26 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
   await expect(agentRow).toHaveAttribute('data-agents-working', 'true')
   await expect(frame.locator('[data-demo-count]')).toHaveText('7')
   const agents = frame.locator('[data-demo-agents]')
-  await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(5)
+  const avatars = agents.locator('[data-demo-agent-avatar]')
+  await expect(avatars, 'Air is on the row first').toHaveCount(1)
+  await expect(avatars.first().locator('.air-mascot')).toHaveCount(1)
+  let joined = 1
+  for (let tick = 0; tick < 60 && joined < 5; tick += 1) {
+    await page.clock.runFor(story(50))
+    const now = await avatars.count()
+    expect(now, 'agents only join').toBeGreaterThanOrEqual(joined)
+    joined = now
+  }
+  await expect(avatars).toHaveCount(5)
+  const neutral = await agents.evaluate((tab) => {
+    const context = document.createElement('canvas').getContext('2d')
+    if (!context) throw new Error('No canvas')
+    context.fillStyle = getComputedStyle(tab).backgroundColor
+    context.fillRect(0, 0, 1, 1)
+    const [red = 0, green = 0, blue = 0] = context.getImageData(0, 0, 1, 1).data
+    return Math.max(red, green, blue) - Math.min(red, green, blue)
+  })
+  expect(neutral, 'the row is white for Air, not purple').toBeLessThan(4)
   const tabOffset = async () => {
     const rowBox = await agentRow.locator('[data-demo-agent-row]').boundingBox()
     const agentsBox = await agents.boundingBox()
@@ -175,6 +197,11 @@ test('a ⌘J shortcut opens the agent dialog, the idea is typed and Enter sends 
       const fill = getComputedStyle(tab).backgroundColor
       return outline.includes(fill)
     })
+  const rowOutline = await agentRow
+    .locator('[data-demo-agent-row]')
+    .evaluate((row) => getComputedStyle(row).boxShadow)
+  expect(rowOutline.split(/,(?![^(]*\))/), 'one outline, no glow around the row').toHaveLength(1)
+  expect(rowOutline).toMatch(/ 1\.5px inset$|inset .* 1\.5px$/)
   const avatarBrightness = new Set<string>()
   for (let sample = 0; sample < 4; sample++) {
     expect(await tabMatchesOutline()).toBe(true)
@@ -250,7 +277,7 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   await expect(cursor).toHaveCSS('opacity', '1')
   expect(await cursorInsideFrame()).toBe(true)
 
-  await page.clock.runFor(story(5600))
+  await page.clock.runFor(story(5000))
   await expect(cursor).toHaveAttribute('data-state', 'resting')
   await expect(agents).toHaveAttribute('data-expanded', 'false')
 
@@ -263,13 +290,42 @@ test('the cursor hovers the agent row and the agents tab expands to name them', 
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
   await expect(agents).toHaveAttribute('data-expanded', 'true')
+  await expect(agents).toContainText('Air')
   await expect(agents).toContainText('Thorfinn')
-  await expect(agents).toContainText('Canute')
+  await expect(agents).not.toContainText('Canute')
   await expect(agents).toContainText('and 3 others are working')
   await expect(agents).not.toContainText('+3')
+  await expect(agents.getByText('Orchestrator', { exact: true })).toHaveCount(1)
   await expect(agents.getByText('Writing Agent', { exact: true })).toHaveCount(1)
-  await expect(agents.getByText('Research Agent', { exact: true })).toHaveCount(1)
   await expect(agents.locator('[data-demo-agent-avatar]')).toHaveCount(5)
+  const looks = await agents.locator('[data-demo-agent-avatar]').evaluateAll((avatars) =>
+    avatars.map((avatar) => {
+      const fills = [...avatar.querySelectorAll('svg [fill]')]
+        .map((shape) => shape.getAttribute('fill') ?? '')
+        .filter((fill) => fill.startsWith('#') && !['#FFFFFF', '#000000'].includes(fill))
+      const air = avatar.querySelector('.air-mascot')
+      return {
+        fills,
+        air: air
+          ? {
+              circle: getComputedStyle(avatar.firstElementChild ?? avatar).backgroundColor,
+              mascot: getComputedStyle(air).backgroundColor,
+            }
+          : null,
+      }
+    }),
+  )
+  expect(looks[0]?.air, 'Air is a white mascot on black').toEqual({
+    circle: 'rgb(0, 0, 0)',
+    mascot: 'rgb(255, 255, 255)',
+  })
+  const palettes = looks.slice(1).map((look) => new Set(look.fills))
+  for (const [index, palette] of palettes.entries())
+    for (const other of palettes.slice(index + 1))
+      expect(
+        [...palette].filter((fill) => other.has(fill)),
+        'every agent has its own colours',
+      ).toEqual([])
   const cursorOnRow = async () => {
     const cursorBox = await cursor.boundingBox()
     const rowBox = await row.boundingBox()
@@ -313,7 +369,7 @@ test('the cursor turns into a pointer as soon as it is over any table row', asyn
   await frame.scrollIntoViewIfNeeded()
   const cursor = frame.locator('[data-demo-cursor]')
   await expect(cursor).toHaveAttribute('data-shape', 'arrow')
-  await page.clock.runFor(story(6900))
+  await page.clock.runFor(story(6090))
   await expect(cursor).toHaveAttribute('data-state', 'moving')
   await expect(cursor).toHaveAttribute('data-shape', 'pointer')
 })
@@ -329,7 +385,7 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
   const editor = frame.locator('[data-demo-editor]')
   const table = frame.locator('[data-demo-table]')
 
-  await page.clock.runFor(story(7550))
+  await page.clock.runFor(story(6740))
   await expect(cursor).toHaveAttribute('data-state', 'hovering')
   await expect(editor).toHaveAttribute('data-state', 'hidden')
   await expect(table).toHaveAttribute('data-state', 'shown')
@@ -400,6 +456,7 @@ test('clicking the agent row opens the post editor', async ({ page }) => {
     await expect(box).toHaveAttribute('data-agent', 'Thorfinn')
     const fieldOutline = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-outline]`)
     await expect(fieldOutline).toHaveCSS('box-shadow', /inset/)
+    await expect(fieldOutline, 'a thin outline').toHaveCSS('box-shadow', / 1\.5px( inset)?$/)
     await expect(fieldOutline).toHaveAttribute('data-active', String(field === 'categories'))
     const tab = editor.locator(`[data-demo-field="${field}"] [data-demo-agent-tab]`)
     await expect(tab).toContainText('Thorfinn')
@@ -478,7 +535,7 @@ test('the agents tab starts expanding as soon as the cursor enters the agent row
   await frame.scrollIntoViewIfNeeded()
   const cursor = frame.locator('[data-demo-cursor]')
   const agents = frame.locator('[data-demo-agents]')
-  await page.clock.runFor(story(7000))
+  await page.clock.runFor(story(6190))
   await expect(cursor).toHaveAttribute('data-state', 'moving')
   await expect(agents).toHaveAttribute('data-expanded', 'false')
   await page.clock.runFor(story(150))
@@ -498,7 +555,7 @@ test('the editor top bar shows the source Canute is reading, one after another',
   const editor = frame.locator('[data-demo-editor]')
   const research = editor.locator('[data-demo-research]')
   const current = research.locator('[data-demo-source][data-state="current"]')
-  await page.clock.runFor(story(8990))
+  await page.clock.runFor(story(8180))
   await expect(editor).toHaveAttribute('data-state', 'shown')
   await expect(research).toContainText('Canute')
   await expect(research).toContainText('reading')
@@ -550,7 +607,7 @@ test('the cursor opens Canute’s research panel from the top bar', async ({ pag
   const panel = editor.locator('[data-demo-research-panel]')
   const cursor = frame.locator('[data-demo-cursor]')
 
-  await page.clock.runFor(story(11300))
+  await page.clock.runFor(story(10490))
   await expect(panel).toHaveAttribute('data-state', 'closed')
   await expect(research).toHaveAttribute('data-hovered', 'false')
   await expect(cursor).toHaveAttribute('data-state', 'moving')
@@ -809,7 +866,7 @@ test('the preview header has an Ask Air split button with an agent menu', async 
   expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(searchBox.x)
   await expect(menu).toHaveAttribute('data-state', 'closed')
 
-  await page.clock.runFor(story(8490))
+  await page.clock.runFor(story(7680))
   await expect(frame.locator('[data-demo-editor]')).toHaveAttribute('data-state', 'shown')
   await expect(header.locator('[data-demo-ask-agent]')).toHaveCount(0)
   const waiting = header.locator('[data-demo-ask-count]')
@@ -866,7 +923,7 @@ test('the cursor answers Canute’s decision and Canute hands it to Air', async 
   const cursor = frame.locator('[data-demo-cursor]')
   const waiting = frame.locator('[data-demo-ask-count]')
 
-  await page.clock.runFor(story(12490))
+  await page.clock.runFor(story(11680))
   await expect(decision).toHaveAttribute('data-state', 'asking')
   await expect(waiting).toHaveText('1')
 
@@ -919,7 +976,7 @@ test('Thorfinn drafts the body at one fixed height and leaves when it is done', 
   const draft = body.locator('[data-demo-body-draft]')
   const readingTime = frame.locator('[data-demo-field="reading-time"]')
 
-  await page.clock.runFor(story(13490))
+  await page.clock.runFor(story(12680))
   await expect(tab).toContainText('Waiting on Canute…')
   await expect(draft).toHaveCount(0)
   await expect(readingTime).toHaveAttribute('data-empty', 'true')
@@ -1072,7 +1129,7 @@ test('scrolling starts during cursor travel and SEO agents stream into individua
   const tab = title.locator('[data-demo-agent-tab]')
   const social = seo.locator('[data-demo-field="social-image"]')
 
-  await page.clock.runFor(story(13490))
+  await page.clock.runFor(story(12680))
   for (let tick = 0; tick < 60; tick += 1) {
     if ((await decision.getAttribute('data-state')) === 'sent') break
     await page.clock.runFor(story(100))
@@ -1199,7 +1256,7 @@ test('the preview plays a little faster than its timeline, opening the editor be
   const frame = page.getByRole('region', { name: 'Aircastle preview' }).locator('[data-demo-frame]')
   await frame.scrollIntoViewIfNeeded()
   const editor = frame.locator('[data-demo-editor]')
-  await page.clock.runFor(6000)
+  await page.clock.runFor(5500)
   await expect(editor).toHaveAttribute('data-state', 'hidden')
   await page.clock.runFor(1700)
   await expect(editor).toHaveAttribute('data-state', 'shown')

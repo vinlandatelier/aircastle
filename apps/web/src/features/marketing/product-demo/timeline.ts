@@ -1,7 +1,13 @@
 import { bodyDraftDuration } from './body-draft'
 import { arcFor, pressDelay, travelTime, type CursorTarget } from './cursor-path'
 import { docsDecisionAnsweredAt, researchLog, researchStepsAt } from './research'
-import { askCursorPressed, askTiming, confettiAt, type PublishedEntry } from './site-ask'
+import {
+  askCursorPressed,
+  askKeystroke,
+  askTiming,
+  confettiAt,
+  type PublishedEntry,
+} from './site-ask'
 
 export const prompt = "Recently shipped MCP for our app, let's announce it"
 
@@ -19,6 +25,9 @@ const rowHoverDuration = 350
 const clickDuration = 220
 const editorOpensAfterClick = 180
 const restAfterEditor = 1400
+const rowAgentCount = 5
+const firstAgentJoinsAfterRow = 600
+const agentJoinInterval = 350
 const outroFadeOut = 900
 const outroFadeIn = 1400
 const rowsReachedAfter = Math.round(cursorTravelDuration * 0.3)
@@ -53,10 +62,7 @@ const writerLeavesTagsAfterEditor =
   tagsStartAfterEditor + (tagCount - 1) * chipInterval + lingerAfterFilling
 const writerReachesBodyAfterEditor = writerLeavesTagsAfterEditor + moveBetweenFields
 
-const keystrokeDelays = Array.from(prompt, (character, index) => {
-  const pause = character === ' ' || character === ',' ? 40 : 0
-  return 30 + ((index * 37) % 11) + pause
-})
+const keystrokeDelays = Array.from(prompt, () => askKeystroke)
 const typingEndsAt = keystrokeDelays.reduce((at, delay) => at + delay, typingStartsAt)
 const sendAt = typingEndsAt + pauseBeforeSend
 const dialogClosesAt = sendAt + sendPressDuration
@@ -81,6 +87,7 @@ export type Frame = {
   typed: number
   sendPressed: boolean
   agentRow: boolean
+  rowAgents: number
   cursor: CursorState
   cursorShape: CursorShape
   view: View
@@ -115,6 +122,7 @@ export const stillFrame: Frame = {
   typed: 0,
   sendPressed: false,
   agentRow: true,
+  rowAgents: rowAgentCount,
   cursor: 'resting',
   cursorShape: 'arrow',
   view: 'table',
@@ -380,6 +388,14 @@ export function frameAt(elapsed: number): Frame {
     typed: typedAt(elapsed),
     sendPressed: elapsed >= sendAt && elapsed < dialogClosesAt,
     agentRow: elapsed >= dialogClosesAt && elapsed < editorClosesAt,
+    rowAgents:
+      elapsed < dialogClosesAt + firstAgentJoinsAfterRow
+        ? 1
+        : Math.min(
+            rowAgentCount,
+            2 +
+              Math.floor((elapsed - dialogClosesAt - firstAgentJoinsAfterRow) / agentJoinInterval),
+          ),
     cursorShape:
       askShape ??
       ((elapsed >= cursorShownAt + rowsReachedAfter && elapsed < clickEndsAt) ||
