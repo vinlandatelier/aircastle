@@ -55,6 +55,13 @@ async function renderRoute(path: string) {
   expect(screen.getByRole('link', { name: 'Back to home' }).getAttribute('href')).toBe('/')
 }
 
+function preferLightSystemTheme() {
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query) =>
+      ({ matches: query === '(prefers-color-scheme: light)', media: query }) as MediaQueryList,
+  )
+}
+
 function preferDarkSystemTheme() {
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (query) =>
@@ -98,8 +105,8 @@ describe('Route failure escalation', () => {
     expect(favicon()).toBe('/brand/favicon-light.svg')
   })
 
-  it('falls back to the system theme when storage is unavailable', async () => {
-    preferDarkSystemTheme()
+  it('falls back to dark when storage is unavailable, whatever the system prefers', async () => {
+    preferLightSystemTheme()
     vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
       throw new DOMException('Storage blocked', 'SecurityError')
     })

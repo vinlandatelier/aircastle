@@ -68,7 +68,9 @@ test.describe('mobile failure recovery', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
     await page.getByRole('link', { name: 'Back to home', exact: true }).focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
+    ).toBeVisible()
     await expect(page).toHaveURL(/\/$/)
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0)
   })

@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 @import '@fontsource-variable/outfit';
 
 @custom-variant dark (&:is(.dark *));
@@ -96,8 +97,8 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  --ring: oklch(0.556 0 0);
+  --radius: 0.3rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -137,6 +138,12 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+[data-theme-scope='marketing'] {
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-normal);
+  line-height: 1.75rem;
+}
+
 :root:has([data-theme-scope='dashboard']) {
   --background: #ffffff;
   --foreground: var(--color-neutral-800);
@@ -149,7 +156,7 @@
   --secondary: --alpha(var(--color-black) / 4%);
   --secondary-foreground: var(--foreground);
   --muted: --alpha(var(--color-black) / 4%);
-  --muted-foreground: var(--color-zinc-600);
+  --muted-foreground: var(--color-neutral-600);
   --accent: --alpha(var(--color-black) / 4%);
   --accent-foreground: var(--foreground);
   --destructive: var(--color-red-500);
@@ -158,7 +165,7 @@
   --ring: var(--color-neutral-400);
   --sidebar: var(--background);
   --sidebar-foreground: var(--muted-foreground);
-  --sidebar-label-foreground: #4e4e54;
+  --sidebar-label-foreground: #4f4f4f;
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--accent);
@@ -168,7 +175,7 @@
 }
 
 :root.dark:has([data-theme-scope='dashboard']) {
-  --background: #19191c;
+  --background: #171717;
   --foreground: var(--color-neutral-100);
   --card: var(--background);
   --card-foreground: var(--foreground);
@@ -179,11 +186,11 @@
   --secondary: --alpha(var(--color-white) / 4%);
   --secondary-foreground: var(--foreground);
   --muted: --alpha(var(--color-white) / 4%);
-  --muted-foreground: var(--color-zinc-400);
-  --accent: #2d2d31;
+  --muted-foreground: var(--color-neutral-400);
+  --accent: #2b2b2b;
   --accent-foreground: var(--foreground);
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-  --border: #262629;
+  --border: #262626;
   --input: var(--border);
   --ring: var(--color-neutral-500);
   --sidebar: var(--background);
@@ -202,6 +209,19 @@
 
 .dark .brand-logo {
   background-image: url('/brand/logo-dark.png');
+}
+
+.air-mascot {
+  background-color: currentColor;
+  mask: url('/brand/air.svg') center / contain no-repeat;
+}
+
+.vinland-logo {
+  background: url('/brand/vinland-light.png') center / contain no-repeat;
+}
+
+.dark .vinland-logo {
+  background-image: url('/brand/vinland-dark.png');
 }
 
 @keyframes brand-spin {

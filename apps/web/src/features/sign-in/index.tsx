@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router'
-import { AtSignIcon, ChevronLeftIcon } from 'lucide-react'
+import { AtSignIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
-import { FloatingFrames } from './floating-frames'
+import { CloudArt } from './cloud-art'
 
 export function SignInPage() {
   return (
@@ -11,61 +11,47 @@ export function SignInPage() {
       data-theme-scope="marketing"
       className="relative min-h-svh overflow-hidden lg:grid lg:grid-cols-2"
     >
-      <div className="relative hidden flex-col border-r bg-secondary p-10 lg:flex dark:bg-secondary/20">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-transparent to-background"
-        />
-        <div className="relative z-10 flex items-center gap-2">
-          <span aria-hidden="true" className="brand-logo block size-7 shrink-0" />
-        </div>
-        <FloatingFrames />
+      <div className="relative hidden lg:block">
+        <CloudArt />
       </div>
-      <div className="relative flex min-h-svh min-w-0 flex-col justify-center px-6 py-24 sm:px-8">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 isolate -z-10 contain-strict bg-[radial-gradient(ellipse_110%_85%_at_100%_0%,--theme(--color-foreground/.13),transparent_72%),radial-gradient(ellipse_90%_70%_at_0%_100%,--theme(--color-foreground/.04),transparent_70%)]"
-        />
-        <Button
-          role="link"
-          className="absolute top-7 left-5"
-          variant="ghost"
-          render={<Link to="/" />}
-          nativeButton={false}
-        >
-          <ChevronLeftIcon aria-hidden="true" data-icon="inline-start" />
-          Home
-        </Button>
-        <div className="mx-auto flex w-full min-w-0 max-w-sm flex-col gap-4">
-          <div className="flex items-center gap-2 lg:hidden">
-            <span aria-hidden="true" className="brand-logo block size-7 shrink-0" />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-wide">Sign in to Aircastle</h1>
+      <div className="relative flex min-h-svh min-w-0 flex-col justify-center bg-background px-6 py-24 sm:px-8">
+        <div className="mx-auto flex w-full min-w-0 max-w-[28rem] flex-col gap-5">
+          <Link
+            to="/"
+            aria-label="Aircastle home"
+            className="brand-link mb-6 self-start rounded-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
+          >
+            <span aria-hidden="true" className="brand-logo block size-10 shrink-0" />
+          </Link>
+          <h1 className="mb-3 text-[2rem] leading-tight font-[400] tracking-tight">
+            Sign in to Aircastle
+          </h1>
           <form onSubmit={(event) => event.preventDefault()}>
-            <FieldGroup className="gap-2">
+            <FieldGroup className="gap-3">
               <Field>
                 <FieldLabel className="sr-only" htmlFor="email">
                   Email
                 </FieldLabel>
-                <InputGroup>
+                <InputGroup className="h-12 text-base">
                   <InputGroupInput
                     id="email"
                     name="email"
                     placeholder="your.email@example.com"
                     type="email"
                     autoComplete="email"
+                    className="text-base md:text-base"
                   />
                   <InputGroupAddon align="inline-start">
                     <AtSignIcon aria-hidden="true" />
                   </InputGroupAddon>
                 </InputGroup>
               </Field>
-              <Button className="w-full" type="submit" disabled>
+              <Button className="h-12 w-full text-base" type="submit" disabled>
                 Continue with email
               </Button>
             </FieldGroup>
           </form>
-          <p className="mt-8 text-sm text-muted-foreground">
+          <p className="mt-6 text-base text-muted-foreground">
             By clicking continue, you agree to our{' '}
             <a
               className="underline underline-offset-4 hover:text-primary"

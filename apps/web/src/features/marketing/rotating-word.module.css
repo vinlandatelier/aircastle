@@ -1,0 +1,75 @@
+.slot {
+  position: relative;
+  display: inline-grid;
+  white-space: nowrap;
+}
+
+.slot::after,
+.word::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: -0.04em;
+  height: 4px;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.slot::after {
+  background-color: currentColor;
+  opacity: 0.12;
+}
+
+.word {
+  position: relative;
+  justify-self: start;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .slot {
+    transition: width 450ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .word {
+    animation: word-enter 550ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .word::before {
+    z-index: 1;
+    background-image: linear-gradient(
+      90deg,
+      rgb(124 58 237 / 0),
+      rgb(124 58 237 / 0.45) 10%,
+      #a855f7 24%,
+      #ec4899 42%,
+      #ef4444 58%,
+      #f97316 72%,
+      rgb(250 204 21 / 0.6) 88%,
+      rgb(250 204 21 / 0)
+    );
+    background-repeat: no-repeat;
+    background-size: 2.95em 100%;
+    mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+    background-position: -2.95em 0;
+    filter: drop-shadow(0 0 6px rgb(236 72 153 / 0.6));
+    animation: underline-beam 1.8s cubic-bezier(0.45, 0, 0.55, 1) 600ms 1 both;
+  }
+}
+
+@keyframes word-enter {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(0.35em);
+  }
+}
+
+@keyframes underline-beam {
+  from {
+    background-position: -2.95em 0;
+  }
+
+  to {
+    background-position: calc(100% + 2.95em) 0;
+  }
+}

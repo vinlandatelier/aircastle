@@ -96,7 +96,7 @@ export async function assertLayout(page: Page) {
   const controls = [
     page.getByRole('button', { name: /^Switch project:/, includeHidden: true }),
     page.getByRole('button', { name: 'Search pages', exact: true, includeHidden: true }),
-    page.getByRole('button', { name: 'Choose theme', exact: true, includeHidden: true }),
+    page.getByRole('button', { name: 'Dark theme', exact: true, includeHidden: true }),
     page.getByRole('button', { name: 'Open account menu', exact: true, includeHidden: true }),
     visibleSidebarTrigger(page),
   ]

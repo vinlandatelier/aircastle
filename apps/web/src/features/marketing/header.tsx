@@ -1,0 +1,76 @@
+import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { cn } from 'cn'
+import { ArrowRightIcon, BookOpenIcon } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { ThemeSwitcher } from '@/components/shell'
+
+export function Header() {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const updateScrolled = () => setScrolled(window.scrollY > 0)
+    updateScrolled()
+    window.addEventListener('scroll', updateScrolled, { passive: true })
+    return () => window.removeEventListener('scroll', updateScrolled)
+  }, [])
+
+  return (
+    <header
+      className={cn(
+        'sticky top-0 z-20 w-full text-foreground motion-safe:transition-colors motion-safe:duration-200',
+        scrolled ? 'bg-background' : 'bg-transparent',
+      )}
+    >
+      <nav
+        aria-label="Marketing navigation"
+        className="mx-auto flex min-h-16 w-full max-w-[70rem] items-center justify-between gap-2 px-4 sm:gap-4"
+      >
+        <Link
+          to="/"
+          aria-label="Aircastle home"
+          className="brand-link inline-flex items-center gap-2.5 rounded-md p-1 text-[1.375rem] font-[400] focus-visible:outline-2 focus-visible:outline-ring sm:p-2"
+        >
+          <span aria-hidden="true" className="brand-logo block size-6" />
+          Aircastle
+        </Link>
+        <div className="flex items-center gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <a
+                    href="/docs"
+                    aria-label="Documentation"
+                    className="inline-flex size-9 items-center justify-center rounded-lg text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
+                  />
+                }
+              >
+                <BookOpenIcon aria-hidden="true" className="size-5" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Docs</TooltipContent>
+            </Tooltip>
+            <ThemeSwitcher className="size-9 rounded-lg text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid [&_svg]:size-5!" />
+          </TooltipProvider>
+          <span
+            data-header-divider
+            aria-hidden="true"
+            className="mx-1 hidden h-5 w-px bg-border min-[400px]:block"
+          />
+          <Link
+            to="/dash"
+            aria-label="Open Aircastle"
+            className="group inline-flex items-center gap-1.5 rounded-lg px-2 py-2 whitespace-nowrap text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring min-[400px]:px-3"
+          >
+            <span className="min-[400px]:hidden">Open</span>
+            <span className="hidden min-[400px]:inline">Open Aircastle</span>
+            <ArrowRightIcon
+              aria-hidden="true"
+              className="size-5 transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+        </div>
+      </nav>
+    </header>
+  )
+}

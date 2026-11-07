@@ -34,7 +34,6 @@ async function expectPublic(page: Page, dark: boolean) {
     dark ? 'oklch(0.985 0 0)' : 'oklch(0.145 0 0)',
   )
   const panel = page.locator('main > div').first()
-  await expectPaint(panel, dark ? 'oklab(0.269 0 0 / 0.2)' : 'oklch(0.97 0 0)')
   await expect(panel).toHaveCSS(
     'border-right-color',
     dark ? 'oklch(1 0 0 / 0.1)' : 'oklch(0.922 0 0)',
@@ -56,11 +55,54 @@ async function expectPublic(page: Page, dark: boolean) {
     'color',
     dark ? 'oklch(0.985 0 0)' : 'oklch(0.145 0 0)',
   )
-  await expect(page.getByText('Aircastle', { exact: true })).toHaveCount(0)
+  await expect(
+    page.locator('main > div').nth(1).getByText('Aircastle', { exact: true }),
+  ).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toHaveCSS(
     'font-weight',
-    '600',
+    '400',
   )
+  const home = page.getByRole('link', { name: 'Home', exact: true })
+  const art = page.locator('[data-sign-in-art]')
+  await expect(home).toBeVisible()
+  const [homeBox, artBox] = await Promise.all([home.boundingBox(), art.boundingBox()])
+  if (!homeBox || !artBox) throw new Error('Home link is not laid out')
+  expect(homeBox.x - artBox.x, 'tucked into the art card').toBeLessThan(48)
+  expect(homeBox.y - artBox.y).toBeLessThan(48)
+  const heading = page.getByRole('heading', { name: 'Sign in to Aircastle' })
+  expect(
+    parseFloat(await heading.evaluate((element) => getComputedStyle(element).fontSize)),
+    'a heading sized for the page',
+  ).toBeGreaterThanOrEqual(32)
+  const email = page.getByRole('textbox', { name: 'Email', exact: true })
+  const submitBox = await page.getByRole('button', { name: 'Continue with email' }).boundingBox()
+  const groupBox = await page.locator('[data-slot="input-group"]').boundingBox()
+  expect(groupBox?.height ?? 0, 'a roomy email field').toBeGreaterThanOrEqual(44)
+  expect(submitBox?.height ?? 0, 'a roomy button').toBeGreaterThanOrEqual(44)
+  expect(submitBox?.width ?? 0, 'a wider form column').toBeGreaterThanOrEqual(420)
+  expect(
+    parseFloat(await email.evaluate((element) => getComputedStyle(element).fontSize)),
+  ).toBeGreaterThanOrEqual(16)
+  const logo = await page.getByRole('link', { name: 'Aircastle home' }).boundingBox()
+  expect(logo?.height ?? 0, 'a logo in proportion').toBeGreaterThanOrEqual(40)
+  const headingBox = await heading.boundingBox()
+  if (!logo || !headingBox || !groupBox) throw new Error('Sign-in form is not laid out')
+  expect(
+    headingBox.y - (logo.y + logo.height),
+    'room between the logo and the heading',
+  ).toBeGreaterThanOrEqual(40)
+  expect(
+    groupBox.y - (headingBox.y + headingBox.height),
+    'room before the fields',
+  ).toBeGreaterThanOrEqual(28)
+  expect(
+    await page.evaluate(() =>
+      [...document.querySelectorAll('main *')].some((element) =>
+        getComputedStyle(element).backgroundImage.includes('radial-gradient'),
+      ),
+    ),
+    'the form side is a solid background',
+  ).toBe(false)
 }
 
 for (const theme of ['light', 'dark'] as const) {
@@ -73,19 +115,36 @@ for (const theme of ['light', 'dark'] as const) {
     })
     await page.goto('/sign-in')
     await expectPublic(page, theme === 'dark')
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Aircastle home', exact: true }).click()
+    await expect(
+      page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
+    ).toBeVisible()
     await page.goto('/dash')
-    await expect(page.getByRole('button', { name: 'Choose theme' })).toBeVisible()
-    const background = theme === 'dark' ? '#19191c' : '#ffffff'
+    await expect(page.getByRole('button', { name: 'Dark theme' })).toHaveAttribute(
+      'aria-pressed',
+      String(theme === 'dark'),
+    )
+    const background = theme === 'dark' ? '#171717' : '#ffffff'
     const foreground = theme === 'dark' ? 'oklch(0.97 0 none)' : 'oklch(0.269 0 none)'
     await expectPaint(page.locator('body'), background, foreground)
-    await page.getByRole('button', { name: 'Choose theme' }).click()
-    const menu = page.getByRole('menu')
-    await expect(menu).toBeVisible()
-    await expectPaint(menu, background, foreground)
-    expect(await menu.evaluate((node) => node.closest('[data-theme-scope]') === null)).toBe(true)
-    await page.keyboard.press('Escape')
+    const tints = await page.evaluate(() => {
+      const context = document.createElement('canvas').getContext('2d')
+      if (!context) throw new Error('No canvas')
+      const scope = document.querySelector('[data-theme-scope="dashboard"]') ?? document.body
+      return ['--background', '--muted-foreground', '--border', '--accent'].map((token) => {
+        const probe = document.createElement('span')
+        probe.style.color = `var(${token})`
+        scope.append(probe)
+        context.clearRect(0, 0, 1, 1)
+        context.fillStyle = getComputedStyle(probe).color
+        probe.remove()
+        context.fillRect(0, 0, 1, 1)
+        const [red = 0, green = 0, blue = 0] = context.getImageData(0, 0, 1, 1).data
+        return { token, tint: Math.max(red, green, blue) - Math.min(red, green, blue) }
+      })
+    })
+    for (const { token, tint } of tints)
+      expect(tint, `${token} is a pure grey, like the landing preview`).toBeLessThanOrEqual(1)
     await page.getByRole('button', { name: 'Search pages', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Search pages' })
     await expect(dialog).toBeVisible()
@@ -93,11 +152,13 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await dialog.evaluate((node) => node.closest('[data-theme-scope]') === null)).toBe(true)
     await page.keyboard.press('Escape')
     await page.goBack()
-    await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
+    ).toBeVisible()
     await page.goBack()
     await expectPublic(page, theme === 'dark')
     await page.goto('/dash')
-    await expect(page.getByRole('button', { name: 'Choose theme' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Dark theme' })).toBeVisible()
     await expectPaint(page.locator('body'), background, foreground)
   })
 }

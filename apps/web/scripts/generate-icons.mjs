@@ -112,9 +112,10 @@ function encodeRgba(pixels, size) {
   ])
 }
 
+const logos = ['public/brand/logo-light.png', 'public/brand/logo-dark.png']
 const [light, dark] = await Promise.all(
-  ['light', 'dark'].map(async (theme) => {
-    const logo = decodeRgba(await readFile(new URL(`public/brand/logo-${theme}.png`, webRoot)))
+  logos.map(async (path) => {
+    const logo = decodeRgba(await readFile(new URL(path, webRoot)))
     const icon = encodeRgba(downscale(logo, faviconSize), faviconSize)
     return `data:image/png;base64,${icon.toString('base64')}`
   }),

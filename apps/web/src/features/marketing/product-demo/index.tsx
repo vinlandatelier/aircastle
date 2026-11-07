@@ -1,0 +1,717 @@
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  ArrowUpIcon,
+  MousePointer2Icon,
+  PointerIcon,
+  TextCursorIcon,
+  BookOpenIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  MoonIcon,
+  PlugIcon,
+  PlusIcon,
+  SearchIcon,
+  SunIcon,
+  type LucideIcon,
+} from 'lucide-react'
+import { cn } from 'cn'
+import { Badge } from '@/components/ui/badge'
+import { Kbd } from '@/components/ui/kbd'
+import { GeneratedAvatar } from '@/components/shell'
+import { navigationGroups } from '@/features/navigation'
+import { EditorView } from './editor-view'
+import { PersonAvatar } from './person'
+import { docsDecisionState } from './research'
+import {
+  askeladd,
+  canute,
+  einar,
+  orchestrator,
+  thorfinn,
+  workingAgents,
+  type DemoAgent,
+} from './agents'
+import { usePrefersReducedMotion } from '../use-prefers-reduced-motion'
+import styles from './product-demo.module.css'
+import { Confetti } from './confetti'
+import { NotificationsBell } from './notifications'
+import { Outro } from './outro'
+import { AuthorsCell, StatusPill } from './posts'
+import { posts } from './posts-data'
+import { PhoneDemo } from './phone-demo'
+import { phoneFrame } from './phone-story'
+import { AgentAvatar } from './agent-avatar'
+import { cursorPosition, type CursorTarget } from './cursor-path'
+import {
+  notificationPreviewPressedAt,
+  notificationsOpenAt,
+  unreadNotificationsAt,
+} from './site-ask'
+import {
+  frameAt,
+  loopDuration,
+  prompt,
+  stillFrame,
+  type CursorShape,
+  type CursorState,
+  type Frame,
+  type Shortcut,
+} from './timeline'
+
+const frameWidth = 1280
+const playbackRate = 1.2
+const frameHeight = 740
+
+function sameFrame(left: Frame, right: Frame) {
+  return (Object.keys(left) as (keyof Frame)[]).every((key) => left[key] === right[key])
+}
+
+const playsWhenVisible = 0.5
+const visibilitySteps = Array.from({ length: 21 }, (_, step) => step / 20)
+
+function usePlayback(stage: React.RefObject<HTMLElement | null>, reducedMotion: boolean) {
+  const [frame, setFrame] = useState<Frame>(() => frameAt(0))
+  const [playing, setPlaying] = useState(false)
+  useEffect(() => {
+    const element = stage.current
+    if (reducedMotion || !element) return
+    let request: number | undefined
+    let played = 0
+    let resumedAt = 0
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return
+        const fits = Math.min(entry.boundingClientRect.height, entry.rootBounds?.height ?? Infinity)
+        if (!entry.isIntersecting || entry.intersectionRect.height < fits * playsWhenVisible) {
+          if (request === undefined) return
+          cancelAnimationFrame(request)
+          request = undefined
+          played += (performance.now() - resumedAt) * playbackRate
+          setPlaying(false)
+          return
+        }
+        if (request !== undefined) return
+        resumedAt = performance.now()
+        setPlaying(true)
+        const tick = () => {
+          const elapsed = played + (performance.now() - resumedAt) * playbackRate
+          const next = frameAt(elapsed % loopDuration)
+          setFrame((current) => (sameFrame(current, next) ? current : next))
+          request = requestAnimationFrame(tick)
+        }
+        request = requestAnimationFrame(tick)
+      },
+      { threshold: visibilitySteps },
+    )
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+      if (request !== undefined) cancelAnimationFrame(request)
+    }
+  }, [stage, reducedMotion])
+  return reducedMotion ? { frame: stillFrame, playing: false } : { frame, playing }
+}
+
+function AgentDialog({
+  state,
+  typed,
+  sendPressed,
+}: {
+  state: Frame['dialog']
+  typed: number
+  sendPressed: boolean
+}) {
+  if (state === 'closed') return null
+  return (
+    <div
+      data-demo-dialog
+      data-state={state}
+      className={cn(
+        'absolute top-[182px] left-1/2 z-50 w-[560px] -translate-x-1/2 rounded-xl border bg-popover p-4 text-base text-popover-foreground shadow-2xl transition-[opacity,scale,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-y-2 starting:scale-[0.97] starting:opacity-0',
+        state === 'closing' && 'translate-y-1 scale-[0.98] opacity-0',
+      )}
+    >
+      <p className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
+        <span className="air-mascot block size-4 shrink-0" />
+        Ask Air
+        <span
+          data-demo-role-label
+          className="rounded-sm bg-muted px-1 py-px text-[10px] leading-none text-muted-foreground"
+        >
+          Orchestrator
+        </span>
+      </p>
+      <p className="relative min-h-20 text-lg">
+        <span data-demo-prompt>{prompt.slice(0, typed)}</span>
+        <span
+          className={cn(
+            'ml-px inline-block h-[1.1em] w-0.5 translate-y-[3px] bg-foreground',
+            typed > 0 && typed < prompt.length ? 'opacity-100' : 'animate-pulse',
+          )}
+        />
+        {typed === 0 && (
+          <span className="absolute inset-0 pl-1.5 text-muted-foreground/70">
+            Describe what you want written, researched or published…
+          </span>
+        )}
+      </p>
+      <div className="mt-3 flex items-center justify-end">
+        <span
+          data-demo-send
+          data-pressed={sendPressed}
+          className={cn(
+            'inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground',
+            sendPressed && styles.sendPress,
+          )}
+        >
+          <ArrowUpIcon className="size-5" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
+const shortcutKeys: Record<Shortcut, readonly string[]> = {
+  'open-agents': ['⌘', 'J'],
+  send: ['↵'],
+}
+
+function ShortcutChip({ shortcut }: { shortcut: Shortcut | undefined }) {
+  const [lastShortcut, setLastShortcut] = useState<Shortcut>('open-agents')
+  if (shortcut && shortcut !== lastShortcut) setLastShortcut(shortcut)
+  return (
+    <div
+      data-demo-shortcut
+      data-state={shortcut ? 'shown' : 'hidden'}
+      className={cn(
+        'absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-popover px-2 py-1.5 shadow-lg transition-[opacity,translate] duration-300',
+        shortcut ? 'opacity-100' : 'translate-y-2 opacity-0',
+      )}
+    >
+      {shortcutKeys[shortcut ?? lastShortcut].map((key) => (
+        <Kbd key={key} className="h-7 min-w-7 text-sm">
+          {key}
+        </Kbd>
+      ))}
+    </div>
+  )
+}
+
+const phoneStageWidth = 640
+const phoneMaxScale = 1.1
+
+function useStageWidth(element: HTMLElement | null) {
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      if (!element) return () => {}
+      const observer = new ResizeObserver(notify)
+      observer.observe(element)
+      return () => observer.disconnect()
+    },
+    [element],
+  )
+  return useSyncExternalStore(
+    subscribe,
+    () => element?.getBoundingClientRect().width ?? frameWidth,
+    () => frameWidth,
+  )
+}
+
+const outlineButton =
+  'inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background bg-clip-padding dark:border-input dark:bg-input/30 [&_svg]:size-4'
+
+const plainIcon =
+  'inline-flex size-7 items-center justify-center text-muted-foreground [&_svg]:size-4'
+
+function WindowDots() {
+  return (
+    <div
+      data-demo-window-dots
+      className="flex h-8 shrink-0 items-center gap-2 border-b bg-black/[0.04] px-3.5 dark:bg-black/35"
+    >
+      <span className="size-3 rounded-full bg-muted-foreground/25" />
+      <span className="size-3 rounded-full bg-muted-foreground/25" />
+      <span className="size-3 rounded-full bg-muted-foreground/25" />
+    </div>
+  )
+}
+
+function AgentMark({ agent, size }: { agent: DemoAgent; size: number }) {
+  if (agent === orchestrator)
+    return <span style={{ width: size, height: size }} className="air-mascot block shrink-0" />
+  return <AgentAvatar agent={agent} size={size} />
+}
+
+function AskMenu() {
+  return (
+    <span
+      data-demo-ask-menu
+      data-state="closed"
+      className="pointer-events-none absolute top-[calc(100%+6px)] right-0 z-50 flex w-72 origin-top-right scale-95 flex-col rounded-lg border bg-popover p-1 text-popover-foreground opacity-0 shadow-lg"
+    >
+      {[orchestrator, ...workingAgents].map((agent, index) => (
+        <span
+          key={agent.name}
+          data-demo-ask-option
+          className={cn(
+            'flex items-center gap-2.5 rounded-md px-2 py-1.5',
+            index === 0 && 'bg-accent text-accent-foreground',
+          )}
+        >
+          <AgentMark agent={agent} size={20} />
+          <span data-demo-ask-name className="truncate">
+            Ask {agent.name}
+          </span>
+          <Badge data-demo-ask-role variant="secondary" className="ml-auto">
+            {agent.role}
+          </Badge>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function AskButton({ waiting }: { waiting: number }) {
+  return (
+    <span className="relative flex">
+      <span data-demo-ask className={cn(outlineButton, 'h-8 gap-2 rounded-r-none pr-1.5 pl-2')}>
+        <span className="air-mascot block size-[18px] shrink-0" />
+        Ask {orchestrator.name}
+        {waiting > 0 && (
+          <span
+            data-demo-ask-count
+            className="flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none text-white transition-[opacity,scale] duration-300 starting:scale-50 starting:opacity-0"
+          >
+            {waiting}
+          </span>
+        )}
+        <Kbd>⌘J</Kbd>
+      </span>
+      <span
+        data-demo-ask-menu-trigger
+        className={cn(outlineButton, 'size-8 rounded-l-none border-l-0')}
+      >
+        <ChevronDownIcon />
+      </span>
+      <AskMenu />
+    </span>
+  )
+}
+
+function DemoHeader({
+  decisionsWaiting,
+  askElapsed,
+}: {
+  decisionsWaiting: number
+  askElapsed: number | null
+}) {
+  return (
+    <div data-demo-header className="relative z-40 flex h-14 shrink-0 items-center gap-2 border-b">
+      <span className="flex h-full w-14 shrink-0 items-center justify-center border-r">
+        <span className="brand-logo block size-6 shrink-0" />
+      </span>
+      <span className="ml-1 inline-flex h-10 items-center gap-3 px-2">
+        <GeneratedAvatar size={24} name="Acme Inc" />
+        <span className="flex items-center">
+          <span className="flex items-center gap-2">
+            Acme Inc
+            <Badge variant="secondary">Pro</Badge>
+          </span>
+          <span className="px-3 text-muted-foreground">/</span>
+          Acme Platforms
+        </span>
+        <ChevronDownIcon className="size-4 text-muted-foreground" />
+      </span>
+      <span className="flex items-center gap-2">
+        <span className={cn(outlineButton, 'h-8 gap-1.5 pr-2.5 pl-2')}>
+          <PlugIcon />
+          Connect
+        </span>
+        <span className={cn(outlineButton, 'size-8')}>
+          <PlusIcon />
+        </span>
+      </span>
+      <span className="ms-auto flex items-center gap-4 pr-5">
+        <AskButton waiting={decisionsWaiting} />
+        <span
+          data-demo-search
+          className="inline-flex h-8 w-60 items-center gap-2.5 rounded-lg bg-secondary pr-2.5 pl-2"
+        >
+          <SearchIcon className="size-4 text-muted-foreground" />
+          <span className="text-muted-foreground">Search...</span>
+          <Kbd className="ml-auto">⌘K</Kbd>
+        </span>
+        <span className={plainIcon}>
+          <BookOpenIcon />
+        </span>
+        <span className={plainIcon}>
+          <SunIcon className="dark:hidden" />
+          <MoonIcon className="hidden dark:block" />
+        </span>
+        <NotificationsBell
+          unread={askElapsed === null ? 0 : unreadNotificationsAt(askElapsed)}
+          open={askElapsed !== null && notificationsOpenAt(askElapsed)}
+          previewPressed={askElapsed !== null && notificationPreviewPressedAt(askElapsed)}
+        />
+        <span data-demo-account className="flex size-8 overflow-hidden rounded-full">
+          <PersonAvatar name="Abyan" className="size-8" />
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function DemoSidebar() {
+  return (
+    <div data-demo-sidebar className="relative z-30 w-14 shrink-0 border-r">
+      <div className="flex flex-col items-center gap-1 py-4">
+        {navigationGroups
+          .flatMap<{ title: string; icon: LucideIcon }>((group) => group.items)
+          .map((item) => (
+            <span
+              key={item.title}
+              className={cn(
+                'inline-flex size-8 items-center justify-center rounded-md',
+                item.title === 'Collections'
+                  ? 'rounded-sm bg-muted text-foreground'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <item.icon className="size-4" />
+            </span>
+          ))}
+      </div>
+      <span
+        data-demo-sidebar-trigger
+        className={cn(
+          outlineButton,
+          'absolute end-0 top-1/2 z-10 size-7 translate-x-1/2 -translate-y-1/2 rounded-md bg-card! text-muted-foreground',
+        )}
+      >
+        <ChevronRightIcon />
+      </span>
+    </div>
+  )
+}
+
+const rowGrid = 'grid grid-cols-[14rem_1fr_7rem_8.5rem_5.5rem] items-center gap-4 px-4'
+
+function AgentLabel({ role }: { role: string }) {
+  return (
+    <span className="rounded-sm bg-black/10 px-1 py-px text-[10px] leading-none text-neutral-900">
+      {role}
+    </span>
+  )
+}
+
+const cursorShapes: Record<CursorShape, LucideIcon> = {
+  arrow: MousePointer2Icon,
+  pointer: PointerIcon,
+  text: TextCursorIcon,
+}
+
+function DemoCursor({
+  state,
+  shape,
+  target,
+  from,
+  progress,
+  curve,
+  drift,
+}: {
+  state: CursorState
+  shape: CursorShape
+  target: CursorTarget
+  from: CursorTarget
+  progress: number
+  curve: number
+  drift: { x: number; y: number }
+}) {
+  const { left, top } = cursorPosition({ from, target, progress, curve, drift })
+  const Shape = cursorShapes[shape]
+  return (
+    <span
+      data-demo-cursor
+      data-state={state}
+      data-shape={shape}
+      data-target={target}
+      style={{ transform: `translate(${left}px, ${top}px)` }}
+      className="absolute top-0 left-0 z-[46]"
+    >
+      <Shape
+        className={cn(
+          'relative size-6 fill-white stroke-black drop-shadow-md transition-[scale] duration-100 ease-out',
+          state === 'clicking' && 'scale-90',
+        )}
+      />
+    </span>
+  )
+}
+
+const rowAgents = [orchestrator, thorfinn, canute, askeladd, einar] as const
+
+function AgentRow({
+  shown,
+  expanded,
+  joined,
+}: {
+  shown: boolean
+  expanded: boolean
+  joined: number
+}) {
+  return (
+    <div
+      data-demo-row="agent"
+      data-state={shown ? 'shown' : 'hidden'}
+      data-agents-working="true"
+      className={cn(
+        'relative z-10 grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        shown ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+      )}
+    >
+      <div
+        className={cn(
+          'min-h-0 transition-[opacity,translate] duration-500 ease-out',
+          shown ? 'translate-y-0 opacity-100 delay-150' : '-translate-y-1 opacity-0',
+        )}
+      >
+        <div
+          data-demo-agent-row
+          className={cn(rowGrid, 'relative border-b py-3', styles.agentRow, styles.airRow)}
+        >
+          <span className="truncate">Introducing Acme MCP</span>
+          <span className="truncate text-muted-foreground italic">Agents are drafting…</span>
+          <StatusPill status="Draft" />
+          <AuthorsCell authors={['Abyan']} />
+          <span className="text-muted-foreground">Just now</span>
+          <div
+            data-demo-agents
+            data-expanded={expanded}
+            className={cn(
+              'absolute top-[calc(100%-1.5px)] left-3 z-10 flex items-center rounded-b-md px-1.5 pt-[calc(0.25rem+1.5px)] pb-1 shadow-sm',
+              styles.agentTab,
+            )}
+          >
+            <span className="flex -space-x-1.5">
+              {rowAgents.slice(0, joined).map((agent) => (
+                <span
+                  key={agent.name}
+                  data-demo-agent-avatar
+                  className={cn(
+                    'rounded-full text-neutral-900',
+                    styles.agentAvatar,
+                    agent !== orchestrator && styles.avatarJoin,
+                  )}
+                >
+                  {agent === orchestrator ? (
+                    <span className="flex size-[18px] items-center justify-center rounded-full bg-black">
+                      <span className="air-mascot block size-3 text-white" />
+                    </span>
+                  ) : (
+                    <AgentAvatar agent={agent} size={18} />
+                  )}
+                </span>
+              ))}
+            </span>
+            <span
+              className={cn(
+                'grid transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                expanded ? 'grid-cols-[1fr]' : 'grid-cols-[0fr]',
+              )}
+            >
+              <span className="overflow-hidden whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5 pr-1 pl-2 text-xs text-neutral-900">
+                  <span className="inline-flex items-center gap-1">
+                    {orchestrator.name}
+                    <span className="inline-flex items-center">
+                      <AgentLabel role={orchestrator.role} />,
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    {thorfinn.name}
+                    <span className="inline-flex items-center">
+                      <AgentLabel role={thorfinn.role} />
+                    </span>
+                  </span>
+                  <span>and {rowAgents.length - 2} others are working</span>
+                </span>
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PostsView({
+  shown,
+  agentRow,
+  agentsJoined,
+  hovered,
+}: {
+  shown: boolean
+  agentRow: boolean
+  agentsJoined: number
+  hovered: boolean
+}) {
+  return (
+    <div
+      data-demo-table
+      data-state={shown ? 'shown' : 'hidden'}
+      className={cn(
+        'absolute inset-0 p-6 transition-[opacity,scale] duration-400 ease-out',
+        shown ? 'scale-100 opacity-100' : 'pointer-events-none scale-[0.99] opacity-0',
+      )}
+    >
+      <div className="flex items-center justify-between pb-4">
+        <div className="flex items-center gap-2.5">
+          <h3 className="text-2xl">Blog posts</h3>
+          <Badge data-demo-count variant="secondary">
+            {posts.length + (agentRow ? 1 : 0)}
+          </Badge>
+        </div>
+        <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary pr-2.5 pl-2 text-primary-foreground">
+          <PlusIcon className="size-4" />
+          New post
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-lg border">
+        <div className={cn(rowGrid, 'border-b py-2.5 text-xs text-muted-foreground uppercase')}>
+          <span>Title</span>
+          <span>Body</span>
+          <span>Status</span>
+          <span>Authors</span>
+          <span>Updated</span>
+        </div>
+        <AgentRow shown={agentRow} expanded={hovered} joined={agentsJoined} />
+        {posts.map((post) => (
+          <div key={post.title} className={cn(rowGrid, 'border-b py-3 last:border-b-0')}>
+            <span className="truncate">{post.title}</span>
+            <span data-demo-body className="truncate text-muted-foreground">
+              {post.body}
+            </span>
+            <StatusPill status={post.status} />
+            <AuthorsCell authors={post.authors} />
+            <span className="text-muted-foreground">{post.updated}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** A scaled mock of the Aircastle app shown below the hero. */
+export function ProductDemo() {
+  const stage = useRef<HTMLDivElement>(null)
+  const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null)
+  const stageWidth = useStageWidth(stageElement)
+  const reducedMotion = usePrefersReducedMotion()
+  const { frame, playing } = usePlayback(stage, reducedMotion)
+  const phone = stageWidth < phoneStageWidth
+  const phoneWidth = Math.min(stageWidth, phoneFrame.width * phoneMaxScale)
+  const scale = phone ? phoneWidth / phoneFrame.width : stageWidth / frameWidth
+
+  return (
+    <section
+      id="product-demo"
+      aria-labelledby="product-demo-title"
+      className="mx-auto w-full max-w-[70rem] scroll-mt-20 px-4 pb-24"
+    >
+      <h2 id="product-demo-title" className="sr-only">
+        Aircastle preview
+      </h2>
+      <p className="sr-only">
+        The Aircastle dashboard with its sidebar collapsed, showing a blog posts collection. A
+        keyboard shortcut opens a dialog for asking agents to do the work.
+      </p>
+      <div
+        ref={(node) => {
+          stage.current = node
+          setStageElement(node)
+        }}
+        data-demo-stage={phone ? 'phone' : 'desktop'}
+        data-demo-playing={playing}
+        style={{ height: (phone ? phoneFrame.height : frameHeight) * scale }}
+        className="relative w-full"
+      >
+        {phone ? (
+          <div className="relative mx-auto h-full" style={{ width: phoneWidth }}>
+            <PhoneDemo frame={frame} scale={scale} />
+          </div>
+        ) : (
+          <div
+            data-demo-frame
+            aria-hidden="true"
+            inert
+            style={{ width: frameWidth, height: frameHeight, scale: String(scale) }}
+            className={cn(
+              'absolute top-0 left-0 flex origin-top-left flex-col overflow-hidden rounded-[18px] bg-card text-sm text-card-foreground shadow-xl select-none',
+              styles.agentPulse,
+            )}
+          >
+            <WindowDots />
+            <DemoHeader
+              decisionsWaiting={
+                frame.view === 'editor' && docsDecisionState(frame.researchSteps) === 'asking'
+                  ? 1
+                  : 0
+              }
+              askElapsed={frame.previewElapsed}
+            />
+            <div className="flex h-[calc(100%-5.5rem)]">
+              <DemoSidebar />
+              <div className="relative min-w-0 flex-1">
+                <PostsView
+                  shown={frame.view === 'table'}
+                  agentRow={frame.agentRow}
+                  agentsJoined={frame.rowAgents}
+                  hovered={frame.agentRowHovered}
+                />
+                <EditorView
+                  shown={frame.view === 'editor'}
+                  categories={frame.categories}
+                  tags={frame.tags}
+                  writerOnCategories={frame.writerOnCategories}
+                  writerOnTags={frame.writerOnTags}
+                  writerOnBody={frame.writerOnBody}
+                  researchSteps={frame.researchSteps}
+                  researchHovered={frame.researchHovered}
+                  researchPanelOpen={frame.researchPanelOpen}
+                  cover={frame.cover}
+                  scrollProgress={frame.editorScroll}
+                  bodyElapsed={frame.bodyElapsed}
+                  seoElapsed={frame.seoElapsed}
+                  socialImage={frame.socialImage}
+                  previewElapsed={frame.previewElapsed}
+                />
+              </div>
+            </div>
+            <div
+              data-demo-dialog-backdrop
+              className={cn(
+                'absolute inset-x-0 top-8 bottom-0 z-[45] bg-background/30 backdrop-blur-[3px] transition-opacity duration-300',
+                frame.dialog === 'open' ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            <AgentDialog state={frame.dialog} typed={frame.typed} sendPressed={frame.sendPressed} />
+            <ShortcutChip shortcut={frame.shortcut} />
+            {frame.confetti && <Confetti {...frame.confetti} />}
+            <DemoCursor
+              state={frame.cursor}
+              shape={frame.cursorShape}
+              target={frame.cursorTarget}
+              from={frame.cursorFrom}
+              progress={frame.cursorProgress}
+              curve={frame.cursorBend}
+              drift={{ x: frame.cursorDriftX, y: frame.cursorDriftY }}
+            />
+            {frame.outroElapsed !== null && (
+              <Outro elapsed={frame.outroElapsed} opacity={frame.outroOpacity} />
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}

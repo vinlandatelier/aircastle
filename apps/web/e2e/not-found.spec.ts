@@ -45,14 +45,18 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Back to home', exact: true }).focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
+    ).toBeVisible()
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0)
     await page.goBack()
     await expect(page).toHaveTitle('Aircastle - Page not found')
     await page.getByRole('link', { name: 'Sign in', exact: true }).click()
     await expect(page).toHaveTitle('Aircastle - Sign in')
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('link', { name: 'Aircastle home', exact: true }).click()
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('heading', { name: 'Aircastle', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('navigation', { name: 'Marketing navigation', exact: true }),
+    ).toBeVisible()
   })
 }

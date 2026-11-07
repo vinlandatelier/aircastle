@@ -17,9 +17,10 @@ Follow [VERIFICATION.md](VERIFICATION.md) before implementing behavior. It defin
 
 ## UI conventions
 
+- Marketing pages use a larger type scale than the dashboard. `[data-theme-scope='marketing']` in `src/index.css` sets an 18px base at the normal weight; marketing text inherits both rather than using `text-sm`. Do not bold or add heavier weights to marketing text unless asked.
 - Use semantic colour tokens in shared UI components. `src/index.css` owns the light/dark `marketing` and `dashboard` palettes; declare `data-theme-scope` on page layouts, with marketing as the public-page default. Keep palette choices out of individual buttons, inputs, and overlays.
 - Add directories when working code needs them. Do not keep empty scaffolding or placeholder folders.
-- Use icon libraries instead of handwritten or copied SVG paths. Prefer `lucide-react` for UI icons and `@primer/octicons-react` for GitHub icons. Keep custom product branding in `public/brand`.
+- Use icon libraries instead of handwritten or copied SVG paths. Prefer `lucide-react` for UI icons, `@primer/octicons-react` for GitHub icons, and `@icons-pack/react-simple-icons` for other third-party brand logos. Keep custom product branding in `public/brand`.
 - Every enabled clickable control must show a pointer cursor on hover. Use native interactive elements or the correct accessible role so the shared rule in `src/index.css` applies.
 - Preserve text-entry cursors on editable inputs and disabled cursors on disabled controls. Maintain the shared rule instead of adding cursor styles to individual components.
 - The header shows `public/brand/logo-light.png` and `public/brand/logo-dark.png`, and the favicons embed 64px copies of the same files. After changing either logo during development, run `vp run --filter @aircastle/web generate:icons` to refresh the favicons. The development and build commands also generate them. App-wide favicon theme handling belongs in `App.tsx` so public pages follow the same preference.

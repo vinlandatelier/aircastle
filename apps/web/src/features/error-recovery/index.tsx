@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { RecoveryPage } from './recovery-page'
-import { themeStorageKey } from '@/theme'
+import { themeFavicons, themeStorageKey } from '@/theme'
 
 function applyRecoveryTheme() {
   const root = document.documentElement
@@ -17,15 +17,11 @@ function applyRecoveryTheme() {
       if (!(error instanceof DOMException)) throw error
       stored = null
     }
-    if (stored === 'light' || stored === 'dark') {
-      theme = stored
-    } else {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    }
+    theme = stored === 'light' ? 'light' : 'dark'
     root.classList.add(theme)
   }
   root.style.colorScheme = theme
-  document.querySelector('link[rel="icon"]')?.setAttribute('href', `/brand/favicon-${theme}.svg`)
+  document.querySelector('link[rel="icon"]')?.setAttribute('href', themeFavicons[theme])
 }
 
 export class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

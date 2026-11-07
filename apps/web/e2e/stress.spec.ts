@@ -32,16 +32,10 @@ async function assertBounded(page: Page, element: Locator) {
 }
 
 async function chooseTheme(page: Page, theme: 'Light' | 'Dark') {
-  await page.getByRole('button', { name: 'Choose theme', exact: true }).click()
-  const menu = page.getByRole('menu', { name: 'Theme', exact: true })
-  await assertBounded(page, menu)
-  for (const endpoint of ['Light', 'System']) {
-    const option = menu.getByRole('menuitemradio', { name: endpoint, exact: true })
-    await option.scrollIntoViewIfNeeded()
-    await assertBounded(page, option)
-  }
-  await menu.getByRole('menuitemradio', { name: theme, exact: true }).click()
-  await expect(menu).toBeHidden()
+  const toggle = page.getByRole('button', { name: 'Dark theme', exact: true })
+  await assertBounded(page, toggle)
+  if (((await toggle.getAttribute('aria-pressed')) === 'true') !== (theme === 'Dark'))
+    await toggle.click()
   await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme.toLowerCase()}\\b`))
 }
 
