@@ -46,8 +46,12 @@ export function createApp({
     .use(except(credentialBearingPath, ordinaryLogger))
     .onError((error, c) => {
       c.error = ErrorSummary.of(error);
-      if (credentialBearingPath(c)) logger.error({ err: c.error }, "Unexpected auth error");
-      return c.json({ error: "Internal server error" }, 500);
+      if (!credentialBearingPath(c)) return c.json({ error: "Internal server error" }, 500);
+      logger.error({ err: c.error }, "Unexpected auth error");
+      return c.json({ kind: "temporary-failure" }, 500, {
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+      });
     })
     .basePath("/api")
     .route("/", health);

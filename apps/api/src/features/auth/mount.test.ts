@@ -29,7 +29,7 @@ for (const path of ["/api/auth/state", "/api/development-inbox/messages"]) {
   });
 }
 
-test("an unexpected auth mount failure returns a generic 500 and logs one sanitized summary", async () => {
+test("an unexpected auth mount failure returns the contracted 500 envelope and logs one sanitized summary", async () => {
   const secret = "credential-canary";
   class LibraryFault extends Error {}
   const lines: string[] = [];
@@ -44,7 +44,9 @@ test("an unexpected auth mount failure returns a generic 500 and logs one saniti
   });
   const response = await app.request(`/api/auth/${secret}`, {}, { peerAddress: "127.0.0.1" });
   expect(response.status).toBe(500);
-  expect(await response.json()).toEqual({ error: "Internal server error" });
+  expect(await response.json()).toEqual({ kind: "temporary-failure" });
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(response.headers.get("referrer-policy")).toBe("no-referrer");
   expect(lines).toHaveLength(1);
   expect(JSON.parse(lines[0]!)).toMatchObject({
     level: 50,

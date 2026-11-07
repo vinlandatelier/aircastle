@@ -1,4 +1,5 @@
 import pino from "pino";
+import { AuthStorageError } from "@aircastle/core";
 import type { AuthEvent } from "@aircastle/core";
 import { expect, test } from "vite-plus/test";
 import { createAuthEventLogger } from "./index.ts";
@@ -14,7 +15,11 @@ function applicationSink() {
       },
     },
   );
-  const records = () => lines.map((line) => JSON.parse(line) as { auth?: AuthEvent });
+  const records = () =>
+    lines.map(
+      (line) =>
+        JSON.parse(line) as { auth?: AuthEvent; level: number; msg?: string; err?: unknown },
+    );
   return {
     logger,
     lines,
@@ -195,5 +200,82 @@ test("a positive application diagnostic sink excludes actual link, session, sign
       }
     },
     { logger: sink.logger },
+  );
+});
+
+test("a malformed inbox message id is not found and reports no storage outage", async () => {
+  const sink = applicationSink();
+  await withAuth(
+    async ({ open, events }) => {
+      const server = await open();
+      const response = await server.request("/development-inbox/messages/%E0%A4%A/open", {});
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ kind: "not-found" });
+      expect(events).toEqual([]);
+      expect(sink.records().filter((record) => record.level >= 50)).toEqual([]);
+    },
+    { logger: sink.logger },
+  );
+});
+
+test("a programming error in an auth request is logged as a summary and not as a storage outage", async () => {
+  const sink = applicationSink();
+  await withAuth(
+    async ({ open, events }) => {
+      const server = await open();
+      for (const [path, body] of [
+        ["/auth/state", undefined],
+        ["/auth/setup", { name: "Alex", email: "alex@example.test" }],
+      ] as const) {
+        const response = await server.request(path, body);
+        expect(response.status, path).toBe(500);
+        expect(await response.json(), path).toEqual({ kind: "temporary-failure" });
+        expect(response.headers.get("cache-control"), path).toContain("no-store");
+      }
+      expect(events.filter((event) => event.kind === "storage-unavailable")).toEqual([]);
+      const errors = sink.records().filter((record) => record.msg === "Unexpected auth error");
+      expect(errors).toHaveLength(2);
+      for (const error of errors)
+        expect(error.err).toMatchObject({ type: "ErrorSummary", message: "TypeError" });
+      for (const field of loggedStrings(sink.records())) expect(field).not.toContain("bug-canary");
+      expect(server.inbox.list()).toEqual([]);
+    },
+    {
+      logger: sink.logger,
+      storage: (store) => ({
+        ...store,
+        transaction: async () => {
+          throw new TypeError("bug-canary");
+        },
+      }),
+    },
+  );
+});
+
+test("a storage outage event carries the driver code and never the driver message", async () => {
+  const sink = applicationSink();
+  await withAuth(
+    async ({ open, events }) => {
+      const server = await open();
+      const response = await server.request("/auth/state");
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ kind: "temporary-failure" });
+      expect(events).toEqual([{ kind: "storage-unavailable", code: "57P01" }]);
+      expect(sink.auth()).toEqual([{ kind: "storage-unavailable", code: "57P01" }]);
+      for (const field of loggedStrings(sink.records()))
+        expect(field).not.toContain("outage-canary");
+    },
+    {
+      logger: sink.logger,
+      storage: (store) => ({
+        ...store,
+        transaction: async () => {
+          throw new AuthStorageError("unavailable", {
+            cause: new Error("outage-canary"),
+            code: "57P01",
+          });
+        },
+      }),
+    },
   );
 });

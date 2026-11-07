@@ -87,18 +87,13 @@ const deliberateCatchAllowances: Readonly<Record<string, { count: number; reason
     reason: "Shutdown reports any close failure as exit code 1.",
   },
   "apps/api/src/features/auth/credentials.ts": {
-    count: 3,
+    count: 2,
     reason:
-      "Any inbox preparation failure is a delivery failure that keeps the previous link, and an unresolved issuance lookup reports storage-unavailable or schedules another reconciliation.",
+      "Any inbox preparation failure is a delivery failure that keeps the previous link, and an issuance lookup that fails right after an unknown commit schedules another reconciliation.",
   },
   "apps/api/src/features/auth/request.ts": {
     count: 1,
     reason: "An unreadable or malformed auth request body is treated as missing input.",
-  },
-  "apps/api/src/features/auth/runtime.ts": {
-    count: 1,
-    reason:
-      "Any failure while answering an auth or inbox request reports temporary-failure (503) and emits storage-unavailable without exposing details.",
   },
   "apps/api/src/features/content/request.ts": {
     count: 2,

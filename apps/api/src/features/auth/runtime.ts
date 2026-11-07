@@ -1,6 +1,7 @@
+import { AuthStorageError } from "@aircastle/core";
 import type { AuthEvent } from "@aircastle/core";
 import { createDevelopmentInbox } from "../development-inbox/index.ts";
-import { createCredentials } from "./credentials.ts";
+import { createCredentials, storageUnavailable } from "./credentials.ts";
 import { createSessions, sessionCookie, sessionProjection } from "./sessions.ts";
 import { authResponse, jsonBody, ok, parseAccount, parseLink } from "./request.ts";
 import type { LocalAuthOptions, LocalAuthRuntime } from "./index.ts";
@@ -63,7 +64,14 @@ export async function developmentAuth(
   ): Promise<Response> {
     if (path === "/api/development-inbox/messages") return authResponse(ok(inbox.list()));
     if (openMessage !== undefined) {
-      const entry = inbox.open(decodeURIComponent(openMessage));
+      let messageId: string;
+      try {
+        messageId = decodeURIComponent(openMessage);
+      } catch (error) {
+        if (!(error instanceof URIError)) throw error;
+        return authResponse({ kind: "not-found" }, 404);
+      }
+      const entry = inbox.open(messageId);
       return entry ? authResponse(ok(entry)) : authResponse({ kind: "not-found" }, 404);
     }
     const token = await cookie.read(request);
@@ -157,8 +165,9 @@ export async function developmentAuth(
         return authResponse({ kind: "forbidden" }, 403);
       try {
         return await respond(request, path, peer, openMessage);
-      } catch {
-        emit({ kind: "storage-unavailable" });
+      } catch (error) {
+        if (!(error instanceof AuthStorageError)) throw error;
+        emit(storageUnavailable(error));
         return authResponse({ kind: "temporary-failure" }, 503);
       }
     },
