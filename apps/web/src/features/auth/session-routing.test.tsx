@@ -14,7 +14,6 @@ import {
 function authenticatedHttp(destination: object = { kind: 'workspaces' }) {
   return displayHttp({
     'GET /api/auth/state': () => ok({ kind: 'authenticated', session }),
-    'GET /api/auth/session': () => ok(session),
     'POST /api/auth/activity': () => ok(session),
     'POST /api/auth/entry': () => ok({ destination, session }),
   })
@@ -75,7 +74,6 @@ describe('Session routing over display-only HTTP doubles', () => {
     const pending = deferredResponse()
     const delayed = displayHttp({
       'GET /api/auth/state': () => pending.promise,
-      'GET /api/auth/session': () => ok(session),
       'POST /api/auth/activity': () => ok(session),
       'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' }, session }),
     })
@@ -157,7 +155,6 @@ describe('Session routing over display-only HTTP doubles', () => {
     let entries = 0
     const http = displayHttp({
       'GET /api/auth/state': () => ok({ kind: 'authenticated', session }),
-      'GET /api/auth/session': () => ok(session),
       'POST /api/auth/activity': () => ok(session),
       'POST /api/auth/entry': () => {
         entries += 1
@@ -195,7 +192,6 @@ describe('Session routing over display-only HTTP doubles', () => {
     const transport = displayHttp({
       'GET /api/auth/state': () =>
         ok(signedIn ? { kind: 'authenticated', session } : { kind: 'signed-out' }),
-      'GET /api/auth/session': () => (signedIn ? ok(session) : failure('unauthenticated', 401)),
       'POST /api/auth/activity': () => (signedIn ? ok(session) : failure('unauthenticated', 401)),
       'POST /api/auth/entry': () => ok({ destination: { kind: 'workspaces' }, session }),
       'POST /api/auth/sign-out': () => signingOut.promise,
@@ -218,7 +214,6 @@ describe('Session routing over display-only HTTP doubles', () => {
     const http = displayHttp({
       'GET /api/auth/state': () =>
         ok(active ? { kind: 'authenticated', session } : { kind: 'signed-out' }),
-      'GET /api/auth/session': () => (active ? ok(session) : failure('unauthenticated', 401)),
       'POST /api/auth/activity': () => (active ? ok(session) : failure('unauthenticated', 401)),
       'POST /api/auth/entry': () =>
         active
@@ -247,7 +242,6 @@ describe('Auth calls per navigation', () => {
   function counted(access: 'member' | 'outsider' = 'member') {
     return displayHttp({
       'GET /api/auth/state': () => ok({ kind: 'authenticated', session }),
-      'GET /api/auth/session': () => ok(session),
       'POST /api/auth/activity': () => ok(renewed),
       'POST /api/auth/entry': async (request) => {
         const body = await request.json()

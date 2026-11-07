@@ -180,7 +180,6 @@ describe('Development inbox display, without delivery or authentication proof', 
     let reads = 0
     const http = displayHttp({
       'GET /api/auth/state': () => ok({ kind: 'authenticated', session }),
-      'GET /api/auth/session': () => ok(session),
       'POST /api/auth/activity': () => ok(session),
       'GET /api/development-inbox/messages': () => {
         reads += 1
