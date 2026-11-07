@@ -65,7 +65,9 @@ const docsScrollBursts = docsScrollSteps.map((step, index) => ({
   step,
 }))
 const docsReadEnds = (docsScrollBursts.at(-1)?.at ?? docsReadReached) + docsScrollBurstDuration
-const docsPublishMoveStarts = docsReadEnds + 300
+const docsScrollUpStarts = docsReadEnds + 350
+const docsScrollUpDuration = 650
+const docsPublishMoveStarts = docsScrollUpStarts + docsScrollUpDuration + 150
 const docsPublishReached = docsPublishMoveStarts + 800
 const docsPublishClicked = docsPublishReached + 250
 const outroStarts = docsPublishClicked + 1500
@@ -171,12 +173,13 @@ export function docsPublishedAt(elapsed: number) {
   return elapsed >= docsPublishClicked
 }
 
-/** How far down the docs page has scrolled, from 0 at the top to 1 at the bottom. */
+/** How far down the docs page has scrolled, from 0 at the top to 1 at the bottom. It reads down to the bottom, then flicks back up. */
 export function docsScrollAt(elapsed: number) {
-  return docsScrollBursts.reduce(
+  const down = docsScrollBursts.reduce(
     (total, { at, step }) => total + step * eased(elapsed - at, docsScrollBurstDuration),
     0,
   )
+  return down - eased(elapsed - docsScrollUpStarts, docsScrollUpDuration)
 }
 
 function eased(elapsed: number, duration: number) {

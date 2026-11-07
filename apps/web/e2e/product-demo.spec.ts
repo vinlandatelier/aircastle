@@ -1696,7 +1696,7 @@ test('once Air reports back, the cursor clicks Publish, confetti bursts from it 
   await expect(publish).toHaveText('Unpublish')
 })
 
-test('a notification says the docs page is ready, its Preview opens the docs entry in preview, and the cursor reads it to the bottom and publishes it', async ({
+test('a notification says the docs page is ready, its Preview opens the docs entry in preview, and the cursor reads it to the bottom, scrolls back up and publishes it', async ({
   page,
 }) => {
   test.setTimeout(150_000)
@@ -1802,6 +1802,7 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
   const end = docs.locator('[data-demo-docs-end]')
   expect((await box(end)).y).toBeGreaterThan(sitePage.y + sitePage.height)
   let previousTitle = (await box(docs.locator('h1'))).y
+  const topTitle = previousTitle
   let scrolledWithCursorOnDocs = false
   let reachedEndAfter: number | null = null
   for (let tick = 0; tick < 120 && reachedEndAfter === null; tick += 1) {
@@ -1828,6 +1829,18 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
   expect(scrolledWithCursorOnDocs).toBe(true)
   expect(reachedEndAfter).not.toBeNull()
   expect(reachedEndAfter ?? Infinity).toBeLessThan(3500)
+
+  let backAtTopWhileReading = false
+  for (let tick = 0; tick < 60; tick += 1) {
+    const now = await frame.evaluate(() => ({
+      title: document.querySelector('[data-demo-docs-page] h1')?.getBoundingClientRect().y ?? 0,
+      target: document.querySelector('[data-demo-cursor]')?.getAttribute('data-target'),
+    }))
+    if (now.target !== 'docs-read') break
+    if (Math.abs(now.title - topTitle) < 1) backAtTopWhileReading = true
+    await page.clock.runFor(story(50))
+  }
+  expect(backAtTopWhileReading).toBe(true)
 
   const publish = frame.locator('[data-demo-publish]')
   const confetti = frame.locator('[data-demo-confetti]')
