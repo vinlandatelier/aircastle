@@ -24,13 +24,14 @@ async function withStore(
   });
 }
 
-test("auth initialization adds its own ledger while preserving content version 1", async () => {
+test("auth initialization adds its own ledger and leaves the content migrations as they are", async () => {
   await withStore(async ({ auth, sql, namespace, store }) => {
     const tables = await sql<{ table_name: string }[]>`
       SELECT table_name FROM information_schema.tables WHERE table_schema = ${namespace}`;
     expect(tables.map((table) => table.table_name)).toContain("auth_migrations");
     expect(await sql`SELECT version FROM ${sql(namespace)}.migrations ORDER BY version`).toEqual([
       { version: 1 },
+      { version: 2 },
     ]);
     await store.initialize();
     expect(await auth.signingSecret()).toMatch(/^.{32,}$/u);
@@ -46,7 +47,10 @@ test("auth can initialize first and content can initialize afterwards", async ()
       >`SELECT to_regnamespace(${namespace}) IS NOT NULL AS exists`;
       expect(rows[0]?.exists).toBe(true);
       await store.initialize();
-      expect(await sql`SELECT version FROM ${sql(namespace)}.migrations`).toEqual([{ version: 1 }]);
+      expect(await sql`SELECT version FROM ${sql(namespace)}.migrations ORDER BY version`).toEqual([
+        { version: 1 },
+        { version: 2 },
+      ]);
       expect(await auth.signingSecret()).toMatch(/^.{32,}$/u);
     } finally {
       await auth.close();
