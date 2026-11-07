@@ -1,7 +1,7 @@
 import { HeadContent, Outlet } from '@tanstack/react-router'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { useEffect } from 'react'
-import { themeStorageKey } from '@/theme'
+import { themeFavicons, themeStorageKey } from '@/theme'
 
 function ThemeFavicon() {
   const { resolvedTheme } = useTheme()
@@ -10,7 +10,7 @@ function ThemeFavicon() {
     if (!resolvedTheme) return
     document
       .querySelector('link[rel="icon"]')
-      ?.setAttribute('href', `/brand/favicon-${resolvedTheme === 'dark' ? 'dark' : 'light'}.svg`)
+      ?.setAttribute('href', themeFavicons[resolvedTheme === 'dark' ? 'dark' : 'light'])
   }, [resolvedTheme])
 
   return null

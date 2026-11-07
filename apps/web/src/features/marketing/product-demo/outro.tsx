@@ -28,7 +28,13 @@ function overshoot(t: number) {
   return 1 + (pull + 1) * (t - 1) ** 3 + pull * (t - 1) ** 2
 }
 
-const galeBlades = [1, 2, 3, 4, 5].map((blade) => `url(/brand/gale-blade-${blade}.svg)`)
+const galeBlades = [
+  'url(/brand/gale/blade-1.svg)',
+  'url(/brand/gale/blade-2.svg)',
+  'url(/brand/gale/blade-3.svg)',
+  'url(/brand/gale/blade-4.svg)',
+  'url(/brand/gale/blade-5.svg)',
+]
 
 function GaleBloom({ elapsed, markSize }: { elapsed: number; markSize: number }) {
   const settle = easeOut(progress(elapsed - bloomStartsAfter, settleDuration))
