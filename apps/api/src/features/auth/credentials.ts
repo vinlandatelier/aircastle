@@ -20,6 +20,12 @@ type LinkFailure =
   | { kind: "invalid-link" | "superseded-link"; next: "setup" | "sign-in" }
   | { kind: "setup-complete" };
 
+/** The diagnostic event for a storage failure, carrying only its driver code. */
+export const storageUnavailable = (error: AuthStorageError): AuthEvent => ({
+  kind: "storage-unavailable",
+  ...(error.code === undefined ? {} : { code: error.code }),
+});
+
 const escapeHtml = (text: string) =>
   text.replace(
     /[&<>"']/g,
@@ -77,8 +83,12 @@ export function createCredentials(options: {
         for (const messageId of pending.keys()) {
           try {
             await resolve(messageId);
-          } catch {
-            options.emit({ kind: "storage-unavailable" });
+          } catch (error) {
+            options.emit(
+              error instanceof AuthStorageError
+                ? storageUnavailable(error)
+                : { kind: "storage-unavailable" },
+            );
           }
         }
       })().finally(() => {
@@ -166,13 +176,12 @@ export function createCredentials(options: {
         else publication?.abort();
         return outcome;
       } catch (error) {
-        options.emit({ kind: "storage-unavailable" });
-        if (
-          publication &&
-          messageId &&
-          error instanceof AuthStorageError &&
-          error.kind === "commit-unknown"
-        ) {
+        if (!(error instanceof AuthStorageError)) {
+          publication?.abort();
+          throw error;
+        }
+        options.emit(storageUnavailable(error));
+        if (publication && messageId && error.kind === "commit-unknown") {
           pending.set(messageId, { email: input.email, publication });
           try {
             if ((await resolve(messageId)) === "committed") return { kind: "issued" as const };
