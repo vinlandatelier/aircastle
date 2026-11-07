@@ -3,6 +3,7 @@ import { createApp } from "../../app.ts";
 import { createLocalAuth } from "./index.ts";
 import { provisionDevelopment } from "@aircastle/core";
 import { browserOrigin, claim, withAuth } from "./test-support/fixture.ts";
+import { projectKeyProbes, type RouteProbe } from "../../test-support/route-probes.ts";
 import pino from "pino";
 
 for (const mode of ["absent", "disabled"] as const) {
@@ -179,19 +180,50 @@ test("project API key cannot authenticate a browser session", async () => {
   });
 });
 
-test("browser cookie alone never substitutes for a project key on content routes", async () => {
-  await withAuth(async ({ open, content }) => {
-    const project = await content.provision({
-      verifier: "fixture-digest",
-      permissions: ["content:read"],
-      key: "reuse",
-      workspaceName: "Development workspace",
-      projectName: "Development project",
-    });
+test("a real browser session never substitutes for a project key on any project-key route", async () => {
+  await withAuth(async ({ open, content, cms }) => {
+    const project = await provisionDevelopment(content);
+    if (!project.issued) throw new Error("Fresh namespace must issue a real project key");
+    const access = { project: project.project, apiKey: project.apiKey };
+    const collections = [
+      {
+        name: "articles",
+        description: {
+          fields: { title: { type: "text", required: true, nullable: false, unique: false } },
+        },
+      },
+    ];
+    const publication = await cms.publish(access, { baseline: null, collections });
+    if (!publication.ok) throw new Error(publication.error.code);
+    const contract = publication.data.contracts.articles ?? "";
+    const created = await cms.create(access, "articles", contract, { title: "Kept" });
+    if (!created.ok) throw new Error(created.error.code);
     const server = await open();
     const { cookie } = await claim(server);
-    const response = await server.request(`/projects/${project.project}/schema`, undefined, cookie);
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ ok: false, error: { code: "unauthorized" } });
+    const send = (probe: RouteProbe, credential: Record<string, string>) =>
+      server.app.request(`${browserOrigin}${probe.path}`, {
+        method: probe.method,
+        headers: {
+          host: new URL(browserOrigin).host,
+          origin: browserOrigin,
+          "content-type": "application/json",
+          "aircastle-schema": contract,
+          ...credential,
+        },
+        ...(probe.body === undefined ? {} : { body: probe.body }),
+      });
+    const probes = projectKeyProbes({
+      project: project.project,
+      collection: "articles",
+      document: created.data.id,
+      collections,
+    });
+    for (const [route, probe] of Object.entries(probes)) {
+      const refused = await send(probe, { cookie });
+      expect(refused.status, route).toBe(401);
+      expect(await refused.json()).toEqual({ ok: false, error: { code: "unauthorized" } });
+      const control = await send(probe, { authorization: `Bearer ${project.apiKey}` });
+      expect(control.ok, `${route} with the project key`).toBe(true);
+    }
   });
 });

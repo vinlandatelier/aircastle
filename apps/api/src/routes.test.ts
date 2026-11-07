@@ -4,6 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import type { ContentService } from "@aircastle/core";
 import { createApp, routeAccess } from "./app.ts";
 import { createLocalAuth } from "./features/auth/index.ts";
+import { projectKeyProbes, type RouteProbe } from "./test-support/route-probes.ts";
 
 const project = "11111111-1111-4111-8111-111111111111";
 const contract = `v1:${"1".repeat(64)}`;
@@ -77,69 +78,23 @@ const classStatus = {
   "project-key": 401,
 } as const satisfies Record<(typeof routeAccess)[keyof typeof routeAccess], number>;
 
-const probes: Record<keyof typeof routeAccess, { method: string; path: string; body?: string }[]> =
-  {
-    "ALL /*": [{ method: "GET", path: "/api/unmounted" }],
-    "GET /api/health": [{ method: "GET", path: "/api/health" }],
-    "GET /api/openapi.json": [{ method: "GET", path: "/api/openapi.json" }],
-    "GET /api/docs": [{ method: "GET", path: "/api/docs" }],
-    "GET /api/docs/scalar.js": [{ method: "GET", path: "/api/docs/scalar.js" }],
-    "ALL /api/auth/*": [
-      { method: "GET", path: "/api/auth/unlisted" },
-      { method: "POST", path: "/api/auth/setup", body: "{}" },
-      { method: "GET", path: "/api/auth/session" },
-    ],
-    "ALL /api/development-inbox/*": [
-      { method: "GET", path: "/api/development-inbox/messages" },
-      { method: "POST", path: "/api/development-inbox/messages/id/open" },
-    ],
-    "GET /api/projects/:project/schema": [
-      { method: "GET", path: `/api/projects/${project}/schema` },
-    ],
-    "POST /api/projects/:project/schema": [
-      {
-        method: "POST",
-        path: `/api/projects/${project}/schema`,
-        body: JSON.stringify({ baseline: null, collections: {} }),
-      },
-    ],
-    "POST /api/projects/:project/collections/:collection/documents": [
-      {
-        method: "POST",
-        path: `/api/projects/${project}/collections/articles/documents`,
-        body: JSON.stringify({ title: "Draft" }),
-      },
-    ],
-    "GET /api/projects/:project/collections/:collection/documents/:id": [
-      {
-        method: "GET",
-        path: `/api/projects/${project}/collections/articles/documents/${project}`,
-      },
-    ],
-    "PATCH /api/projects/:project/collections/:collection/documents/:id": [
-      {
-        method: "PATCH",
-        path: `/api/projects/${project}/collections/articles/documents/${project}`,
-        body: JSON.stringify({ changes: { title: "Edited" } }),
-      },
-    ],
-    "DELETE /api/projects/:project/collections/:collection/documents/:id": [
-      {
-        method: "DELETE",
-        path: `/api/projects/${project}/collections/articles/documents/${project}`,
-      },
-    ],
-    "GET /api/projects/:project/collections/:collection/documents": [
-      { method: "GET", path: `/api/projects/${project}/collections/articles/documents?limit=1` },
-    ],
-    "POST /api/projects/:project/collections/:collection/documents/query": [
-      {
-        method: "POST",
-        path: `/api/projects/${project}/collections/articles/documents/query`,
-        body: JSON.stringify({ limit: 1 }),
-      },
-    ],
-  };
+const probes: Record<keyof typeof routeAccess, RouteProbe | RouteProbe[]> = {
+  "ALL /*": [{ method: "GET", path: "/api/unmounted" }],
+  "GET /api/health": [{ method: "GET", path: "/api/health" }],
+  "GET /api/openapi.json": [{ method: "GET", path: "/api/openapi.json" }],
+  "GET /api/docs": [{ method: "GET", path: "/api/docs" }],
+  "GET /api/docs/scalar.js": [{ method: "GET", path: "/api/docs/scalar.js" }],
+  "ALL /api/auth/*": [
+    { method: "GET", path: "/api/auth/unlisted" },
+    { method: "POST", path: "/api/auth/setup", body: "{}" },
+    { method: "GET", path: "/api/auth/session" },
+  ],
+  "ALL /api/development-inbox/*": [
+    { method: "GET", path: "/api/development-inbox/messages" },
+    { method: "POST", path: "/api/development-inbox/messages/id/open" },
+  ],
+  ...projectKeyProbes({ project, collection: "articles", document: project, collections: {} }),
+};
 
 describe("API route access", () => {
   test("every mounted handler is a named handler of a classified route", async () => {
@@ -207,7 +162,7 @@ describe("API route access", () => {
     async (route, requests) => {
       const { app, calls, close } = await mountedApp();
       try {
-        for (const probe of requests) {
+        for (const probe of [requests].flat()) {
           for (const cookie of [undefined, "aircastle_session_43121=signed.value"]) {
             const response = await app.request(probe.path, {
               method: probe.method,
