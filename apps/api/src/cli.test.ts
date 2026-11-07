@@ -4,13 +4,15 @@ import { describe, expect, test } from "vite-plus/test";
 
 const apiDirectory = resolve(import.meta.dirname, "..");
 const cli = resolve(apiDirectory, "node_modules/.bin/hono");
+const childTimeout = 10_000;
+const testTimeout = childTimeout + 5_000;
 
 describe("Hono CLI", () => {
-  test("discovers API routes without starting the server", () => {
+  test("discovers API routes without starting the server", { timeout: testTimeout }, () => {
     const result = spawnSync(process.execPath, [cli, "routes", "src/cli.ts"], {
       cwd: apiDirectory,
       encoding: "utf8",
-      timeout: 10_000,
+      timeout: childTimeout,
     });
 
     expect(result.status, result.stderr).toBe(0);
@@ -22,17 +24,21 @@ describe("Hono CLI", () => {
     );
   });
 
-  test("sends a request through the Bun runtime without starting the server", () => {
-    const result = spawnSync(
-      process.execPath,
-      [cli, "request", "/api/health", "src/cli.ts", "--runtime", "bun"],
-      { cwd: apiDirectory, encoding: "utf8", timeout: 10_000 },
-    );
+  test(
+    "sends a request through the Bun runtime without starting the server",
+    { timeout: testTimeout },
+    () => {
+      const result = spawnSync(
+        process.execPath,
+        [cli, "request", "/api/health", "src/cli.ts", "--runtime", "bun"],
+        { cwd: apiDirectory, encoding: "utf8", timeout: childTimeout },
+      );
 
-    expect(result.status, result.stderr).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      ok: true,
-      data: { status: 200, body: { status: "ok" }, runtime: "bun" },
-    });
-  });
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        ok: true,
+        data: { status: 200, body: { status: "ok" }, runtime: "bun" },
+      });
+    },
+  );
 });
