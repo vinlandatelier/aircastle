@@ -13,9 +13,8 @@
   "workspaces": {
     ".": {
       "vitest": {
-        "config": ["vite.content.config.ts", "vite.db.config.ts"]
+        "config": ["vite.content.config.ts", "vite.db.config.ts", "vite.image.config.ts"]
       },
-      "ignoreDependencies": ["vite"],
       "ignoreExportsUsedInFile": true
     },
     "apps/api": {
