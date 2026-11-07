@@ -1886,7 +1886,7 @@ test('a notification says the docs page is ready, its Preview opens the docs ent
   await expect(status).toHaveText('Published')
 })
 
-test('after the docs entry is published, the whole preview fades to a grainy background and Aircastle appears in the centre, then the loop starts again', async ({
+test('after the docs entry is published, the preview fades to a grainy cloud gradient, the Gale mark blooms in the centre and Aircastle slides out beside it, then the loop starts again', async ({
   page,
 }) => {
   test.setTimeout(150_000)
@@ -1925,7 +1925,10 @@ test('after the docs entry is published, the whole preview fades to a grainy bac
   expect(fadingIn).toBeGreaterThan(0)
   expect(fadingIn).toBeLessThan(1)
 
-  await page.clock.runFor(story(1000))
+  await expect(outro).toHaveCSS('backdrop-filter', /blur/)
+  await page.clock.runFor(story(850))
+  expect(await opacityOf(outro), 'the card eases in over more than a second').toBeLessThan(1)
+  await page.clock.runFor(story(600))
   await expect.poll(() => opacityOf(outro)).toBe(1)
   const frameBox = await box(frame)
   const outroBox = await box(outro)
@@ -1935,7 +1938,7 @@ test('after the docs entry is published, the whole preview fades to a grainy bac
     /feTurbulence/,
   )
   const shot = (await outro.screenshot()).toString('base64')
-  const brightness = await page.evaluate(async (data) => {
+  const sides = await page.evaluate(async (data) => {
     const image = new Image()
     image.src = `data:image/png;base64,${data}`
     await image.decode()
@@ -1945,13 +1948,25 @@ test('after the docs entry is published, the whole preview fades to a grainy bac
     const context = canvas.getContext('2d')
     if (!context) throw new Error('No canvas')
     context.drawImage(image, 0, 0)
-    const pixels = context.getImageData(0, 0, image.width, image.height).data
-    let total = 0
-    for (let index = 0; index < pixels.length; index += 4)
-      total += ((pixels[index] ?? 0) + (pixels[index + 1] ?? 0) + (pixels[index + 2] ?? 0)) / 3
-    return total / (pixels.length / 4)
+    const colour = (left: number, top: number) => {
+      const pixels = context.getImageData(
+        Math.floor(left * image.width),
+        Math.floor(top * image.height),
+        Math.floor(image.width * 0.1),
+        Math.floor(image.height * 0.2),
+      ).data
+      let red = 0
+      let blue = 0
+      for (let index = 0; index < pixels.length; index += 4) {
+        red += pixels[index] ?? 0
+        blue += pixels[index + 2] ?? 0
+      }
+      return { red: red / (pixels.length / 4), blue: blue / (pixels.length / 4) }
+    }
+    return { left: colour(0.01, 0.1), right: colour(0.89, 0.45) }
   }, shot)
-  expect(brightness, 'the card is a dark background').toBeLessThan(26)
+  expect(sides.left.red - sides.left.blue, 'warm orange at the left').toBeGreaterThan(60)
+  expect(sides.right.blue - sides.right.red, 'cool blue at the right edge').toBeGreaterThan(10)
   const covered = await page.evaluate(({ x, y, width, height }) => {
     const demo = document.querySelector('[data-demo-frame]')
     demo?.removeAttribute('inert')
@@ -1973,19 +1988,50 @@ test('after the docs entry is published, the whole preview fades to a grainy bac
   }, frameBox)
   expect(covered).toBe(true)
 
+  const mark = outro.locator('[data-demo-outro-mark]')
+  const blades = mark.locator('[data-demo-outro-blade]')
+  await expect(blades).toHaveCount(5)
+  expect(await opacityOf(blades.first()), 'the strands bloom one after another').toBeGreaterThan(
+    await opacityOf(blades.last()),
+  )
+  expect(await opacityOf(wordmark), 'the logo comes before the name').toBe(0)
+  const centreX = frameBox.x + frameBox.width / 2
+  const centreY = frameBox.y + frameBox.height / 2
+  const blooming = await box(mark)
+  expect(Math.abs(blooming.x + blooming.width / 2 - centreX)).toBeLessThan(2)
+  expect(Math.abs(blooming.y + blooming.height / 2 - centreY)).toBeLessThan(2)
+
+  let slidOut = false
+  for (let tick = 0; tick < 80; tick += 1) {
+    await page.clock.runFor(story(50))
+    const shown = await opacityOf(wordmark)
+    if (shown === 0) continue
+    if (shown < 1) {
+      const logo = await box(mark)
+      const name = await box(wordmark)
+      expect(name.x, 'the name slides out to the right of the logo').toBeGreaterThan(
+        logo.x + logo.width - 2,
+      )
+      if (shown > 0.3)
+        expect(logo.x + logo.width / 2, 'the logo makes room').toBeLessThan(centreX - 2)
+      slidOut = true
+    }
+    if (shown === 1) break
+  }
+  expect(slidOut).toBe(true)
+  await page.clock.runFor(story(600))
   await expect(wordmark).toHaveText('Aircastle')
-  const letters = wordmark.locator('[data-demo-outro-letter]')
-  await expect(letters).toHaveCount('Aircastle'.length)
-  const firstLetter = await opacityOf(letters.first())
-  const lastLetter = await opacityOf(letters.last())
-  expect(firstLetter).toBeGreaterThan(lastLetter)
-  await page.clock.runFor(story(1500))
-  for (const letter of await letters.all()) expect(await opacityOf(letter)).toBe(1)
-  const mark = await box(wordmark)
-  expect(Math.abs(mark.x + mark.width / 2 - (frameBox.x + frameBox.width / 2))).toBeLessThan(2)
-  expect(Math.abs(mark.y + mark.height / 2 - (frameBox.y + frameBox.height / 2))).toBeLessThan(2)
+  expect(await opacityOf(wordmark)).toBe(1)
+  for (const blade of await blades.all()) expect(await opacityOf(blade)).toBe(1)
+  const logo = await box(mark)
+  const name = await box(wordmark)
+  expect(name.x).toBeGreaterThan(logo.x + logo.width)
+  const lockupCentre = (logo.x + name.x + name.width) / 2
+  expect(Math.abs(lockupCentre - centreX), 'logo and name sit centred together').toBeLessThan(2)
+  expect(Math.abs(name.y + name.height / 2 - (logo.y + logo.height / 2))).toBeLessThan(3)
   const colour = await wordmark.evaluate((element) => getComputedStyle(element).color)
   expect(colour).toBe('rgb(255, 255, 255)')
+  await expect(wordmark).toHaveCSS('font-weight', '300')
 
   let fadedOut = false
   for (let tick = 0; tick < 200 && (await outro.count()) > 0; tick += 1) {
