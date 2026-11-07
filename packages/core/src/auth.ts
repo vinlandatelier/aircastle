@@ -31,8 +31,6 @@ export interface AuthUserRecord {
   id: string;
   name: string;
   email: string;
-  emailVerified: boolean;
-  image: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -44,8 +42,6 @@ export interface AuthSessionRecord {
   expiresAt: number;
   createdAt: number;
   updatedAt: number;
-  ipAddress: string | null;
-  userAgent: string | null;
 }
 
 export interface AuthLinkRecord {
