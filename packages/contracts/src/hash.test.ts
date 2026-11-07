@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
 import { describe, expect, test } from "vite-plus/test";
-import { contractId } from "./index.ts";
+import { canonicalContract, contractId } from "./index.ts";
 import { description, field, freezeDeep } from "./support/fixtures.ts";
 
 const vectors = [
@@ -32,12 +31,9 @@ const vectors = [
 ];
 
 describe("canonical data contract identifiers", () => {
-  test.each(vectors)(
-    "independent fixture bytes for $name produce the pinned digest",
-    ({ bytes, digest }) => {
-      expect(createHash("sha256").update(bytes, "utf8").digest("hex")).toBe(digest);
-    },
-  );
+  test.each(vectors)("$name has the pinned canonical bytes", ({ input, bytes }) => {
+    expect(canonicalContract(input)).toBe(bytes);
+  });
 
   test.each(vectors)("$name matches its independently pinned digest", async ({ input, digest }) => {
     expect(await contractId(input)).toBe(`v1:${digest}`);
