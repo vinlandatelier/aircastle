@@ -7,6 +7,7 @@ import {
   type CollectionDescription,
   type CompiledCollection,
   type IssuePath,
+  type JsonValue,
 } from "@aircastle/schema";
 
 type FieldIdentity = Parameters<typeof collection>[0][string];
@@ -124,7 +125,7 @@ function wireField(value: unknown, path: IssuePath): Decoded<WireText> {
 export function decodeDescription(
   value: unknown,
   path: IssuePath,
-): Decoded<CompiledCollection<Record<string, string | null>>> {
+): Decoded<CompiledCollection<Record<string, JsonValue>>> {
   if (
     !isPlainRecord(value) ||
     !knownKeys(value, new Set(["fields"])) ||
@@ -140,7 +141,12 @@ export function decodeDescription(
     fields[name] = decoded.data;
   }
   try {
-    return { ok: true, data: compileSchema({ wire: collection(fields) }).wire };
+    return {
+      ok: true,
+      data: compileSchema({ wire: collection(fields) }).wire as CompiledCollection<
+        Record<string, JsonValue>
+      >,
+    };
   } catch (error) {
     if (!(error instanceof SchemaError)) throw error;
     return { ok: false, issue: { reason: "invalid_schema", issues: error.issues } };

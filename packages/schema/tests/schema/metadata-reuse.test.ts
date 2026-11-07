@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import { collection, compileSchema, text } from "../../src/index.ts";
-import { compileCollection } from "../support/collections.ts";
+import { compileCollection, textField } from "../support/collections.ts";
 import {
   expectFailure,
   expectOwnKeys,
@@ -96,7 +96,7 @@ describe("descriptions, editors and reusable declarations", () => {
 
   test("code defaults to plaintext and does not validate language syntax", () => {
     const defaultCode = compileCollection({ body: text().editor("code") });
-    expect(defaultCode.describe().fields.body!.editor).toEqual({
+    expect(textField(defaultCode.describe(), "body").editor).toEqual({
       type: "code",
       language: "plaintext",
     });
@@ -111,7 +111,7 @@ describe("descriptions, editors and reusable declarations", () => {
       "sql",
     ] as const) {
       const collection = compileCollection({ body: text().editor("code", { language }) });
-      expect(collection.describe().fields.body!.editor).toEqual({ type: "code", language });
+      expect(textField(collection.describe(), "body").editor).toEqual({ type: "code", language });
       expectSuccess(collection.validate({ body: "this is not valid code {{{" }), {
         body: "this is not valid code {{{",
       });
@@ -193,8 +193,8 @@ describe("descriptions, editors and reusable declarations", () => {
     const collection = compileCollection({ title: field });
     choices.push("after");
     options.rows = 9;
-    expect(collection.describe().fields.title!.choices).toEqual(["draft", "published"]);
-    expect(collection.describe().fields.title!.editor).toEqual({ type: "textarea", rows: 5 });
+    expect(textField(collection.describe(), "title").choices).toEqual(["draft", "published"]);
+    expect(textField(collection.describe(), "title").editor).toEqual({ type: "textarea", rows: 5 });
     for (const title of ["before", "after"])
       expectFailure(collection.validate({ title }), [
         { code: "invalid_choice", path: ["title"], allowed: ["draft", "published"] },

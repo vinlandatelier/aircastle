@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { ReceivedType } from "../../src/index.ts";
 import { collection, compileSchema, text } from "../../src/index.ts";
-import { compileCollection, type TextBuilder } from "../support/collections.ts";
+import { compileCollection, textField, type TextBuilder } from "../support/collections.ts";
 import {
   expectFailure,
   expectOwnKeys,
@@ -152,7 +152,7 @@ describe("approved declaration and metadata decisions", () => {
     for (const entry of cases) {
       const collection = compileCollection({ title: entry.field });
       const baseline = compileCollection({ title: entry.baseline });
-      expect(collection.describe().fields.title!.editor).toEqual(entry.editor);
+      expect(textField(collection.describe(), "title").editor).toEqual(entry.editor);
       expect(collection.describe()).toEqual(baseline.describe());
       expectSuccess(collection.validate({ title: "a" }), { title: "a" });
       expectFailure(collection.validate({ title: 42 }), [
@@ -167,7 +167,7 @@ describe("approved declaration and metadata decisions", () => {
     });
     const initial = collection.describe();
     const expected = JSON.parse(JSON.stringify(initial));
-    const field = initial.fields.title!;
+    const field = textField(initial, "title");
     Reflect.set(field, "default", "changed");
     Reflect.set(field, "nullable", true);
     Reflect.set(field.choices!, "0", "changed");
