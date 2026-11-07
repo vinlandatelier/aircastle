@@ -9,6 +9,9 @@
       "development": "./src/index.ts",
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
+    },
+    "./testing": {
+      "development": "./src/test-support/store-contract.ts"
     }
   },
   "scripts": {
@@ -21,8 +24,8 @@
     "@aircastle/schema": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "1.3.4",
-    "typescript": "7.0.2",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
     "vite-plus": "catalog:"
   }
 }

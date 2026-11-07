@@ -8,6 +8,7 @@ import {
   controlledStore,
   documentId,
   successful,
+  failOnReport,
 } from "./test-support/fixtures.ts";
 
 const collection = (description: CollectionDescription): PublishedCollection[] => [
@@ -19,7 +20,7 @@ test("initial publication activates a complete project and returns generated con
     state: { revision: null, collections: [] },
   });
   const publication = successful(
-    await createService(store).publish(access, { baseline: null, collections }),
+    await createService(store, failOnReport).publish(access, { baseline: null, collections }),
   );
   expect(publication.revision).toEqual(expect.any(String));
   expect(publication.revision.length).toBeGreaterThan(0);
@@ -31,7 +32,10 @@ test("initial publication activates a complete project and returns generated con
 test("identical publication is a no-op even with an outdated baseline", async () => {
   const { store } = controlledStore();
   const result = successful(
-    await createService(store).publish(access, { baseline: "old-revision", collections }),
+    await createService(store, failOnReport).publish(access, {
+      baseline: "old-revision",
+      collections,
+    }),
   );
   expect(result.revision).toBe("revision-start");
 });
@@ -45,7 +49,10 @@ test("a changed schema with a stale baseline conflicts without activation", asyn
     },
   });
   expect(
-    await createService(store).publish(access, { baseline: "old-revision", collections: changed }),
+    await createService(store, failOnReport).publish(access, {
+      baseline: "old-revision",
+      collections: changed,
+    }),
   ).toEqual({ ok: false, error: { code: "schema_conflict" } });
   expect(snapshot()).toEqual({ revision: "revision-start", collections });
 });
@@ -53,7 +60,7 @@ test("a changed schema with a stale baseline conflicts without activation", asyn
 test("one invalid collection rejects the whole project publication", async () => {
   const { store, snapshot } = controlledStore();
   expect(
-    await createService(store).publish(access, {
+    await createService(store, failOnReport).publish(access, {
       baseline: "revision-start",
       collections: [
         ...collections,
@@ -74,30 +81,32 @@ test("one invalid collection rejects the whole project publication", async () =>
 for (const title of ["a", "four"]) {
   test(`tightening title rejects existing value ${JSON.stringify(title)} without changing content`, async () => {
     const saved = { id: documentId, title, slug: "saved", status: "draft" };
-    const { store, snapshot, snapshotDocuments } = controlledStore({ documents: [saved] });
+    const { store, snapshot, snapshotDocuments } = controlledStore({
+      documents: { articles: [saved] },
+    });
     const changed = collection({
       fields: { ...articles.fields, title: { ...articles.fields.title!, min: 5 } },
     });
     expect(
-      await createService(store).publish(access, {
+      await createService(store, failOnReport).publish(access, {
         baseline: "revision-start",
         collections: changed,
       }),
     ).toEqual({ ok: false, error: { code: "migration_required" } });
     expect(snapshot()).toEqual({ revision: "revision-start", collections });
-    expect(snapshotDocuments()).toEqual([saved]);
+    expect(snapshotDocuments("articles")).toEqual([saved]);
   });
 }
 
 test("tightening accepts existing values already within the proposed rules", async () => {
   const { store, snapshot } = controlledStore({
-    documents: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }],
+    documents: { articles: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }] },
   });
   const changed = collection({
     fields: { ...articles.fields, title: { ...articles.fields.title!, min: 5 } },
   });
   const result = successful(
-    await createService(store).publish(access, {
+    await createService(store, failOnReport).publish(access, {
       baseline: "revision-start",
       collections: changed,
     }),
@@ -108,7 +117,7 @@ test("tightening accepts existing values already within the proposed rules", asy
 
 test("a new default that would fill existing content requires migration", async () => {
   const { store } = controlledStore({
-    documents: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }],
+    documents: { articles: [{ id: documentId, title: "Hello", slug: "hello", status: "draft" }] },
   });
   const changed = collection({
     fields: {
@@ -117,7 +126,7 @@ test("a new default that would fill existing content requires migration", async 
     },
   });
   expect(
-    await createService(store).publish(access, {
+    await createService(store, failOnReport).publish(access, {
       baseline: "revision-start",
       collections: changed,
     }),
@@ -130,7 +139,7 @@ for (const kind of ["field", "collection"]) {
     const changed =
       kind === "collection" ? [] : collection({ fields: { title: articles.fields.title! } });
     expect(
-      await createService(store).publish(access, {
+      await createService(store, failOnReport).publish(access, {
         baseline: "revision-start",
         collections: changed,
       }),
@@ -140,7 +149,7 @@ for (const kind of ["field", "collection"]) {
 
 test("editor-only changes create a revision without changing the data contract", async () => {
   const { store } = controlledStore();
-  const cms = createService(store);
+  const cms = createService(store, failOnReport);
   const first = successful(await cms.publish(access, { baseline: "revision-start", collections }));
   const changed = collection({
     fields: {

@@ -1,9 +1,4 @@
-import type {
-  IssuePath,
-  SchemaError as SchemaErrorContract,
-  SchemaIssue,
-  ValidationIssue,
-} from "./contract.ts";
+import type { IssuePath, NonemptyIssues, SchemaIssue, ValidationIssue } from "./contract.ts";
 
 type Details<Issue> = Issue extends { path: IssuePath; message: string }
   ? Omit<Issue, "path" | "message">
@@ -38,11 +33,11 @@ export function schemaIssue(path: IssuePath, details: Details<SchemaIssue>): Sch
   };
 }
 
-export class SchemaError extends Error implements SchemaErrorContract {
+export class SchemaError extends Error {
   override readonly name = "SchemaError";
-  readonly issues: SchemaErrorContract["issues"];
+  readonly issues: NonemptyIssues<SchemaIssue>;
 
-  constructor(issues: SchemaErrorContract["issues"]) {
+  constructor(issues: NonemptyIssues<SchemaIssue>) {
     super("The schema contains invalid declarations.");
     this.issues = issues;
   }

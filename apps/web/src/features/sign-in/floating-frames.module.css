@@ -1,0 +1,40 @@
+.art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--foreground);
+  mask-image: linear-gradient(transparent 8%, black 32%, black 76%, transparent);
+}
+
+.field {
+  position: absolute;
+  top: 58%;
+  left: 50%;
+  width: min(82%, 35rem);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+}
+
+.frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--frame-size);
+  aspect-ratio: 1;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  transform: translate(-50%, -50%) rotate(var(--frame-angle));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .frame {
+    animation: frame-drift 28s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  }
+}
+
+@keyframes frame-drift {
+  to {
+    transform: translate(-50%, -50%) rotate(calc(var(--frame-angle) + 12deg));
+  }
+}

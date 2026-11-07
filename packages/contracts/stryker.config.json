@@ -1,10 +1,12 @@
 {
   "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "mutate": ["src/index.ts"],
+  "mutate": ["src/index.ts", "src/decode.ts"],
   "testRunner": "command",
   "coverageAnalysis": "off",
   "disableTypeChecks": false,
   "concurrency": 4,
+  "timeoutMS": 60000,
+  "thresholds": { "high": 97, "low": 95, "break": 94 },
   "reporters": ["clear-text", "progress", "json", "html"],
   "jsonReporter": {
     "fileName": "reports/mutation/mutation.json"

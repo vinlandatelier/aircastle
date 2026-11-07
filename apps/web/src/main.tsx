@@ -1,31 +1,20 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import {
-  createRootRoute,
-  createRoute,
-  createRouter,
-  Outlet,
-  RouterProvider,
-} from '@tanstack/react-router'
-import App from './App'
+import { RouterProvider, createBrowserHistory } from '@tanstack/react-router'
+import { createAppRouter } from './router'
+import { AppErrorBoundary } from '@/features/error-recovery'
 import './index.css'
 
-const rootRoute = createRootRoute({ component: Outlet })
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: App,
-})
-const router = createRouter({ routeTree: rootRoute.addChildren([indexRoute]) })
+const router = createAppRouter(createBrowserHistory())
 
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router
-  }
-}
+document
+  .querySelectorAll('head > title, head > meta[name="description"]')
+  .forEach((element) => element.remove())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AppErrorBoundary>
+      <RouterProvider router={router} />
+    </AppErrorBoundary>
   </StrictMode>,
 )

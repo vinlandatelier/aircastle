@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "vite-plus/test";
 import type { Permission, PublishedCollection } from "@aircastle/contracts";
 import { postgresAdapter } from "./index.ts";
-import { withDatabase } from "../../../tests/support/content-database.ts";
+import { development, withDatabase } from "./test-support/database.ts";
 import {
   createForeignSentinel,
   insertDocumentRow,
@@ -10,6 +10,7 @@ import {
   setFutureVersion,
   snapshotLayout,
 } from "./test-support/layout.ts";
+import { layoutVersions } from "./test-support/layout-v1.ts";
 
 const permissions: readonly Permission[] = ["content:read", "content:write", "schema:publish"];
 const verifier = createHash("sha256").update("ac_integrity_fixture_secret").digest("hex");
@@ -19,11 +20,23 @@ const description = {
 const collections: PublishedCollection[] = [{ name: "articles", description }];
 const contract = `v1:${"1".repeat(64)}`;
 
+test("R13 a fresh namespace starts at ledger [1,2] with ownership marker 1", async () => {
+  await withDatabase(async ({ sql, store, namespace }) => {
+    await store.initialize();
+    expect(await layoutVersions(sql, namespace)).toEqual({ ledger: [1, 2], marker: [1] });
+  });
+});
+
 for (const location of ["marker", "ledger"] as const) {
   test(`startup refuses a newer ${location} version without modifying stored or foreign data`, async () => {
     await withDatabase(async ({ sql, store, namespace, url, close }) => {
       await store.initialize();
-      const project = await store.provision({ verifier, permissions, newKey: false });
+      const project = await store.provision({
+        verifier,
+        permissions,
+        key: "reuse",
+        ...development,
+      });
       const persisted = await store.transaction(project.project, async (transaction) => {
         await transaction.activate(collections, {
           revision: "before-future-version",
@@ -60,14 +73,14 @@ test("database foreign keys independently reject cross-project and cross-collect
     const first = await store.provision({
       verifier,
       permissions,
-      newKey: false,
+      key: "reuse",
       workspaceName: "FK workspace",
       projectName: "First",
     });
     const second = await store.provision({
       verifier: createHash("sha256").update("second-fk-key").digest("hex"),
       permissions,
-      newKey: false,
+      key: "reuse",
       workspaceName: "FK workspace",
       projectName: "Second",
     });

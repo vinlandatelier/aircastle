@@ -1,14 +1,40 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": [".agents/skills/**"],
+  "ignoreDependencies": ["@stryker-mutator/command-runner"],
+  "ignoreBinaries": ["actionlint"],
+  "ignoreUnresolved": [
+    "^scripts/with-postgres\\.ts$",
+    "^packages/schema/scripts/classify-mutations\\.ts$"
+  ],
+  "ignoreIssues": {
+    "apps/web/src/components/ui/**": ["exports", "types"]
+  },
   "workspaces": {
     ".": {
+      "vitest": {
+        "config": ["vite.content.config.ts", "vite.db.config.ts"]
+      },
       "ignoreDependencies": ["vite"],
       "ignoreExportsUsedInFile": true
     },
+    "apps/api": {
+      "entry": ["src/{index,cli}.ts"]
+    },
+    "apps/web": {
+      "entry": ["e2e/fixture-modules/*.ts"],
+      "vitest": {
+        "config": ["vite.config.ts"]
+      }
+    },
+    "packages/client": {
+      "entry": ["tests/types/**/*.ts"],
+      "paths": {
+        "aircastle-client-under-test": ["./src/index.ts"]
+      }
+    },
     "packages/schema": {
       "entry": ["src/index.ts", "tests/types/**/*.ts"],
-      "ignoreDependencies": ["@stryker-mutator/command-runner"],
       "ignoreExportsUsedInFile": true
     }
   }

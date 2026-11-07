@@ -1,5 +1,6 @@
-import { beforeAll, describe, expect, test } from "vite-plus/test";
-import { compileCollection, requireSchemaApi, type RuntimeApi } from "../support/api.ts";
+import { describe, expect, test } from "vite-plus/test";
+import { collection, compileSchema, text } from "../../src/index.ts";
+import { compileCollection } from "../support/collections.ts";
 import {
   expectFailure,
   expectOwnKeys,
@@ -8,14 +9,9 @@ import {
 } from "../support/assertions.ts";
 
 describe("descriptions, editors and reusable declarations", () => {
-  let api: RuntimeApi;
-  beforeAll(() => {
-    api = requireSchemaApi();
-  });
-
   test("textarea description includes effective defaults and omits unset metadata", () => {
-    const description = compileCollection(api, {
-      title: api.text().min(3).editor("textarea"),
+    const description = compileCollection({
+      title: text().min(3).editor("textarea"),
     }).describe();
     expect(description).toEqual({
       fields: {
@@ -42,8 +38,8 @@ describe("descriptions, editors and reusable declarations", () => {
   });
 
   test("defaulted radio metadata describes input presence and ordered choices", () => {
-    const description = compileCollection(api, {
-      status: api.text().oneOf(["published", "draft"]).default("draft").editor("radio"),
+    const description = compileCollection({
+      status: text().oneOf(["published", "draft"]).default("draft").editor("radio"),
     }).describe();
     expect(description).toEqual({
       fields: {
@@ -70,9 +66,8 @@ describe("descriptions, editors and reusable declarations", () => {
   });
 
   test("effective bounds, format, nullable, optional and uniqueness are described", () => {
-    const description = compileCollection(api, {
-      email: api
-        .text()
+    const description = compileCollection({
+      email: text()
         .min(3)
         .min(5)
         .max(100)
@@ -100,7 +95,7 @@ describe("descriptions, editors and reusable declarations", () => {
   });
 
   test("code defaults to plaintext and does not validate language syntax", () => {
-    const defaultCode = compileCollection(api, { body: api.text().editor("code") });
+    const defaultCode = compileCollection({ body: text().editor("code") });
     expect(defaultCode.describe().fields.body!.editor).toEqual({
       type: "code",
       language: "plaintext",
@@ -115,7 +110,7 @@ describe("descriptions, editors and reusable declarations", () => {
       "markdown",
       "sql",
     ] as const) {
-      const collection = compileCollection(api, { body: api.text().editor("code", { language }) });
+      const collection = compileCollection({ body: text().editor("code", { language }) });
       expect(collection.describe().fields.body!.editor).toEqual({ type: "code", language });
       expectSuccess(collection.validate({ body: "this is not valid code {{{" }), {
         body: "this is not valid code {{{",
@@ -125,9 +120,9 @@ describe("descriptions, editors and reusable declarations", () => {
 
   for (const rows of [0, -1, 1.5, NaN, Infinity, "4", null]) {
     test(`rejects invalid textarea rows ${String(rows)}`, () => {
-      const field = api.text().editor("textarea", { rows });
+      const field = text().editor("textarea", { rows: rows as number });
       expectSchemaError(
-        () => compileCollection(api, { title: field }),
+        () => compileCollection({ title: field }),
         [
           {
             code: "invalid_editor_options",
@@ -147,18 +142,20 @@ describe("descriptions, editors and reusable declarations", () => {
     ["radio", { rows: 4 }, "rows", "unknown_option"],
   ] as const) {
     test(`rejects ${editor} option ${option}`, () => {
-      const field = api.text().oneOf(["a"]).editor(editor, options);
+      const field = text()
+        .oneOf(["a"])
+        .editor(editor as "textarea", options as { rows?: number });
       expectSchemaError(
-        () => compileCollection(api, { title: field }),
+        () => compileCollection({ title: field }),
         [{ code: "invalid_editor_options", path: ["articles", "title"], option, reason }],
       );
     });
   }
 
   test("radio requires choices", () => {
-    const field = api.text().editor("radio");
+    const field = text().editor("radio");
     expectSchemaError(
-      () => compileCollection(api, { title: field }),
+      () => compileCollection({ title: field }),
       [
         {
           code: "incompatible_editor",
@@ -171,14 +168,14 @@ describe("descriptions, editors and reusable declarations", () => {
   });
 
   test("editor settings do not alter acceptance or defaults", () => {
-    const base = api.text().min(2).oneOf(["aa", "bb"]).default("aa");
+    const base = text().min(2).oneOf(["aa", "bb"]).default("aa");
     for (const field of [
       base,
       base.editor("textarea"),
       base.editor("code", { language: "json" }),
       base.editor("radio"),
     ]) {
-      const collection = compileCollection(api, { title: field });
+      const collection = compileCollection({ title: field });
       expectSuccess(collection.validate({}), { title: "aa" });
       expectSuccess(collection.validate({ title: "bb" }), { title: "bb" });
       expectFailure(collection.validate({ title: "cc" }), [
@@ -190,10 +187,10 @@ describe("descriptions, editors and reusable declarations", () => {
   test("choices and editor options are captured at declaration time", () => {
     const choices = ["draft", "published"];
     const options = { rows: 5 };
-    const field = api.text().oneOf(choices).editor("textarea", options);
+    const field = text().oneOf(choices).editor("textarea", options);
     choices.push("before");
     options.rows = 8;
-    const collection = compileCollection(api, { title: field });
+    const collection = compileCollection({ title: field });
     choices.push("after");
     options.rows = 9;
     expect(collection.describe().fields.title!.choices).toEqual(["draft", "published"]);
@@ -209,22 +206,22 @@ describe("descriptions, editors and reusable declarations", () => {
   test("accepts frozen caller-owned configuration", () => {
     const choices = Object.freeze(["draft", "published"]);
     const options = Object.freeze({ rows: 3 });
-    const fields = Object.freeze({ title: api.text().oneOf(choices).editor("textarea", options) });
-    const collections = Object.freeze({ articles: api.collection(fields) });
-    const collection = api.compileSchema(collections).articles!;
-    expectSuccess(collection.validate(Object.freeze({ title: "draft" })), { title: "draft" });
+    const fields = Object.freeze({ title: text().oneOf(choices).editor("textarea", options) });
+    const collections = Object.freeze({ articles: collection(fields) });
+    const compiled = compileSchema(collections).articles;
+    expectSuccess(compiled.validate(Object.freeze({ title: "draft" })), { title: "draft" });
   });
 
   test("deriving fields preserves the base and reports current reuse paths", () => {
-    const base = api.text();
+    const base = text();
     const short = base.max(3);
     const optional = base.optional();
-    const schema = api.compileSchema({
-      long: api.collection({ title: base }),
-      short: api.collection({ caption: short }),
-      optional: api.collection({ subtitle: optional }),
+    const schema = compileSchema({
+      long: collection({ title: base }),
+      short: collection({ caption: short }),
+      optional: collection({ subtitle: optional }),
     });
-    const elsewhere = compileCollection(api, { other: short });
+    const elsewhere = compileCollection({ other: short });
     for (let run = 0; run < 3; run++) {
       expectSuccess(schema.long!.validate({ title: "Hello" }), { title: "Hello" });
       expectFailure(schema.short!.validate({ caption: "Hello" }), [
@@ -240,7 +237,7 @@ describe("descriptions, editors and reusable declarations", () => {
   });
 
   test("uniqueness is metadata and repeated equal values remain valid", () => {
-    const collection = compileCollection(api, { title: api.text().unique() });
+    const collection = compileCollection({ title: text().unique() });
     expectSuccess(collection.validate({ title: "same" }), { title: "same" });
     expectSuccess(collection.validate({ title: "same" }), { title: "same" });
   });

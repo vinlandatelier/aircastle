@@ -27,14 +27,34 @@ describe("assertion controls", () => {
   const unknown = { code: "unknown_field" as const, path: ["extra"] };
   const withMessage = { ...short, message: "Readable explanation." };
 
-  test("accepts changed wording and additional unspecified diagnostic metadata", () => {
+  test("accepts changed wording", () => {
     expectFailure(
-      {
-        ok: false,
-        issues: [{ ...withMessage, message: "Different readable wording.", diagnosticId: 7 }],
-      },
+      { ok: false, issues: [{ ...withMessage, message: "Different readable wording." }] },
       [short],
     );
+  });
+
+  test("rejects unspecified diagnostic metadata", () => {
+    expect(() =>
+      expectFailure({ ok: false, issues: [{ ...withMessage, diagnosticId: 7 }] }, [short]),
+    ).toThrow();
+  });
+
+  test("rejects an element index the expectation does not name", () => {
+    const wholeValue = {
+      code: "invalid_choices" as const,
+      path: ["articles", "title"],
+      reason: "invalid_type" as const,
+    };
+    const element = { ...wholeValue, index: 0, message: "Invalid choices." };
+    expect(() =>
+      expectSchemaError(() => {
+        throw Object.assign(new Error("Invalid schema."), {
+          name: "SchemaError",
+          issues: [element],
+        });
+      }, [wholeValue]),
+    ).toThrow();
   });
 
   test.each([

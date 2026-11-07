@@ -1,16 +1,14 @@
 import { expect } from "vite-plus/test";
 import type { SchemaIssue, ValidationIssue } from "../../src/index.ts";
 
-type ExpectedIssue<Issue> = Issue extends { message: string }
-  ? Omit<Issue, "message" | "causes"> & {
-      causes?: readonly ExpectedIssue<ValidationIssue>[];
-    }
-  : never;
+type ExpectedIssue<Issue> = Issue extends { causes: readonly ValidationIssue[] }
+  ? Omit<Issue, "message" | "causes"> & { causes: readonly ExpectedIssue<ValidationIssue>[] }
+  : Omit<Issue, "message">;
 
 export type ExpectedValidationIssue = ExpectedIssue<ValidationIssue>;
 export type ExpectedSchemaIssue = ExpectedIssue<SchemaIssue>;
 
-function record(value: unknown): Record<string, unknown> {
+function expectObject(value: unknown): Record<string, unknown> {
   expect(value).not.toBeNull();
   expect(typeof value).toBe("object");
   expect(Array.isArray(value)).toBe(false);
@@ -18,11 +16,11 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 export function expectOwnKeys(value: object, expected: readonly string[]): void {
-  expect(Reflect.ownKeys(value).sort()).toEqual([...expected].sort());
+  expect(new Set(Reflect.ownKeys(value))).toEqual(new Set(expected));
 }
 
 export function expectData(actual: unknown, expected: Record<string, unknown>): void {
-  const data = record(actual);
+  const data = expectObject(actual);
   expectOwnKeys(data, Object.keys(expected));
   for (const key of Object.keys(expected)) {
     expect(Object.hasOwn(data, key)).toBe(true);
@@ -31,7 +29,7 @@ export function expectData(actual: unknown, expected: Record<string, unknown>): 
 }
 
 export function expectSuccess(actual: unknown, expected: Record<string, unknown>): void {
-  const result = record(actual);
+  const result = expectObject(actual);
   expectOwnKeys(result, ["ok", "data"]);
   expect(result.ok).toBe(true);
   expectData(result.data, expected);
@@ -46,11 +44,11 @@ function expectIssues(
   expect(issues.length).toBeGreaterThan(0);
   expect(issues).toHaveLength(expected.length);
   expected.forEach((wanted, index) => {
-    const issue = record(issues[index]);
+    const issue = expectObject(issues[index]);
     expect(typeof issue.message).toBe("string");
     expect((issue.message as string).trim().length).toBeGreaterThan(0);
+    expectOwnKeys(issue, [...Object.keys(wanted), "message"]);
     for (const [key, value] of Object.entries(wanted)) {
-      expect(Object.hasOwn(issue, key)).toBe(true);
       if (key === "causes") expectIssues(issue[key], value as ExpectedValidationIssue[]);
       else expect(issue[key]).toEqual(value);
     }
@@ -58,7 +56,7 @@ function expectIssues(
 }
 
 export function expectFailure(actual: unknown, expected: readonly ExpectedValidationIssue[]): void {
-  const result = record(actual);
+  const result = expectObject(actual);
   expectOwnKeys(result, ["ok", "issues"]);
   expect(result.ok).toBe(false);
   expectIssues(result.issues, expected);

@@ -52,6 +52,7 @@ function configFor(target: "source" | "declarations", file: string) {
       extends: sourceConfig,
       compilerOptions: {
         customConditions: target === "declarations" ? [] : ["development"],
+        skipLibCheck: target === "source",
         paths: {
           "aircastle-client-under-test": [
             target === "source" ? join(root, "src/index.ts") : emittedEntry,

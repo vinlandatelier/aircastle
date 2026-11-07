@@ -4,16 +4,23 @@ import { expect } from "vite-plus/test";
 
 type Sql = ReturnType<typeof postgres>;
 
+/**
+ * Moves a current namespace one step past the supported layout: the ownership marker becomes 2,
+ * or the ledger `[1,2]` gains version 3.
+ */
 export async function setFutureVersion(sql: Sql, namespace: string, location: "marker" | "ledger") {
-  const rows =
-    location === "marker"
-      ? await sql<
-          { version: number }[]
-        >`UPDATE ${sql(namespace)}.ownership SET version = 2 WHERE singleton = 1 RETURNING version`
-      : await sql<
-          { version: number }[]
-        >`INSERT INTO ${sql(namespace)}.migrations (version) VALUES (2) RETURNING version`;
-  expect(rows.map((row) => row.version)).toEqual([2]);
+  if (location === "marker") {
+    const rows = await sql<
+      { version: number }[]
+    >`UPDATE ${sql(namespace)}.ownership SET version = 2 WHERE singleton = 1 RETURNING version`;
+    expect(rows.map((row) => row.version)).toEqual([2]);
+    return;
+  }
+  await sql`INSERT INTO ${sql(namespace)}.migrations (version) VALUES (3)`;
+  const ledger = await sql<
+    { version: number }[]
+  >`SELECT version FROM ${sql(namespace)}.migrations ORDER BY version`;
+  expect(ledger.map((row) => row.version)).toEqual([1, 2, 3]);
 }
 
 export async function snapshotLayout(sql: Sql, namespace: string) {

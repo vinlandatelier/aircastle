@@ -20,10 +20,12 @@ if (args.some((arg) => arg !== "--new-key") || args.length > 1) {
         : { namespace: process.env.AIRCASTLE_DATABASE_NAMESPACE }),
     });
     await database.initialize();
-    const result = await provisionDevelopment(database, { newKey: args.includes("--new-key") });
+    const result = await provisionDevelopment(database, {
+      key: args.includes("--new-key") ? "issue" : "reuse",
+    });
     console.log(`AIRCASTLE_URL=${url.href.replace(/\/$/, "")}`);
     console.log(`AIRCASTLE_PROJECT_ID=${result.project}`);
-    if (result.apiKey) console.log(`AIRCASTLE_API_KEY=${result.apiKey}`);
+    if (result.issued) console.log(`AIRCASTLE_API_KEY=${result.apiKey}`);
     else
       console.log(
         "The existing API key is not recoverable. Reuse your saved key or run vp run dev:setup --new-key.",

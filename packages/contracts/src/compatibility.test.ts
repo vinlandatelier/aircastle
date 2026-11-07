@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { CollectionDescription, TextFieldDescription } from "@aircastle/schema";
-import { compatibleForCreate, projectDocument, validateStored } from "./index.ts";
+import { compatibleForCreate, projectDocument, uniqueFields, validateStored } from "./index.ts";
 import { description, field, freezeDeep } from "./support/fixtures.ts";
 
 const cases: readonly [
@@ -306,4 +306,13 @@ describe("client output projection", () => {
       error: { code: "schema_mismatch" },
     });
   });
+});
+
+test("uniqueFields lists only the unique fields in declaration order", () => {
+  const schema = description({
+    slug: field({ unique: true }),
+    title: field(),
+    email: field({ unique: true, required: false }),
+  });
+  expect(uniqueFields(schema)).toEqual(["slug", "email"]);
 });

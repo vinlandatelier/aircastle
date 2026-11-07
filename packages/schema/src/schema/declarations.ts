@@ -129,12 +129,14 @@ export function collection<const Fields extends Readonly<Record<string, FieldIde
   return new Collection(definition);
 }
 
+/** `WeakMap.get` returns `undefined` for primitives, so any value can be looked up. */
 export function fieldDefinition(value: unknown): readonly Modifier[] | undefined {
-  return value !== null && typeof value === "object" ? fields.get(value) : undefined;
+  return fields.get(value as object);
 }
 
+/** `WeakMap.get` returns `undefined` for primitives, so any value can be looked up. */
 export function collectionDefinition(value: unknown): RecordSnapshot | undefined {
-  return value !== null && typeof value === "object" ? collections.get(value) : undefined;
+  return collections.get(value as object);
 }
 
 type FieldValue<Field extends FieldIdentity> =

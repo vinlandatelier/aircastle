@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Command as CommandPrimitive } from 'cmdk'
+import { Command as CommandPrimitive, defaultFilter } from 'cmdk'
 import { cn } from 'cn'
 
 import {
@@ -12,9 +12,25 @@ import {
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group'
 import { SearchIcon, CheckIcon } from 'lucide-react'
 
-function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
+const substringFirst: NonNullable<React.ComponentProps<typeof CommandPrimitive>['filter']> = (
+  value,
+  query,
+  keywords,
+) => {
+  const index = value.toLowerCase().indexOf(query.toLowerCase())
+  if (index === -1) return defaultFilter(value, query, keywords) / 2
+  if (index === 0) return 1
+  return /[\s\-_/]/.test(value[index - 1]!) ? 0.9 : 0.8
+}
+
+function Command({
+  className,
+  filter = substringFirst,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
+      filter={filter}
       data-slot="command"
       className={cn(
         'flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground',
@@ -63,7 +79,7 @@ function CommandInput({
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
       <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
         <CommandPrimitive.Input
-          data-slot="command-input"
+          data-slot="input-group-control"
           className={cn(
             'w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50',
             className,
@@ -83,7 +99,7 @@ function CommandList({ className, ...props }: React.ComponentProps<typeof Comman
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        'max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none',
+        'max-h-72 in-data-[slot=dialog-content]:max-h-[min(18rem,calc(66svh-5rem))] scroll-py-1 overflow-x-hidden overflow-y-auto outline-none',
         className,
       )}
       {...props}

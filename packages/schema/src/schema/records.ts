@@ -27,6 +27,20 @@ export function snapshotRecord(value: unknown): RecordSnapshot {
   return { ok: true, entries: Object.freeze(entries) };
 }
 
+/** Whether a value is a plain object whose own keys are all enumerable string data properties. It reads no accessors. */
+export function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return snapshotRecord(value).ok;
+}
+
+/** Whether a value strictly equals one of a self-keyed table's names. It never coerces the value to a key. */
+export function isMember<Key extends string>(
+  table: { readonly [Name in Key]: Name },
+  value: unknown,
+): value is Key {
+  const names: readonly unknown[] = Object.values(table);
+  return names.includes(value);
+}
+
 export function snapshotChoices(value: unknown): unknown {
   if (!Array.isArray(value)) return value;
   const values: unknown[] = [];

@@ -6,7 +6,7 @@ Aircastle is a code-first, headless CMS with agentic capabilities designed to au
 
 Install the [Vite+ CLI](https://viteplus.dev/guide/) and use Node.js 24.11 or later within the 24.x release line. Other supported Node.js versions are listed in `engines.node` in `package.json`.
 
-Vite+ uses Bun 1.3.4 for dependency management, pinned in `.bun-version` and `package.json`.
+Vite+ uses Bun for dependency management. The Bun version is pinned in `.bun-version` and in `packageManager` in `package.json`.
 
 ```sh
 vp install --frozen-lockfile
@@ -15,6 +15,14 @@ vp run typecheck
 vp check
 vp run test
 ```
+
+Create your local environment file at the repository root:
+
+```sh
+cp .env.example .env
+```
+
+Both apps read the root `.env`; no `.env` files are needed in `apps/api` or `apps/web`. Exported shell variables take precedence. Set `PORT` in the root file to change the API port and the web app's `/api` proxy together. Only `VITE_*` variables are exposed to browser code; keep secrets unprefixed. Restart the development servers after changing environment values.
 
 Start the web app on port 43121:
 
@@ -32,7 +40,7 @@ The API uses port 43122 in both development and built runs. Override it with `PO
 
 Open [API documentation](http://localhost:43122/api/docs) or its [OpenAPI document](http://localhost:43122/api/openapi.json). The documentation UI loads a pinned Scalar script from jsDelivr and requires internet access.
 
-API environment variables are validated at startup. `PORT` must be an integer from 1 to 65535. `LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`. `NODE_ENV` accepts `development`, `test`, or `production` and defaults to `development`.
+The API validates its environment variables at startup and exits if one is invalid. `DATABASE_URL` is required and must not be empty. `PORT` must be an integer from 1 to 65535. `LOG_LEVEL` defaults to `info` and accepts Pino's levels, including `silent`.
 
 Start both apps concurrently with `vp run dev`.
 
@@ -42,8 +50,12 @@ Run common commands from the repository root:
 
 | Command | Scope |
 | --- | --- |
+| `vp run check` | Everything CI runs: build, types, lint, workflow lint, unused code, runtime and database tests, browser journeys, database runner checks, and schema coverage |
+| `vp run test:db` | Disposable Postgres runner lifecycle checks |
 | `vp run test` | Build, then run runtime, Postgres, and type-contract tests with disposable databases |
-| `vp run test-web` | Web tests, currently an empty suite |
+| `vp run test-web` | Fast web component tests |
+| `vp run test-web:e2e` | Normal and fixture web builds, then Chromium journeys |
+| `vp run test-web:coverage` | Web V8 coverage with HTML and JSON reports |
 | `vp run test-api` | API tests |
 | `vp run test-schema` | Schema runtime tests |
 | `vp run test-mutation` | Slower schema mutation tests, run separately |
@@ -51,6 +63,17 @@ Run common commands from the repository root:
 | `vp run lint-web` | Web app |
 | `vp run lint-api` | API app |
 | `vp run lint-schema` | Schema package |
+
+Install the browser before running web browser verification:
+
+```sh
+vp -C apps/web exec playwright install chromium
+vp run test-web:e2e
+```
+
+Playwright builds the web app twice, once with its real data and once with fixture data, and serves each build until the run ends. The normal build listens on `WEB_E2E_PORT`, which defaults to 43124, and the fixture build listens on the next port. An occupied port stops the run. To run browser journeys in two worktrees at once, give each run its own port, for example `WEB_E2E_PORT=43224 vp run test-web:e2e`. The journeys do not require the API or Postgres for the current shell.
+
+Each run overwrites its reports in `apps/web/reports/`. `html/` holds the HTML report, `results.json` holds the JSON results, `test-results/` holds traces and screenshots of failed tests, and `build/normal/` and `build/fixture/` hold the two builds. Open the HTML report with `vp -C apps/web exec playwright show-report reports/html`. Run a focused scenario with `vp run test-web:e2e stress.spec.ts --grep long-text`.
 
 ## Local Postgres
 
@@ -75,7 +98,7 @@ vp run db:test -- vp run test-api
 
 The wrapper uses the same Compose file and pinned image. Each invocation gets a unique project, volume and automatically assigned localhost port. It supplies `DATABASE_URL` to the command, overriding any inherited value. It preserves the command's exit status and deletes its database after success, failure, Ctrl-C or termination. Forced kills and Docker outages can prevent cleanup; the wrapper prints its project name for recovery with `docker compose -p <project> -f compose.yaml down --volumes`.
 
-The full `vp run test` and `vp run check` commands require Docker and create disposable databases automatically.
+The full `vp run test` and `vp run check` commands require Docker and create disposable databases automatically. `vp run check` also runs web browser journeys, which need the Chromium installation described above, and lints workflows with [actionlint](https://github.com/rhysd/actionlint), which must be on your `PATH`.
 
 Run `vp run dev:setup` to provision local development connection settings. Reruns reuse the project and do not reveal its existing key. Use `vp run dev:setup --new-key` to issue another key.
 

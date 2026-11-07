@@ -12,10 +12,16 @@ apps/
 │           ├── health/       Process liveness and its response schema
 │           └── content/      Project schema publication and content HTTP routes
 └── web/                      React admin
-    ├── scripts/              Theme-aware brand icon generation
+    ├── scripts/              Brand icon generation
     └── src/
-        ├── components/       Efferd app shell and its layout components
+        ├── components/       Shared presentation modules
+        │   ├── shell/        Persistent header, sidebar, page frame, and supporting controls
         │   └── ui/           Local shadcn UI components built on Base UI
+        ├── features/         Product behavior by feature
+        │   ├── error-recovery/ App-wide fatal error boundary and standalone recovery
+        │   ├── navigation/   Shared page catalog, sidebar navigation, and page search
+        │   ├── not-found/    Public recovery page for unmatched destinations
+        │   └── sign-in/      Standalone email sign-in interface and decorative background
         ├── hooks/            Browser state subscriptions
         └── lib/              Browser-safe UI utilities
 
@@ -28,17 +34,48 @@ packages/
 └── cli/                      Schema publication, reconciliation, and lockfiles
 
 scripts/                      Repository checks and local development tooling
+
+.github/                      CI workflows and shared setup
 ```
 
-The API assembles middleware, feature routes, and API documentation in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. The CLI entry uses the same app factory with a silent logger.
+The API assembles middleware, feature routes, and API documentation through `createApp({ logger, cms, maxRequestBytes })` in `apps/api/src/app.ts`. Bun startup in `src/index.ts` validates environment configuration, constructs the logger and CMS runtime, and initializes owned storage before listening. Shutdown stops accepting requests, drains CMS operations, and closes storage. `src/cli.ts` exports a quiet app from the same factory with a silent logger and no `cms`, so it serves no content routes.
 
 The server mounts every API route under `/api`, including `/api/docs` and `/api/openapi.json`. Feature routers use paths relative to that mount and follow the feature pattern below.
 
 Vite forwards `/api` requests unchanged during development and preview. The built API owns the same prefix without Vite. Hosted routing must forward `/api` unchanged to Bun. Production admin serving and deployment configuration are not implemented yet.
 
+## Web app structure
+
+Paths in this section are relative to `apps/web`.
+
+- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `App` provides light, dark, and system themes with `next-themes` and renders route-owned document metadata. A shared CMS layout under `/dash/workspaces/$workspaceId/projects/$projectId` keeps the shell mounted as dashboard destinations change; `/` and `/sign-in` render outside that layout.
+- `src/components/shell/` owns the persistent header, sidebar, page frame, and private supporting controls. The sidebar collapses independently beneath the full-width header. Import the shell through its `index.tsx` entry point.
+- `src/components/ui/` holds shared UI primitives built on Base UI.
+- `src/features/<feature>/` owns a product feature's behavior, types, data fetching, and tests. Import features through their `index.ts` or `index.tsx` entry point; keep supporting files private.
+- Keep feature-specific hooks and helpers inside their feature. Reserve `src/hooks/` and `src/lib/` for shared browser subscriptions and utilities.
+- Keep public-interface behavior tests beside the module implementation. Add feature folders only when implementing their behavior.
+
+`src/features/navigation` owns the page catalog, sidebar links, and keyboard page search. `src/router.tsx` registers destinations and their document titles under `/dash/workspaces/$workspaceId/projects/$projectId` from that catalog. Dashboard navigation preserves both route parameters, which currently accept arbitrary nonempty values without a workspace or project lookup. The project base redirects to its collections page. `/dash` redirects to `/dash/workspaces/demo/projects/demo/collections`; `/` reserves the marketing entry with a minimal branded placeholder and its landing-page metadata. Dashboard destinations currently render placeholders. `components.json` configures shadcn and the Efferd registry.
+
+`src/features/sign-in` vendors the Efferd `@efferd/auth-5` layout with Aircastle branding and email-only controls. The email action remains disabled until magic-link authentication is implemented. Legal links open `/terms-of-service` and `/privacy-policy` in new tabs; those pages are not implemented yet.
+
+`src/features/not-found` owns the standalone recovery page for unmatched destinations, including unknown dashboard paths. The router handles these at its root so the page uses the marketing palette outside the CMS shell. Its links return to `/` or `/sign-in`; sign-in's Home link also returns to `/`.
+
+`src/features/error-recovery` catches rendering failures outside the router and listens for uncaught runtime errors and unhandled promise rejections. Route render and loader failures reach that boundary because no route defines an error component and the router's generic global error boundary is disabled. Recovery unmounts the failed app and its metadata, retains the document theme or resolves it for an early failure, and renders without router or theme-provider dependencies. Reload retries the current URL; Home performs a full navigation to `/`. Handled failures and ordinary missing pages keep their existing behavior.
+
+`src/index.css` owns the `marketing` and `dashboard` colour palettes in light and dark mode. Marketing uses Efferd's auth preview tokens and is the default for public pages. Sign-in declares `data-theme-scope="marketing"`; the shell declares `data-theme-scope="dashboard"`. The dashboard marker selects its palette at the document root, including overlays rendered outside the shell. Shared UI components consume the active semantic tokens without separate component variants or theme providers.
+
+Colocated component tests use Vite+ and happy-dom. `e2e/` owns Chromium journeys and extreme-input fixtures. Fixture builds set `WEB_FIXTURES=1`, and a Vite plugin then swaps `src/components/shell/data.ts` and `src/features/navigation/pages.ts` for the modules in `e2e/fixture-modules/` by resolved path, so every import spelling gets the fixture. Normal production builds retain their real data and expose no fixture controls. `tsconfig.e2e.json` type-checks the Playwright config, journeys and fixture modules.
+
+`playwright.config.ts` owns browser execution. Its `webServer` entries build the normal and fixture apps and preview them on `WEB_E2E_PORT` and the next port, which `e2e/origins.ts` derives for both the config and the `visit` helper. Playwright starts and stops those servers, rejects `.only`, retries and flaky passes, and writes HTML and JSON reports, traces, and screenshots to the ignored `reports/` directory. Lint keeps process spawning, server launchers and skipped journeys out of `apps/web`, so new verification goes into Playwright or Vitest configuration rather than a custom runner. Coverage measures TypeScript execution, including unimported source; it does not measure CSS or establish correctness. [Frontend verification](apps/web/VERIFICATION.md) defines the feature workflow. Browser cases use descriptive file, suite and test names without a central registry.
+
+## Repository automation
+
+`.github/workflows/ci.yml` runs the required `Lint, typecheck and test` check. `.github/workflows/mutation.yml` runs full schema and contract mutation testing nightly or on demand. AI review and the `.agents/skills/gardener` audit run locally, outside GitHub Actions. [Automation instructions](.github/AGENTS.md) record the workflow rules.
+
 ## Feature pattern
 
-The folder names the feature. Start with its implementation and public-interface tests together:
+The folder names the feature. Small features such as API health keep their implementation and public-interface tests together:
 
 ```text
 <feature>/
@@ -52,15 +89,29 @@ The folder names the feature. Start with its implementation and public-interface
 - Keep supporting files private. Cross-module callers use the public entry point.
 - Optimize how much code a reader needs to understand one change. File count alone is not the goal.
 
+The API content feature separates HTTP mechanics behind the same public factory:
+
+```text
+content/
+├── index.ts          Public factory, route descriptions, handlers, and input checks
+├── request.ts        Credentials and bounded JSON body parsing
+├── responses.ts      Result status mapping and sanitized error responses
+└── index.test.ts     HTTP behavior through createApp
+```
+
+`apps/api/AGENTS.md` describes how API routes declare schemas, how content routes check input, and where handlers go. Test supporting files through the feature's public behavior; do not export them from the entry point solely for tests.
+
+`tests/harness/module-boundaries.test.ts` fails when a file under `apps/api/src` or `apps/web/src` reaches into another feature's or the web shell's private files through a relative or web `@/` static import, re-export, import-type query, `import x = require`, dynamic `import()`, `require`, or `createRequire` loader. Lint and `vp run check:policy` enforce the browser boundary and imports between workspaces.
+
 This is a general pattern, not a required file inventory for every module. Existing modules can adopt it when relevant work warrants a change.
 
 ## Ownership
 
 - `apps/api` translates HTTP requests and agent tool calls into CMS operations. It owns transport schemas, logging integration, API documentation, and runtime resource assembly. Keep startup configuration outside feature handlers.
-- `apps/web` owns the admin shell, local UI components, and browser state. `App` composes the shell through `components/app-shell.tsx` and provides light, dark, and system themes with `next-themes`. The full-width header owns the fixed brand cell and header actions. The sidebar collapses independently beneath it. The Efferd layout uses shadcn components and displays sample navigation and dashboard placeholders. `apps/web/components.json` configures shadcn and the Efferd registry.
+- `apps/web` owns the admin shell, local UI components, and browser state. Its module layout and entry points are described in [Web app structure](#web-app-structure).
 - `packages/schema` owns collection definitions, compilation, validation, and descriptions. Its public entry point is `@aircastle/schema`.
 - The core owns CMS operations and their rules. Keep feature-specific permissions, revisions, and review behavior with the feature. HTTP and agent tools call the same operations.
-- The core defines the persistence operations it needs and which changes must be atomic. Database adapters implement those operations and transactions, keeping SQL and driver types private.
+- The core defines the persistence operations it needs and which changes must be atomic. Database adapters implement those operations and transactions, keeping SQL and driver types private. The test-only `@aircastle/core/testing` entry exports the `ContentStore` contract suite. The core fake store and each adapter run it.
 - The Postgres adapter owns SQL, row mapping, database constraints, and migrations for Aircastle's own tables. User collection migrations belong with the user's project when the eventual storage design requires them. Project collections share JSONB document storage within an instance-owned namespace. Content migration execution is deferred.
 - `packages/contracts` owns browser-safe content result types, serialized collection contracts, compatibility and projection. It uses the schema package and has no server or SQL imports.
 - `packages/client` owns developer configuration and the typed application HTTP client. `packages/cli` owns publication and lockfile workflows and communicates over HTTP.

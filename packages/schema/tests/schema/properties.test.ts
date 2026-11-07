@@ -1,16 +1,12 @@
-import { beforeAll, describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 import fc from "fast-check";
-import { compileCollection, requireSchemaApi, type RuntimeApi } from "../support/api.ts";
+import { text } from "../../src/index.ts";
+import { compileCollection } from "../support/collections.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";
 import { propertyParameters } from "../support/properties.ts";
 
 describe("generated schema laws", () => {
-  let api: RuntimeApi;
-  beforeAll(() => {
-    api = requireSchemaApi();
-  });
-
-  const text = fc
+  const graphemes = fc
     .array(fc.constantFrom("a", "é", "e\u0301", "😀", "🇦🇺", "👨‍👩‍👧‍👦", " ", "\r\n", "\t"), {
       maxLength: 30,
     })
@@ -20,13 +16,13 @@ describe("generated schema laws", () => {
     .map((parts) => parts.join(""));
 
   test("accepted text is preserved and successful output validates again", () => {
-    const collection = compileCollection(api, {
-      title: api.text(),
-      subtitle: api.text().optional(),
-      status: api.text().default("draft"),
+    const collection = compileCollection({
+      title: text(),
+      subtitle: text().optional(),
+      status: text().default("draft"),
     });
     fc.assert(
-      fc.property(text, (title) => {
+      fc.property(graphemes, (title) => {
         const result = collection.validate({ title, subtitle: undefined });
         expectSuccess(result, { title, status: "draft" });
         if (!result.ok) throw new Error("Generated valid document failed");
@@ -45,8 +41,8 @@ describe("generated schema laws", () => {
         (title, first, second) => {
           const min = Math.min(first, second);
           const max = Math.max(first, second);
-          for (const field of [api.text().min(min).max(max), api.text().max(max).min(min)]) {
-            const result = compileCollection(api, { title: field }).validate({ title });
+          for (const field of [text().min(min).max(max), text().max(max).min(min)]) {
+            const result = compileCollection({ title: field }).validate({ title });
             if (title.length < min)
               expectFailure(result, [
                 {
@@ -77,9 +73,9 @@ describe("generated schema laws", () => {
 
   test("tightening a valid maximum cannot introduce newly accepted values", () => {
     fc.assert(
-      fc.property(text, fc.integer({ min: 0, max: 20 }), (title, maximum) => {
-        const tight = compileCollection(api, { title: api.text().max(maximum) });
-        const loose = compileCollection(api, { title: api.text().max(maximum + 1) });
+      fc.property(graphemes, fc.integer({ min: 0, max: 20 }), (title, maximum) => {
+        const tight = compileCollection({ title: text().max(maximum) });
+        const loose = compileCollection({ title: text().max(maximum + 1) });
         const result = tight.validate({ title });
         if (result.ok) expectSuccess(loose.validate({ title }), { title });
       }),
@@ -89,9 +85,9 @@ describe("generated schema laws", () => {
 
   test("omitted and explicit undefined both default without changing the input", () => {
     fc.assert(
-      fc.property(text, (fallback) => {
-        const collection = compileCollection(api, {
-          title: api.text().optional().default(fallback),
+      fc.property(graphemes, (fallback) => {
+        const collection = compileCollection({
+          title: text().optional().default(fallback),
         });
         const explicit = { title: undefined };
         expectSuccess(collection.validate({}), { title: fallback });
@@ -108,7 +104,7 @@ describe("generated schema laws", () => {
       fc.integer({ min: 0xd800, max: 0xdbff }).map((unit) => `a${String.fromCharCode(unit)}`),
       fc.integer({ min: 0xdc00, max: 0xdfff }).map((unit) => `${String.fromCharCode(unit)}a`),
     );
-    const collection = compileCollection(api, { title: api.text().min(10).email() });
+    const collection = compileCollection({ title: text().min(10).email() });
     fc.assert(
       fc.property(loneSurrogate, (title) => {
         expectFailure(collection.validate({ title }), [

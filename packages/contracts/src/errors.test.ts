@@ -3,7 +3,10 @@ import { describe, expect, test } from "vite-plus/test";
 import { parseContentError, type ContentError } from "./index.ts";
 import { freezeDeep } from "./support/fixtures.ts";
 
-type BareCode = Exclude<ContentError["code"], "validation_failed" | "unique_conflict">;
+type BareCode = Exclude<
+  ContentError["code"],
+  "validation_failed" | "unique_conflict" | "referenced"
+>;
 const bareCodes: Record<BareCode, true> = {
   invalid_request: true,
   unauthorized: true,
@@ -149,6 +152,43 @@ describe("accepted structured content errors", () => {
   });
 });
 
+describe("R11 R13 referenced error", () => {
+  test.each([
+    ["articles", "author"],
+    ["__proto__", "constructor"],
+    ["", ""],
+  ])("accepts referenced from collection %j field %j", (collection, field) => {
+    expect(parseContentError({ code: "referenced", collection, field })).toEqual({
+      code: "referenced",
+      collection,
+      field,
+    });
+  });
+
+  test("round-trips a referenced error through JSON", () => {
+    const error: ContentError = { code: "referenced", collection: "articles", field: "author" };
+    expect(parseContentError(JSON.parse(JSON.stringify(error)))).toEqual({
+      code: "referenced",
+      collection: "articles",
+      field: "author",
+    });
+  });
+
+  test.each([
+    ["missing collection and field", { code: "referenced" }],
+    ["missing collection", { code: "referenced", field: "author" }],
+    ["missing field", { code: "referenced", collection: "articles" }],
+    ["null collection", { code: "referenced", collection: null, field: "author" }],
+    ["numeric collection", { code: "referenced", collection: 1, field: "author" }],
+    ["array collection", { code: "referenced", collection: ["articles"], field: "author" }],
+    ["null field", { code: "referenced", collection: "articles", field: null }],
+    ["numeric field", { code: "referenced", collection: "articles", field: 1 }],
+    ["object field", { code: "referenced", collection: "articles", field: {} }],
+  ])("rejects referenced with %s", (_name, input) => {
+    expect(parseContentError(input)).toBeUndefined();
+  });
+});
+
 describe("malformed content errors", () => {
   test.each([
     ["null root", null],
@@ -157,6 +197,7 @@ describe("malformed content errors", () => {
     ["missing code", {}],
     ["nonstrings as code", { code: 1 }],
     ["unknown code", { code: "unknown_error" }],
+    ["array-wrapped code", { code: ["unauthorized"] }],
     ["missing issues", { code: "validation_failed" }],
     ["null issues", { code: "validation_failed", issues: null }],
     ["object issues", { code: "validation_failed", issues: {} }],
@@ -177,6 +218,7 @@ describe("malformed content errors", () => {
     ["missing issue code", { path: ["title"], message }],
     ["numeric issue code", { code: 1, path: ["title"], message }],
     ["unknown issue code", { code: "bad_field", path: ["title"], message }],
+    ["array-wrapped issue code", { code: ["required"], path: ["title"], message }],
     ["missing message", { code: "required", path: ["title"] }],
     ["numeric message", { ...required, message: 1 }],
     ["null message", { ...required, message: null }],
@@ -205,6 +247,10 @@ describe("malformed content errors", () => {
     [
       "numeric received type",
       { code: "invalid_type", path: ["title"], message, expected: "string", received: 1 },
+    ],
+    [
+      "array-wrapped received type",
+      { code: "invalid_type", path: ["title"], message, expected: "string", received: ["string"] },
     ],
     [
       "unknown received type",

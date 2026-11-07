@@ -33,21 +33,36 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Verify expected type errors with isolated negative fixtures and explicit compiler diagnostics, without suppressions.
 - Run `vp run check:policy` for JavaScript and TypeScript changes. The configured type-check command also enforces this policy.
 
+## Agent collaboration
+
+- Select models by capability from those available in the active harness. Do not hardcode provider names, model names, or versions in shared instructions.
+- Use the most capable reasoning model available for complex analysis, scoping, architecture, and review.
+- Use a capable everyday coding model one tier below the strongest reasoning model for implementation. Do not use small or lightweight models for implementation; report when a suitable model is unavailable.
+- Keep shared instructions in `AGENTS.md` and skills in `.agents/skills/`. Keep `CLAUDE.md` and `.claude/skills/` entries as symlinks to those sources so harnesses share the same guidance.
+
 ## Changes and verification
 
 - Before editing, identify the active worktree, approved behavior, bounded outcome, and relevant checks. Resolve blocking behavior choices before writing dependent code or expectations; choose routine implementation details autonomously.
 - Keep one authoritative specification and decision record, with one writer per shared update. Worktrees must reference them rather than maintain copies. Resolve code paths in the active worktree.
-- Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists.
+- Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists. Before writing any infrastructure, check the version-matched documentation of repository tools and well-known libraries. Infrastructure includes test harnesses and runners, server lifecycle, clients, parsers, validators, retry loops, and report formats. Write custom code only for a gap that no stock option covers, and name that gap with a documentation link in the PR body.
 - Define observable behavior and relevant failure cases before implementing a feature.
 - For executable behavior changes, write or update tests first and confirm they fail for the intended reason before implementing the change.
-- Derive expected results from requirements and test through the module's public interface.
+- Derive expected results from requirements and test through the module's public interface. Each test must exercise Aircastle code, not only a dependency.
 - Keep changes focused and follow existing repository conventions.
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.
+- Fix the class, not only the instance. When you fix a defect or a review finding, add or extend the check that would have caught it, following `.agents/skills/guardrails/SKILL.md`, and show it failing on a planted violation.
+- Before you change behavior that an earlier commit chose deliberately, read its history. Keep its intent or ask the user.
+- State the reason for every exemption, such as a lint override, knip ignore, policy allowance or type cast, in the allowance's reason string, or else in the commit and PR body that add it.
 - Verify documentation and configuration changes directly; add executable tests when behavior changes.
-- After edits, run affected checks. Run `vp run check` for final verification; it covers policy, source and emitted type contracts, runtime tests, and inference. A failed stage stops the command and leaves later stages unverified.
+- Run only the checks necessary to verify the current change and its affected callers. Select the smallest relevant test files, cases, and package checks. Explain what each selected check proves before running it.
+- Finish work locally before you open a PR. Implement, run the relevant checks, get one independent review, fix its findings, and have the reviewer check the fixes until none remain. Then open the PR ready for review. CI confirms finished work. A CI failure means a local check is missing, so add it.
+- Push to a PR once per review round, not once per fix. Run `vp run check` on the final commit before each push; it runs every script CI runs. Do not run repository-wide suites at other times unless the user requests them. This includes `vp run check`, `vp run test`, `vp run test:all`, and `vp run test:prepared`.
+- Broaden verification only when a failure or a concrete dependency impact requires it. Name the affected behavior and select its relevant checks. UI work does not require backend, database, mutation, or verification-tool suites unless it changes those concerns.
+- For documentation-only changes, inspect the edited text, links, and diff. Do not run executable test suites.
 - Reuse passing evidence for unchanged code, dependencies, configuration, and environment. Repeat a check only when its inputs change, it fails, or a new finding requires it. Record the command, exit code, and revision or content hash; setup failures do not establish behavior.
 - Use one focused audit of the completed change. Follow up on named findings and affected code instead of restarting a broad review. The author checks the reviewer's evidence and log; do not create recursive audit chains.
+- `.github/workflows/ci.yml` runs the required `Lint, typecheck and test` check. Each `vp run` step runs one package script; rerun that script locally to reproduce a failure.
 
 ## Public documentation
 

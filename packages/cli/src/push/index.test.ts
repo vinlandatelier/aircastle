@@ -157,6 +157,16 @@ test("first push publishes an unpublished project's definitions and creates a se
     expect(result.output).not.toContain("project-secret");
   }));
 
+test("a config default export that reads the URL through a getter is accepted", async () =>
+  fixture(async ({ config, command, requests }) => {
+    await config(
+      "export default { get url() { return process.env.AIRCASTLE_URL; }, project: process.env.AIRCASTLE_PROJECT_ID, collections: { articles: collection({ title: text() }) } };",
+    );
+    const result = await command();
+    expect(result.code, result.output).toBe(0);
+    expect(posts(requests)).toHaveLength(1);
+  }));
+
 test("missing lockfile is recovered without publication when remote definitions match", async () =>
   fixture(async ({ cwd, state, command, requests }) => {
     state.revision = "already-published";
@@ -251,7 +261,7 @@ test("explicit reconciliation previews and confirms the exact baseline", async (
     expect(result.output).toContain("REVIEW=");
     expect(result.output).toContain("articles");
     expect(posts(requests)).toHaveLength(1);
-    expect((posts(requests)[0]?.body as { baseline: string }).baseline).toBe("reviewed-revision");
+    expect(posts(requests)[0]?.body).toMatchObject({ baseline: "reviewed-revision" });
     expect(JSON.parse(await readFile(join(cwd, "aircastle.lock"), "utf8")).revision).toBe(
       "revision-published",
     );
@@ -313,8 +323,9 @@ function jsonLines(output: string): unknown[] {
   return output.split(/\r?\n/).flatMap((line) => {
     try {
       return [JSON.parse(line) as unknown];
-    } catch {
-      return [];
+    } catch (error) {
+      if (error instanceof SyntaxError) return [];
+      throw error;
     }
   });
 }

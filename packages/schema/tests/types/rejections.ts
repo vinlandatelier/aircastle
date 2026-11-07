@@ -51,6 +51,18 @@ export const rejectionCases: readonly RejectionCase[] = [
   },
   {
     suite: "contracts",
+    file: "tests/types/negative/contracts/choices-empty-has-no-index.ts",
+    codes: [2353],
+    target: "index: 3",
+  },
+  {
+    suite: "contracts",
+    file: "tests/types/negative/contracts/choices-constraints-need-causes.ts",
+    codes: [2322],
+    target: "const rejected: SchemaIssue",
+  },
+  {
+    suite: "contracts",
     file: "tests/types/negative/contracts/default-needs-causes.ts",
     codes: [2322],
     target: "causes: []",

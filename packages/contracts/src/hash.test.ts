@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
 import { describe, expect, test } from "vite-plus/test";
-import { contractId } from "./index.ts";
+import { canonicalContract, contractId } from "./index.ts";
 import { description, field, freezeDeep } from "./support/fixtures.ts";
 
 const vectors = [
@@ -22,15 +21,19 @@ const vectors = [
     bytes: '{"fields":{"title":{"nullable":false,"required":true,"type":"text","unique":false}}}',
     digest: "cba60446f99c12f7e6acb7ddb9ec8beb0a18584a5fb498bf7a6237f033119325",
   },
+  {
+    name: "choices kept as an ordered array",
+    input: description({ title: field({ choices: ["draft", "published"] }) }),
+    bytes:
+      '{"fields":{"title":{"choices":["draft","published"],"nullable":false,"required":true,"type":"text","unique":false}}}',
+    digest: "065b107c124ae608ff3de01c781b1309fa6759d7f966af8b8b93026f33762d36",
+  },
 ];
 
 describe("canonical data contract identifiers", () => {
-  test.each(vectors)(
-    "independent fixture bytes for $name produce the pinned digest",
-    ({ bytes, digest }) => {
-      expect(createHash("sha256").update(bytes, "utf8").digest("hex")).toBe(digest);
-    },
-  );
+  test.each(vectors)("$name has the pinned canonical bytes", ({ input, bytes }) => {
+    expect(canonicalContract(input)).toBe(bytes);
+  });
 
   test.each(vectors)("$name matches its independently pinned digest", async ({ input, digest }) => {
     expect(await contractId(input)).toBe(`v1:${digest}`);

@@ -1,4 +1,3 @@
-/** Type contracts only. Runtime builders and validation arrive through TDD. */
 export type IssuePath = readonly (string | number)[];
 
 export type ReceivedType =
@@ -54,7 +53,7 @@ export type ValidationIssue = IssueDetails &
       }
   );
 
-type NonemptyIssues<Issue> = readonly [Issue, ...Issue[]];
+export type NonemptyIssues<Issue> = readonly [Issue, ...Issue[]];
 
 export type ValidationResult<Output extends object> =
   | { readonly ok: true; readonly data: Output }
@@ -89,9 +88,18 @@ export type SchemaIssue = IssueDetails &
       }
     | {
         readonly code: "invalid_choices";
-        readonly reason: "empty" | "invalid_type" | "violates_constraints";
-        readonly index?: number;
-        readonly causes?: NonemptyIssues<ValidationIssue>;
+        readonly reason: "empty" | "invalid_type";
+      }
+    | {
+        readonly code: "invalid_choices";
+        readonly reason: "invalid_type";
+        readonly index: number;
+      }
+    | {
+        readonly code: "invalid_choices";
+        readonly reason: "violates_constraints";
+        readonly index: number;
+        readonly causes: NonemptyIssues<ValidationIssue>;
       }
     | {
         readonly code: "duplicate_choice";
@@ -118,12 +126,6 @@ export type SchemaIssue = IssueDetails &
         readonly reason: "requires_choices";
       }
   );
-
-/** Shape of the future exception; this is not a runtime constructor. */
-export interface SchemaError extends Error {
-  readonly name: "SchemaError";
-  readonly issues: NonemptyIssues<SchemaIssue>;
-}
 
 export type CodeLanguage =
   | "plaintext"
@@ -160,8 +162,8 @@ export interface CollectionDescription {
 }
 
 export interface CompiledCollection<Output extends object> {
-  validate(input: unknown): ValidationResult<Output>;
-  describe(): CollectionDescription;
+  validate: (input: unknown) => ValidationResult<Output>;
+  describe: () => CollectionDescription;
 }
 
 export type CompiledSchema<Outputs extends Record<string, object>> = {

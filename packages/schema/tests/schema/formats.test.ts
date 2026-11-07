@@ -1,13 +1,9 @@
-import { beforeAll, describe, test } from "vite-plus/test";
-import { compileCollection, requireSchemaApi, type RuntimeApi } from "../support/api.ts";
+import { describe, test } from "vite-plus/test";
+import { text } from "../../src/index.ts";
+import { compileCollection } from "../support/collections.ts";
 import { expectFailure, expectSuccess } from "../support/assertions.ts";
 
 describe("Aircastle format policy", () => {
-  let api: RuntimeApi;
-  beforeAll(() => {
-    api = requireSchemaApi();
-  });
-
   const validEmail = [
     "a@example.com",
     "ada@b.com",
@@ -60,14 +56,14 @@ describe("Aircastle format policy", () => {
   ];
   for (const title of validEmail) {
     test(`accepts email unchanged ${JSON.stringify(title)}`, () => {
-      expectSuccess(compileCollection(api, { title: api.text().email() }).validate({ title }), {
+      expectSuccess(compileCollection({ title: text().email() }).validate({ title }), {
         title,
       });
     });
   }
   for (const title of invalidEmail) {
     test(`rejects email ${JSON.stringify(title)}`, () => {
-      expectFailure(compileCollection(api, { title: api.text().email() }).validate({ title }), [
+      expectFailure(compileCollection({ title: text().email() }).validate({ title }), [
         { code: "invalid_email", path: ["title"] },
       ]);
     });
@@ -145,22 +141,22 @@ describe("Aircastle format policy", () => {
   ];
   for (const title of validUrls) {
     test(`accepts URL unchanged ${JSON.stringify(title)}`, () => {
-      expectSuccess(compileCollection(api, { title: api.text().url() }).validate({ title }), {
+      expectSuccess(compileCollection({ title: text().url() }).validate({ title }), {
         title,
       });
     });
   }
   for (const title of invalidUrls) {
     test(`rejects URL ${JSON.stringify(title)}`, () => {
-      expectFailure(compileCollection(api, { title: api.text().url() }).validate({ title }), [
+      expectFailure(compileCollection({ title: text().url() }).validate({ title }), [
         { code: "invalid_url", path: ["title"] },
       ]);
     });
   }
 
   test("format fields permit optional omission but reject supplied empty text", () => {
-    for (const field of [api.text().email().optional(), api.text().url().optional()]) {
-      expectSuccess(compileCollection(api, { title: field }).validate({}), {});
+    for (const field of [text().email().optional(), text().url().optional()]) {
+      expectSuccess(compileCollection({ title: field }).validate({}), {});
     }
   });
 });

@@ -1,14 +1,15 @@
 import {
-  collection,
   compileSchema,
-  text,
-  type CodeLanguage,
+  isMember,
+  isPlainRecord,
+  SchemaError,
   type CollectionDefinitions,
   type CollectionDescription,
   type CompiledCollection,
   type ValidationIssue,
   type ReceivedType,
 } from "@aircastle/schema";
+import { collectionName, decodeCollections, decodeDescription, fieldName } from "./decode.ts";
 
 export type { CollectionDescription, CollectionDefinitions } from "@aircastle/schema";
 export type DocumentData = Record<string, string | null>;
@@ -18,6 +19,7 @@ export type Permission = "content:read" | "content:write" | "schema:publish";
 export type ContentError =
   | { code: "validation_failed"; issues: readonly [ValidationIssue, ...ValidationIssue[]] }
   | { code: "unique_conflict"; field: string }
+  | { code: "referenced"; collection: string; field: string }
   | {
       code:
         | "invalid_request"
@@ -34,6 +36,54 @@ export type ContentError =
         | "unknown_write_outcome";
     };
 export type Result<Data> = { ok: true; data: Data } | { ok: false; error: ContentError };
+/**
+ * A partial update: `changes` replaces the supplied top-level fields and `unset` names fields to
+ * remove. Callers validate `changes` against the collection schema.
+ */
+export interface DocumentUpdate {
+  changes: unknown;
+  unset: readonly string[];
+}
+/**
+ * A list request as it travels over the wire. `where` is an unvalidated filter object, `sort` is a
+ * field name with an optional `-` prefix and `cursor` is an opaque value from a previous page.
+ */
+export interface DocumentListQuery {
+  where?: unknown;
+  sort?: string;
+  limit?: number;
+  cursor?: string;
+}
+/** The page size a list query uses when it does not name one. */
+export const defaultListLimit = 20;
+/** The largest page size a list query may request. */
+export const maximumListLimit = 100;
+const listQueryKeys = new Set<string>([
+  "where",
+  "sort",
+  "limit",
+  "cursor",
+] satisfies (keyof DocumentListQuery)[]);
+const listSortPattern = /^-?[A-Za-z_][A-Za-z0-9_]*$/;
+/** Whether `key` names a {@link DocumentListQuery} property. */
+export function isListQueryKey(key: string): key is keyof DocumentListQuery {
+  return listQueryKeys.has(key);
+}
+/** Whether `value` is an integer page size from 1 to {@link maximumListLimit}. */
+export function isListLimit(value: unknown): value is number {
+  return (
+    typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= maximumListLimit
+  );
+}
+/** Whether `value` is a field name, optionally prefixed with `-` for descending order. */
+export function isListSort(value: unknown): value is string {
+  return typeof value === "string" && listSortPattern.test(value);
+}
+/** One page of a list. `next` is null exactly when no further matching documents existed. */
+export interface DocumentPage<Document = ContentDocument> {
+  documents: Document[];
+  next: string | null;
+}
 export interface PublishedCollection {
   name: string;
   description: CollectionDescription;
@@ -52,193 +102,80 @@ export interface Lockfile {
   revision: string;
 }
 
-type FieldIdentity = Parameters<typeof collection>[0][string];
-interface WireText extends FieldIdentity {
-  min(value: number): WireText;
-  max(value: number): WireText;
-  optional(): WireText;
-  nullable(): WireText;
-  unique(): WireText;
-  default(value: string | null): WireText;
-  oneOf(values: readonly string[]): WireText;
-  email(): WireText;
-  url(): WireText;
-  editor(name: "textarea", options?: { rows?: number }): WireText;
-  editor(name: "code", options?: { language?: CodeLanguage }): WireText;
-  editor(name: "radio", options?: Readonly<Record<string, never>>): WireText;
-}
+type PlainIssueCode = Exclude<
+  ValidationIssue["code"],
+  "invalid_type" | "too_short" | "too_long" | "invalid_choice"
+>;
+type PlainErrorCode = Exclude<
+  ContentError["code"],
+  "validation_failed" | "unique_conflict" | "referenced"
+>;
 
-const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const reservedCollections = new Set([
-  "then",
-  "close",
-  "constructor",
-  "prototype",
-  "__proto__",
-  "toJSON",
-]);
-const fieldKeys = new Set([
-  "type",
-  "required",
-  "nullable",
-  "unique",
-  "min",
-  "max",
-  "choices",
-  "default",
-  "format",
-  "editor",
-]);
-const languages: readonly string[] = [
-  "plaintext",
-  "javascript",
-  "typescript",
-  "json",
-  "html",
-  "css",
-  "markdown",
-  "sql",
-];
+/** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
+const plainIssueCodes = {
+  required: "required",
+  invalid_document: "invalid_document",
+  invalid_unicode: "invalid_unicode",
+  invalid_character: "invalid_character",
+  invalid_email: "invalid_email",
+  invalid_url: "invalid_url",
+  unknown_field: "unknown_field",
+} satisfies { [Name in PlainIssueCode]: Name };
+/** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
+const receivedTypes = {
+  string: "string",
+  number: "number",
+  boolean: "boolean",
+  null: "null",
+  undefined: "undefined",
+  array: "array",
+  object: "object",
+  bigint: "bigint",
+  symbol: "symbol",
+  function: "function",
+} satisfies { [Name in ReceivedType]: Name };
+/** Self-keyed so a wrong value rejects its name; `Record<Union, true>` values are never read. */
+const plainErrorCodes = {
+  invalid_request: "invalid_request",
+  unauthorized: "unauthorized",
+  forbidden: "forbidden",
+  not_found: "not_found",
+  schema_mismatch: "schema_mismatch",
+  schema_conflict: "schema_conflict",
+  migration_required: "migration_required",
+  payload_too_large: "payload_too_large",
+  internal_error: "internal_error",
+  unavailable: "unavailable",
+  transport_error: "transport_error",
+  unknown_write_outcome: "unknown_write_outcome",
+} satisfies { [Name in PlainErrorCode]: Name };
 
-function record(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object") return false;
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Reflect.ownKeys(value).every((key) => {
-    const property = Object.getOwnPropertyDescriptor(value, key);
-    return (
-      typeof key === "string" && property?.enumerable === true && Object.hasOwn(property, "value")
-    );
-  });
-}
-
-function knownKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
-  return Object.keys(value).every((key) => allowed.has(key));
-}
-
-function collectionName(value: unknown): value is string {
-  return typeof value === "string" && identifier.test(value) && !reservedCollections.has(value);
-}
-
-function fieldName(value: string): boolean {
-  return identifier.test(value) && value !== "id";
-}
-
-function malformed(): never {
-  throw new TypeError("Invalid collection description");
-}
-
-function wireField(value: unknown): WireText {
-  if (
-    !record(value) ||
-    !knownKeys(value, fieldKeys) ||
-    value.type !== "text" ||
-    typeof value.required !== "boolean" ||
-    typeof value.nullable !== "boolean" ||
-    typeof value.unique !== "boolean"
-  )
-    malformed();
-  let builder: WireText = text();
-  if (!value.required) builder = builder.optional();
-  if (value.nullable) builder = builder.nullable();
-  if (value.unique) builder = builder.unique();
-  for (const constraint of ["min", "max"] as const) {
-    if (Object.hasOwn(value, constraint)) {
-      const bound = value[constraint];
-      if (typeof bound !== "number") malformed();
-      builder = builder[constraint](bound);
-    }
-  }
-  if (Object.hasOwn(value, "choices")) {
-    if (
-      !Array.isArray(value.choices) ||
-      !value.choices.every((choice: unknown) => typeof choice === "string")
-    )
-      malformed();
-    builder = builder.oneOf(value.choices);
-  }
-  if (Object.hasOwn(value, "format")) {
-    if (value.format === "email") builder = builder.email();
-    else if (value.format === "url") builder = builder.url();
-    else malformed();
-  }
-  if (Object.hasOwn(value, "default")) {
-    if (value.required || (typeof value.default !== "string" && value.default !== null))
-      malformed();
-    builder = builder.default(value.default);
-  }
-  if (Object.hasOwn(value, "editor")) {
-    const editor = value.editor;
-    if (!record(editor)) malformed();
-    if (editor.type === "textarea") {
-      if (!knownKeys(editor, new Set(["type", "rows"])) || typeof editor.rows !== "number")
-        malformed();
-      builder = builder.editor("textarea", { rows: editor.rows });
-    } else if (editor.type === "code") {
-      if (
-        !knownKeys(editor, new Set(["type", "language"])) ||
-        typeof editor.language !== "string" ||
-        !languages.includes(editor.language)
-      )
-        malformed();
-      builder = builder.editor("code", { language: editor.language as CodeLanguage });
-    } else if (editor.type === "radio") {
-      if (!knownKeys(editor, new Set(["type"]))) malformed();
-      builder = builder.editor("radio");
-    } else malformed();
-  }
-  return builder;
-}
-
-function decodedDescription(value: unknown): CompiledCollection<DocumentData> {
-  if (!record(value) || !knownKeys(value, new Set(["fields"])) || !record(value.fields))
-    malformed();
-  const fields: Record<string, FieldIdentity> = Object.create(null);
-  for (const [name, field] of Object.entries(value.fields)) {
-    if (!fieldName(name)) malformed();
-    fields[name] = wireField(field);
-  }
-  return compileSchema({ wire: collection(fields) }).wire;
+function isCount(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0;
 }
 
 export function describeCollections(definitions: CollectionDefinitions): PublishedCollection[] {
   const compiled = compileSchema(definitions);
   return Object.entries(compiled).map(([name, definition]) => {
     const description = definition.describe();
-    if (!collectionName(name) || !Object.keys(description.fields).every(fieldName)) malformed();
+    if (!collectionName(name) || !Object.keys(description.fields).every(fieldName))
+      throw new TypeError("Invalid collection description");
     return { name, description };
   });
 }
 
 export function parseCollections(input: unknown): Result<PublishedCollection[]> {
-  try {
-    if (!Array.isArray(input)) malformed();
-    const names = new Set<string>();
-    const collections: PublishedCollection[] = [];
-    for (const entry of input) {
-      if (
-        !record(entry) ||
-        !knownKeys(entry, new Set(["name", "description"])) ||
-        !collectionName(entry.name) ||
-        names.has(entry.name)
-      )
-        malformed();
-      names.add(entry.name);
-      collections.push({
-        name: entry.name,
-        description: decodedDescription(entry.description).describe(),
-      });
-    }
-    return { ok: true, data: collections };
-  } catch {
-    return { ok: false, error: { code: "invalid_request" } };
-  }
+  const decoded = decodeCollections(input);
+  return decoded.ok ? decoded : { ok: false, error: { code: "invalid_request" } };
 }
 
 export function compileDescription(
   description: CollectionDescription,
 ): CompiledCollection<DocumentData> {
-  return decodedDescription(description);
+  const decoded = decodeDescription(description, []);
+  if (decoded.ok) return decoded.data;
+  if (decoded.issue.reason === "invalid_schema") throw new SchemaError(decoded.issue.issues);
+  throw new TypeError("Invalid collection description", { cause: decoded.issue });
 }
 
 function canonical(value: unknown): string {
@@ -246,16 +183,14 @@ function canonical(value: unknown): string {
     if (Array.isArray(entry)) return entry.map(sorted);
     if (entry !== null && typeof entry === "object") {
       return Object.fromEntries(
-        Object.entries(entry)
-          .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-          .map(([key, child]) => [key, sorted(child)]),
+        Object.keys(entry)
+          .sort()
+          .map((key) => [key, sorted(Reflect.get(entry, key))]),
       );
     }
     return entry;
   };
-  const result = JSON.stringify(sorted(value));
-  if (result === undefined) malformed();
-  return result;
+  return JSON.stringify(sorted(value));
 }
 
 export function sameSchema(
@@ -307,7 +242,6 @@ export function compatibleForCreate(
     return (
       !(source.nullable && !target.nullable) &&
       !(!source.required && target.required) &&
-      Object.hasOwn(source, "default") === Object.hasOwn(target, "default") &&
       source.default === target.default &&
       source.unique === target.unique &&
       (source.min ?? -Infinity) >= (target.min ?? -Infinity) &&
@@ -319,14 +253,22 @@ export function compatibleForCreate(
   });
 }
 
+/** Names of the fields whose string values must be unique within the collection. */
+export function uniqueFields(description: CollectionDescription): string[] {
+  return Object.entries(description.fields)
+    .filter(([, field]) => field.unique)
+    .map(([name]) => name);
+}
+
 export function validateStored(description: CollectionDescription, data: unknown): boolean {
-  if (!record(data)) return false;
   const result = compileDescription(description).validate(data);
+  if (!result.ok) return false;
+  /** `validate` succeeded, so `data` is a plain record of data properties. */
+  const stored = data as Readonly<Record<string, unknown>>;
   return (
-    result.ok &&
-    Object.keys(data).length === Object.keys(result.data).length &&
+    Object.keys(stored).length === Object.keys(result.data).length &&
     Object.entries(result.data).every(
-      ([key, value]) => Object.hasOwn(data, key) && data[key] === value,
+      ([key, value]) => Object.hasOwn(stored, key) && stored[key] === value,
     )
   );
 }
@@ -348,69 +290,23 @@ export function projectDocument(
 }
 
 function issue(input: unknown): ValidationIssue | undefined {
-  if (
-    !record(input) ||
-    typeof input.code !== "string" ||
-    typeof input.message !== "string" ||
-    !Array.isArray(input.path)
-  )
+  if (!isPlainRecord(input) || typeof input.message !== "string" || !Array.isArray(input.path))
     return undefined;
   const path: (string | number)[] = [];
   for (const value of input.path) {
-    if (
-      typeof value !== "string" &&
-      !(typeof value === "number" && Number.isInteger(value) && value >= 0)
-    )
-      return undefined;
+    if (typeof value !== "string" && !isCount(value)) return undefined;
     path.push(value);
   }
   const details = { path, message: input.message };
+  if (isMember(plainIssueCodes, input.code)) return { ...details, code: input.code };
   switch (input.code) {
-    case "required":
-    case "invalid_document":
-    case "invalid_unicode":
-    case "invalid_character":
-    case "invalid_email":
-    case "invalid_url":
-    case "unknown_field":
-      return { ...details, code: input.code };
     case "invalid_type":
-      if (
-        input.expected !== "string" ||
-        typeof input.received !== "string" ||
-        ![
-          "string",
-          "number",
-          "boolean",
-          "null",
-          "undefined",
-          "array",
-          "object",
-          "bigint",
-          "symbol",
-          "function",
-        ].includes(input.received)
-      )
-        return undefined;
-      return {
-        ...details,
-        code: "invalid_type",
-        expected: "string",
-        received: input.received as ReceivedType,
-      };
+      if (input.expected !== "string" || !isMember(receivedTypes, input.received)) return undefined;
+      return { ...details, code: "invalid_type", expected: "string", received: input.received };
     case "too_short":
     case "too_long": {
       const bound = input.code === "too_short" ? input.minimum : input.maximum;
-      if (
-        typeof bound !== "number" ||
-        !Number.isInteger(bound) ||
-        bound < 0 ||
-        typeof input.actual !== "number" ||
-        !Number.isInteger(input.actual) ||
-        input.actual < 0 ||
-        input.unit !== "graphemes"
-      )
-        return undefined;
+      if (!isCount(bound) || !isCount(input.actual) || input.unit !== "graphemes") return undefined;
       return input.code === "too_short"
         ? { ...details, code: "too_short", minimum: bound, actual: input.actual, unit: "graphemes" }
         : { ...details, code: "too_long", maximum: bound, actual: input.actual, unit: "graphemes" };
@@ -423,13 +319,12 @@ function issue(input: unknown): ValidationIssue | undefined {
       )
         return undefined;
       return { ...details, code: "invalid_choice", allowed: [...input.allowed] };
-    default:
-      return undefined;
   }
+  return undefined;
 }
 
 export function parseContentError(input: unknown): ContentError | undefined {
-  if (!record(input)) return undefined;
+  if (!isPlainRecord(input)) return undefined;
   if (input.code === "validation_failed") {
     if (!Array.isArray(input.issues) || input.issues.length === 0) return undefined;
     const issues: ValidationIssue[] = [];
@@ -445,21 +340,10 @@ export function parseContentError(input: unknown): ContentError | undefined {
       ? { code: "unique_conflict", field: input.field }
       : undefined;
   }
-  switch (input.code) {
-    case "invalid_request":
-    case "unauthorized":
-    case "forbidden":
-    case "not_found":
-    case "schema_mismatch":
-    case "schema_conflict":
-    case "migration_required":
-    case "payload_too_large":
-    case "internal_error":
-    case "unavailable":
-    case "transport_error":
-    case "unknown_write_outcome":
-      return { code: input.code };
-    default:
-      return undefined;
+  if (input.code === "referenced") {
+    return typeof input.collection === "string" && typeof input.field === "string"
+      ? { code: "referenced", collection: input.collection, field: input.field }
+      : undefined;
   }
+  return isMember(plainErrorCodes, input.code) ? { code: input.code } : undefined;
 }
