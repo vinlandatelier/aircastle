@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vite-plus/test'
 import {
   phoneEditorFieldAt,
-  phoneFingerAt,
   phoneFrame,
   phoneReplyToastAt,
   phoneScreenAt,
   phoneSheetAt,
   phoneSiteScrollAt,
   phoneSpots,
+  phoneTouchAt,
 } from './phone-story'
 import { askTiming } from './site-ask'
 import { frameAt, loopDuration, seoTiming } from './timeline'
@@ -25,6 +25,18 @@ function runsOf<T>(read: (elapsed: number) => T) {
     else runs.push({ value, from: elapsed, to: elapsed + step })
   }
   return runs
+}
+
+const tapScreens: Record<string, string> = {
+  row: 'posts',
+  research: 'editor',
+  decision: 'editor',
+  preview: 'editor',
+  reference: 'site',
+  publish: 'site',
+  bell: 'site',
+  'notification-preview': 'site',
+  'docs-publish': 'docs',
 }
 
 describe('the phone story', () => {
@@ -85,21 +97,56 @@ describe('the phone story', () => {
     }
   })
 
-  it('keeps the finger on the screen, clear of its rounded corners, all loop long', () => {
-    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
-      const finger = phoneFingerAt(frameAt(elapsed))
-      if (!finger.shown) continue
-      expect(finger.left).toBeGreaterThanOrEqual(20)
-      expect(finger.left).toBeLessThanOrEqual(phoneFrame.width - 20)
-      expect(finger.top).toBeGreaterThanOrEqual(20)
-      expect(finger.top).toBeLessThanOrEqual(phoneFrame.height - 20)
-    }
-  })
-
-  it("lifts the finger while Air's sheet is up, since nothing in it is tapped", () => {
+  it('shows a tap on each control as it is pressed, and nothing between taps', () => {
+    const tapped: string[] = []
     for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
       const frame = frameAt(elapsed)
-      if (phoneSheetAt(frame) === 'air') expect(phoneFingerAt(frame).shown).toBe(false)
+      const touch = phoneTouchAt(frame)
+      if (frame.cursor === 'moving') expect(touch, 'nothing glides across the screen').toBeNull()
+      if (touch?.kind !== 'tap') continue
+      expect(touch).toEqual({
+        kind: 'tap',
+        target: frame.cursorTarget,
+        ...phoneSpots[frame.cursorTarget],
+      })
+      expect(phoneScreenAt(frame), `the ${touch.target} tap stays on its own screen`).toBe(
+        tapScreens[touch.target],
+      )
+      if (frame.cursor === 'clicking' && tapped.at(-1) !== touch.target) tapped.push(touch.target)
+    }
+    expect(tapped).toEqual([
+      'row',
+      'research',
+      'decision',
+      'preview',
+      'reference',
+      'publish',
+      'bell',
+      'notification-preview',
+      'docs-publish',
+    ])
+  })
+
+  it('shows a held press only while selecting the opening line', () => {
+    let pressed = 0
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      const touch = phoneTouchAt(frame)
+      if (touch?.kind !== 'press') continue
+      pressed += step
+      expect(['line-start', 'line-end']).toContain(touch.target)
+      expect(phoneScreenAt(frame)).toBe('site')
+      expect(touch.left).toBeGreaterThanOrEqual(phoneSpots['line-start'].left - 1)
+      expect(touch.top).toBeGreaterThanOrEqual(phoneSpots['line-start'].top - 1)
+      expect(touch.top).toBeLessThanOrEqual(phoneSpots['line-end'].top + 1)
+    }
+    expect(pressed, 'the selection is held long enough to see').toBeGreaterThan(500)
+  })
+
+  it("shows no touch while Air's sheet is up, since nothing in it is tapped", () => {
+    for (let elapsed = 0; elapsed < loopDuration; elapsed += step) {
+      const frame = frameAt(elapsed)
+      if (phoneSheetAt(frame) === 'air') expect(phoneTouchAt(frame)).toBeNull()
     }
   })
 

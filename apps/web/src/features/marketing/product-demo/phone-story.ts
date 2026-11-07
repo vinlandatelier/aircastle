@@ -13,7 +13,6 @@ const airSheetLingers = 900
 const sheetLowers = 400
 const readDownDuration = 1100
 const toastLingersAfterJump = 900
-const phoneDrift = 0.35
 
 /** Which screen the phone shows for this frame of the story. */
 export function phoneScreenAt(frame: Frame): PhoneScreen {
@@ -71,17 +70,45 @@ export function phoneEditorFieldAt(frame: Frame): 'top' | 'body' | 'seo' {
   return frame.seoElapsed !== null && frame.seoElapsed >= 0 ? 'seo' : 'body'
 }
 
-/** Where the finger is on the phone, and whether it touches the screen. It lifts while Air's sheet is up, since nothing in it is tapped. */
-export function phoneFingerAt(frame: Frame) {
-  const { left, top } = cursorPosition({
-    spots: phoneSpots,
-    from: frame.cursorFrom,
-    target: frame.cursorTarget,
-    progress: frame.cursorProgress,
-    curve: frame.cursorBend,
-    drift: { x: frame.cursorDriftX * phoneDrift, y: frame.cursorDriftY * phoneDrift },
-  })
-  return { left, top, shown: frame.cursor !== 'resting' && phoneSheetAt(frame) !== 'air' }
+const tapScreens: Partial<Record<CursorTarget, PhoneScreen>> = {
+  row: 'posts',
+  research: 'editor',
+  decision: 'editor',
+  preview: 'editor',
+  reference: 'site',
+  publish: 'site',
+  bell: 'site',
+  'notification-preview': 'site',
+  'docs-publish': 'docs',
+}
+
+/** A touch on the phone screen: a tap on a control, or a held press that selects the opening line. */
+export type PhoneTouch = {
+  kind: 'tap' | 'press'
+  target: CursorTarget
+  left: number
+  top: number
+}
+
+/** The touch on the phone screen, if any. Phones have no pointer, so nothing hovers or glides: a tap shows on the control as it is pressed, and a press shows only while it selects text. */
+export function phoneTouchAt(frame: Frame): PhoneTouch | null {
+  const target = frame.cursorTarget
+  const holding = frame.cursor === 'hovering' && target === 'line-start'
+  if (frame.cursor === 'dragging' || holding) {
+    const { left, top } = cursorPosition({
+      spots: phoneSpots,
+      from: frame.cursorFrom,
+      target,
+      progress: frame.cursorProgress,
+      curve: frame.cursorBend,
+      drift: { x: 0, y: 0 },
+    })
+    return { kind: 'press', target, left, top }
+  }
+  const pressed = frame.cursor === 'clicking' || frame.cursor === 'still'
+  const onScreen = tapScreens[target] === phoneScreenAt(frame)
+  if (!pressed || frame.cursorProgress < 1 || !onScreen) return null
+  return { kind: 'tap', target, ...phoneSpots[target] }
 }
 
 /** The phone preview's size in its own pixels, before it is scaled to the stage. */

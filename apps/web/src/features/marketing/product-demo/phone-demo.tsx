@@ -27,13 +27,13 @@ import { Outro } from './outro'
 import { PersonAvatar } from './person'
 import {
   phoneEditorFieldAt,
-  phoneFingerAt,
   phoneFrame,
   phoneReplyToastAt,
   phoneScreenAt,
   phoneSheetAt,
   phoneSiteScrollAt,
   phoneSpots,
+  phoneTouchAt,
 } from './phone-story'
 import { AuthorsCell, StatusPill } from './posts'
 import { posts } from './posts-data'
@@ -54,8 +54,6 @@ import styles from './product-demo.module.css'
 const statusBarHeight = 32
 const appBarHeight = 48
 const contextBarHeight = 52
-
-const fingerRadius = 14
 
 const rowAgents = [orchestrator, thorfinn, canute, askeladd, einar] as const
 
@@ -452,25 +450,32 @@ function DocsScreen({ elapsed, docsElapsed }: { elapsed: number; docsElapsed: nu
   )
 }
 
-function PhoneFinger({ frame }: { frame: Frame }) {
-  const { left, top, shown } = phoneFingerAt(frame)
-  const pressing = frame.cursor === 'clicking' || frame.cursor === 'dragging'
+function PhoneTouchMark({ frame }: { frame: Frame }) {
+  const touch = phoneTouchAt(frame)
+  if (!touch) return null
+  if (touch.kind === 'press')
+    return (
+      <span
+        data-phone-touch="press"
+        data-target={touch.target}
+        style={{ left: touch.left, top: touch.top }}
+        className="pointer-events-none absolute z-[55] size-0"
+      >
+        <span className="absolute -inset-3.5 rounded-full border border-white/70 bg-white/40 shadow-[0_2px_10px_rgb(0_0_0/0.25)]" />
+      </span>
+    )
   return (
     <span
-      data-phone-finger
-      data-state={frame.cursor}
-      data-target={frame.cursorTarget}
-      data-shown={shown}
-      style={{ translate: `${left - fingerRadius}px ${top - fingerRadius}px` }}
-      className={cn(
-        'pointer-events-none absolute top-0 left-0 z-[55] size-7 rounded-full border border-white/70 bg-white/35 shadow-[0_2px_10px_rgb(0_0_0/0.25)] backdrop-blur-[1px] transition-[opacity,scale] duration-150',
-        shown ? 'opacity-100' : 'opacity-0',
-        pressing && 'scale-75 bg-white/55',
-      )}
+      key={touch.target}
+      data-phone-touch="tap"
+      data-target={touch.target}
+      style={{ left: touch.left, top: touch.top }}
+      className="pointer-events-none absolute z-[55] size-0"
     >
-      {frame.cursor === 'clicking' && (
-        <span className="absolute inset-0 animate-ping rounded-full border border-white/80" />
-      )}
+      <span className={cn('absolute -inset-4 rounded-full bg-white/45', styles.tapDot)} />
+      <span
+        className={cn('absolute -inset-4 rounded-full border-2 border-white/75', styles.tapRing)}
+      />
     </span>
   )
 }
@@ -530,7 +535,7 @@ export function PhoneDemo({ frame, scale }: { frame: Frame; scale: number }) {
         )}
       </div>
       {frame.confetti && <Confetti {...frame.confetti} from={phoneSpots.publish} />}
-      <PhoneFinger frame={frame} />
+      <PhoneTouchMark frame={frame} />
       {frame.outroElapsed !== null && (
         <Outro phone elapsed={frame.outroElapsed} opacity={frame.outroOpacity} />
       )}

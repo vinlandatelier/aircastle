@@ -129,7 +129,7 @@ type PhoneMoment = {
   screen: string
   sheet: string
   dialog: string | null
-  finger: { x: number; y: number; target: string; state: string; shown: boolean }
+  touch: { x: number; y: number; target: string; kind: string } | null
   phone: Rect
   pressed: Rect | null
   opening: Rect[]
@@ -144,10 +144,9 @@ function readPhone(frame: Locator) {
         const { left, top, right, bottom } = node.getBoundingClientRect()
         return { left, top, right, bottom }
       }
-      const finger = element.querySelector('[data-phone-finger]')
-      if (!finger) throw new Error('The phone preview has no finger')
-      const fingerBox = finger.getBoundingClientRect()
-      const target = finger.getAttribute('data-target') ?? ''
+      const touch = element.querySelector('[data-phone-touch]')
+      const touchBox = touch?.getBoundingClientRect()
+      const target = touch?.getAttribute('data-target') ?? ''
       const pressed = tapTargets[target] ? element.querySelector(tapTargets[target]) : null
       const opening = element.querySelector('[data-demo-site-opening]')
       return {
@@ -155,13 +154,15 @@ function readPhone(frame: Locator) {
         sheet: element.getAttribute('data-phone-sheet-open') ?? '',
         dialog:
           element.querySelector('[data-phone-sheet="ask"]')?.getAttribute('data-state') ?? null,
-        finger: {
-          x: fingerBox.left + fingerBox.width / 2,
-          y: fingerBox.top + fingerBox.height / 2,
-          target,
-          state: finger.getAttribute('data-state') ?? '',
-          shown: finger.getAttribute('data-shown') === 'true',
-        },
+        touch:
+          touch && touchBox
+            ? {
+                x: touchBox.left + touchBox.width / 2,
+                y: touchBox.top + touchBox.height / 2,
+                target,
+                kind: touch.getAttribute('data-phone-touch') ?? '',
+              }
+            : null,
         phone: rect(element),
         pressed: pressed ? rect(pressed) : null,
         opening: opening
@@ -226,16 +227,16 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
     tick += 1
   ) {
     let now = await readPhone(frame)
-    if (now.finger.state === 'clicking' && !taps.has(now.finger.target)) {
+    if (now.touch?.kind === 'tap' && !taps.has(now.touch.target)) {
       await page.waitForTimeout(600)
       now = await readPhone(frame)
     }
     if (screens.at(-1) !== now.screen) screens.push(now.screen)
     if (now.sheet !== 'none' && sheets.at(-1) !== now.sheet) sheets.push(now.sheet)
-    if (now.finger.shown)
+    if (now.touch)
       expect(
-        contains(now.phone, now.finger.x, now.finger.y),
-        `the finger stays on the screen at ${now.finger.target}`,
+        contains(now.phone, now.touch.x, now.touch.y),
+        `the touch on ${now.touch.target} is on the screen`,
       ).toBe(true)
     for (const opacity of now.sheetOpacities)
       expect(opacity, 'sheets slide in solid, never see-through').toBe(1)
@@ -247,15 +248,15 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
         now.phone.right + 1,
       )
     }
-    if (now.finger.state === 'clicking' && !taps.has(now.finger.target)) {
-      expect(now.pressed, `${now.finger.target} is on the screen when tapped`).not.toBeNull()
+    if (now.touch?.kind === 'tap' && !taps.has(now.touch.target)) {
+      expect(now.pressed, `${now.touch.target} is on the screen when tapped`).not.toBeNull()
       expect(
-        contains(now.pressed!, now.finger.x, now.finger.y),
-        `the ${now.finger.target} tap at ${Math.round(now.finger.x - now.phone.left)},${Math.round(now.finger.y - now.phone.top)} lands on it: ${JSON.stringify(now.pressed)} in ${JSON.stringify(now.phone)}`,
+        contains(now.pressed!, now.touch.x, now.touch.y),
+        `the ${now.touch.target} tap at ${Math.round(now.touch.x - now.phone.left)},${Math.round(now.touch.y - now.phone.top)} lands on it: ${JSON.stringify(now.pressed)} in ${JSON.stringify(now.phone)}`,
       ).toBe(true)
-      taps.set(now.finger.target, tick)
+      taps.set(now.touch.target, tick)
     }
-    if (now.finger.state === 'dragging') {
+    if (now.touch?.kind === 'press') {
       dragStart ??= now
       dragEnd = now
     }
@@ -268,7 +269,7 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
       ).toBeLessThan(0.05)
       backdropChecked = true
     }
-    await page.clock.runFor(story(now.finger.state === 'moving' ? 30 : 60))
+    await page.clock.runFor(story(40))
   }
 
   expect(screens).toEqual(['posts', 'editor', 'site', 'docs', 'posts'])
@@ -278,13 +279,13 @@ test('on a phone, the preview tells the same story on a phone-shaped screen, and
   const [firstLine] = dragStart?.opening ?? []
   const lastLine = dragEnd?.opening.at(-1)
   if (!dragStart || !dragEnd || !firstLine || !lastLine)
-    throw new Error('The finger never selected the opening line')
+    throw new Error('The opening line was never selected')
   expect(
-    contains(firstLine, dragStart.finger.x, dragStart.finger.y, 12),
+    contains(firstLine, dragStart.touch!.x, dragStart.touch!.y, 12),
     'the selection starts on the opening line',
   ).toBe(true)
   expect(
-    contains(lastLine, dragEnd.finger.x, dragEnd.finger.y, 12),
+    contains(lastLine, dragEnd.touch!.x, dragEnd.touch!.y, 12),
     'and ends on its last word',
   ).toBe(true)
 })

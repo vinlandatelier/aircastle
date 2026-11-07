@@ -215,3 +215,52 @@
     opacity: 0;
   }
 }
+
+.tapDot,
+.tapRing {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tapDot {
+    animation: tap-dot 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .tapRing {
+    animation: tap-ring 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+}
+
+@keyframes tap-dot {
+  0% {
+    scale: 0.5;
+    opacity: 0;
+  }
+
+  15% {
+    scale: 1;
+    opacity: 1;
+  }
+
+  45% {
+    scale: 0.92;
+    opacity: 1;
+  }
+
+  100% {
+    scale: 0.9;
+    opacity: 0;
+  }
+}
+
+@keyframes tap-ring {
+  0% {
+    scale: 0.7;
+    opacity: 0.9;
+  }
+
+  100% {
+    scale: 2.2;
+    opacity: 0;
+  }
+}
