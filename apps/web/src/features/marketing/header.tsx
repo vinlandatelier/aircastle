@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
-import { ArrowRightIcon } from 'lucide-react'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { ArrowRightIcon, BookOpenIcon } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThemeSwitcher } from '@/components/shell'
 
 export function Header() {
@@ -36,6 +36,20 @@ export function Header() {
         </Link>
         <div className="flex items-center gap-1">
           <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <a
+                    href="/docs"
+                    aria-label="Documentation"
+                    className="inline-flex size-9 items-center justify-center rounded-lg text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid"
+                  />
+                }
+              >
+                <BookOpenIcon aria-hidden="true" className="size-5" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Docs</TooltipContent>
+            </Tooltip>
             <ThemeSwitcher className="size-9 rounded-lg text-foreground hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid [&_svg]:size-5!" />
           </TooltipProvider>
           <span

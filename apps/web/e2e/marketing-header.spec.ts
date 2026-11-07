@@ -95,6 +95,10 @@ for (const theme of ['light', 'dark'] as const) {
     const toggle = page.getByRole('banner').getByRole('button', { name: 'Dark theme' })
     await page.keyboard.press('Tab')
     await page.keyboard.press('Tab')
+    await expect(
+      page.getByRole('banner').getByRole('link', { name: 'Documentation' }),
+    ).toBeFocused()
+    await page.keyboard.press('Tab')
     await expect(toggle).toBeFocused()
     const contrast = await toggle.evaluate((element) => {
       const style = getComputedStyle(element)
@@ -130,5 +134,30 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Space')
     await expect(html).toHaveClass(new RegExp(`\\b${theme}\\b`))
     await expect(toggle).toHaveAttribute('aria-pressed', String(theme === 'dark'))
+  })
+}
+
+for (const width of [1440, 320]) {
+  test(`landing header at ${width}px has a docs icon beside the theme switch that leads to /docs`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 700 })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    const banner = page.getByRole('banner')
+    const docs = banner.getByRole('link', { name: 'Documentation' })
+    await expect(docs).toHaveAttribute('href', '/docs')
+    const docsBox = await docs.boundingBox()
+    const themeBox = await banner.getByRole('button', { name: 'Dark theme' }).boundingBox()
+    if (!docsBox || !themeBox) throw new Error('The header icons are not laid out')
+    expect(Math.abs(docsBox.y - themeBox.y), 'it sits on the theme switch line').toBeLessThan(2)
+    expect(Math.abs(docsBox.width - themeBox.width), 'at the same size').toBeLessThan(1)
+    expect(themeBox.x - (docsBox.x + docsBox.width), 'right beside it').toBeLessThan(12)
+    expect(themeBox.x - (docsBox.x + docsBox.width)).toBeGreaterThanOrEqual(0)
+    await docs.hover()
+    await expect(page.getByText('Docs', { exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    )
   })
 }
