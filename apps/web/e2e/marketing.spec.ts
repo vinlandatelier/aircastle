@@ -64,7 +64,8 @@ const shownWord = (page: import('@playwright/test').Page) =>
   page.getByRole('heading', { level: 1 }).locator('[aria-hidden="true"] > span > span')
 
 test('hero cycles its last word while its accessible name stays on write', async ({ page }) => {
-  await page.clock.install()
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/')
   const hero = page.getByRole('heading', {
@@ -79,7 +80,8 @@ test('hero cycles its last word while its accessible name stays on write', async
 })
 
 test('hero keeps write with reduced motion', async ({ page }) => {
-  await page.clock.install()
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   await expect(shownWord(page)).toHaveText('write')

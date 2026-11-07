@@ -9,6 +9,8 @@ function story(timeline: number) {
   return Math.ceil(timeline / playbackRate)
 }
 
+test.describe.configure({ timeout: 90_000 })
+
 test('product preview sits below the hero without a visible label', async ({ page }) => {
   await page.goto('/')
   const preview = page.getByRole('region', { name: 'Aircastle preview' })

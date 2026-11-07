@@ -62,7 +62,13 @@ async function expectPublic(page: Page, dark: boolean) {
     'font-weight',
     '400',
   )
-  await expect(page.getByRole('link', { name: 'Home', exact: true })).toHaveCount(0)
+  const home = page.getByRole('link', { name: 'Home', exact: true })
+  const art = page.locator('[data-sign-in-art]')
+  await expect(home).toBeVisible()
+  const [homeBox, artBox] = await Promise.all([home.boundingBox(), art.boundingBox()])
+  if (!homeBox || !artBox) throw new Error('Home link is not laid out')
+  expect(homeBox.x - artBox.x, 'tucked into the art card').toBeLessThan(48)
+  expect(homeBox.y - artBox.y).toBeLessThan(48)
   const heading = page.getByRole('heading', { name: 'Sign in to Aircastle' })
   expect(
     parseFloat(await heading.evaluate((element) => getComputedStyle(element).fontSize)),

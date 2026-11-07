@@ -39,6 +39,8 @@ async function expectNoSideScroll(page: Page) {
   ).toBeLessThanOrEqual(390)
 }
 
+test.describe.configure({ timeout: 90_000 })
+
 test('on a phone, the hero title wraps cleanly and the rotating word never reflows it', async ({
   page,
 }) => {

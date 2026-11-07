@@ -51,7 +51,7 @@ test('a first visit is dark whatever the system prefers', async ({ page }) => {
 test('sign-in art is the same green folds in light and dark, on an inset rounded card that says Meet Air', async ({
   page,
 }) => {
-  const looks: { left: number[]; right: number[] }[] = []
+  const looks: { left: number[]; right: number[]; brightness: number }[] = []
   for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
       key: themeStorageKey,
@@ -114,12 +114,25 @@ test('sign-in art is the same green folds in light and dark, on an inset rounded
             for (const channel of [0, 1, 2]) sum[channel]! += pixels[index + channel] ?? 0
           return sum.map((value) => value / (pixels.length / 4))
         }
-        return { left: average(0.02, 0.2), right: average(0.88, 0.6) }
+        const all = context.getImageData(0, 0, image.width, image.height).data
+        let light = 0
+        for (let index = 0; index < all.length; index += 4)
+          light +=
+            0.2126 * (all[index] ?? 0) +
+            0.7152 * (all[index + 1] ?? 0) +
+            0.0722 * (all[index + 2] ?? 0)
+        return {
+          left: average(0.02, 0.2),
+          right: average(0.88, 0.6),
+          brightness: light / (all.length / 4),
+        }
       }, shot),
     )
   }
   const [light, dark] = looks
   if (!light || !dark) throw new Error('Both themes were not captured')
+  expect(light.brightness, 'dim enough for white text to read well').toBeLessThan(175)
+  expect(light.brightness, 'but still a light, fresh green').toBeGreaterThan(150)
   const [red = 0, green = 0] = light.left
   expect(green - red, 'green and cyan, not orange').toBeGreaterThan(40)
   for (const side of ['left', 'right'] as const)
