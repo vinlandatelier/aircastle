@@ -171,7 +171,7 @@
   --secondary: --alpha(var(--color-black) / 4%);
   --secondary-foreground: var(--foreground);
   --muted: --alpha(var(--color-black) / 4%);
-  --muted-foreground: var(--color-zinc-600);
+  --muted-foreground: var(--color-neutral-600);
   --accent: --alpha(var(--color-black) / 4%);
   --accent-foreground: var(--foreground);
   --destructive: var(--color-red-500);
@@ -186,7 +186,7 @@
   --radius: 0.3rem;
   --sidebar: var(--background);
   --sidebar-foreground: var(--muted-foreground);
-  --sidebar-label-foreground: #4e4e54;
+  --sidebar-label-foreground: #4f4f4f;
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--accent);
@@ -196,7 +196,7 @@
 }
 
 :root.dark:has([data-theme-scope='dashboard']) {
-  --background: #19191c;
+  --background: #171717;
   --foreground: var(--color-neutral-100);
   --card: var(--background);
   --card-foreground: var(--foreground);
@@ -207,11 +207,11 @@
   --secondary: --alpha(var(--color-white) / 4%);
   --secondary-foreground: var(--foreground);
   --muted: --alpha(var(--color-white) / 4%);
-  --muted-foreground: var(--color-zinc-400);
-  --accent: #2d2d31;
+  --muted-foreground: var(--color-neutral-400);
+  --accent: #2b2b2b;
   --accent-foreground: var(--foreground);
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-  --border: #262629;
+  --border: #262626;
   --input: var(--border);
   --ring: var(--color-neutral-500);
   --chart-1: oklch(0.87 0 0);

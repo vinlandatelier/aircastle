@@ -83,9 +83,27 @@ for (const theme of ['light', 'dark'] as const) {
       'aria-pressed',
       String(theme === 'dark'),
     )
-    const background = theme === 'dark' ? '#19191c' : '#ffffff'
+    const background = theme === 'dark' ? '#171717' : '#ffffff'
     const foreground = theme === 'dark' ? 'oklch(0.97 0 none)' : 'oklch(0.269 0 none)'
     await expectPaint(page.locator('body'), background, foreground)
+    const tints = await page.evaluate(() => {
+      const context = document.createElement('canvas').getContext('2d')
+      if (!context) throw new Error('No canvas')
+      const scope = document.querySelector('[data-theme-scope="dashboard"]') ?? document.body
+      return ['--background', '--muted-foreground', '--border', '--accent'].map((token) => {
+        const probe = document.createElement('span')
+        probe.style.color = `var(${token})`
+        scope.append(probe)
+        context.clearRect(0, 0, 1, 1)
+        context.fillStyle = getComputedStyle(probe).color
+        probe.remove()
+        context.fillRect(0, 0, 1, 1)
+        const [red = 0, green = 0, blue = 0] = context.getImageData(0, 0, 1, 1).data
+        return { token, tint: Math.max(red, green, blue) - Math.min(red, green, blue) }
+      })
+    })
+    for (const { token, tint } of tints)
+      expect(tint, `${token} is a pure grey, like the landing preview`).toBeLessThanOrEqual(1)
     await page.getByRole('button', { name: 'Search pages', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Search pages' })
     await expect(dialog).toBeVisible()
