@@ -329,7 +329,7 @@ describe("local auth HTTP boundaries", () => {
       },
       { limits: defaults, logger },
     );
-  }, 30_000);
+  });
 
   test("request paths, errors and projections never leak actual credential canaries", async () => {
     const logs: string[] = [];
