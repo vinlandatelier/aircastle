@@ -1,6 +1,5 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vite-plus/test'
-import { createBrowserAuth } from '.'
 import {
   displayHttp,
   expectNoShell,
@@ -111,12 +110,17 @@ describe('Requested destinations over display-only HTTP, without authorization p
         const http = displayHttp({
           'GET /api/auth/state': () =>
             ok({ kind: purpose === 'setup' ? 'setup-required' : 'signed-out' }),
+          [`POST /api/auth/${purpose}`]: () => ok({ confirmation: 'inbox' }),
         })
-        const auth = createBrowserAuth({ fetch: http.fetch })
-        await expect(auth.enter(path, {})).rejects.toMatchObject({
-          options: { href: purpose === 'setup' ? '/setup' : '/sign-in' },
+        const { router, user } = await mountAuth(path, http)
+        if (purpose === 'setup') await submitSetup(user, 'Alex', 'alex@example.test')
+        else await submitSignIn(user, 'alex@example.test')
+        expect(router.state.location.pathname).toBe(purpose === 'setup' ? '/setup' : '/sign-in')
+        expect(await screen.findByRole('status')).toBeTruthy()
+        expect(await http.calls(`/auth/${purpose}`)[0]!.json()).toEqual({
+          ...(purpose === 'setup' ? { name: 'Alex' } : {}),
+          email: 'alex@example.test',
         })
-        expect(auth.returnTo).toBeUndefined()
       },
     )
 

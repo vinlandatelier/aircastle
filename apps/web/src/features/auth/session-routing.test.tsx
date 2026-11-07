@@ -137,8 +137,8 @@ describe('Session routing over display-only HTTP doubles', () => {
     [{ kind: 'create-workspace' }, '/dash/workspaces/new', 'Create a workspace'],
     [{ kind: 'workspaces' }, '/dash/workspaces', 'Workspaces'],
     [
-      { kind: 'workspace-projects', workspaceId: 'remembered' },
-      '/dash/workspaces/remembered/projects',
+      { kind: 'workspace-projects', workspaceId: '77777777-7777-4777-8777-777777777777' },
+      '/dash/workspaces/77777777-7777-4777-8777-777777777777/projects',
       'Projects',
     ],
   ] as const)(

@@ -4,7 +4,8 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { createAppRouter } from './router'
 import { vi } from 'vite-plus/test'
 
-const protectedPath = '/dash/workspaces/demo/projects/demo/collections'
+const protectedPath =
+  '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/collections'
 const session = {
   user: {
     id: 'shell-display-user',

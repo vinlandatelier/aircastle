@@ -4,7 +4,8 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { expect, vi } from 'vite-plus/test'
 import { createAppRouter } from '@/router'
 
-export const protectedPath = '/dash/workspaces/demo/projects/demo/collections'
+export const protectedPath =
+  '/dash/workspaces/11111111-1111-4111-8111-111111111111/projects/22222222-2222-4222-8222-222222222222/collections'
 export const session = {
   user: {
     id: 'display-user',
@@ -31,9 +32,11 @@ export function deferredResponse() {
   return { promise, resolve }
 }
 
-export function displayHttp(routes: Record<string, () => Response | Promise<Response>> = {}) {
+export function displayHttp(
+  routes: Record<string, (request: Request) => Response | Promise<Response>> = {},
+) {
   const requests: Request[] = []
-  const handlers: Record<string, () => Response | Promise<Response>> = {
+  const handlers: Record<string, (request: Request) => Response | Promise<Response>> = {
     'GET /api/auth/state': () => ok({ kind: 'signed-out' }),
     'GET /api/auth/session': () => failure('unauthenticated', 401),
     ...routes,
@@ -45,7 +48,7 @@ export function displayHttp(routes: Record<string, () => Response | Promise<Resp
     )
     requests.push(request.clone())
     const handler = handlers[`${request.method} ${new URL(request.url).pathname}`]
-    return handler ? handler() : failure('temporary-failure')
+    return handler ? handler(request.clone()) : failure('temporary-failure')
   })
   function calls(path: string, method = 'POST') {
     return requests.filter(
