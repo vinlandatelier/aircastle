@@ -18,7 +18,7 @@ beforeEach(() => {
   observer = new MutationObserver(() => {
     for (const heading of document.querySelectorAll('h1'))
       seen.headings.add(heading.textContent ?? '')
-    if (document.querySelector('nav[aria-label="Main navigation"]')) seen.shell = true
+    if (document.querySelector('[aria-label="Main navigation"]')) seen.shell = true
   })
   observer.observe(document.body, { childList: true, subtree: true, characterData: true })
 })
@@ -99,13 +99,14 @@ describe('Route access through the real router', () => {
   )
 
   it.each([
-    [projects, () => screen.findByRole('heading', { name: 'Projects' })],
-    [page, () => screen.findByRole('navigation', { name: 'Main navigation' })],
-  ] as const)('renders the canonical authorized path %s', async (path, rendered) => {
+    [projects, () => screen.findByRole('heading', { name: 'Projects' }), false],
+    [page, () => screen.findByRole('navigation', { name: 'Main navigation' }), true],
+  ] as const)('renders the canonical authorized path %s', async (path, rendered, shell) => {
     const { router } = await mountAuth(path, http('authenticated', 'member'))
 
     expect(await rendered()).toBeTruthy()
     expect(router.state.location.pathname).toBe(path)
+    expect(seen.shell).toBe(shell)
   })
 
   it('asks the server about lower-case ids whatever the path casing', async () => {
