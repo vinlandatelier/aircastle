@@ -48,6 +48,7 @@ export async function developmentAuth(
     inbox,
     clock,
     emit,
+    report: options.report,
     origin: config.browserOrigin,
     ...(config.initialEmail === undefined ? {} : { initialEmail: config.initialEmail }),
   });

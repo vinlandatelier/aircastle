@@ -6,7 +6,7 @@ import {
 } from "@aircastle/adapter-postgres";
 import { createAircastle } from "@aircastle/core";
 import { cmsErrorReporter, createApp } from "../../../app.ts";
-import { createLocalAuth } from "../index.ts";
+import { authErrorReporter, createLocalAuth } from "../index.ts";
 import { createDevelopmentInbox } from "../../development-inbox/index.ts";
 import type { LocalAuthConfig } from "../index.ts";
 
@@ -61,6 +61,7 @@ const auth = await createLocalAuth(
         clock: () => now,
         inbox,
         emit: () => {},
+        report: authErrorReporter(logger),
       },
 );
 const app = createApp({ logger, cms, auth });

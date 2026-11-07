@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { AuthStorageError } from "@aircastle/core";
+import { AuthStorageError, ErrorSummary } from "@aircastle/core";
 import type {
   AuthEvent,
   AuthLinkRecord,
   AuthStore,
   AuthTransaction,
   ProtectedDestination,
+  ReportError,
 } from "@aircastle/core";
 import type {
   DevelopmentInbox,
@@ -57,6 +58,7 @@ export function createCredentials(options: {
   inbox: DevelopmentInbox;
   clock: () => number;
   emit: (event: AuthEvent) => void;
+  report: ReportError;
   origin: string;
   initialEmail?: string;
 }) {
@@ -68,7 +70,15 @@ export function createCredentials(options: {
   async function resolve(messageId: string): Promise<"committed" | "not-committed"> {
     const capture = pending.get(messageId);
     if (!capture) throw new AuthStorageError("unavailable");
-    const result = await options.storage.resolveIssuance({ messageId, email: capture.email });
+    const result = await options.storage
+      .resolveIssuance({ messageId, email: capture.email })
+      .catch((error: unknown) => {
+        if (!(error instanceof AuthStorageError)) {
+          pending.delete(messageId);
+          capture.publication.abort();
+        }
+        throw error;
+      });
     if (result === "committed") capture.publication.commit();
     else capture.publication.abort();
     pending.delete(messageId);
@@ -84,11 +94,8 @@ export function createCredentials(options: {
           try {
             await resolve(messageId);
           } catch (error) {
-            options.emit(
-              error instanceof AuthStorageError
-                ? storageUnavailable(error)
-                : { kind: "storage-unavailable" },
-            );
+            if (error instanceof AuthStorageError) options.emit(storageUnavailable(error));
+            else options.report(ErrorSummary.of(error));
           }
         }
       })().finally(() => {
@@ -185,7 +192,8 @@ export function createCredentials(options: {
           pending.set(messageId, { email: input.email, publication });
           try {
             if ((await resolve(messageId)) === "committed") return { kind: "issued" as const };
-          } catch {
+          } catch (resolveError) {
+            if (!(resolveError instanceof AuthStorageError)) throw resolveError;
             schedule();
           }
         } else publication?.abort();

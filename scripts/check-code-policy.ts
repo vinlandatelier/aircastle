@@ -87,9 +87,8 @@ const deliberateCatchAllowances: Readonly<Record<string, { count: number; reason
     reason: "Shutdown reports any close failure as exit code 1.",
   },
   "apps/api/src/features/auth/credentials.ts": {
-    count: 2,
-    reason:
-      "Any inbox preparation failure is a delivery failure that keeps the previous link, and an issuance lookup that fails right after an unknown commit schedules another reconciliation.",
+    count: 1,
+    reason: "Any inbox preparation failure is a delivery failure that keeps the previous link.",
   },
   "apps/api/src/features/auth/request.ts": {
     count: 1,
