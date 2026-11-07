@@ -44,41 +44,64 @@ test('a first visit is dark whatever the system prefers', async ({ page }) => {
   await expect(page.locator('html')).toHaveClass(/\bdark\b/)
 })
 
-for (const reducedMotion of ['no-preference', 'reduce'] as const) {
-  test(`sign-in art is a five-armed Gale vortex that ${reducedMotion === 'reduce' ? 'holds still' : 'turns counter-clockwise, faster near the centre'}`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ reducedMotion })
+test('sign-in art is the same warm cloud field in light and dark, with a modest logo and name', async ({
+  page,
+}) => {
+  const looks: { left: number[]; right: number[] }[] = []
+  for (const theme of ['light', 'dark'] as const) {
+    await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+      key: themeStorageKey,
+      value: theme,
+    })
     await page.goto('/sign-in')
     await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toBeVisible()
-    const vortex = page.locator('[data-sign-in-vortex]')
-    await expect(vortex).toBeVisible()
-    await expect(vortex).toHaveAttribute('aria-hidden', 'true')
-    const rings = vortex.locator('[data-vortex-ring]')
-    expect(await rings.count()).toBeGreaterThanOrEqual(8)
-    for (const ring of await rings.all())
-      await expect(ring.locator('[data-vortex-arm]')).toHaveCount(5)
-
-    const turns = await rings.evaluateAll((elements) =>
-      elements.map((element) => {
-        const [spin] = element.getAnimations()
-        if (!spin) return null
-        spin.pause()
-        spin.currentTime = 2000
-        const { a, b } = new DOMMatrix(getComputedStyle(element).transform)
-        return (Math.atan2(b, a) * 180) / Math.PI
-      }),
-    )
-    if (reducedMotion === 'reduce') {
-      expect(turns.every((turn) => turn === null)).toBe(true)
-      return
-    }
+    const art = page.locator('[data-sign-in-art]')
+    await expect(art).toBeVisible()
+    await expect(art).toHaveAttribute('aria-hidden', 'true')
+    await expect(art.locator('feTurbulence')).toHaveCount(1)
+    const name = art.getByText('Aircastle', { exact: true })
+    await expect(name).toHaveCSS('color', 'rgb(255, 255, 255)')
     expect(
-      turns.every((turn) => turn !== null && turn < 0),
-      'every ring turns counter-clockwise',
-    ).toBe(true)
-    const inner = Math.abs(turns[0] ?? 0)
-    const outer = Math.abs(turns.at(-1) ?? 0)
-    expect(inner, 'the centre turns faster than the edge').toBeGreaterThan(outer)
-  })
-}
+      parseFloat(await name.evaluate((element) => getComputedStyle(element).fontSize)),
+    ).toBeLessThanOrEqual(28)
+    const mark = await art.locator('[data-sign-in-mark]').boundingBox()
+    expect(mark?.width ?? Infinity).toBeLessThanOrEqual(36)
+    const shot = (await art.screenshot()).toString('base64')
+    looks.push(
+      await page.evaluate(async (data) => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${data}`
+        await image.decode()
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const context = canvas.getContext('2d')
+        if (!context) throw new Error('No canvas')
+        context.drawImage(image, 0, 0)
+        const average = (left: number, top: number) => {
+          const pixels = context.getImageData(
+            Math.floor(left * image.width),
+            Math.floor(top * image.height),
+            Math.floor(image.width * 0.1),
+            Math.floor(image.height * 0.1),
+          ).data
+          const sum = [0, 0, 0]
+          for (let index = 0; index < pixels.length; index += 4)
+            for (const channel of [0, 1, 2]) sum[channel]! += pixels[index + channel] ?? 0
+          return sum.map((value) => value / (pixels.length / 4))
+        }
+        return { left: average(0.02, 0.2), right: average(0.88, 0.6) }
+      }, shot),
+    )
+  }
+  const [light, dark] = looks
+  if (!light || !dark) throw new Error('Both themes were not captured')
+  const [red = 0, , blue = 0] = light.left
+  expect(red - blue, 'warm orange on the left').toBeGreaterThan(60)
+  for (const side of ['left', 'right'] as const)
+    for (const channel of [0, 1, 2])
+      expect(
+        Math.abs((light[side][channel] ?? 0) - (dark[side][channel] ?? 0)),
+        'the art does not change with the theme',
+      ).toBeLessThan(4)
+})

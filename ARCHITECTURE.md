@@ -50,9 +50,10 @@ Vite forwards `/api` requests unchanged during development and preview. The buil
 
 Paths in this section are relative to `apps/web`.
 
-- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `App` provides light, dark, and system themes with `next-themes` and renders route-owned document metadata. A shared CMS layout under `/dash/workspaces/$workspaceId/projects/$projectId` keeps the shell mounted as dashboard destinations change; `/` and `/sign-in` render outside that layout.
+- `src/App.tsx`, `src/main.tsx`, and `src/router.tsx` compose the app, providers, and routes. `App` provides light and dark themes with `next-themes`, dark by default, and renders route-owned document metadata; an inline script in `index.html` applies the saved theme before first paint. A shared CMS layout under `/dash/workspaces/$workspaceId/projects/$projectId` keeps the shell mounted as dashboard destinations change; `/` and `/sign-in` render outside that layout.
 - `src/components/shell/` owns the persistent header, sidebar, page frame, and private supporting controls. The sidebar collapses independently beneath the full-width header. Import the shell through its `index.tsx` entry point.
 - `src/components/ui/` holds shared UI primitives built on Base UI.
+- `src/components/brand/` holds shared brand artwork, such as the cloud gradient behind the landing preview's closing card and the sign-in panel.
 - `src/features/<feature>/` owns a product feature's behavior, types, data fetching, and tests. Import features through their `index.ts` or `index.tsx` entry point; keep supporting files private.
 - Keep feature-specific hooks and helpers inside their feature. Reserve `src/hooks/` and `src/lib/` for shared browser subscriptions and utilities.
 - Keep public-interface behavior tests beside the module implementation. Add feature folders only when implementing their behavior.

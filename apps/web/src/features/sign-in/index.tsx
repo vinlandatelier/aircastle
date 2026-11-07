@@ -3,7 +3,7 @@ import { AtSignIcon, ChevronLeftIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
-import { GaleVortex } from './gale-vortex'
+import { CloudArt } from './cloud-art'
 
 export function SignInPage() {
   return (
@@ -11,15 +11,8 @@ export function SignInPage() {
       data-theme-scope="marketing"
       className="relative min-h-svh overflow-hidden lg:grid lg:grid-cols-2"
     >
-      <div className="relative hidden flex-col border-r bg-secondary p-10 lg:flex dark:bg-secondary/20">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-transparent to-background"
-        />
-        <div className="relative z-10 flex items-center gap-2">
-          <span aria-hidden="true" className="brand-logo block size-7 shrink-0" />
-        </div>
-        <GaleVortex />
+      <div className="relative hidden border-r lg:block">
+        <CloudArt />
       </div>
       <div className="relative flex min-h-svh min-w-0 flex-col justify-center px-6 py-24 sm:px-8">
         <div

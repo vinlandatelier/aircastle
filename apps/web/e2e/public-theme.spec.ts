@@ -34,7 +34,6 @@ async function expectPublic(page: Page, dark: boolean) {
     dark ? 'oklch(0.985 0 0)' : 'oklch(0.145 0 0)',
   )
   const panel = page.locator('main > div').first()
-  await expectPaint(panel, dark ? 'oklab(0.269 0 0 / 0.2)' : 'oklch(0.97 0 0)')
   await expect(panel).toHaveCSS(
     'border-right-color',
     dark ? 'oklch(1 0 0 / 0.1)' : 'oklch(0.922 0 0)',
@@ -56,7 +55,9 @@ async function expectPublic(page: Page, dark: boolean) {
     'color',
     dark ? 'oklch(0.985 0 0)' : 'oklch(0.145 0 0)',
   )
-  await expect(page.getByText('Aircastle', { exact: true })).toHaveCount(0)
+  await expect(
+    page.locator('main > div').nth(1).getByText('Aircastle', { exact: true }),
+  ).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Sign in to Aircastle' })).toHaveCSS(
     'font-weight',
     '600',
