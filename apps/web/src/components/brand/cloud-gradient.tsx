@@ -4,20 +4,20 @@ import styles from './cloud-gradient.module.css'
 
 const looks = {
   emberClouds: {
-    noise: { baseFrequency: 0.006, octaves: 2, seed: 8, weight: 0.85 },
+    noise: { baseFrequency: '0.006', octaves: 2, seed: 8, weight: 0.85 },
     red: '0.933 0.949 0.961 0.784 0.604 0.482 0.400',
     green: '0.467 0.604 0.722 0.502 0.502 0.502 0.471',
     blue: '0.180 0.361 0.573 0.424 0.643 0.722 0.706',
   },
-  seaPools: {
-    noise: { baseFrequency: 0.004, octaves: 1, seed: 6, weight: 1 },
+  seaFolds: {
+    noise: { baseFrequency: '0.016 0.0035', octaves: 3, seed: 2, weight: 0.55 },
     red: '0.106 0.204 0.459 0.722 0.290 0.165 0.110',
     green: '0.478 0.643 0.835 0.918 0.737 0.596 0.420',
     blue: '0.420 0.565 0.749 0.859 0.808 0.710 0.561',
   },
 } as const
 
-/** A grainy painterly gradient filling its parent: warm "ember clouds" running orange to lilac blue, or cool "sea pools" running teal through mint to ocean blue. */
+/** A grainy painterly gradient filling its parent: warm "ember clouds" running orange to lilac blue, or cool "sea folds", soft vertical folds running teal through mint to ocean blue. */
 export function CloudGradient({
   id,
   look = 'emberClouds',

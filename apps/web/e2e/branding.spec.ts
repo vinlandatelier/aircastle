@@ -48,7 +48,7 @@ test('a first visit is dark whatever the system prefers', async ({ page }) => {
   await expect(page.locator('html')).toHaveClass(/\bdark\b/)
 })
 
-test('sign-in art is the same green pools in light and dark, on an inset rounded card that says Meet Air', async ({
+test('sign-in art is the same green folds in light and dark, on an inset rounded card that says Meet Air', async ({
   page,
 }) => {
   const looks: { left: number[]; right: number[] }[] = []
@@ -71,6 +71,10 @@ test('sign-in art is the same green pools in light and dark, on an inset rounded
     await expect(greeting.locator('[data-sign-in-air]')).toBeVisible()
     const learn = art.getByRole('link', { name: 'Learn more' })
     await expect(learn).toBeVisible()
+    const size = (locator: import('@playwright/test').Locator) =>
+      locator.evaluate((element) => parseFloat(getComputedStyle(element).fontSize))
+    expect(await size(greeting), 'a big greeting').toBeGreaterThanOrEqual(72)
+    expect(await size(learn), 'a readable link').toBeGreaterThanOrEqual(22)
     const [line, more] = await Promise.all([greeting.boundingBox(), learn.boundingBox()])
     if (!line || !more) throw new Error('Greeting is not laid out')
     expect(more.y, 'Learn more sits just below').toBeGreaterThanOrEqual(line.y + line.height - 1)
