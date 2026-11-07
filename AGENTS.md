@@ -47,7 +47,7 @@ Aircastle is a standalone headless CMS with code-defined collections. These inst
 - Reuse existing tools and checks. Add verification infrastructure only when an agreed requirement cannot be checked with what exists. Before writing any infrastructure, check the version-matched documentation of repository tools and well-known libraries. Infrastructure includes test harnesses and runners, server lifecycle, clients, parsers, validators, retry loops, and report formats. Write custom code only for a gap that no stock option covers, and name that gap with a documentation link in the PR body.
 - Define observable behavior and relevant failure cases before implementing a feature.
 - For executable behavior changes, write or update tests first and confirm they fail for the intended reason before implementing the change.
-- Derive expected results from requirements and test through the module's public interface.
+- Derive expected results from requirements and test through the module's public interface. Each test must exercise Aircastle code, not only a dependency.
 - Keep changes focused and follow existing repository conventions.
 - Use the repository's configured build, type-check, and test commands. Report which checks ran and any unresolved failures.
 - Do not weaken assertions or skip failing checks to make an implementation pass.
